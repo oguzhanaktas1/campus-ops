@@ -1,0 +1,144 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { PortalLayout, type NavItem } from "@/components/portal-layout";
+import { NotificationBell } from "@/components/notification-bell";
+import { ProfileDropdown } from "@/components/profile-dropdown";
+import { ThemeToggle } from "@/components/theme-toggle";
+import {
+  LayoutDashboard,
+  FileText,
+  Calendar,
+  FolderOpen,
+  Bell,
+  Settings,
+  Loader2,
+  GraduationCap,
+  Briefcase,
+  User,
+  CalendarDays,
+  Building2,
+  Package,
+  ShieldCheck,
+  PartyPopper,
+} from "lucide-react";
+import AuthGuard from "@/components/AuthGuard/auth-guard";
+
+const navItems: NavItem[] = [
+  { label: "Dashboard",        href: "/student/dashboard",       icon: LayoutDashboard },
+  // ── Domain Modules ──────────────────────────────────────────
+  { label: "Documents",        href: "/student/documents",       icon: GraduationCap },
+  { label: "Reservations",     href: "/student/reservations",    icon: Building2 },
+  { label: "Appointments",     href: "/student/appointments",    icon: CalendarDays },
+  { label: "Internships",      href: "/student/internships",     icon: Briefcase },
+  { label: "Equipment",        href: "/student/equipment",       icon: Package },
+  { label: "Events",           href: "/student/events",          icon: PartyPopper },
+  { label: "Access Requests",  href: "/student/access-requests", icon: ShieldCheck },
+  // ── Personal ────────────────────────────────────────────────
+  { label: "My Requests",      href: "/student/requests",        icon: FileText },
+  { label: "Calendar",         href: "/student/calendar",        icon: Calendar },
+  { label: "Notifications",    href: "/student/notifications",   icon: Bell },
+  { label: "My Files",         href: "/student/files",           icon: FolderOpen },
+  { label: "Profile",          href: "/student/profile",         icon: User },
+  { label: "Settings",         href: "/student/settings",        icon: Settings },
+];
+
+export default function StudentLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const [user, setUser] = useState<any>(null);
+  const [unreadCount, setUnreadCount] = useState(0); 
+  const [isLoading, setIsLoading] = useState(true);
+  const router = useRouter();
+
+  useEffect(() => {
+    const fetchData = async () => {
+      const token = localStorage.getItem("access_token");
+      if (!token) return router.push("/login");
+
+      try {
+        const backendUrl =
+          process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
+
+        const profileRes = await fetch(`${backendUrl}/auth/profile`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (!profileRes.ok) {
+          localStorage.removeItem("access_token");
+          return router.push("/login");
+        }
+        setUser(await profileRes.json());
+
+        const notifRes = await fetch(`${backendUrl}/notifications`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (notifRes.ok) {
+          const data = await notifRes.json();
+          const notifications = Array.isArray(data) ? data : (data.notifications ?? []);
+          setUnreadCount(notifications.filter((n: any) => !n.isRead).length);
+        }
+      } catch (error) {
+        console.error("Layout Fetch Error:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
+
+    // Opsiyonel Polling
+    const interval = setInterval(fetchData, 30000);
+    return () => clearInterval(interval);
+  }, [router]);
+
+  if (isLoading)
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="size-8 animate-spin text-primary" />
+      </div>
+    );
+  if (!user) return null;
+
+  // Nav Items Güncelle (Badge için)
+  const dynamicNavItems = navItems.map((item) => {
+    if (item.label === "Notifications") {
+      return { ...item, badge: unreadCount };
+    }
+    return item;
+  });
+
+  const topbar = (
+    <div className="flex items-center justify-between flex-1">
+      <div className="hidden sm:block">
+        <h1 className="text-sm font-semibold text-foreground">
+          Student Portal
+        </h1>
+        <p className="text-xs text-muted-foreground">
+          {user.department} · {user.studentId}
+        </p>
+      </div>
+      <div className="flex items-center gap-1 ml-auto">
+        <ThemeToggle />
+        <NotificationBell role="student" />
+        <ProfileDropdown user={user} settingsHref="/student/settings" />
+      </div>
+    </div>
+  );
+
+  return (
+    <AuthGuard allowedRoles={["STUDENT"]}>
+      <PortalLayout
+        navItems={dynamicNavItems} 
+        portalName="Student Portal"
+        portalColor="indigo"
+        topbar={topbar}
+      >
+        {children}
+      </PortalLayout>
+    </AuthGuard>
+  );
+}

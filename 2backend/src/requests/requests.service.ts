@@ -1,0 +1,399 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
+/* eslint-disable @typescript-eslint/no-unsafe-argument */
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+  ConflictException,
+} from '@nestjs/common';
+import { PrismaService } from '../core/prisma/prisma.service';
+import { PriorityLevel, RequestStatus } from '@prisma/client';
+import { CreateRequestDto } from './dto/create-request.dto';
+import { AddCommentDto } from './dto/add-comment.dto';
+import { WorkflowEngineService } from '../workflow/workflow-engine.service';
+
+const OPEN_STATUSES: RequestStatus[] = ['SUBMITTED', 'IN_REVIEW', 'WAITING_APPROVAL'];
+const INTERNAL_ROLES = ['STAFF', 'FACULTY', 'ADMIN'];
+
+function makeRequestNo(): string {
+  const d = new Date();
+  const ymd = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
+  const rand = Math.floor(Math.random() * 9000) + 1000;
+  return `REQ-${ymd}-${rand}`;
+}
+
+const requesterInclude = {
+  id: true,
+  email: true,
+  profile: { select: { fullName: true, firstName: true, studentNumber: true, title: true } },
+} as const;
+
+const assigneeInclude = {
+  id: true,
+  email: true,
+  profile: { select: { fullName: true, title: true } },
+} as const;
+
+@Injectable()
+export class RequestsService {
+  constructor(
+    private prisma: PrismaService,
+    private workflowEngine: WorkflowEngineService,
+  ) {}
+
+  // ─── CREATE ────────────────────────────────────────────────────────────────
+
+  async create(userId: string, dto: CreateRequestDto) {
+    const reqType = await this.prisma.requestType.findUnique({ where: { id: dto.requestTypeId } });
+    if (!reqType) throw new NotFoundException('Request type not found.');
+    if (!reqType.isActive) throw new ForbiddenException('This request type is inactive.');
+
+    let requestNo = makeRequestNo();
+    while (await this.prisma.request.findUnique({ where: { requestNo } })) {
+      requestNo = makeRequestNo();
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      // Determine initial status: bootstrap workflow if request type has one
+      let initialStatus = RequestStatus.SUBMITTED;
+
+      const req = await tx.request.create({
+        data: {
+          requestNo,
+          requestTypeId: dto.requestTypeId,
+          requesterUserId: userId,
+          title: dto.title,
+          description: dto.description ?? null,
+          priority: dto.priority ?? PriorityLevel.MEDIUM,
+          status: initialStatus,
+          submittedAt: new Date(),
+          currentAssigneeUserId: dto.currentAssigneeUserId ?? null,
+          facultyId: dto.facultyId ?? null,
+          departmentId: dto.departmentId ?? null,
+          unitId: dto.unitId ?? null,
+          dynamicData: (dto.dynamicData as any) ?? undefined,
+        },
+        include: {
+          requestType: { select: { id: true, key: true, name: true, category: true, workflowDefinitionId: true } },
+          requester: { select: requesterInclude },
+        },
+      });
+
+      await tx.requestStatusHistory.create({
+        data: {
+          requestId: req.id,
+          oldStatus: null,
+          newStatus: initialStatus,
+          changedByUserId: userId,
+          changeReason: 'Request submitted.',
+        },
+      });
+
+      // Bootstrap workflow if request type has a workflow definition
+      const wfDefId = (req.requestType as any).workflowDefinitionId as string | null;
+      if (wfDefId) {
+        const wfStatus = await this.workflowEngine.bootstrapInstance(tx, req.id, wfDefId);
+        if (wfStatus) {
+          await tx.request.update({ where: { id: req.id }, data: { status: wfStatus } });
+          await tx.requestStatusHistory.create({
+            data: {
+              requestId: req.id,
+              oldStatus: initialStatus,
+              newStatus: wfStatus,
+              changedByUserId: userId,
+              changeReason: 'Workflow started.',
+            },
+          });
+        }
+      }
+
+      return req;
+    });
+  }
+
+  // ─── MY REQUESTS ──────────────────────────────────────────────────────────
+
+  async findMy(userId: string, type?: string, status?: string) {
+    const requests = await this.prisma.request.findMany({
+      where: {
+        requesterUserId: userId,
+        ...(type ? { requestType: { key: type } } : {}),
+        ...(status ? { status: status.toUpperCase() as RequestStatus } : {}),
+      },
+      include: {
+        requestType: { select: { id: true, key: true, name: true, category: true } },
+        currentAssignee: { select: assigneeInclude },
+        _count: { select: { comments: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return requests.map((r: any) => this.toListItem(r));
+  }
+
+  // ─── INBOX ────────────────────────────────────────────────────────────────
+
+  async findInbox(userId: string, roles: string[]) {
+    const isAdmin = roles.includes('ADMIN');
+    const isStaff = roles.includes('STAFF');
+    const isFaculty = roles.includes('FACULTY');
+
+    if (!isAdmin && !isStaff && !isFaculty) return [];
+
+    const where = isAdmin
+      ? { status: { in: OPEN_STATUSES } }
+      : {
+          status: { in: OPEN_STATUSES },
+          OR: [
+            { currentAssigneeUserId: userId },
+            { assignments: { some: { assignedToUserId: userId } } },
+            { currentAssigneeUserId: null as string | null },
+          ],
+        };
+
+    const requests = await this.prisma.request.findMany({
+      where,
+      include: {
+        requestType: { select: { id: true, key: true, name: true, category: true } },
+        requester: { select: requesterInclude },
+        currentAssignee: { select: assigneeInclude },
+        _count: { select: { comments: true } },
+      },
+      orderBy: [{ priority: 'desc' }, { createdAt: 'asc' }],
+      take: 100,
+    });
+
+    return requests.map((r: any) => this.toListItem(r));
+  }
+
+  // ─── DETAIL ───────────────────────────────────────────────────────────────
+
+  async findById(userId: string, roles: string[], requestId: string) {
+    const isAdmin = roles.includes('ADMIN');
+    const isStudent = roles.includes('STUDENT') && !isAdmin;
+    const canSeeInternal = roles.some((r) => INTERNAL_ROLES.includes(r));
+
+    const req: any = await this.prisma.request.findUnique({
+      where: { id: requestId },
+      include: {
+        requestType: true,
+        requester: {
+          include: {
+            profile: { include: { faculty: true, department: true } },
+          },
+        },
+        currentAssignee: { select: assigneeInclude },
+        statusHistory: { orderBy: { changedAt: 'asc' } },
+        comments: {
+          where: canSeeInternal ? {} : { isInternal: false },
+          include: {
+            user: { select: requesterInclude },
+            replies: {
+              where: canSeeInternal ? {} : { isInternal: false },
+              include: { user: { select: requesterInclude } },
+              orderBy: { createdAt: 'asc' },
+            },
+          },
+          orderBy: { createdAt: 'asc' },
+        },
+        watchers: {
+          include: { user: { select: { id: true, email: true, profile: { select: { fullName: true } } } } },
+        },
+        fileLinks: {
+          include: {
+            file: {
+              select: { id: true, originalFileName: true, fileSizeBytes: true, mimeType: true, storagePath: true },
+            },
+          },
+        },
+        _count: { select: { comments: true } },
+      },
+    });
+
+    if (!req) throw new NotFoundException('Request not found.');
+
+    // Access control
+    if (!isAdmin) {
+      const isOwner = req.requesterUserId === userId;
+      const isAssigned = req.currentAssigneeUserId === userId;
+      const isWatcher = req.watchers.some((w: any) => w.userId === userId);
+
+      if (!isOwner && !isAssigned && !isWatcher) {
+        if (isStudent) throw new ForbiddenException('Access denied.');
+        // Staff/faculty: allow for open requests (they can triage from inbox)
+        if (!OPEN_STATUSES.includes(req.status)) throw new ForbiddenException('Access denied.');
+      }
+    }
+
+    return {
+      request: {
+        id: req.id,
+        requestNo: req.requestNo,
+        title: req.title,
+        description: req.description,
+        status: req.status,
+        priority: req.priority,
+        createdAt: req.createdAt,
+        submittedAt: req.submittedAt,
+        dueAt: req.dueAt,
+        dynamicData: req.dynamicData,
+        requestType: req.requestType,
+        requester: {
+          id: req.requester.id,
+          email: req.requester.email,
+          fullName: req.requester.profile?.fullName ?? req.requester.email,
+          studentNumber: req.requester.profile?.studentNumber ?? null,
+          faculty: req.requester.profile?.faculty?.name ?? null,
+          department: req.requester.profile?.department?.name ?? null,
+        },
+        currentAssignee: req.currentAssignee
+          ? {
+              id: req.currentAssignee.id,
+              email: req.currentAssignee.email,
+              fullName: req.currentAssignee.profile?.fullName ?? req.currentAssignee.email,
+            }
+          : null,
+      },
+      statusHistory: req.statusHistory,
+      comments: req.comments.map((c: any) => ({
+        id: c.id,
+        commentText: c.commentText,
+        isInternal: c.isInternal,
+        parentCommentId: c.parentCommentId,
+        createdAt: c.createdAt,
+        author: {
+          id: c.user.id,
+          fullName: c.user.profile?.fullName ?? c.user.email,
+        },
+        replies: (c.replies ?? []).map((r: any) => ({
+          id: r.id,
+          commentText: r.commentText,
+          isInternal: r.isInternal,
+          createdAt: r.createdAt,
+          author: {
+            id: r.user.id,
+            fullName: r.user.profile?.fullName ?? r.user.email,
+          },
+        })),
+      })),
+      watchers: req.watchers.map((w: any) => ({
+        userId: w.userId,
+        fullName: w.user?.profile?.fullName ?? w.user?.email ?? '',
+      })),
+      attachments: req.fileLinks.map((fl: any) => ({
+        id: fl.file.id,
+        name: fl.file.originalFileName,
+        size: fl.file.fileSizeBytes,
+        mimeType: fl.file.mimeType,
+        path: fl.file.storagePath,
+      })),
+    };
+  }
+
+  // ─── ACTIONS ──────────────────────────────────────────────────────────────
+
+  processAction(userId: string, roles: string[], requestId: string, dto: import('../workflow/dto/process-action.dto').ProcessActionDto) {
+    return this.workflowEngine.processAction(userId, roles, requestId, dto);
+  }
+
+  // ─── COMMENTS ─────────────────────────────────────────────────────────────
+
+  async addComment(userId: string, roles: string[], requestId: string, dto: AddCommentDto) {
+    const req = await this.prisma.request.findUnique({ where: { id: requestId } });
+    if (!req) throw new NotFoundException('Request not found.');
+
+    const canSeeInternal = roles.some((r) => INTERNAL_ROLES.includes(r));
+    const isInternal = dto.isInternal === true && canSeeInternal;
+
+    const comment: any = await this.prisma.requestComment.create({
+      data: {
+        requestId,
+        userId,
+        commentText: dto.commentText,
+        isInternal,
+        parentCommentId: dto.parentCommentId ?? null,
+      },
+      include: { user: { select: requesterInclude } },
+    });
+
+    return {
+      id: comment.id,
+      commentText: comment.commentText,
+      isInternal: comment.isInternal,
+      parentCommentId: comment.parentCommentId,
+      createdAt: comment.createdAt,
+      author: {
+        id: comment.user.id,
+        fullName: comment.user.profile?.fullName ?? comment.user.email,
+      },
+    };
+  }
+
+  async getComments(userId: string, roles: string[], requestId: string) {
+    const canSeeInternal = roles.some((r) => INTERNAL_ROLES.includes(r));
+    return this.prisma.requestComment.findMany({
+      where: {
+        requestId,
+        parentCommentId: null,
+        ...(canSeeInternal ? {} : { isInternal: false }),
+      },
+      include: {
+        user: { select: requesterInclude },
+        replies: {
+          where: canSeeInternal ? {} : { isInternal: false },
+          include: { user: { select: requesterInclude } },
+          orderBy: { createdAt: 'asc' },
+        },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+  }
+
+  // ─── WATCHERS ─────────────────────────────────────────────────────────────
+
+  async addWatcher(requestId: string, watchUserId: string) {
+    if (!(await this.prisma.request.findUnique({ where: { id: requestId } }))) {
+      throw new NotFoundException('Request not found.');
+    }
+    try {
+      return await this.prisma.requestWatcher.create({ data: { requestId, userId: watchUserId } });
+    } catch {
+      throw new ConflictException('User is already watching this request.');
+    }
+  }
+
+  async removeWatcher(requestId: string, watchUserId: string) {
+    const w = await this.prisma.requestWatcher.findUnique({
+      where: { requestId_userId: { requestId, userId: watchUserId } },
+    });
+    if (!w) throw new NotFoundException('Watcher not found.');
+    await this.prisma.requestWatcher.delete({
+      where: { requestId_userId: { requestId, userId: watchUserId } },
+    });
+    return { message: 'Watcher removed.' };
+  }
+
+  // ─── PRIVATE ──────────────────────────────────────────────────────────────
+
+  private toListItem(r: any) {
+    return {
+      id: r.id,
+      requestNo: r.requestNo,
+      title: r.title,
+      status: r.status,
+      priority: r.priority,
+      createdAt: r.createdAt,
+      submittedAt: r.submittedAt,
+      dueAt: r.dueAt,
+      requestType: r.requestType,
+      requester: r.requester
+        ? { id: r.requester.id, fullName: r.requester.profile?.fullName ?? r.requester.email }
+        : null,
+      currentAssignee: r.currentAssignee
+        ? { id: r.currentAssignee.id, fullName: r.currentAssignee.profile?.fullName ?? r.currentAssignee.email }
+        : null,
+      commentCount: r._count?.comments ?? 0,
+    };
+  }
+}
