@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { ShoppingCart, Loader2, AlertCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
@@ -17,6 +17,7 @@ const STATUS_BADGE: Record<string, string> = {
 }
 
 export default function StaffProcurementPage() {
+  const router = useRouter()
   const [requests, setRequests] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [filter, setFilter] = useState('all')
@@ -84,7 +85,11 @@ export default function StaffProcurementPage() {
               </thead>
               <tbody className="divide-y divide-border">
                 {filtered.map((r) => (
-                  <tr key={r.id} className="hover:bg-muted/20 transition-colors">
+                  <tr
+                    key={r.id}
+                    onClick={() => router.push(`/staff/requests/procurement/${r.id}`)}
+                    className="hover:bg-muted/20 transition-colors cursor-pointer"
+                  >
                     <td className="px-4 py-3 font-mono text-xs">{r.requestNo}</td>
                     <td className="px-4 py-3">
                       <p className="font-medium truncate max-w-[180px]">{r.itemName}</p>
@@ -100,7 +105,7 @@ export default function StaffProcurementPage() {
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      <Link href={`/staff/procurement/${r.id}`} className="text-xs text-primary hover:underline font-medium">View</Link>
+                      <span className="text-xs text-primary font-medium">View</span>
                     </td>
                   </tr>
                 ))}

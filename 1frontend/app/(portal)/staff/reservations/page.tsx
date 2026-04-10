@@ -162,7 +162,7 @@ export default function StaffReservationsPage() {
                 {filtered.map((req) => (
                   <tr
                     key={req.id}
-                    onClick={() => router.push(`/staff/reservations/${req.id}`)}
+                    onClick={() => router.push(`/staff/requests/reservations/${req.id}`)}
                     className="hover:bg-muted/20 transition-colors cursor-pointer"
                   >
                     <td className="px-5 py-4">

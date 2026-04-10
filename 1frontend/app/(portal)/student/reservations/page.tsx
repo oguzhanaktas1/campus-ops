@@ -82,7 +82,7 @@ export default function StudentReservationsPage() {
         ) : (
           <div className="space-y-3">
             {active.map((r) => (
-              <Link key={r.id} href={`/student/reservations/${r.id}`}>
+              <Link key={r.id} href={`/student/requests/${r.id}`}>
                 <div className="bg-card border border-border rounded-lg p-4 flex items-start justify-between gap-4 hover:bg-muted/20 transition-colors cursor-pointer">
                   <div className="space-y-1 flex-1 min-w-0">
                     <div className="flex items-center gap-2">
@@ -120,7 +120,7 @@ export default function StudentReservationsPage() {
           <h2 className="text-sm font-semibold text-foreground mb-3">Past Reservations</h2>
           <div className="space-y-2">
             {past.map((r) => (
-              <Link key={r.id} href={`/student/reservations/${r.id}`}>
+              <Link key={r.id} href={`/student/requests/${r.id}`}>
                 <div className="bg-card border border-border rounded-lg p-4 flex items-center justify-between gap-4 opacity-70 hover:opacity-100 hover:bg-muted/20 transition-all cursor-pointer">
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-foreground">{r.eventName ?? r.title}</p>

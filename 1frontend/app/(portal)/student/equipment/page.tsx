@@ -84,7 +84,7 @@ export default function StudentEquipmentPage() {
             {requests.map((r) => (
               <Link
                 key={r.equipmentRequestId ?? r.id}
-                href={`/student/equipment/${r.equipmentRequestId ?? r.id}`}
+                href={`/student/requests/${r.id}`}
                 className="flex items-center justify-between px-5 py-4 hover:bg-muted/30 transition-colors"
               >
                 <div className="min-w-0">

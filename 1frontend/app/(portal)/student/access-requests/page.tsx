@@ -67,7 +67,11 @@ export default function StudentAccessRequestsPage() {
         ) : (
           <div className="divide-y divide-border">
             {requests.map((r) => (
-              <div key={r.id} className="flex items-center justify-between px-5 py-4 hover:bg-muted/30 transition-colors">
+              <Link
+                key={r.id}
+                href={`/student/requests/${r.id}`}
+                className="flex items-center justify-between px-5 py-4 hover:bg-muted/30 transition-colors"
+              >
                 <div className="min-w-0">
                   <p className="text-sm font-semibold text-foreground truncate">{r.targetResource}</p>
                   <p className="text-xs text-muted-foreground mt-0.5">{r.requestNo} · {r.accessType}</p>
@@ -75,7 +79,7 @@ export default function StudentAccessRequestsPage() {
                 <span className={cn('text-xs font-semibold px-2 py-0.5 rounded-full border ml-4 shrink-0', STATUS_BADGE[r.status] ?? STATUS_BADGE.SUBMITTED)}>
                   {r.status?.replace(/_/g, ' ')}
                 </span>
-              </div>
+              </Link>
             ))}
           </div>
         )}

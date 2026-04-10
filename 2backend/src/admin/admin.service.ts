@@ -23,7 +23,13 @@ export class AdminService {
   async getAllUsers() {
     const users = await this.prisma.user.findMany({
       include: {
-        profile: true,
+        profile: {
+          include: {
+            faculty: { select: { id: true, name: true } },
+            department: { select: { id: true, name: true } },
+            unit: { select: { id: true, name: true } },
+          },
+        },
         primaryRoles: { include: { role: true } },
       },
       orderBy: { createdAt: 'desc' },
@@ -35,10 +41,19 @@ export class AdminService {
       email: user.email,
       phoneNumber: user.phoneNumber || '',
       department:
-        user.profile?.departmentId ||
+        user.profile?.department?.name ||
+        user.profile?.unit?.name ||
+        user.profile?.faculty?.name ||
         user.profile?.bio ||
         'Department not specified',
       role: user.primaryRoles[0]?.role?.name?.toLowerCase() || 'student',
+      roles: user.primaryRoles
+        .map((ur) => ({
+          id: ur.roleId,
+          name: ur.role.name,
+          isPrimary: ur.isPrimary,
+        }))
+        .sort((a, b) => Number(b.isPrimary) - Number(a.isPrimary)),
       lastLogin: user.updatedAt,
       status: user.status.toLowerCase(),
       title: user.profile?.title || '',
@@ -76,6 +91,19 @@ export class AdminService {
 
     const hashedPassword = await bcrypt.hash(data.password, 10);
     const fullName = `${data.firstName} ${data.lastName}`.trim();
+    const primaryRoleId = data.primaryRoleId || data.roleId;
+    const submittedRoleIds = Array.isArray(data.roleIds) ? data.roleIds : [];
+    const roleIds = Array.from(
+      new Set(
+        [primaryRoleId, ...submittedRoleIds].filter(
+          (value): value is string => typeof value === 'string' && value.length > 0,
+        ),
+      ),
+    );
+
+    if (roleIds.length === 0) {
+      throw new BadRequestException('At least one role is required.');
+    }
 
     return this.prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
@@ -97,14 +125,19 @@ export class AdminService {
               birthDate: data.birthDate ? new Date(data.birthDate) : null,
               address: data.address || null,
               bio: data.bio || null,
+              avatarUrl: data.avatarUrl || null,
             },
           },
         },
       });
 
-      if (data.roleId) {
+      for (const roleId of roleIds) {
         await tx.userRole.create({
-          data: { userId: user.id, roleId: data.roleId, isPrimary: true },
+          data: {
+            userId: user.id,
+            roleId,
+            isPrimary: roleId === primaryRoleId,
+          },
         });
       }
 
@@ -137,6 +170,19 @@ export class AdminService {
     }
 
     const fullName = `${data.firstName} ${data.lastName}`.trim();
+    const primaryRoleId = data.primaryRoleId || data.roleId;
+    const submittedRoleIds = Array.isArray(data.roleIds) ? data.roleIds : [];
+    const roleIds = Array.from(
+      new Set(
+        [primaryRoleId, ...submittedRoleIds].filter(
+          (value): value is string => typeof value === 'string' && value.length > 0,
+        ),
+      ),
+    );
+
+    if (roleIds.length === 0) {
+      throw new BadRequestException('At least one role is required.');
+    }
 
     return this.prisma.$transaction(async (tx) => {
       // 1. Update Core User
@@ -165,15 +211,20 @@ export class AdminService {
             birthDate: data.birthDate ? new Date(data.birthDate) : null,
             address: data.address || null,
             bio: data.bio || null,
+            avatarUrl: data.avatarUrl !== undefined ? data.avatarUrl || null : user.profile.avatarUrl,
           },
         });
       }
 
-      // 3. Update Role
-      if (data.roleId && user.primaryRoles[0]?.roleId !== data.roleId) {
-        await tx.userRole.deleteMany({ where: { userId: id } });
+      // 3. Update Roles
+      await tx.userRole.deleteMany({ where: { userId: id } });
+      for (const roleId of roleIds) {
         await tx.userRole.create({
-          data: { userId: id, roleId: data.roleId, isPrimary: true },
+          data: {
+            userId: id,
+            roleId,
+            isPrimary: roleId === primaryRoleId,
+          },
         });
       }
 
@@ -193,6 +244,17 @@ export class AdminService {
 
   // KULLANICI SİL (AUDIT LOG EKLENDİ)
   async deleteUser(adminId: string, id: string) {
+    // Delete uploaded files first (FK: File.uploadedByUserId -> User.id)
+    const userFiles = await this.prisma.file.findMany({
+      where: { uploadedByUserId: id },
+      select: { id: true },
+    });
+    if (userFiles.length > 0) {
+      const fileIds = userFiles.map((f) => f.id);
+      await this.prisma.fileLink.deleteMany({ where: { fileId: { in: fileIds } } });
+      await this.prisma.file.deleteMany({ where: { uploadedByUserId: id } });
+    }
+
     try {
       await this.prisma.user.update({
         where: { id },
@@ -364,18 +426,43 @@ export class AdminService {
   }
 
   async updateMe(userId: string, data: any) {
-    const nameParts = data.name.trim().split(' ');
-    const firstName = nameParts[0];
-    const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
+    const firstName = data.firstName ?? data.name?.trim().split(' ')[0] ?? '';
+    const lastName = data.lastName ?? (data.name?.trim().split(' ').slice(1).join(' ') ?? '');
+    const fullName = `${firstName} ${lastName}`.trim();
 
     return this.prisma.$transaction(async (tx) => {
       await tx.user.update({
         where: { id: userId },
-        data: { email: data.email, phoneNumber: data.phoneNumber },
+        data: {
+          email: data.email,
+          phoneNumber: data.phoneNumber || null,
+        },
       });
-      await tx.userProfile.update({
-        where: { userId: userId },
-        data: { firstName, lastName, fullName: data.name },
+      await tx.userProfile.upsert({
+        where: { userId },
+        update: {
+          firstName,
+          lastName,
+          fullName,
+          title: data.title || null,
+          gender: data.gender || null,
+          birthDate: data.birthDate ? new Date(data.birthDate) : null,
+          address: data.address || null,
+          bio: data.bio || null,
+          avatarUrl: data.avatarUrl !== undefined ? data.avatarUrl || null : undefined,
+        },
+        create: {
+          userId,
+          firstName,
+          lastName,
+          fullName,
+          title: data.title || null,
+          gender: data.gender || null,
+          birthDate: data.birthDate ? new Date(data.birthDate) : null,
+          address: data.address || null,
+          bio: data.bio || null,
+          avatarUrl: data.avatarUrl || null,
+        },
       });
       return { message: 'Profile updated successfully' };
     });

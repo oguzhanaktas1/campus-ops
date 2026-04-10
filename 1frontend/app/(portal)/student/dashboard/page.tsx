@@ -89,7 +89,7 @@ export default function StudentDashboard() {
   const firstName = user?.firstName || user?.fullName?.split(' ')[0] || 'Student'
 
   const quickActions = [
-    { label: 'New Request', href: '/student/requests/new', icon: PlusCircle, color: 'bg-primary/10 text-primary' },
+    { label: 'Internship Application', href: '/student/internships/new', icon: PlusCircle, color: 'bg-primary/10 text-primary' },
     { label: 'Book Appointment', href: '/student/requests?type=internship_approval', icon: Calendar, color: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-400' },
     { label: 'Reserve Room', href: '/student/requests?type=room_reservation', icon: BookMarked, color: 'bg-amber-100 text-amber-600 dark:bg-amber-950/30 dark:text-amber-400' },
     { label: 'My Files', href: '/student/files', icon: FileText, color: 'bg-purple-100 text-purple-600 dark:bg-purple-950/30 dark:text-purple-400' },

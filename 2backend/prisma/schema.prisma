@@ -1207,7 +1207,7 @@ model File {
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
 
-  uploadedBy       User         @relation(fields: [uploadedByUserId], references: [id], onDelete: Restrict)
+  uploadedBy       User         @relation(fields: [uploadedByUserId], references: [id], onDelete: Cascade)
   links            FileLink[]
 
   @@index([uploadedByUserId])

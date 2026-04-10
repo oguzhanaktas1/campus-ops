@@ -571,6 +571,18 @@ export class StudentService {
       where: { id: id, requesterUserId: userId },
       include: {
         requestType: true,
+        requester: {
+          include: {
+            profile: {
+              include: {
+                faculty: { select: { name: true } },
+                department: { select: { name: true } },
+                unit: { select: { name: true } },
+              },
+            },
+            primaryRoles: { include: { role: true } },
+          },
+        },
         assignments: {
           include: {
             assignedTo: { include: { profile: true } },
@@ -609,6 +621,24 @@ export class StudentService {
       formSchema: request.requestType?.formSchemaJson || null,
 
       dynamicData: request.dynamicData || {},
+      requester: request.requester
+        ? {
+            id: request.requester.id,
+            email: request.requester.email,
+            fullName: request.requester.profile?.fullName || request.requester.email,
+            role:
+              request.requester.primaryRoles?.[0]?.role?.name ||
+              'STUDENT',
+            faculty: request.requester.profile?.faculty?.name || null,
+            department:
+              request.requester.profile?.department?.name ||
+              request.requester.profile?.unit?.name ||
+              null,
+            studentNumber: request.requester.profile?.studentNumber || null,
+            staffNumber: request.requester.profile?.staffNumber || null,
+            title: request.requester.profile?.title || null,
+          }
+        : null,
       assignedFacultyId:
         request.assignments?.[0]?.assignedToUserId ||
         request.currentAssigneeUserId ||

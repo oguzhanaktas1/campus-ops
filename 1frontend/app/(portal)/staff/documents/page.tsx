@@ -207,7 +207,7 @@ export default function StaffDocumentsPage() {
                 {filtered.map((req) => (
                   <tr
                     key={req.id}
-                    onClick={() => router.push(`/staff/documents/${req.id}`)}
+                    onClick={() => router.push(`/staff/requests/documents/${req.id}`)}
                     className="hover:bg-muted/20 transition-colors cursor-pointer"
                   >
                     <td className="px-5 py-4">

@@ -9,31 +9,38 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import {
   LayoutDashboard,
   CheckSquare,
-  Archive,
   CalendarDays,
   Bell,
   Settings,
   Loader2,
   Briefcase,
   Calendar,
-  User,
   PartyPopper,
-  Users,
+  ShieldCheck,
+  FileText,
+  Package,
+  Ticket,
+  MapPin,
+  ShoppingCart,
 } from "lucide-react";
 import AuthGuard from "@/components/AuthGuard/auth-guard";
 
 const baseNavItems: NavItem[] = [
   { label: "Dashboard",         href: "/faculty/dashboard",        icon: LayoutDashboard },
   // ── Student Requests (domain-first) ───────────────────────────
-  { label: "Approvals",         href: "/faculty/approvals",        icon: CheckSquare },
-  { label: "Internships",       href: "/faculty/internships",      icon: Briefcase },
-  { label: "Appointments",      href: "/faculty/appointments",     icon: CalendarDays },
-  { label: "Events",            href: "/faculty/events",           icon: PartyPopper },
-  { label: "Student Requests",  href: "/faculty/student-requests", icon: Users },
+  { label: "Approvals",        href: "/faculty/approvals",        icon: CheckSquare },
+  { label: "Internships",      href: "/faculty/internships",      icon: Briefcase },
+  { label: "Appointments",     href: "/faculty/appointments",     icon: CalendarDays },
+  { label: "Events",           href: "/faculty/events",           icon: PartyPopper },
+  { label: "Documents",        href: "/faculty/documents",        icon: FileText },
+  { label: "Equipment",        href: "/faculty/equipment",        icon: Package },
+  { label: "Reservations",     href: "/faculty/reservations",     icon: MapPin },
+  { label: "Procurement",      href: "/faculty/procurement",      icon: ShoppingCart },
+  { label: "IT Tickets",       href: "/faculty/tickets",          icon: Ticket },
+  { label: "Access Requests",  href: "/faculty/access-requests",  icon: ShieldCheck },
   // ── Personal ──────────────────────────────────────────────────
   { label: "My Calendar",       href: "/faculty/calendar",         icon: Calendar },
   { label: "Notifications",     href: "/faculty/notifications",    icon: Bell },
-  { label: "Profile",           href: "/faculty/profile",          icon: User },
   { label: "Settings",          href: "/faculty/settings",         icon: Settings },
 ];
 

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { StatusBadge } from '@/components/status-badge'
@@ -16,7 +17,6 @@ import {
   Clock,
 } from 'lucide-react'
 import { getToken } from '@/lib/auth'
-import Link from 'next/link'
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000'
 
@@ -33,6 +33,7 @@ const STOCK_STATUS_CONFIG: Record<string, { label: string; className: string }> 
 }
 
 export default function StaffEquipmentPage() {
+  const router = useRouter()
   const [requests, setRequests] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -138,7 +139,11 @@ export default function StaffEquipmentPage() {
                     : null
 
                   return (
-                    <tr key={req.id} className="hover:bg-muted/20 transition-colors">
+                    <tr
+                      key={req.id}
+                      onClick={() => router.push(`/staff/requests/equipment/${req.id}`)}
+                      className="hover:bg-muted/20 transition-colors cursor-pointer"
+                    >
                       <td className="px-4 py-3.5">
                         <p className="font-medium text-foreground truncate max-w-[180px]">
                           {req.equipmentName}
@@ -173,11 +178,9 @@ export default function StaffEquipmentPage() {
                         <StatusBadge status={req.status} />
                       </td>
                       <td className="px-4 py-3.5">
-                        <Link href={`/staff/equipment/${req.id}`}>
-                          <Button variant="ghost" size="icon" className="size-7">
-                            <ChevronRight className="size-4" />
-                          </Button>
-                        </Link>
+                        <Button variant="ghost" size="icon" className="size-7 pointer-events-none">
+                          <ChevronRight className="size-4" />
+                        </Button>
                       </td>
                     </tr>
                   )

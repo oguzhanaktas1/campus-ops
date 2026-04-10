@@ -67,7 +67,11 @@ export default function StudentEventsPage() {
         ) : (
           <div className="divide-y divide-border">
             {events.map((ev) => (
-              <div key={ev.id} className="flex items-center justify-between px-5 py-4 hover:bg-muted/30 transition-colors">
+              <Link
+                key={ev.id}
+                href={`/student/requests/${ev.id}`}
+                className="flex items-center justify-between px-5 py-4 hover:bg-muted/30 transition-colors"
+              >
                 <div className="min-w-0">
                   <p className="text-sm font-semibold text-foreground truncate">{ev.eventName}</p>
                   <p className="text-xs text-muted-foreground mt-0.5">
@@ -78,7 +82,7 @@ export default function StudentEventsPage() {
                 <span className={cn('text-xs font-semibold px-2 py-0.5 rounded-full border ml-4 shrink-0', STATUS_BADGE[ev.status] ?? STATUS_BADGE.SUBMITTED)}>
                   {ev.status?.replace(/_/g, ' ')}
                 </span>
-              </div>
+              </Link>
             ))}
           </div>
         )}

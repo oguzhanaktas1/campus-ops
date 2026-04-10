@@ -164,7 +164,7 @@ export default function StaffTicketsPage() {
         ) : (
           <div className="divide-y divide-border">
             {filtered.map((ticket) => (
-              <Link key={ticket.id} href={`/staff/tickets/${ticket.id}`}>
+              <Link key={ticket.id} href={`/staff/requests/tickets/${ticket.id}`}>
                 <div className="px-5 py-4 hover:bg-muted/20 transition-colors cursor-pointer">
                   <div className="flex items-start gap-4">
                     <div className="flex-1 min-w-0">

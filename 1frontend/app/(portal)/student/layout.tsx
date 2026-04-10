@@ -20,6 +20,7 @@ import {
   CalendarDays,
   Building2,
   Package,
+  ShoppingCart,
   ShieldCheck,
   PartyPopper,
 } from "lucide-react";
@@ -27,20 +28,20 @@ import AuthGuard from "@/components/AuthGuard/auth-guard";
 
 const navItems: NavItem[] = [
   { label: "Dashboard",        href: "/student/dashboard",       icon: LayoutDashboard },
+  { label: "My Requests",      href: "/student/requests",        icon: FileText },
   // ── Domain Modules ──────────────────────────────────────────
   { label: "Documents",        href: "/student/documents",       icon: GraduationCap },
   { label: "Reservations",     href: "/student/reservations",    icon: Building2 },
   { label: "Appointments",     href: "/student/appointments",    icon: CalendarDays },
   { label: "Internships",      href: "/student/internships",     icon: Briefcase },
   { label: "Equipment",        href: "/student/equipment",       icon: Package },
+  { label: "Procurement",      href: "/student/procurement",     icon: ShoppingCart },
   { label: "Events",           href: "/student/events",          icon: PartyPopper },
   { label: "Access Requests",  href: "/student/access-requests", icon: ShieldCheck },
   // ── Personal ────────────────────────────────────────────────
-  { label: "My Requests",      href: "/student/requests",        icon: FileText },
   { label: "Calendar",         href: "/student/calendar",        icon: Calendar },
   { label: "Notifications",    href: "/student/notifications",   icon: Bell },
   { label: "My Files",         href: "/student/files",           icon: FolderOpen },
-  { label: "Profile",          href: "/student/profile",         icon: User },
   { label: "Settings",         href: "/student/settings",        icon: Settings },
 ];
 

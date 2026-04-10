@@ -1,68 +1,74 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/switch'
-import { Loader2, Lock } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Loader2, Lock, User, Shield } from 'lucide-react'
 import { toast } from 'sonner'
+
+const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
+
+const FIELD_LABELS: Record<string, string> = {
+  fullName: 'Full Name', firstName: 'First Name', lastName: 'Last Name',
+  email: 'Email', studentNumber: 'Student Number', faculty: 'Faculty',
+  department: 'Department', gender: 'Gender', birthDate: 'Birth Date',
+  phoneNumber: 'Phone Number', address: 'Address', bio: 'Bio',
+}
+
+function ProfileField({ label, value, wide = false }: { label: string; value: string; wide?: boolean }) {
+  const isEmpty = !value
+  return (
+    <div className={`space-y-1.5 ${wide ? 'sm:col-span-2' : ''}`}>
+      <Label className="text-xs text-muted-foreground">{label}</Label>
+      {label === 'Bio' || label === 'Address' ? (
+        <Textarea value={isEmpty ? '—' : value} readOnly className="bg-muted/50 cursor-not-allowed text-muted-foreground resize-none min-h-[70px]" />
+      ) : (
+        <Input value={isEmpty ? '—' : value} readOnly className="bg-muted/50 cursor-not-allowed text-muted-foreground" />
+      )}
+    </div>
+  )
+}
 
 export default function StudentSettingsPage() {
   const [user, setUser] = useState<any>(null)
   const [preferences, setPreferences] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
-
   const [passwords, setPasswords] = useState({ currentPassword: '', newPassword: '' })
   const [isChangingPassword, setIsChangingPassword] = useState(false)
 
   useEffect(() => {
-    const fetchSettingsData = async () => {
+    const fetch_ = async () => {
       const token = localStorage.getItem('access_token')
       if (!token) return
-
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
       const headers = { Authorization: `Bearer ${token}` }
-
       try {
         const [profileRes, prefsRes] = await Promise.all([
-          fetch(`${backendUrl}/auth/profile`, { headers }),
-          fetch(`${backendUrl}/student/preferences`, { headers })
+          fetch(`${BACKEND}/auth/profile`, { headers }),
+          fetch(`${BACKEND}/student/preferences`, { headers }),
         ])
-
         if (profileRes.ok) setUser(await profileRes.json())
         if (prefsRes.ok) setPreferences(await prefsRes.json())
-      } catch (error) {
-        console.error('Settings fetch error:', error)
-        toast.error('Ayarlar yüklenemedi.')
-      } finally {
-        setIsLoading(false)
-      }
+      } catch { toast.error('Failed to load settings.') }
+      finally { setIsLoading(false) }
     }
-
-    fetchSettingsData()
+    fetch_()
   }, [])
 
   const handlePreferenceChange = async (key: string, checked: boolean) => {
     setPreferences((prev: any) => ({ ...prev, [key]: checked }))
-
     try {
       const token = localStorage.getItem('access_token')
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
-      
-      const res = await fetch(`${backendUrl}/student/preferences`, {
+      const res = await fetch(`${BACKEND}/student/preferences`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({ [key]: checked })
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ [key]: checked }),
       })
-
-      if (!res.ok) throw new Error('Güncellenemedi')
-      toast.success('Preference updated successfully.')
-    } catch (error) {
+      if (!res.ok) throw new Error()
+      toast.success('Preference updated.')
+    } catch {
       toast.error('Failed to update preference.')
       setPreferences((prev: any) => ({ ...prev, [key]: !checked }))
     }
@@ -70,158 +76,108 @@ export default function StudentSettingsPage() {
 
   const handlePasswordChange = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!passwords.currentPassword || !passwords.newPassword) {
-      toast.error('Please fill in all password fields.')
-      return
-    }
-
+    if (!passwords.currentPassword || !passwords.newPassword) { toast.error('Please fill in all fields.'); return }
     setIsChangingPassword(true)
     try {
       const token = localStorage.getItem('access_token')
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
-      
-      const res = await fetch(`${backendUrl}/student/change-password`, {
+      const res = await fetch(`${BACKEND}/student/change-password`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify(passwords)
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(passwords),
       })
-
-      if (!res.ok) {
-        const errorData = await res.json()
-        throw new Error(errorData.message || 'Şifre güncellenemedi.')
-      }
-
-      toast.success('Password changed successfully!')
-      setPasswords({ currentPassword: '', newPassword: '' }) 
-    } catch (error: any) {
-      toast.error(error.message)
-    } finally {
-      setIsChangingPassword(false)
-    }
+      if (!res.ok) { const e = await res.json(); throw new Error(e.message) }
+      toast.success('Password changed!')
+      setPasswords({ currentPassword: '', newPassword: '' })
+    } catch (err: any) { toast.error(err.message || 'Failed.') }
+    finally { setIsChangingPassword(false) }
   }
 
-  if (isLoading) {
-    return <div className="flex h-[50vh] items-center justify-center"><Loader2 className="size-8 animate-spin text-primary" /></div>
-  }
-
+  if (isLoading) return <div className="flex h-[50vh] items-center justify-center"><Loader2 className="size-8 animate-spin text-primary" /></div>
   if (!user) return null
-
-  // 🔥 BACKEND'İN TERTEMİZ FLAT (DÜZ) YAPISINA BİREBİR UYUMLU EŞLEŞTİRME 🔥
-  const fullName = user.fullName || user.name || 'Not Set'
-  const studentId = user.studentId || 'Not Set'
-  const email = user.email || 'Not Set'
-  const departmentName = user.department || 'Not Set'
-  const bio = user.bio || 'No bio or description provided by the university system.'
 
   return (
     <div className="p-6 max-w-2xl mx-auto space-y-6">
       <div>
         <h1 className="text-xl font-bold text-foreground">Settings</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">Manage your account preferences</p>
+        <p className="text-sm text-muted-foreground mt-0.5">Your profile and account preferences</p>
       </div>
 
       <div className="bg-card border border-border rounded-lg shadow-sm divide-y divide-border">
-        
-        {/* KİLİTLİ PROFİL BİLGİLERİ */}
+
+        {/* Profile Info — read-only */}
         <div className="p-5 space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-foreground">Profile Information</h2>
+            <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
+              <User className="size-4 text-primary" /> Profile Information
+            </h2>
             <span className="text-[10px] text-muted-foreground flex items-center gap-1 bg-muted px-2 py-1 rounded">
               <Lock className="size-3" /> Managed by University
             </span>
           </div>
+
+          {/* Avatar */}
+          {user.avatarUrl && (
+            <div className="flex items-center gap-3">
+              <img src={user.avatarUrl} alt="avatar" className="size-16 rounded-full object-cover border border-border" />
+              <div>
+                <p className="text-sm font-semibold">{user.fullName}</p>
+                <p className="text-xs text-muted-foreground">{user.email}</p>
+              </div>
+            </div>
+          )}
+
           <div className="grid sm:grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <Label>Full Name</Label>
-              <Input defaultValue={fullName} readOnly className="bg-muted/50 cursor-not-allowed text-muted-foreground" />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Student ID</Label>
-              <Input defaultValue={studentId} readOnly className="bg-muted/50 cursor-not-allowed text-muted-foreground" />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Email</Label>
-              <Input defaultValue={email} readOnly className="bg-muted/50 cursor-not-allowed text-muted-foreground" />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Department</Label>
-              <Input defaultValue={departmentName} readOnly className="bg-muted/50 cursor-not-allowed text-muted-foreground" />
-            </div>
-            <div className="space-y-1.5 sm:col-span-2">
-              <Label>Description / Bio</Label>
-              <Textarea 
-                defaultValue={bio} 
-                readOnly 
-                className="bg-muted/50 cursor-not-allowed text-muted-foreground min-h-[80px] resize-none" 
-              />
-            </div>
+            <ProfileField label="First Name"     value={user.firstName} />
+            <ProfileField label="Last Name"      value={user.lastName} />
+            <ProfileField label="Email"          value={user.email} />
+            <ProfileField label="Student Number" value={user.studentNumber || user.studentId} />
+            <ProfileField label="Faculty"        value={user.faculty} />
+            <ProfileField label="Department"     value={user.department} />
+            <ProfileField label="Gender"         value={user.gender} />
+            <ProfileField label="Birth Date"     value={user.birthDate} />
+            <ProfileField label="Phone Number"   value={user.phoneNumber} />
+            <ProfileField label="Address"        value={user.address} wide />
+            <ProfileField label="Bio"            value={user.bio} wide />
           </div>
         </div>
 
-        {/* BİLDİRİM TERCİHLERİ */}
+        {/* Notification Preferences */}
         <div className="p-5 space-y-4">
           <h2 className="text-sm font-semibold text-foreground">Notification Preferences</h2>
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-foreground">Email Notifications</p>
-                <p className="text-xs text-muted-foreground">Receive important updates via email</p>
+            {[
+              { key: 'emailEnabled', label: 'Email Notifications', desc: 'Receive updates via email' },
+              { key: 'inAppEnabled', label: 'In-App Notifications', desc: 'Notifications inside the portal' },
+              { key: 'reminderEmailEnabled', label: 'Appointment Reminders', desc: 'Email reminder before appointments' },
+            ].map(({ key, label, desc }) => (
+              <div key={key} className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-foreground">{label}</p>
+                  <p className="text-xs text-muted-foreground">{desc}</p>
+                </div>
+                <Switch
+                  checked={preferences?.[key] ?? true}
+                  onCheckedChange={(val) => handlePreferenceChange(key, val)}
+                />
               </div>
-              <Switch 
-                checked={preferences?.emailEnabled ?? true} 
-                onCheckedChange={(val) => handlePreferenceChange('emailEnabled', val)}
-              />
-            </div>
-
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-foreground">In-App Notifications</p>
-                <p className="text-xs text-muted-foreground">Get notified when a request changes status</p>
-              </div>
-              <Switch 
-                checked={preferences?.inAppEnabled ?? true} 
-                onCheckedChange={(val) => handlePreferenceChange('inAppEnabled', val)}
-              />
-            </div>
-
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-foreground">Appointment Reminders</p>
-                <p className="text-xs text-muted-foreground">Email reminder before scheduled appointments</p>
-              </div>
-              <Switch 
-                checked={preferences?.reminderEmailEnabled ?? true} 
-                onCheckedChange={(val) => handlePreferenceChange('reminderEmailEnabled', val)}
-              />
-            </div>
+            ))}
           </div>
         </div>
 
-        {/* ŞİFRE DEĞİŞTİRME */}
+        {/* Change Password */}
         <div className="p-5 space-y-4">
-          <h2 className="text-sm font-semibold text-foreground">Change Password</h2>
+          <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
+            <Shield className="size-4" /> Change Password
+          </h2>
           <form onSubmit={handlePasswordChange} className="space-y-4">
             <div className="grid sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label>Current Password</Label>
-                <Input 
-                  type="password" 
-                  placeholder="••••••••" 
-                  value={passwords.currentPassword}
-                  onChange={(e) => setPasswords({...passwords, currentPassword: e.target.value})}
-                />
+                <Input type="password" placeholder="••••••••" value={passwords.currentPassword} onChange={e => setPasswords({ ...passwords, currentPassword: e.target.value })} />
               </div>
               <div className="space-y-1.5">
                 <Label>New Password</Label>
-                <Input 
-                  type="password" 
-                  placeholder="••••••••" 
-                  value={passwords.newPassword}
-                  onChange={(e) => setPasswords({...passwords, newPassword: e.target.value})}
-                />
+                <Input type="password" placeholder="••••••••" value={passwords.newPassword} onChange={e => setPasswords({ ...passwords, newPassword: e.target.value })} />
               </div>
             </div>
             <Button size="sm" variant="outline" type="submit" disabled={isChangingPassword}>

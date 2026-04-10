@@ -15,12 +15,13 @@ import {
   BookMarked,
   BarChart3,
   Calendar,
-  User,
   Package,
   ShieldCheck,
   PartyPopper,
   ShoppingCart,
   Inbox,
+  Briefcase,
+  CalendarDays,
 } from "lucide-react";
 import AuthGuard from "@/components/AuthGuard/auth-guard";
 
@@ -34,12 +35,13 @@ const navItems: NavItem[] = [
   { label: "Documents",        href: "/staff/documents",       icon: Files },
   { label: "Procurement",      href: "/staff/procurement",     icon: ShoppingCart },
   { label: "Events",           href: "/staff/events",          icon: PartyPopper },
+  { label: "Internships",      href: "/staff/internships",     icon: Briefcase },
+  { label: "Appointments",     href: "/staff/appointments",    icon: CalendarDays },
   { label: "Access Requests",  href: "/staff/access-requests", icon: ShieldCheck },
   // ── Personal ──────────────────────────────────────────────────
   { label: "Reports",          href: "/staff/reports",         icon: BarChart3 },
   { label: "Calendar",         href: "/staff/calendar",        icon: Calendar },
   { label: "Notifications",    href: "/staff/notifications",   icon: Bell },
-  { label: "Profile",          href: "/staff/profile",         icon: User },
   { label: "Settings",         href: "/staff/settings",        icon: Settings },
 ];
 

@@ -101,15 +101,49 @@ export class StaffService {
 
   // 3. REQUEST DETAILS
   async getRequestDetail(id: string) {
-    return this.prisma.request.findUnique({
+    const request = await this.prisma.request.findUnique({
       where: { id },
       include: {
-        requester: { include: { profile: true } },
+        requester: {
+          include: {
+            profile: {
+              include: {
+                faculty: { select: { name: true } },
+                department: { select: { name: true } },
+                unit: { select: { name: true } },
+              },
+            },
+            primaryRoles: { include: { role: true } },
+          },
+        },
         requestType: true,
         currentAssignee: { include: { profile: true } },
         fileLinks: true,
       },
     });
+
+    if (!request) return null;
+
+    return {
+      ...request,
+      requester: request.requester
+        ? {
+            ...request.requester,
+            fullName:
+              request.requester.profile?.fullName || request.requester.email,
+            role:
+              request.requester.primaryRoles?.[0]?.role?.name || 'STAFF',
+            faculty: request.requester.profile?.faculty?.name || null,
+            department:
+              request.requester.profile?.department?.name ||
+              request.requester.profile?.unit?.name ||
+              null,
+            studentNumber: request.requester.profile?.studentNumber || null,
+            staffNumber: request.requester.profile?.staffNumber || null,
+            title: request.requester.profile?.title || null,
+          }
+        : null,
+    };
   }
 
   // 4. GET FACULTY MEMBERS

@@ -42,6 +42,7 @@ interface DbUser {
   phoneNumber?: string; 
   department: string; 
   role: Role; 
+  roles?: Array<{ id: string; name: string; isPrimary?: boolean }>;
   status: string; 
   createdAt: string; 
   title?: string; 
@@ -245,6 +246,9 @@ export default function AdminUsersPage() {
           <tbody className="divide-y divide-border">
             {filtered.map((user) => {
               const roleCfg = roleConfig[user.role]
+              const secondaryRoles = (user.roles ?? [])
+                .filter((item) => item.name.toLowerCase() !== user.role)
+                .map((item) => item.name)
               return (
                 <tr key={user.id} className="hover:bg-muted/20 transition-colors">
                   <td className="px-5 py-3.5">
@@ -263,9 +267,16 @@ export default function AdminUsersPage() {
                   </td>
                   <td className="px-5 py-3.5 hidden md:table-cell text-muted-foreground truncate max-w-[200px]">{user.department}</td>
                   <td className="px-5 py-3.5">
-                    <span className={cn('flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-md border w-fit', roleCfg?.className)}>
-                      {roleCfg?.icon} {roleCfg?.label}
-                    </span>
+                    <div className="space-y-1">
+                      <span className={cn('flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-md border w-fit', roleCfg?.className)}>
+                        {roleCfg?.icon} {roleCfg?.label}
+                      </span>
+                      {secondaryRoles.length > 0 ? (
+                        <p className="text-[11px] text-muted-foreground">
+                          {secondaryRoles.join(', ')}
+                        </p>
+                      ) : null}
+                    </div>
                   </td>
                   <td className="px-5 py-3.5">
                     {/* 🔥 STATÜ ROZETİ BURADA 🔥 */}
