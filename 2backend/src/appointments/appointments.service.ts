@@ -371,6 +371,7 @@ export class AppointmentsService {
 
   async confirm(
     userId: string,
+    roles: string[],
     requestId: string,
     dto: {
       confirmedStartAt?: string;
@@ -400,6 +401,11 @@ export class AppointmentsService {
       throw new BadRequestException('Already confirmed.');
     }
 
+    await this.workflowEngine.processAction(userId, roles, requestId, {
+      action: 'approve',
+      comment: dto.note?.trim() || undefined,
+    });
+
     const confirmResult = await this.prisma.$transaction(async (tx) => {
       const appointment = await tx.appointment.create({
         data: {
@@ -418,21 +424,6 @@ export class AppointmentsService {
       await tx.appointmentRequest.update({
         where: { id: ar.id },
         data: { actualAppointmentId: appointment.id },
-      });
-
-      await tx.request.update({
-        where: { id: requestId },
-        data: { status: RequestStatus.APPROVED },
-      });
-
-      await tx.requestStatusHistory.create({
-        data: {
-          requestId,
-          oldStatus: prevReq?.status ?? null,
-          newStatus: RequestStatus.APPROVED,
-          changedByUserId: userId,
-          changeReason: dto.note?.trim() || 'Appointment confirmed.',
-        },
       });
 
       if (dto.note?.trim()) {
@@ -485,7 +476,7 @@ export class AppointmentsService {
 
   // ── DECLINE ────────────────────────────────────────────────────────────────
 
-  async decline(userId: string, requestId: string, dto: { reason?: string }) {
+  async decline(userId: string, roles: string[], requestId: string, dto: { reason?: string }) {
     const ar = await this.prisma.appointmentRequest.findFirst({
       where: { requestId },
     });
@@ -493,24 +484,12 @@ export class AppointmentsService {
     if (ar.targetUserId !== userId)
       throw new ForbiddenException('Only the target user can decline.');
 
-    const prevReq = await this.prisma.request.findUnique({
-      where: { id: requestId },
+    await this.workflowEngine.processAction(userId, roles, requestId, {
+      action: 'reject',
+      comment: dto.reason?.trim() || undefined,
     });
 
     await this.prisma.$transaction(async (tx) => {
-      await tx.request.update({
-        where: { id: requestId },
-        data: { status: RequestStatus.REJECTED },
-      });
-      await tx.requestStatusHistory.create({
-        data: {
-          requestId,
-          oldStatus: prevReq?.status ?? null,
-          newStatus: RequestStatus.REJECTED,
-          changedByUserId: userId,
-          changeReason: dto.reason?.trim() || 'Appointment declined.',
-        },
-      });
       if (dto.reason?.trim()) {
         await tx.requestComment.create({
           data: {
@@ -536,7 +515,7 @@ export class AppointmentsService {
 
   // ── CANCEL ─────────────────────────────────────────────────────────────────
 
-  async cancel(userId: string, requestId: string, dto: { reason?: string }) {
+  async cancel(userId: string, roles: string[], requestId: string, dto: { reason?: string }) {
     const ar = await this.prisma.appointmentRequest.findFirst({
       where: { requestId },
     });
@@ -544,25 +523,12 @@ export class AppointmentsService {
     if (ar.requesterUserId !== userId)
       throw new ForbiddenException('Only the requester can cancel.');
 
-    const prevReq = await this.prisma.request.findUnique({
-      where: { id: requestId },
+    await this.workflowEngine.processAction(userId, roles, requestId, {
+      action: 'cancel',
+      comment: dto.reason?.trim() || undefined,
     });
 
     return this.prisma.$transaction(async (tx) => {
-      await tx.request.update({
-        where: { id: requestId },
-        data: { status: RequestStatus.CANCELLED },
-      });
-      await tx.requestStatusHistory.create({
-        data: {
-          requestId,
-          oldStatus: prevReq?.status ?? null,
-          newStatus: RequestStatus.CANCELLED,
-          changedByUserId: userId,
-          changeReason:
-            dto.reason?.trim() || 'Appointment cancelled by requester.',
-        },
-      });
       if (ar.actualAppointmentId) {
         await tx.appointment.update({
           where: { id: ar.actualAppointmentId },

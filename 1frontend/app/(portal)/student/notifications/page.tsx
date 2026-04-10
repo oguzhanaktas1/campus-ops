@@ -30,7 +30,7 @@ export default function StudentNotificationsPage() {
   const fetchNotifications = async () => {
     try {
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
-      const res = await fetch(`${backendUrl}/notifications`, {
+      const res = await fetch(`${backendUrl}/student/notifications`, {
         headers: { Authorization: `Bearer ${getToken()}` }
       })
       if (res.ok) { const d = await res.json(); setNotifications(Array.isArray(d) ? d : (d.notifications ?? [])); }
@@ -68,7 +68,7 @@ export default function StudentNotificationsPage() {
     try {
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
 
-      const res = await fetch(`${backendUrl}/notifications`, {
+      const res = await fetch(`${backendUrl}/student/notifications`, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
@@ -94,8 +94,8 @@ export default function StudentNotificationsPage() {
     try {
       if (!notif.isRead) {
         const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
-        await fetch(`${backendUrl}/notifications/${notif.id}/read`, {
-          method: 'PATCH',
+        await fetch(`${backendUrl}/student/notifications/${notif.id}/read`, {
+          method: 'POST',
           headers: { Authorization: `Bearer ${getToken()}` }
         })
         
@@ -113,8 +113,8 @@ export default function StudentNotificationsPage() {
   const handleMarkAllRead = async () => {
     try {
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
-      const res = await fetch(`${backendUrl}/notifications/read-all`, {
-        method: 'PATCH',
+      const res = await fetch(`${backendUrl}/student/notifications/read-all`, {
+        method: 'POST',
         headers: { Authorization: `Bearer ${getToken()}` }
       })
       

@@ -19,6 +19,7 @@ import { toast } from 'sonner'
 
 interface StaffRequest {
   id: string
+  requestNo?: string
   title: string
   category: string
   status: string
@@ -68,6 +69,10 @@ function getRequestNumber(id: string) {
   return `#${id.slice(-6).toUpperCase()}`
 }
 
+function getDisplayRequestNumber(req: StaffRequest) {
+  return req.requestNo || getRequestNumber(req.id)
+}
+
 function isOverdue(req: StaffRequest) {
   if (!req.dueDate) return false
   const s = req.status?.toLowerCase()
@@ -84,12 +89,27 @@ export default function StaffInboxPage() {
       try {
         const token = localStorage.getItem('access_token')
         const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
-        const res = await fetch(`${backendUrl}/staff/requests`, {
+        const res = await fetch(`${backendUrl}/requests/inbox`, {
           headers: { Authorization: `Bearer ${token}` },
         })
         if (res.ok) {
           const data = await res.json()
-          setRequests(Array.isArray(data) ? data : [])
+          setRequests(
+            Array.isArray(data)
+              ? data.map((item: any) => ({
+                  id: item.id,
+                  requestNo: item.requestNo,
+                  title: item.title,
+                  category: item.requestType?.category || item.requestType?.key || 'general',
+                  status: item.status,
+                  priority: item.priority,
+                  createdAt: item.createdAt,
+                  dueDate: item.dueAt,
+                  requesterName: item.requester?.fullName,
+                  assignedToMe: item.assignedToMe === true,
+                }))
+              : []
+          )
         } else {
           setRequests([])
         }
@@ -106,11 +126,7 @@ export default function StaffInboxPage() {
   const getTabRequests = (tab: TabKey): StaffRequest[] => {
     switch (tab) {
       case 'assigned':
-        return requests.filter(
-          (r) =>
-            r.assignedToMe === true ||
-            ['in_progress', 'in_review'].includes(r.status?.toLowerCase())
-        )
+        return requests.filter((r) => r.assignedToMe === true)
       case 'pending':
         return requests.filter((r) =>
           ['pending', 'submitted', 'waiting_approval'].includes(r.status?.toLowerCase())
@@ -283,7 +299,7 @@ export default function StaffInboxPage() {
                       >
                         <td className="px-5 py-4">
                           <span className="font-mono text-xs font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded">
-                            {getRequestNumber(req.id)}
+                            {getDisplayRequestNumber(req)}
                           </span>
                         </td>
                         <td className="px-5 py-4">

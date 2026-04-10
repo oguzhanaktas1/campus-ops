@@ -7,6 +7,12 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { PriorityLevel, RequestStatus } from '@prisma/client';
 
 const KEY = 'DOCUMENT_REQUEST';
+const STATUS_ACTION_MAP: Partial<Record<RequestStatus, 'approve' | 'reject' | 'revision' | 'cancel'>> = {
+  [RequestStatus.APPROVED]: 'approve',
+  [RequestStatus.REJECTED]: 'reject',
+  [RequestStatus.REVISION_REQUESTED]: 'revision',
+  [RequestStatus.CANCELLED]: 'cancel',
+};
 
 function makeNo() {
   const d = new Date();
@@ -106,11 +112,24 @@ export class DocumentsService {
       return req;
     });
 
-    void this.notificationsService.createNotification({
-      userId, title: 'Document Request Submitted',
-      message: 'Request ' + requestNo + ' received.',
-      requestId: result.id, actionUrl: '/student/documents/' + result.id,
+    await this.prisma.notification.deleteMany({
+      where: {
+        userId,
+        requestId: result.id,
+        OR: [
+          {
+            title: {
+              contains: 'Document Request Submitted',
+              mode: 'insensitive',
+            },
+          },
+          {
+            actionUrl: `/student/documents/${result.id}`,
+          },
+        ],
+      },
     });
+
     return { requestId: result.id, requestNo: result.requestNo };
   }
 
@@ -181,21 +200,35 @@ export class DocumentsService {
     if (!roles.some((r) => ['ADMIN', 'STAFF'].includes(r))) throw new ForbiddenException('Insufficient permissions.');
     const dr = await this.prisma.documentRequest.findFirst({ where: { requestId } });
     if (!dr) throw new NotFoundException('Document request not found.');
-    const prevReq = await this.prisma.request.findUnique({ where: { id: requestId } });
-    const newStatus = dto.status ?? RequestStatus.IN_REVIEW;
+    const newStatus = dto.status ?? RequestStatus.APPROVED;
+    const action = STATUS_ACTION_MAP[newStatus];
+    if (!action) {
+      throw new BadRequestException('This endpoint only supports workflow actions: approve, reject, revision, cancel.');
+    }
 
-    await this.prisma.$transaction(async (tx) => {
-      await tx.request.update({ where: { id: requestId }, data: { status: newStatus } });
-      if (dto.issuedAt || newStatus === RequestStatus.COMPLETED) {
-        await tx.documentRequest.update({ where: { id: dr.id }, data: { issuedAt: dto.issuedAt ? new Date(dto.issuedAt) : new Date() } });
-      }
-      await tx.requestStatusHistory.create({ data: { requestId, oldStatus: prevReq?.status ?? null, newStatus, changedByUserId: userId, changeReason: dto.note?.trim() || ('Status updated to ' + newStatus + '.') } });
-      if (dto.note?.trim()) await tx.requestComment.create({ data: { requestId, userId, commentText: dto.note, isInternal: false } });
+    await this.workflowEngine.processAction(userId, roles, requestId, {
+      action,
+      comment: dto.note?.trim() || undefined,
     });
 
-    if (prevReq?.requesterUserId) {
+    await this.prisma.$transaction(async (tx) => {
+      if (dto.issuedAt || newStatus === RequestStatus.APPROVED) {
+        await tx.documentRequest.update({
+          where: { id: dr.id },
+          data: { issuedAt: dto.issuedAt ? new Date(dto.issuedAt) : new Date() },
+        });
+      }
+      if (dto.note?.trim()) {
+        await tx.requestComment.create({
+          data: { requestId, userId, commentText: dto.note, isInternal: false },
+        });
+      }
+    });
+
+    const req = await this.prisma.request.findUnique({ where: { id: requestId } });
+    if (req?.requesterUserId) {
       void this.notificationsService.createNotification({
-        userId: prevReq.requesterUserId, title: 'Document Request Updated',
+        userId: req.requesterUserId, title: 'Document Request Updated',
         message: 'Status changed to ' + newStatus + '.', requestId,
         actionUrl: '/student/documents/' + requestId,
       });

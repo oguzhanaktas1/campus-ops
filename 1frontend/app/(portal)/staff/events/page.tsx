@@ -116,7 +116,6 @@ export default function StaffEventsPage() {
                     <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} placeholder="Note (optional)..."
                       className="w-full bg-background border border-input rounded-md px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring resize-none" />
                     <div className="flex gap-2 flex-wrap">
-                      <Button size="sm" variant="outline" onClick={(event) => { event.stopPropagation(); void updateStatus(ev.id, 'IN_REVIEW') }}>Mark In Review</Button>
                       <Button size="sm" className="gap-1.5 bg-green-600 hover:bg-green-700" onClick={(event) => { event.stopPropagation(); void updateStatus(ev.id, 'APPROVED') }}>
                         <CheckCircle className="size-3.5" /> Approve
                       </Button>

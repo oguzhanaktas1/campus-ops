@@ -58,6 +58,16 @@ export class StudentService {
         });
       }
 
+      const coordinators = await this.prisma.user.findMany({
+        where: {
+          status: 'ACTIVE',
+          primaryRoles: {
+            some: { role: { name: 'INTERNSHIP_COORDINATOR' } },
+          },
+        },
+        select: { id: true },
+      });
+
       const requestNo = `INT-${Date.now().toString().slice(-6)}-${Math.floor(Math.random() * 1000)}`;
 
       const newRequest = await this.prisma.$transaction(async (tx) => {
@@ -70,7 +80,6 @@ export class StudentService {
             status: RequestStatus.SUBMITTED,
             submittedAt: new Date(),
             priority: PriorityLevel.MEDIUM,
-            currentAssigneeUserId: data.advisorUserId || null,
             internshipRequest: {
               create: {
                 studentUserId: userId,
@@ -99,13 +108,26 @@ export class StudentService {
           },
         });
 
-        if (data.advisorUserId) {
-          await tx.requestAssignment.create({
-            data: {
+        if (coordinators.length > 0) {
+          await tx.requestAssignment.createMany({
+            data: coordinators.map((coordinator) => ({
               requestId: req.id,
-              assignedToUserId: data.advisorUserId,
+              assignedToUserId: coordinator.id,
               assignedByUserId: userId,
-            },
+              assignmentNote: 'Routed to internship coordinators.',
+            })),
+          });
+
+          await tx.notification.createMany({
+            data: coordinators.map((coordinator) => ({
+              userId: coordinator.id,
+              requestId: req.id,
+              type: 'IN_APP',
+              title: 'New Internship Request',
+              message:
+                'A new internship application is waiting for coordinator review.',
+              actionUrl: `/staff/requests/internship/${req.id}`,
+            })),
           });
         }
 
@@ -602,6 +624,19 @@ export class StudentService {
         },
         // 🔥 1. EKSİK OLAN SORGULAMA BURASI: Timeline verilerini DB'den çek
         statusHistory: { orderBy: { changedAt: 'desc' } },
+        workflowInstance: {
+          include: {
+            currentStep: true,
+            workflowDefinition: {
+              include: {
+                steps: { orderBy: { stepOrder: 'asc' } },
+              },
+            },
+            instanceSteps: {
+              orderBy: { createdAt: 'asc' },
+            },
+          },
+        },
       },
     });
 
@@ -678,6 +713,33 @@ export class StudentService {
         date: h.changedAt,
         note: h.changeReason || 'Status updated.',
       })),
+      workflow: request.workflowInstance
+        ? {
+            status: request.workflowInstance.status,
+            currentStep: request.workflowInstance.currentStep?.stepName || null,
+            workflowName:
+              request.workflowInstance.workflowDefinition?.name || null,
+            steps:
+              request.workflowInstance.workflowDefinition?.steps?.map((step) => {
+                const instanceStep = request.workflowInstance.instanceSteps.find(
+                  (item) => item.workflowStepId === step.id,
+                );
+                return {
+                  id: step.id,
+                  label: step.stepName,
+                  status:
+                    step.id === request.workflowInstance.currentStepId
+                      ? 'active'
+                      : instanceStep?.status === 'COMPLETED'
+                        ? 'completed'
+                        : request.status === 'REJECTED' &&
+                            step.id === request.workflowInstance.currentStepId
+                          ? 'failed'
+                          : 'pending',
+                };
+              }) || [],
+          }
+        : null,
     };
   }
 
@@ -1054,7 +1116,37 @@ export class StudentService {
   // 🔥 ÖĞRENCİ BİLDİRİMLERİ (IN-APP) 🔥
   async getNotifications(userId: string) {
     return this.prisma.notification.findMany({
-      where: { userId: userId },
+      where: {
+        userId: userId,
+        AND: [
+          {
+            OR: [
+              { requestId: null },
+              { request: { requesterUserId: userId } },
+            ],
+          },
+          {
+            OR: [
+              { actionUrl: null },
+              { actionUrl: { startsWith: '/student' } },
+            ],
+          },
+        ],
+        NOT: [
+          {
+            title: {
+              contains: 'Document Request Submitted',
+              mode: 'insensitive',
+            },
+          },
+          {
+            title: {
+              contains: 'Reservation Request Submitted',
+              mode: 'insensitive',
+            },
+          },
+        ],
+      },
       orderBy: { createdAt: 'desc' },
       take: 50,
     });

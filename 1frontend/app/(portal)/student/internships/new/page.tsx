@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -25,7 +25,6 @@ const WORK_MODES = ['ONSITE', 'REMOTE', 'HYBRID']
 export default function NewInternshipPage() {
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [advisors, setAdvisors] = useState<any[]>([])
 
   const [form, setForm] = useState({
     companyName: '',
@@ -38,35 +37,22 @@ export default function NewInternshipPage() {
     endDate: '',
     durationDays: '',
     insuranceRequired: false,
-    advisorUserId: '',
   })
-
-  useEffect(() => {
-    fetch(`${BACKEND}/student/faculty-members`, {
-      headers: { Authorization: `Bearer ${getToken()}` },
-    })
-      .then((r) => r.ok ? r.json() : [])
-      .then(setAdvisors)
-      .catch(() => {})
-  }, [])
-
-  // Auto-calculate duration when dates change
-  useEffect(() => {
-    if (form.startDate && form.endDate) {
-      const start = new Date(form.startDate)
-      const end = new Date(form.endDate)
-      if (end >= start) {
-        const diff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
-        setForm((prev) => ({ ...prev, durationDays: String(diff) }))
-      }
-    }
-  }, [form.startDate, form.endDate])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!form.companyName.trim()) { toast.error('Company name is required.'); return }
-    if (!form.startDate || !form.endDate) { toast.error('Start and end dates are required.'); return }
-    if (new Date(form.endDate) < new Date(form.startDate)) { toast.error('End date cannot be before start date.'); return }
+    if (!form.companyName.trim()) {
+      toast.error('Company name is required.')
+      return
+    }
+    if (!form.startDate || !form.endDate) {
+      toast.error('Start and end dates are required.')
+      return
+    }
+    if (new Date(form.endDate) < new Date(form.startDate)) {
+      toast.error('End date cannot be before start date.')
+      return
+    }
 
     setIsSubmitting(true)
     try {
@@ -88,7 +74,6 @@ export default function NewInternshipPage() {
           endDate: form.endDate,
           durationDays: Number(form.durationDays) || 0,
           insuranceRequired: form.insuranceRequired,
-          advisorUserId: form.advisorUserId || undefined,
         }),
       })
 
@@ -96,7 +81,7 @@ export default function NewInternshipPage() {
         toast.success('Internship application submitted successfully.')
         router.push('/student/internships')
       } else {
-        const err = await res.json().catch(() => ({})) as { message?: string }
+        const err = (await res.json().catch(() => ({}))) as { message?: string }
         toast.error(err.message ?? 'Failed to submit application.')
       }
     } catch {
@@ -114,7 +99,10 @@ export default function NewInternshipPage() {
     required = false,
   ) => (
     <div className="space-y-1.5">
-      <Label>{label}{required && <span className="text-destructive ml-0.5">*</span>}</Label>
+      <Label>
+        {label}
+        {required && <span className="ml-0.5 text-destructive">*</span>}
+      </Label>
       <Input
         type={type}
         placeholder={placeholder}
@@ -126,8 +114,8 @@ export default function NewInternshipPage() {
   )
 
   return (
-    <div className="p-6 max-w-2xl mx-auto pb-20">
-      <div className="flex items-center gap-3 mb-6">
+    <div className="mx-auto max-w-2xl p-6 pb-20">
+      <div className="mb-6 flex items-center gap-3">
         <Link href="/student/internships">
           <Button variant="ghost" size="sm" className="gap-1.5">
             <ArrowLeft className="size-4" /> Back
@@ -135,15 +123,18 @@ export default function NewInternshipPage() {
         </Link>
         <div className="flex items-center gap-2">
           <Briefcase className="size-5 text-primary" />
-          <h1 className="text-xl font-bold text-foreground">New Internship Application</h1>
+          <h1 className="text-xl font-bold text-foreground">
+            New Internship Application
+          </h1>
         </div>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Company Info */}
-        <div className="bg-card border border-border rounded-lg p-5 space-y-4">
-          <h2 className="text-sm font-semibold text-foreground">Company Information</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="space-y-4 rounded-lg border border-border bg-card p-5">
+          <h2 className="text-sm font-semibold text-foreground">
+            Company Information
+          </h2>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             {field('Company Name', 'companyName', 'text', 'e.g. Acme Corp', true)}
             {field('Industry / Sector', 'companySector', 'text', 'e.g. Software')}
             {field('Contact Person', 'companyContactName', 'text', 'e.g. Jane Doe')}
@@ -151,28 +142,47 @@ export default function NewInternshipPage() {
           </div>
         </div>
 
-        {/* Internship Details */}
-        <div className="bg-card border border-border rounded-lg p-5 space-y-4">
-          <h2 className="text-sm font-semibold text-foreground">Internship Details</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="space-y-4 rounded-lg border border-border bg-card p-5">
+          <h2 className="text-sm font-semibold text-foreground">
+            Internship Details
+          </h2>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
-              <Label>Type <span className="text-destructive">*</span></Label>
-              <Select value={form.internshipType} onValueChange={(v) => setForm({ ...form, internshipType: v })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+              <Label>
+                Type <span className="text-destructive">*</span>
+              </Label>
+              <Select
+                value={form.internshipType}
+                onValueChange={(v) => setForm({ ...form, internshipType: v })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   {INTERNSHIP_TYPES.map((t) => (
-                    <SelectItem key={t} value={t}>{t.charAt(0) + t.slice(1).toLowerCase()}</SelectItem>
+                    <SelectItem key={t} value={t}>
+                      {t.charAt(0) + t.slice(1).toLowerCase()}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label>Work Mode <span className="text-destructive">*</span></Label>
-              <Select value={form.workMode} onValueChange={(v) => setForm({ ...form, workMode: v })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+              <Label>
+                Work Mode <span className="text-destructive">*</span>
+              </Label>
+              <Select
+                value={form.workMode}
+                onValueChange={(v) => setForm({ ...form, workMode: v })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   {WORK_MODES.map((m) => (
-                    <SelectItem key={m} value={m}>{m.charAt(0) + m.slice(1).toLowerCase()}</SelectItem>
+                    <SelectItem key={m} value={m}>
+                      {m.charAt(0) + m.slice(1).toLowerCase()}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -185,22 +195,45 @@ export default function NewInternshipPage() {
                 type="number"
                 min={1}
                 value={form.durationDays}
-                onChange={(e) => setForm({ ...form, durationDays: e.target.value })}
-                placeholder="Auto-calculated"
+                onChange={(e) =>
+                  setForm({ ...form, durationDays: e.target.value })
+                }
+                placeholder="Enter planned duration"
               />
             </div>
-            <div className="space-y-1.5 flex flex-col justify-end">
+            <div className="flex flex-col justify-end space-y-1.5">
               <div className="flex items-center gap-3 pb-1">
                 <button
                   type="button"
                   role="switch"
                   aria-checked={form.insuranceRequired}
-                  onClick={() => setForm({ ...form, insuranceRequired: !form.insuranceRequired })}
-                  className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${form.insuranceRequired ? 'bg-primary' : 'bg-muted-foreground/30'}`}
+                  onClick={() =>
+                    setForm({
+                      ...form,
+                      insuranceRequired: !form.insuranceRequired,
+                    })
+                  }
+                  className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                    form.insuranceRequired
+                      ? 'bg-primary'
+                      : 'bg-muted-foreground/30'
+                  }`}
                 >
-                  <span className={`inline-block size-3.5 rounded-full bg-white shadow transition-transform ${form.insuranceRequired ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                  <span
+                    className={`inline-block size-3.5 rounded-full bg-white shadow transition-transform ${
+                      form.insuranceRequired ? 'translate-x-4' : 'translate-x-0.5'
+                    }`}
+                  />
                 </button>
-                <Label className="cursor-pointer" onClick={() => setForm({ ...form, insuranceRequired: !form.insuranceRequired })}>
+                <Label
+                  className="cursor-pointer"
+                  onClick={() =>
+                    setForm({
+                      ...form,
+                      insuranceRequired: !form.insuranceRequired,
+                    })
+                  }
+                >
                   Insurance Required
                 </Label>
               </div>
@@ -208,30 +241,18 @@ export default function NewInternshipPage() {
           </div>
         </div>
 
-        {/* Advisor */}
-        <div className="bg-card border border-border rounded-lg p-5 space-y-4">
-          <h2 className="text-sm font-semibold text-foreground">Faculty Advisor</h2>
-          <div className="space-y-1.5">
-            <Label>Advisor</Label>
-            <Select value={form.advisorUserId} onValueChange={(v) => setForm({ ...form, advisorUserId: v })}>
-              <SelectTrigger><SelectValue placeholder="Select advisor (optional)" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">No advisor</SelectItem>
-                {advisors.map((a) => (
-                  <SelectItem key={a.id} value={a.id}>
-                    {a.profile?.fullName ?? a.email}
-                    {a.profile?.title ? ` (${a.profile.title})` : ''}
-                    {a.profile?.department?.name ? ` — ${a.profile.department.name}` : ''}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+        <div className="rounded-lg border border-border bg-card p-5">
+          <p className="text-sm text-muted-foreground">
+            After submission, the application is routed automatically to users
+            with the `INTERNSHIP_COORDINATOR` role.
+          </p>
         </div>
 
         <div className="flex justify-end gap-3">
           <Link href="/student/internships">
-            <Button type="button" variant="outline" disabled={isSubmitting}>Cancel</Button>
+            <Button type="button" variant="outline" disabled={isSubmitting}>
+              Cancel
+            </Button>
           </Link>
           <Button type="submit" disabled={isSubmitting}>
             {isSubmitting && <Loader2 className="mr-2 size-4 animate-spin" />}

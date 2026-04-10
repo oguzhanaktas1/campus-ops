@@ -74,7 +74,7 @@ export default function StudentLayout({
         }
         setUser(await profileRes.json());
 
-        const notifRes = await fetch(`${backendUrl}/notifications`, {
+        const notifRes = await fetch(`${backendUrl}/student/notifications`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (notifRes.ok) {

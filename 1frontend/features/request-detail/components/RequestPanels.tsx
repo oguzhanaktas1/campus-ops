@@ -86,7 +86,7 @@ export function RequestCommentsPanel({
     setIsSubmitting(true)
     try {
       const response = await fetch(
-        `${backendUrl}/student/requests/${detail.id}/comments`,
+        `${backendUrl}/${detail.portal}/requests/${detail.id}/comments`,
         {
           method: 'POST',
           headers: {
@@ -305,7 +305,7 @@ function StaffActionPanel({
   detail: RequestDetailViewModel
   onDetailChange: (detail: RequestDetailViewModel) => void
 }) {
-  const [faculty, setFaculty] = useState<any[]>([])
+  const [people, setPeople] = useState<any[]>([])
   const [isOpen, setIsOpen] = useState(false)
   const [selected, setSelected] = useState<any | null>(null)
   const [search, setSearch] = useState('')
@@ -336,10 +336,10 @@ function StaffActionPanel({
         const response = await fetch(`${backendUrl}/staff/faculty-members`, {
           headers: { Authorization: `Bearer ${token}` },
         })
-        if (!response.ok) throw new Error('faculty failed')
-        setFaculty(await response.json())
+        if (!response.ok) throw new Error('people failed')
+        setPeople(await response.json())
       } catch {
-        toast.error('Faculty list could not be loaded')
+        toast.error('Assignable people could not be loaded')
       }
     }
 
@@ -348,14 +348,14 @@ function StaffActionPanel({
 
   const filtered = useMemo(() => {
     const query = search.toLowerCase()
-    return faculty.filter((item) => {
+    return people.filter((item) => {
       const name = item.profile?.fullName ?? item.fullName ?? ''
       const email = item.email ?? ''
       return (
         name.toLowerCase().includes(query) || email.toLowerCase().includes(query)
       )
     })
-  }, [faculty, search])
+  }, [people, search])
 
   const handleAssign = async () => {
     const token = getToken()
@@ -446,8 +446,7 @@ function StaffActionPanel({
           </div>
         ) : (
           <div className="rounded-lg border border-dashed p-3 text-sm text-muted-foreground">
-            No assignee yet. Select a faculty member to move this request into
-            review.
+            No assignee yet. Select a person to assign this request directly.
           </div>
         )}
 
@@ -460,7 +459,7 @@ function StaffActionPanel({
             >
               <span className="flex items-center gap-2">
                 <UserPlus className="size-4" />
-                Select Faculty
+                Select Person
               </span>
               <ChevronDown className="size-4" />
             </Button>
@@ -472,7 +471,7 @@ function StaffActionPanel({
                     <Search className="absolute left-2 top-2.5 size-4 text-muted-foreground" />
                     <input
                       className="w-full rounded-md border bg-muted/40 py-2 pl-8 pr-3 text-sm outline-none"
-                      placeholder="Search faculty..."
+                      placeholder="Search people..."
                       value={search}
                       onChange={(event) => setSearch(event.target.value)}
                     />
@@ -506,7 +505,7 @@ function StaffActionPanel({
                     ))
                   ) : (
                     <p className="p-3 text-sm text-muted-foreground">
-                      No faculty found.
+                      No people found.
                     </p>
                   )}
                 </div>

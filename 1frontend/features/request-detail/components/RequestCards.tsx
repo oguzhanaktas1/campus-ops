@@ -63,7 +63,10 @@ export function WorkflowCurrentStepCard({
 }: {
   detail: RequestDetailViewModel
 }) {
-  const steps = buildWorkflowSteps(detail.requestType.key, detail.status)
+  const steps =
+    detail.workflow.steps && detail.workflow.steps.length > 0
+      ? detail.workflow.steps
+      : buildWorkflowSteps(detail.requestType.key, detail.status)
 
   return (
     <Card>
@@ -74,7 +77,7 @@ export function WorkflowCurrentStepCard({
         <div className="flex items-center justify-between rounded-lg border bg-muted/30 px-3 py-2">
           <span className="text-sm text-muted-foreground">Current Step</span>
           <span className="text-sm font-medium text-foreground">
-            {detail.workflow.currentStep ?? 'Status-based progression'}
+            {detail.workflow.currentStep ?? 'Workflow progression'}
           </span>
         </div>
         <WorkflowStepIndicator steps={steps} />

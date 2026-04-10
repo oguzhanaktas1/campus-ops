@@ -1,8 +1,16 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../core/prisma/prisma.service';
 import { RequestStatus, PriorityLevel } from '@prisma/client';
+import { WorkflowEngineService } from '../workflow/workflow-engine.service';
 
 const TYPE_KEY = 'INTERNSHIP_REQUEST';
+
+const STATUS_ACTION_MAP: Partial<Record<RequestStatus, 'approve' | 'reject' | 'revision' | 'cancel'>> = {
+  [RequestStatus.APPROVED]: 'approve',
+  [RequestStatus.REJECTED]: 'reject',
+  [RequestStatus.REVISION_REQUESTED]: 'revision',
+  [RequestStatus.CANCELLED]: 'cancel',
+};
 
 function makeRequestNo(): string {
   const d = new Date();
@@ -12,7 +20,10 @@ function makeRequestNo(): string {
 
 @Injectable()
 export class InternshipsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private workflowEngine: WorkflowEngineService,
+  ) {}
 
   private async getOrCreateRequestType() {
     let rt = await this.prisma.requestType.findUnique({ where: { key: TYPE_KEY } });
@@ -42,6 +53,7 @@ export class InternshipsService {
     const requestNo = makeRequestNo();
 
     const req = await this.prisma.$transaction(async (tx) => {
+      const initialStatus = RequestStatus.SUBMITTED;
       const r = await tx.request.create({
         data: {
           requestNo,
@@ -78,6 +90,26 @@ export class InternshipsService {
         await tx.requestAssignment.create({
           data: { requestId: r.id, assignedToUserId: dto.advisorUserId, assignedByUserId: userId },
         });
+      }
+
+      const wfDefId = rt.workflowDefinitionId;
+      if (wfDefId) {
+        const wfStatus = await this.workflowEngine.bootstrapInstance(tx, r.id, wfDefId);
+        if (wfStatus) {
+          await tx.request.update({
+            where: { id: r.id },
+            data: { status: wfStatus },
+          });
+          await tx.requestStatusHistory.create({
+            data: {
+              requestId: r.id,
+              oldStatus: initialStatus,
+              newStatus: wfStatus,
+              changedByUserId: userId,
+              changeReason: 'Workflow started.',
+            },
+          });
+        }
       }
       return r;
     });
@@ -137,24 +169,41 @@ export class InternshipsService {
         },
         requester: { include: { profile: { select: { fullName: true, studentNumber: true, title: true } } } },
         statusHistory: { orderBy: { changedAt: 'asc' } },
+        workflowInstance: {
+          include: {
+            currentStep: true,
+            workflowDefinition: { select: { name: true } },
+          },
+        },
       },
     });
     if (!r) throw new NotFoundException('Internship request not found.');
     const isPrivileged = roles.some((ro) => ['STAFF', 'ADMIN', 'FACULTY'].includes(ro));
     if (!isPrivileged && r.requesterUserId !== userId) throw new ForbiddenException();
-    return r;
+    return {
+      ...r,
+      workflow: r.workflowInstance
+        ? {
+            status: r.workflowInstance.status,
+            currentStep: r.workflowInstance.currentStep?.stepName ?? null,
+            workflowName: r.workflowInstance.workflowDefinition?.name ?? null,
+          }
+        : null,
+    };
   }
 
-  async updateStatus(userId: string, id: string, status: RequestStatus, note?: string) {
+  async updateStatus(userId: string, roles: string[], id: string, status: RequestStatus, note?: string) {
     const r = await this.prisma.request.findUnique({ where: { id } });
     if (!r) throw new NotFoundException('Internship request not found.');
 
-    const updated = await this.prisma.$transaction(async (tx) => {
-      const upd = await tx.request.update({ where: { id }, data: { status } });
-      await tx.requestStatusHistory.create({
-        data: { requestId: id, oldStatus: r.status, newStatus: status, changedByUserId: userId, changeReason: note ?? '' },
-      });
-      return upd;
+    const action = STATUS_ACTION_MAP[status];
+    if (!action) {
+      throw new BadRequestException('This endpoint only supports workflow actions: approve, reject, revision, cancel.');
+    }
+
+    const updated = await this.workflowEngine.processAction(userId, roles, id, {
+      action,
+      comment: note,
     });
 
     void this.prisma.auditLog.create({

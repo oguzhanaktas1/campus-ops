@@ -6,10 +6,12 @@ import type { RequestDetailViewModel } from '@/features/request-detail/types'
 import { formatDate } from '@/features/request-detail/utils'
 
 export function RequestHeader({ detail }: { detail: RequestDetailViewModel }) {
+  const backHref = detail.portal === 'staff' ? '/staff/inbox' : `/${detail.portal}/requests`
+
   return (
     <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
       <div className="flex min-w-0 flex-1 items-start gap-3">
-        <Link href={`/${detail.portal}/requests`}>
+        <Link href={backHref}>
           <Button variant="ghost" size="icon" className="size-8 shrink-0">
             <ArrowLeft className="size-4" />
           </Button>

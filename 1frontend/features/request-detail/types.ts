@@ -34,6 +34,12 @@ export interface RequestTimelineEvent {
   note?: string
 }
 
+export interface RequestWorkflowStep {
+  id: string
+  label: string
+  status: 'pending' | 'active' | 'completed' | 'failed' | 'warning'
+}
+
 export interface RequestDetailViewModel {
   id: string
   portal: RequestPortal
@@ -58,9 +64,10 @@ export interface RequestDetailViewModel {
   timeline: RequestTimelineEvent[]
   statusHistory: RequestTimelineEvent[]
   workflow: {
-    currentStep?: string | null
-    name?: string | null
-    status?: string | null
+      currentStep?: string | null
+      name?: string | null
+      status?: string | null
+      steps?: RequestWorkflowStep[]
   }
   domainData: Record<string, unknown> | null
   raw: Record<string, unknown>

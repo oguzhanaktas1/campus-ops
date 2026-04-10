@@ -2,15 +2,15 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import {
-  Controller,
-  Get,
-  Post,
   Body,
-  Param,
-  UseGuards,
-  Request,
+  Controller,
   Delete,
+  Get,
+  Param,
+  Post,
   Put,
+  Request,
+  UseGuards,
 } from '@nestjs/common';
 import { FacultyService } from './faculty.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -20,7 +20,7 @@ import { extractUserId } from '../core/auth/extract-user-id';
 
 @Controller('faculty')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles('FACULTY') // Sadece hocalar girebilsin
+@Roles('FACULTY')
 export class FacultyController {
   constructor(private readonly facultyService: FacultyService) {}
 
@@ -40,7 +40,6 @@ export class FacultyController {
 
   @Get('requests/all')
   getAllRequests(@Request() req: any) {
-    // Kendi extractUserId fonksiyonunu kullanmayı unutma
     const userId = req.user?.userId || req.user?.id;
     return this.facultyService.getAllRequests(userId);
   }
@@ -51,7 +50,14 @@ export class FacultyController {
     return this.facultyService.getRequestDetail(userId, id);
   }
 
-  // ─── INTERNSHIP DEDICATED ENDPOINTS ──────────────────────────────────────
+  @Post('requests/:id/comments')
+  addComment(
+    @Request() req: any,
+    @Param('id') id: string,
+    @Body('text') text: string,
+  ) {
+    return this.facultyService.addCommentToRequest(extractUserId(req), id, text);
+  }
 
   @Get('internships')
   getInternships(@Request() req: any) {
@@ -74,7 +80,6 @@ export class FacultyController {
     return this.facultyService.getNotifications(extractUserId(req));
   }
 
-  // 🔥 BİLDİRİM SİLME ENDPOINTİ 🔥
   @Delete('notifications')
   deleteNotifications(@Request() req: any, @Body('ids') ids: string[]) {
     return this.facultyService.deleteNotifications(extractUserId(req), ids);
@@ -90,7 +95,6 @@ export class FacultyController {
     return this.facultyService.markAllNotificationsAsRead(extractUserId(req));
   }
 
-  // 🔥 SETTINGS: BİLDİRİM TERCİHLERİ ENDPOINTLERİ 🔥
   @Get('preferences')
   getPreferences(@Request() req: any) {
     return this.facultyService.getPreferences(extractUserId(req));
@@ -101,7 +105,6 @@ export class FacultyController {
     return this.facultyService.updatePreferences(extractUserId(req), body);
   }
 
-  // 🔥 SETTINGS: OFİS SAATLERİ ENDPOINTLERİ 🔥
   @Get('office-hours')
   getOfficeHours(@Request() req: any) {
     return this.facultyService.getOfficeHours(extractUserId(req));

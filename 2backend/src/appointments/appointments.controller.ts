@@ -49,19 +49,19 @@ export class AppointmentRequestsController {
   /** POST /appointment-requests/:id/confirm */
   @Post(':id/confirm')
   confirm(@CurrentUser() user: ReqUser, @Param('id') id: string, @Body() dto: any) {
-    return this.svc.confirm(user.userId, id, dto);
+    return this.svc.confirm(user.userId, user.roles, id, dto);
   }
 
   /** POST /appointment-requests/:id/decline */
   @Post(':id/decline')
   decline(@CurrentUser() user: ReqUser, @Param('id') id: string, @Body() dto: any) {
-    return this.svc.decline(user.userId, id, dto);
+    return this.svc.decline(user.userId, user.roles, id, dto);
   }
 
   /** POST /appointment-requests/:id/cancel */
   @Post(':id/cancel')
   cancel(@CurrentUser() user: ReqUser, @Param('id') id: string, @Body() dto: any) {
-    return this.svc.cancel(user.userId, id, dto);
+    return this.svc.cancel(user.userId, user.roles, id, dto);
   }
 }
 

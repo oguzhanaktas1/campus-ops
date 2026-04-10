@@ -350,6 +350,56 @@ export class FacultyService {
 
   // ─── INTERNSHIP DEDICATED ENDPOINTS ──────────────────────────────────────
 
+  async addCommentToRequest(userId: string, requestId: string, text: string) {
+    const content = text?.trim();
+    if (!content) {
+      throw new BadRequestException('Comment text is required.');
+    }
+
+    const request = await this.prisma.request.findFirst({
+      where: {
+        id: requestId,
+        OR: [
+          { currentAssigneeUserId: userId },
+          {
+            assignments: {
+              some: { assignedToUserId: userId, isActive: true },
+            },
+          },
+          { approvalActions: { some: { actionByUserId: userId } } },
+        ],
+      },
+    });
+
+    if (!request) throw new NotFoundException('Request not found.');
+
+    const comment = await this.prisma.requestComment.create({
+      data: {
+        requestId,
+        userId,
+        commentText: content,
+        isInternal: false,
+      },
+      include: {
+        user: {
+          include: {
+            profile: true,
+            primaryRoles: { include: { role: true } },
+          },
+        },
+      },
+    });
+
+    return {
+      id: comment.id,
+      author: comment.user.profile?.fullName || comment.user.email,
+      authorRole:
+        comment.user.primaryRoles?.[0]?.role?.name?.toLowerCase() ?? 'faculty',
+      content: comment.commentText,
+      createdAt: comment.createdAt,
+    };
+  }
+
   async getInternships(userId: string) {
     const records = await this.prisma.internshipRequest.findMany({
       where: {

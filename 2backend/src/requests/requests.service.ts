@@ -147,7 +147,7 @@ export class RequestsService {
           status: { in: OPEN_STATUSES },
           OR: [
             { currentAssigneeUserId: userId },
-            { assignments: { some: { assignedToUserId: userId } } },
+            { assignments: { some: { assignedToUserId: userId, isActive: true } } },
             { currentAssigneeUserId: null as string | null },
           ],
         };
@@ -158,13 +158,17 @@ export class RequestsService {
         requestType: { select: { id: true, key: true, name: true, category: true } },
         requester: { select: requesterInclude },
         currentAssignee: { select: assigneeInclude },
+        assignments: {
+          where: { isActive: true },
+          select: { assignedToUserId: true },
+        },
         _count: { select: { comments: true } },
       },
       orderBy: [{ priority: 'desc' }, { createdAt: 'asc' }],
       take: 100,
     });
 
-    return requests.map((r: any) => this.toListItem(r));
+    return requests.map((r: any) => this.toListItem(r, userId));
   }
 
   // ─── DETAIL ───────────────────────────────────────────────────────────────
@@ -199,6 +203,29 @@ export class RequestsService {
         },
         watchers: {
           include: { user: { select: { id: true, email: true, profile: { select: { fullName: true } } } } },
+        },
+        assignments: {
+          include: {
+            assignedTo: { select: assigneeInclude },
+            assignedBy: { select: assigneeInclude },
+          },
+          orderBy: { assignedAt: 'desc' },
+        },
+        approvalActions: {
+          include: {
+            actionBy: { select: requesterInclude },
+            workflowInstanceStep: {
+              include: { workflowStep: true },
+            },
+          },
+          orderBy: { createdAt: 'desc' },
+        },
+        workflowInstance: {
+          include: {
+            currentStep: true,
+            workflowDefinition: { include: { steps: { orderBy: { stepOrder: 'asc' } } } },
+            instanceSteps: { orderBy: { createdAt: 'asc' } },
+          },
         },
         fileLinks: {
           include: {
@@ -281,6 +308,72 @@ export class RequestsService {
         userId: w.userId,
         fullName: w.user?.profile?.fullName ?? w.user?.email ?? '',
       })),
+      assignments: req.assignments.map((assignment: any) => ({
+        id: assignment.id,
+        assignedAt: assignment.assignedAt,
+        unassignedAt: assignment.unassignedAt,
+        isActive: assignment.isActive,
+        note: assignment.assignmentNote,
+        assignedTo: assignment.assignedTo
+          ? {
+              id: assignment.assignedTo.id,
+              email: assignment.assignedTo.email,
+              fullName:
+                assignment.assignedTo.profile?.fullName ??
+                assignment.assignedTo.email,
+            }
+          : null,
+        assignedBy: assignment.assignedBy
+          ? {
+              id: assignment.assignedBy.id,
+              email: assignment.assignedBy.email,
+              fullName:
+                assignment.assignedBy.profile?.fullName ??
+                assignment.assignedBy.email,
+            }
+          : null,
+      })),
+      approvalHistory: req.approvalActions.map((action: any) => ({
+        id: action.id,
+        actionType: action.actionType,
+        decisionNote: action.decisionNote,
+        createdAt: action.createdAt,
+        actor: {
+          id: action.actionBy.id,
+          fullName: action.actionBy.profile?.fullName ?? action.actionBy.email,
+        },
+        workflowStep: action.workflowInstanceStep?.workflowStep
+          ? {
+              id: action.workflowInstanceStep.workflowStep.id,
+              key: action.workflowInstanceStep.workflowStep.stepKey,
+              name: action.workflowInstanceStep.workflowStep.stepName,
+            }
+          : null,
+      })),
+      workflow: req.workflowInstance
+        ? {
+            status: req.workflowInstance.status,
+            currentStep: req.workflowInstance.currentStep?.stepName ?? null,
+            workflowName: req.workflowInstance.workflowDefinition?.name ?? null,
+            steps:
+              req.workflowInstance.workflowDefinition?.steps?.map((step: any) => {
+                const instanceStep = req.workflowInstance.instanceSteps.find(
+                  (item: any) => item.workflowStepId === step.id,
+                );
+                return {
+                  id: step.id,
+                  label: step.stepName,
+                  status:
+                    step.id === req.workflowInstance.currentStepId
+                      ? 'active'
+                      : instanceStep?.status === 'COMPLETED'
+                        ? 'completed'
+                        : 'pending',
+                  dueAt: instanceStep?.dueAt ?? null,
+                };
+              }) ?? [],
+          }
+        : null,
       attachments: req.fileLinks.map((fl: any) => ({
         id: fl.file.id,
         name: fl.file.originalFileName,
@@ -376,7 +469,14 @@ export class RequestsService {
 
   // ─── PRIVATE ──────────────────────────────────────────────────────────────
 
-  private toListItem(r: any) {
+  private toListItem(r: any, currentUserId?: string) {
+    const assignedToMe =
+      !!currentUserId &&
+      (r.currentAssignee?.id === currentUserId ||
+        (r.assignments ?? []).some(
+          (assignment: any) => assignment.assignedToUserId === currentUserId,
+        ));
+
     return {
       id: r.id,
       requestNo: r.requestNo,
@@ -393,6 +493,7 @@ export class RequestsService {
       currentAssignee: r.currentAssignee
         ? { id: r.currentAssignee.id, fullName: r.currentAssignee.profile?.fullName ?? r.currentAssignee.email }
         : null,
+      assignedToMe,
       commentCount: r._count?.comments ?? 0,
     };
   }

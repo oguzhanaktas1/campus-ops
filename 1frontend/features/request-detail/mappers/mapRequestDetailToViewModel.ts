@@ -172,6 +172,19 @@ export function mapRequestDetailToViewModel(
         null,
       name: raw.workflow?.workflowName ?? raw.workflow?.name ?? null,
       status: raw.workflow?.status ?? null,
+      steps: Array.isArray(raw.workflow?.steps)
+        ? raw.workflow.steps.map((step: any) => ({
+            id: String(step.id ?? fallbackId()),
+            label: String(step.label ?? step.stepName ?? 'Step'),
+            status:
+              step.status === 'active' ||
+              step.status === 'completed' ||
+              step.status === 'failed' ||
+              step.status === 'warning'
+                ? step.status
+                : 'pending',
+          }))
+        : [],
     },
     domainData:
       domainData ??

@@ -34,7 +34,7 @@ function InfoRow({ label, value }: { label: string; value?: string | null }) {
   )
 }
 
-const STATUSES = ['SUBMITTED', 'IN_REVIEW', 'WAITING_APPROVAL', 'APPROVED', 'REJECTED', 'REVISION_REQUESTED', 'CANCELLED', 'COMPLETED']
+const ACTIONABLE_STATUSES = ['APPROVED', 'REJECTED', 'REVISION_REQUESTED', 'CANCELLED']
 
 export default function AdminInternshipDetailPage() {
   const { id } = useParams() as { id: string }
@@ -48,7 +48,12 @@ export default function AdminInternshipDetailPage() {
     if (!id) return
     fetch(`${BACKEND}/internships/${id}`, { headers: { Authorization: `Bearer ${getToken()}` } })
       .then((r) => r.ok ? r.json() : null)
-      .then((d) => { setData(d); if (d) setNewStatus(d.status ?? '') })
+      .then((d) => {
+        setData(d)
+        if (d) {
+          setNewStatus(ACTIONABLE_STATUSES.includes(d.status) ? d.status : 'APPROVED')
+        }
+      })
       .catch(() => {})
       .finally(() => setIsLoading(false))
   }, [id])
@@ -164,7 +169,7 @@ export default function AdminInternshipDetailPage() {
               <Select value={newStatus} onValueChange={setNewStatus}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {STATUSES.map((s) => <SelectItem key={s} value={s}>{s.replace(/_/g, ' ')}</SelectItem>)}
+                  {ACTIONABLE_STATUSES.map((s) => <SelectItem key={s} value={s}>{s.replace(/_/g, ' ')}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -172,7 +177,7 @@ export default function AdminInternshipDetailPage() {
               <Label>Admin Note (optional)</Label>
               <Textarea className="resize-none min-h-[80px]" placeholder="Add an internal note..." value={note} onChange={(e) => setNote(e.target.value)} disabled={isSaving} />
             </div>
-            <Button className="w-full gap-2" onClick={handleSave} disabled={isSaving || newStatus === data.status}>
+            <Button className="w-full gap-2" onClick={handleSave} disabled={isSaving || !ACTIONABLE_STATUSES.includes(newStatus) || newStatus === data.status}>
               {isSaving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />} Save Changes
             </Button>
           </div>

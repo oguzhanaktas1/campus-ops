@@ -35,6 +35,16 @@ export class DocumentsController {
     return this.svc.findById(user.userId, user.roles, id);
   }
 
+  /** PATCH /document-requests/:id/status */
+  @Patch(':id/status')
+  processStatus(
+    @CurrentUser() user: ReqUser,
+    @Param('id') id: string,
+    @Body() dto: { status?: RequestStatus; issuedAt?: string; note?: string },
+  ) {
+    return this.svc.process(user.userId, user.roles, id, dto);
+  }
+
   /** PATCH /document-requests/:id/process */
   @Patch(':id/process')
   process(

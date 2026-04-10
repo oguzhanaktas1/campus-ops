@@ -1,332 +1,385 @@
-"use client";
+'use client'
 
-import { useEffect, useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { StatusBadge, PriorityBadge } from "@/components/status-badge";
-import { RequestTimeline } from "@/components/request-timeline";
+import { useEffect, useMemo, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import {
   CheckCircle2,
-  XCircle,
-  RotateCcw,
   ChevronRight,
+  Inbox,
   Loader2,
-  Info,
-  ListChecks,
-  Calendar, // 🔥 YENİ EKLENDİ
-  Lock,     // 🔥 YENİ EKLENDİ
-} from "lucide-react";
-import { cn } from "@/lib/utils";
-import { toast } from "sonner";
+  RotateCcw,
+  XCircle,
+} from 'lucide-react'
+import { toast } from 'sonner'
+import { cn } from '@/lib/utils'
+import { getToken } from '@/lib/auth'
+import { StatusBadge, PriorityBadge } from '@/components/status-badge'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Textarea } from '@/components/ui/textarea'
+import { EmptyState } from '@/components/empty-state'
+import { RequestHeader } from '@/features/request-detail/components/RequestHeader'
+import {
+  RelatedEntitiesCard,
+  RequestMetaCard,
+  RequestQuickFactsCard,
+  WorkflowCurrentStepCard,
+} from '@/features/request-detail/components/RequestCards'
+import {
+  RequestAttachmentsPanel,
+  RequestCommentsPanel,
+  RequestTimelineTabs,
+} from '@/features/request-detail/components/RequestPanels'
+import { DomainDetailPanel } from '@/features/request-detail/domain-panels/DomainDetailPanel'
+import { useRequestDetail } from '@/features/request-detail/hooks/useRequestDetail'
 
-type ActionType = "approve" | "reject" | "revision" | null;
+type ActionType = 'approve' | 'reject' | 'revision' | null
 
-function formatDate(d: string) {
-  if (!d) return "";
-  return new Date(d).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
+interface PendingApprovalItem {
+  id: string
+  title: string
+  status: string
+  priority: string
+  createdAt: string
+  submittedByName: string
+  typeName: string
 }
 
-// 🔥 GOOGLE TAKVİM URL OLUŞTURUCU 🔥
-const generateGoogleCalendarUrl = (request: any) => {
-  if (!request?.dynamicData) return null;
-  
-  const dateKey = Object.keys(request.dynamicData).find(k => k.toLowerCase().includes('date'));
-  const timeKey = Object.keys(request.dynamicData).find(k => k.toLowerCase().includes('time'));
-  
-  if (!dateKey || !timeKey) return null;
-
-  const dateVal = request.dynamicData[dateKey]; // "2026-04-15"
-  const timeVal = String(request.dynamicData[timeKey]).replace(':', ''); // "14:30" -> "1430"
-
-  // Google Calendar formatı: YYYYMMDDTHHMMSSZ
-  const startDateStr = dateVal.replace(/-/g, '') + 'T' + timeVal + '00';
-  const endDateStr = dateVal.replace(/-/g, '') + 'T' + (parseInt(timeVal) + 100).toString() + '00';
-
-  const title = encodeURIComponent(`[CampusOps] ${request.title}`);
-  const details = encodeURIComponent(`Student: ${request.submittedByName}\nDetails: ${request.description}`);
-
-  return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${startDateStr}/${endDateStr}&details=${details}`;
-};
+function formatDate(d: string) {
+  if (!d) return ''
+  return new Date(d).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  })
+}
 
 export default function FacultyApprovalsPage() {
-  const [pending, setPending] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isProcessing, setIsProcessing] = useState(false);
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const initialSelectedId = searchParams.get('id')
 
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [comment, setComment] = useState("");
-  const [done, setDone] = useState<Record<string, ActionType>>({});
+  const [pending, setPending] = useState<PendingApprovalItem[]>([])
+  const [isQueueLoading, setIsQueueLoading] = useState(true)
+  const [isProcessing, setIsProcessing] = useState(false)
+  const [selectedId, setSelectedId] = useState<string | null>(initialSelectedId)
+  const [comment, setComment] = useState('')
 
-  const fetchPendingRequests = async () => {
-    try {
-      const token = localStorage.getItem("access_token");
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
-      const res = await fetch(`${backendUrl}/faculty/requests/pending`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setPending(data);
-        if (data.length > 0 && !selectedId) {
-          setSelectedId(data[0].id);
-        }
-      } else {
-        const errorData = await res.json().catch(() => ({}));
-        toast.error(errorData?.message || "Failed to load pending requests.");
-      }
-    } catch (error) {
-      toast.error("Failed to load pending requests.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const { detail, isLoading, setDetail } = useRequestDetail(
+    selectedId ?? '',
+    'faculty',
+  )
 
   useEffect(() => {
-    fetchPendingRequests();
-  }, []);
+    const fetchPendingRequests = async () => {
+      try {
+        const token = getToken()
+        const backendUrl =
+          process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
+        const res = await fetch(`${backendUrl}/faculty/requests/pending`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
 
-  const selected = pending.find((r) => r.id === selectedId);
+        if (!res.ok) {
+          const errorData = await res.json().catch(() => ({}))
+          throw new Error(errorData?.message || 'Failed to load queue')
+        }
 
-  const handleAction = async (action: ActionType) => {
-    if (!selectedId || !action) return;
+        const data = await res.json()
+        const rows = Array.isArray(data) ? data : []
+        setPending(rows)
 
-    if ((action === "reject" || action === "revision") && comment.trim() === "") {
-      toast.error(`A comment is required to ${action} this request.`);
-      return;
+        const nextSelectedId =
+          initialSelectedId && rows.some((item) => item.id === initialSelectedId)
+            ? initialSelectedId
+            : rows[0]?.id ?? null
+
+        setSelectedId((current) =>
+          current && rows.some((item) => item.id === current)
+            ? current
+            : nextSelectedId,
+        )
+      } catch (error) {
+        toast.error(
+          error instanceof Error ? error.message : 'Failed to load approvals.',
+        )
+        setPending([])
+      } finally {
+        setIsQueueLoading(false)
+      }
     }
 
-    setIsProcessing(true);
+    void fetchPendingRequests()
+  }, [initialSelectedId])
+
+  useEffect(() => {
+    if (!selectedId) {
+      router.replace('/faculty/approvals')
+      return
+    }
+
+    router.replace(`/faculty/approvals?id=${selectedId}`)
+  }, [router, selectedId])
+
+  const selectedSummary = useMemo(
+    () => pending.find((item) => item.id === selectedId) ?? null,
+    [pending, selectedId],
+  )
+
+  const handleAction = async (action: ActionType) => {
+    if (!selectedId || !action) return
+
+    if ((action === 'reject' || action === 'revision') && comment.trim() === '') {
+      toast.error(`A comment is required to ${action} this request.`)
+      return
+    }
+
+    setIsProcessing(true)
     try {
-      const token = localStorage.getItem("access_token");
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
+      const token = getToken()
+      const backendUrl =
+        process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
 
       const res = await fetch(`${backendUrl}/faculty/requests/${selectedId}/action`, {
-        method: "POST",
+        method: 'POST',
         headers: {
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({ action, comment }),
-      });
+      })
 
-      if (res.ok) {
-        toast.success(`Request successfully marked as ${action}d!`);
-        setDone((prev) => ({ ...prev, [selectedId]: action }));
-        setComment("");
-
-        // İşlem bitince kısa bir süre sonra listeden düşürüp bir sonrakine geçiyoruz
-        setTimeout(() => {
-          setPending(prev => prev.filter(p => p.id !== selectedId));
-          const next = pending.find((r) => r.id !== selectedId && !done[r.id]);
-          setSelectedId(next ? next.id : null);
-        }, 3000); // Hocanın takvime ekle butonunu görebilmesi için 3 saniye süre verdik
-      } else {
-        const errorData = await res.json();
-        toast.error(errorData.message || "Failed to process request");
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}))
+        throw new Error(errorData?.message || 'Failed to process request')
       }
-    } catch (err) {
-      toast.error("Network error. Please try again.");
-    } finally {
-      setIsProcessing(false);
-    }
-  };
 
-  if (isLoading) {
-    return (
-      <div className="h-full flex items-center justify-center">
-        <Loader2 className="size-8 animate-spin text-primary" />
-      </div>
-    );
+      toast.success(`Request ${action}d successfully.`)
+      setComment('')
+
+      setPending((prev) => {
+        const next = prev.filter((item) => item.id !== selectedId)
+        setSelectedId(next[0]?.id ?? null)
+        return next
+      })
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : 'Failed to process request.',
+      )
+    } finally {
+      setIsProcessing(false)
+    }
   }
 
   return (
-    <div className="h-full flex flex-col lg:flex-row overflow-hidden">
-      {/* SOL: BEKLEYENLER LİSTESİ */}
-      <div className="lg:w-80 flex-shrink-0 border-r border-border overflow-y-auto bg-card">
-        <div className="px-4 py-3 border-b border-border">
-          <h2 className="text-sm font-semibold text-foreground">Pending Approvals</h2>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            {pending.filter((p) => !done[p.id]).length} requires action
-          </p>
-        </div>
-        <div className="divide-y divide-border">
-          {pending.map((req) => {
-            const doneAction = done[req.id];
-            return (
-              <button
-                key={req.id}
-                onClick={() => setSelectedId(req.id)}
-                className={cn(
-                  "w-full text-left px-4 py-3.5 flex items-start gap-2 hover:bg-muted/30 transition-colors",
-                  selectedId === req.id && "bg-primary/5 border-r-2 border-r-primary",
-                  doneAction && "opacity-50 pointer-events-none" // 🔥 Tıklanmayı engelle
-                )}
-              >
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-foreground truncate">{req.title}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {req.submittedByName} · {formatDate(req.createdAt)}
-                  </p>
-                  {doneAction && (
-                    <span className={cn(
-                      "inline-flex items-center gap-1 text-[10px] font-bold mt-1 uppercase tracking-wider",
-                      doneAction === "approve" && "text-emerald-600",
-                      doneAction === "reject" && "text-destructive",
-                      doneAction === "revision" && "text-amber-600"
-                    )}>
-                      {doneAction === "approve" && <CheckCircle2 className="size-3" />}
-                      {doneAction === "reject" && <XCircle className="size-3" />}
-                      {doneAction === "revision" && <RotateCcw className="size-3" />}
-                      {doneAction}D
-                    </span>
-                  )}
-                </div>
-                <ChevronRight className="size-4 text-muted-foreground flex-shrink-0 mt-0.5" />
-              </button>
-            );
-          })}
-          {pending.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
-              <CheckCircle2 className="size-10 text-emerald-500/20 mb-3" />
-              <p className="text-sm font-medium text-foreground">All Caught Up!</p>
-              <p className="text-xs text-muted-foreground mt-1">No requests pending your approval.</p>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* SAĞ: TALEP DETAYI VE AKSİYONLAR */}
-      <div className="flex-1 overflow-y-auto p-6 bg-muted/5">
-        {!selected ? (
-          <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
-            Select a request to review
+    <div className="h-full overflow-hidden">
+      <div className="grid h-full lg:grid-cols-[320px_minmax(0,1fr)]">
+        <aside className="border-r border-border bg-card">
+          <div className="border-b border-border px-4 py-4">
+            <h1 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+              <Inbox className="size-4 text-primary" />
+              Faculty Approval Queue
+            </h1>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {pending.length} request{pending.length === 1 ? '' : 's'} waiting
+              for review
+            </p>
           </div>
-        ) : (
-          <div className="max-w-3xl space-y-6">
-            <div>
-              <div className="flex items-start justify-between gap-3 flex-wrap">
-                <div>
-                  <h1 className="text-2xl font-bold text-foreground">{selected.title}</h1>
-                  <p className="text-sm text-muted-foreground mt-1 flex items-center gap-2">
-                    <span className="font-medium text-primary">{selected.submittedByName}</span>
-                    <span>•</span> {formatDate(selected.createdAt)}
-                    <span>•</span> {selected.typeName}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <PriorityBadge priority={selected.priority} />
-                  <StatusBadge
-                    status={
-                      done[selected.id]
-                        ? done[selected.id] === "approve" ? "APPROVED" : done[selected.id] === "reject" ? "REJECTED" : "REVISION_REQUESTED"
-                        : selected.status
-                    }
-                  />
-                </div>
+
+          <div className="max-h-[calc(100vh-9rem)] overflow-y-auto">
+            {isQueueLoading ? (
+              <div className="flex h-48 items-center justify-center">
+                <Loader2 className="size-7 animate-spin text-primary" />
               </div>
-            </div>
-
-            <div className="bg-card border border-border rounded-lg p-5 shadow-sm">
-              <p className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
-                <Info className="size-4 text-muted-foreground" /> Request Description
-              </p>
-              <div className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
-                {selected.description || "No description provided."}
-              </div>
-            </div>
-
-            {selected.formSchema && selected.formSchema.length > 0 && (
-              <div className="bg-card border border-border rounded-lg p-5 shadow-sm space-y-4">
-                <p className="text-sm font-semibold text-foreground flex items-center gap-2">
-                  <ListChecks className="size-4 text-muted-foreground" /> Specific Form Details
-                </p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-muted/20 p-4 rounded-lg border border-border/50">
-                  {selected.formSchema.map((field: any) => {
-                    const answer = selected.dynamicData?.[field.id] || selected[field.id];
-                    return (
-                      <div key={field.id} className={field.gridCols === 2 ? "col-span-1 sm:col-span-2" : "col-span-1"}>
-                        <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-1">
-                          {field.label}
-                        </p>
-                        <p className="text-sm font-medium text-foreground bg-background px-3 py-2 rounded-md border border-border/50">
-                          {answer ? String(answer) : <span className="text-muted-foreground italic">Not provided</span>}
-                        </p>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* 🔥 KARAR ALANI VE KİLİT MEKANİZMASI 🔥 */}
-            {done[selected.id] || (selected.status === 'APPROVED' || selected.status === 'REJECTED' || selected.status === 'REVISION_REQUESTED') ? (
-              <div className="bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900 p-6 rounded-lg flex flex-col items-center text-center gap-4">
-                <div className="size-12 rounded-full bg-emerald-100 dark:bg-emerald-900/50 flex items-center justify-center">
-                  <Lock className="size-6 text-emerald-600" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-emerald-800 dark:text-emerald-400 uppercase tracking-wider">Action Recorded</h3>
-                  <p className="text-xs text-emerald-700 dark:text-emerald-500 mt-1">This request has been successfully processed and is now locked.</p>
-                </div>
-
-                {/* TAKVİME EKLE BUTONU (Sadece Approve yapıldıysa ve tarih verisi varsa) */}
-                {done[selected.id] === "approve" && generateGoogleCalendarUrl(selected) && (
-                  <a 
-                    href={generateGoogleCalendarUrl(selected)!} 
-                    target="_blank" 
-                    rel="noreferrer"
-                    className="mt-2 inline-flex items-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 rounded-md text-xs font-bold transition-colors shadow-sm"
-                  >
-                    <Calendar className="size-4" /> Add to Google Calendar
-                  </a>
-                )}
+            ) : pending.length === 0 ? (
+              <div className="p-4">
+                <EmptyState
+                  title="No pending approvals"
+                  description="Faculty review queue is currently empty."
+                  icon={<CheckCircle2 className="size-6 text-emerald-500" />}
+                />
               </div>
             ) : (
-              <div className="bg-card border border-border rounded-lg p-5 shadow-sm space-y-4">
-                <div className="flex justify-between items-center">
-                  <p className="text-sm font-semibold text-foreground">Faculty Decision</p>
-                  {comment.trim() === "" && (
-                    <p className="text-[10px] text-amber-600 font-medium bg-amber-50 px-2 py-1 rounded">
-                      Comment required for Reject/Revision
-                    </p>
-                  )}
-                </div>
-                <div className="space-y-3">
-                  <Textarea
-                    placeholder="Provide your reasoning or feedback here (Required for Reject/Revision)..."
-                    value={comment}
-                    onChange={(e) => setComment(e.target.value)}
-                    className="resize-none min-h-[100px] border-muted-foreground/20 focus:border-primary"
-                    disabled={isProcessing}
-                  />
-                  <div className="flex gap-3 flex-wrap">
-                    <Button className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white flex-1 sm:flex-none" disabled={isProcessing} onClick={() => handleAction("approve")}>
-                      {isProcessing ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />} Approve
-                    </Button>
-                    <Button variant="destructive" className="gap-2 flex-1 sm:flex-none" disabled={isProcessing} onClick={() => handleAction("reject")}>
-                      {isProcessing ? <Loader2 className="size-4 animate-spin" /> : <XCircle className="size-4" />} Reject
-                    </Button>
-                    <Button variant="outline" className="gap-2 flex-1 sm:flex-none border-amber-200 text-amber-700 hover:bg-amber-50 hover:text-amber-800" disabled={isProcessing} onClick={() => handleAction("revision")}>
-                      {isProcessing ? <Loader2 className="size-4 animate-spin" /> : <RotateCcw className="size-4" />} Request Revision
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {selected.timeline && selected.timeline.length > 0 && (
-              <div className="bg-card border border-border rounded-lg p-5 shadow-sm">
-                <p className="text-sm font-semibold text-foreground mb-4">Activity History</p>
-                <RequestTimeline events={selected.timeline} />
+              <div className="divide-y divide-border">
+                {pending.map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => setSelectedId(item.id)}
+                    className={cn(
+                      'flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/40',
+                      selectedId === item.id &&
+                        'border-r-2 border-r-primary bg-primary/5',
+                    )}
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium text-foreground">
+                        {item.title}
+                      </p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {item.submittedByName} · {formatDate(item.createdAt)}
+                      </p>
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <PriorityBadge priority={item.priority} />
+                        <StatusBadge status={item.status} />
+                      </div>
+                    </div>
+                    <ChevronRight className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                  </button>
+                ))}
               </div>
             )}
           </div>
-        )}
+        </aside>
+
+        <main className="overflow-y-auto bg-muted/10">
+          {!selectedId ? (
+            <div className="flex h-full items-center justify-center p-6">
+              <EmptyState
+                title="Select a request"
+                description="Choose a pending approval from the queue to inspect details and decide."
+                icon={<Inbox className="size-6" />}
+              />
+            </div>
+          ) : isLoading || !detail ? (
+            <div className="flex h-full items-center justify-center">
+              <Loader2 className="size-8 animate-spin text-primary" />
+            </div>
+          ) : (
+            <div className="mx-auto max-w-7xl space-y-6 p-6 pb-20">
+              <RequestHeader detail={detail} />
+
+              <div className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_340px]">
+                <div className="space-y-6">
+                  <RequestMetaCard detail={detail} />
+                  <DomainDetailPanel detail={detail} />
+                  <RequestAttachmentsPanel detail={detail} />
+                  <RequestCommentsPanel
+                    detail={detail}
+                    onCommentAdded={(comments) => setDetail({ ...detail, comments })}
+                  />
+                  <RequestTimelineTabs detail={detail} />
+                </div>
+
+                <div className="space-y-6">
+                  <FacultyDecisionPanel
+                    detailStatus={detail.status}
+                    submittedByName={
+                      detail.requester?.fullName ??
+                      selectedSummary?.submittedByName ??
+                      'Requester'
+                    }
+                    requestTypeName={
+                      detail.requestType.name || selectedSummary?.typeName || 'Request'
+                    }
+                    comment={comment}
+                    isProcessing={isProcessing}
+                    onCommentChange={setComment}
+                    onAction={handleAction}
+                  />
+                  <WorkflowCurrentStepCard detail={detail} />
+                  <RequestQuickFactsCard detail={detail} />
+                  <RelatedEntitiesCard detail={detail} />
+                </div>
+              </div>
+            </div>
+          )}
+        </main>
       </div>
     </div>
-  );
+  )
+}
+
+function FacultyDecisionPanel({
+  detailStatus,
+  submittedByName,
+  requestTypeName,
+  comment,
+  isProcessing,
+  onCommentChange,
+  onAction,
+}: {
+  detailStatus: string
+  submittedByName: string
+  requestTypeName: string
+  comment: string
+  isProcessing: boolean
+  onCommentChange: (value: string) => void
+  onAction: (action: ActionType) => void
+}) {
+  const isLocked = ['APPROVED', 'REJECTED', 'REVISION_REQUESTED'].includes(
+    detailStatus,
+  )
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Faculty Decision</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="rounded-lg border bg-muted/30 p-3 text-sm">
+          <p className="font-medium text-foreground">{requestTypeName}</p>
+          <p className="mt-1 text-muted-foreground">
+            Reviewing request submitted by {submittedByName}.
+          </p>
+        </div>
+
+        {isLocked ? (
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
+            This request has already been processed in the faculty queue.
+          </div>
+        ) : (
+          <>
+            <Textarea
+              placeholder="Add a faculty note. Reject and revision actions require a comment."
+              value={comment}
+              onChange={(event) => onCommentChange(event.target.value)}
+              className="min-h-[120px] resize-none"
+              disabled={isProcessing}
+            />
+
+            <div className="flex flex-wrap gap-3">
+              <Button
+                className="gap-2 bg-emerald-600 text-white hover:bg-emerald-700"
+                onClick={() => onAction('approve')}
+                disabled={isProcessing}
+              >
+                {isProcessing ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="size-4" />
+                )}
+                Approve
+              </Button>
+              <Button
+                variant="destructive"
+                className="gap-2"
+                onClick={() => onAction('reject')}
+                disabled={isProcessing}
+              >
+                {isProcessing ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <XCircle className="size-4" />
+                )}
+                Reject
+              </Button>
+              <Button
+                variant="outline"
+                className="gap-2 border-amber-300 text-amber-700 hover:bg-amber-50 hover:text-amber-800"
+                onClick={() => onAction('revision')}
+                disabled={isProcessing}
+              >
+                {isProcessing ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <RotateCcw className="size-4" />
+                )}
+                Request Revision
+              </Button>
+            </div>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  )
 }

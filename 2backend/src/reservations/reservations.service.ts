@@ -223,12 +223,24 @@ export class ReservationsService {
       };
     });
 
-    void this.notificationsService.createNotification({
-      userId,
-      title: 'Reservation Request Submitted',
-      message: `Request ${result.requestNo} received for ${resource.name}.`,
-      actionUrl: '/student/reservations/' + result.requestId,
+    await this.prisma.notification.deleteMany({
+      where: {
+        userId,
+        requestId: result.requestId,
+        OR: [
+          {
+            title: {
+              contains: 'Reservation Request Submitted',
+              mode: 'insensitive',
+            },
+          },
+          {
+            actionUrl: `/student/reservations/${result.requestId}`,
+          },
+        ],
+      },
     });
+
     return result;
   }
 
@@ -496,28 +508,16 @@ export class ReservationsService {
       requestId,
     );
 
+    await this.workflowEngine.processAction(userId, roles, requestId, {
+      action: 'approve',
+      comment: dto.note?.trim() || undefined,
+    });
+
     const rrrData = rrr;
     const result = await this.prisma.$transaction(async (tx) => {
-      const prevReq = await tx.request.findUnique({ where: { id: requestId } });
-
       await tx.roomReservationRequest.update({
         where: { id: rrrData.id },
         data: { reservationStatus: ReservationStatus.APPROVED },
-      });
-
-      await tx.request.update({
-        where: { id: requestId },
-        data: { status: RequestStatus.APPROVED },
-      });
-
-      await tx.requestStatusHistory.create({
-        data: {
-          requestId,
-          oldStatus: prevReq?.status ?? null,
-          newStatus: RequestStatus.APPROVED,
-          changedByUserId: userId,
-          changeReason: dto.note?.trim() || 'Reservation approved.',
-        },
       });
 
       const reservation = await tx.reservation.create({
@@ -586,28 +586,16 @@ export class ReservationsService {
     });
     if (!rrr) throw new NotFoundException('Reservation request not found.');
 
+    await this.workflowEngine.processAction(userId, roles, requestId, {
+      action: 'reject',
+      comment: dto.reason?.trim() || undefined,
+    });
+
     const rrrData = rrr;
     const result = await this.prisma.$transaction(async (tx) => {
-      const prevReq = await tx.request.findUnique({ where: { id: requestId } });
-
       await tx.roomReservationRequest.update({
         where: { id: rrrData.id },
         data: { reservationStatus: ReservationStatus.REJECTED },
-      });
-
-      await tx.request.update({
-        where: { id: requestId },
-        data: { status: RequestStatus.REJECTED },
-      });
-
-      await tx.requestStatusHistory.create({
-        data: {
-          requestId,
-          oldStatus: prevReq?.status ?? null,
-          newStatus: RequestStatus.REJECTED,
-          changedByUserId: userId,
-          changeReason: dto.reason?.trim() || 'Reservation rejected.',
-        },
       });
 
       if (dto.reason?.trim()) {

@@ -27,6 +27,6 @@ export class EventsController {
 
   @Patch(':id/status')
   updateStatus(@CurrentUser() user: ReqUser, @Param('id') id: string, @Body() body: { status: any; note?: string }) {
-    return this.svc.updateStatus(user.userId, id, body.status, body.note);
+    return this.svc.updateStatus(user.userId, user.roles, id, body.status, body.note);
   }
 }

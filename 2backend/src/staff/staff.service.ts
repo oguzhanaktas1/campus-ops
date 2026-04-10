@@ -119,6 +119,35 @@ export class StaffService {
         requestType: true,
         currentAssignee: { include: { profile: true } },
         fileLinks: true,
+        assignments: {
+          include: {
+            assignedTo: { include: { profile: true } },
+            assignedBy: { include: { profile: true } },
+          },
+          orderBy: { assignedAt: 'desc' },
+        },
+        approvalActions: {
+          include: {
+            actionBy: { include: { profile: true } },
+            workflowInstanceStep: {
+              include: { workflowStep: true },
+            },
+          },
+          orderBy: { createdAt: 'desc' },
+        },
+        workflowInstance: {
+          include: {
+            currentStep: true,
+            workflowDefinition: {
+              include: {
+                steps: { orderBy: { stepOrder: 'asc' } },
+              },
+            },
+            instanceSteps: {
+              orderBy: { createdAt: 'asc' },
+            },
+          },
+        },
       },
     });
 
@@ -143,6 +172,76 @@ export class StaffService {
             title: request.requester.profile?.title || null,
           }
         : null,
+      workflow: request.workflowInstance
+        ? {
+            status: request.workflowInstance.status,
+            currentStep: request.workflowInstance.currentStep?.stepName ?? null,
+            workflowName:
+              request.workflowInstance.workflowDefinition?.name ?? null,
+            steps:
+              request.workflowInstance.workflowDefinition?.steps?.map((step) => {
+                const instanceStep = request.workflowInstance?.instanceSteps.find(
+                  (item) => item.workflowStepId === step.id,
+                );
+                return {
+                  id: step.id,
+                  label: step.stepName,
+                  status:
+                    step.id === request.workflowInstance?.currentStepId
+                      ? 'active'
+                      : instanceStep?.status === 'COMPLETED'
+                        ? 'completed'
+                        : request.status === 'REJECTED' &&
+                            step.id === request.workflowInstance?.currentStepId
+                          ? 'failed'
+                          : 'pending',
+                };
+              }) ?? [],
+          }
+        : null,
+      assignments: request.assignments.map((assignment) => ({
+        id: assignment.id,
+        assignedAt: assignment.assignedAt,
+        unassignedAt: assignment.unassignedAt,
+        isActive: assignment.isActive,
+        note: assignment.assignmentNote,
+        assignedTo: assignment.assignedTo
+          ? {
+              id: assignment.assignedTo.id,
+              fullName:
+                assignment.assignedTo.profile?.fullName ||
+                assignment.assignedTo.email,
+              email: assignment.assignedTo.email,
+            }
+          : null,
+        assignedBy: assignment.assignedBy
+          ? {
+              id: assignment.assignedBy.id,
+              fullName:
+                assignment.assignedBy.profile?.fullName ||
+                assignment.assignedBy.email,
+              email: assignment.assignedBy.email,
+            }
+          : null,
+      })),
+      approvalHistory: request.approvalActions.map((action) => ({
+        id: action.id,
+        actionType: action.actionType,
+        decisionNote: action.decisionNote,
+        createdAt: action.createdAt,
+        actor: {
+          id: action.actionBy.id,
+          fullName: action.actionBy.profile?.fullName || action.actionBy.email,
+          email: action.actionBy.email,
+        },
+        workflowStep: action.workflowInstanceStep?.workflowStep
+          ? {
+              id: action.workflowInstanceStep.workflowStep.id,
+              key: action.workflowInstanceStep.workflowStep.stepKey,
+              name: action.workflowInstanceStep.workflowStep.stepName,
+            }
+          : null,
+      })),
     };
   }
 
@@ -151,10 +250,13 @@ export class StaffService {
     return this.prisma.user.findMany({
       where: {
         status: 'ACTIVE',
-        primaryRoles: { some: { role: { name: 'FACULTY' } } },
+        primaryRoles: {
+          some: { role: { name: { in: ['FACULTY', 'STAFF', 'ADMIN'] } } },
+        },
       },
       select: {
         id: true,
+        email: true,
         profile: {
           select: {
             fullName: true,
@@ -173,44 +275,113 @@ export class StaffService {
     assigneeUserId: string,
     staffId: string, // This is the ID of the staff member making the assignment
   ) {
-    const updatedRequest = await this.prisma.request.update({
+    const request = await this.prisma.request.findUnique({
       where: { id: requestId },
-      data: {
-        currentAssigneeUserId: assigneeUserId,
-        status: RequestStatus.IN_REVIEW,
-      },
       include: {
         currentAssignee: { include: { profile: true } },
-        requestType: true,
         requester: { include: { profile: true } },
-        fileLinks: true,
-        comments: {
-          include: {
-            user: { include: { profile: true } },
+      },
+    });
+    if (!request) throw new NotFoundException('Request not found.');
+
+    const assignee = await this.prisma.user.findUnique({
+      where: { id: assigneeUserId },
+      include: { profile: true },
+    });
+    if (!assignee || assignee.status !== 'ACTIVE') {
+      throw new BadRequestException('Assignee is invalid or inactive.');
+    }
+
+    const updatedRequest = await this.prisma.$transaction(async (tx) => {
+      await tx.requestAssignment.updateMany({
+        where: { requestId, isActive: true },
+        data: { isActive: false, unassignedAt: new Date() },
+      });
+
+      await tx.requestAssignment.create({
+        data: {
+          requestId,
+          assignedToUserId: assigneeUserId,
+          assignedByUserId: staffId,
+          assignmentNote: 'Assigned manually from staff request detail.',
+        },
+      });
+
+      await tx.requestWatcher.createMany({
+        data: [
+          { requestId, userId: request.requesterUserId },
+          { requestId, userId: assigneeUserId },
+          { requestId, userId: staffId },
+        ],
+        skipDuplicates: true,
+      });
+
+      const nextStatus =
+        request.status === RequestStatus.SUBMITTED
+          ? RequestStatus.IN_REVIEW
+          : request.status;
+
+      const updated = await tx.request.update({
+        where: { id: requestId },
+        data: {
+          currentAssigneeUserId: assigneeUserId,
+          status: nextStatus,
+        },
+        include: {
+          currentAssignee: { include: { profile: true } },
+          requestType: true,
+          requester: { include: { profile: true } },
+          fileLinks: true,
+          comments: {
+            include: {
+              user: { include: { profile: true } },
+            },
           },
         },
-      },
-    });
+      });
 
-    // Record Status History
-    await this.prisma.requestStatusHistory.create({
-      data: {
-        requestId: requestId,
-        newStatus: RequestStatus.IN_REVIEW,
-        changedByUserId: staffId,
-        changeReason:
-          'Request assigned to a faculty member and marked as In Review.',
-      },
-    });
+      if (nextStatus !== request.status) {
+        await tx.requestStatusHistory.create({
+          data: {
+            requestId,
+            oldStatus: request.status,
+            newStatus: nextStatus,
+            changedByUserId: staffId,
+            changeReason: `Request assigned to ${assignee.profile?.fullName || assignee.email} and moved to In Review.`,
+          },
+        });
+      }
 
-    // 🔥 AUDIT LOG: REQUEST ASSIGNED 🔥
-    await this.prisma.auditLog.create({
-      data: {
-        userId: staffId,
-        actionType: AuditActionType.ASSIGN,
-        entityType: 'Request',
-        entityId: requestId,
-      },
+      await tx.requestComment.create({
+        data: {
+          requestId,
+          userId: staffId,
+          commentText: `Request assigned to ${assignee.profile?.fullName || assignee.email}.`,
+          isInternal: true,
+        },
+      });
+
+      await tx.notification.create({
+        data: {
+          userId: assigneeUserId,
+          requestId,
+          type: 'IN_APP',
+          title: 'Request Assigned',
+          message: `${request.requestNo} has been assigned to you.`,
+          actionUrl: '/staff/inbox',
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          userId: staffId,
+          actionType: AuditActionType.ASSIGN,
+          entityType: 'Request',
+          entityId: requestId,
+        },
+      });
+
+      return updated;
     });
 
     return updatedRequest;
