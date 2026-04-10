@@ -98,6 +98,13 @@ type WorkflowDetail = WorkflowSummary & {
       priority: string
       requesterName: string
       currentAssigneeName?: string | null
+      sla?: {
+        dueAt?: string | null
+        firstResponseState?: string | null
+        resolutionState?: string | null
+        escalationTriggered?: boolean
+        stepOverdueCount?: number
+      }
     }
     activeAssignment?: {
       assignedAt: string
@@ -463,9 +470,17 @@ export default function AdminWorkflowsPage() {
             </div>
           ) : (
             workflows.map((workflow) => (
-              <button
+              <div
                 key={workflow.id}
+                role="button"
+                tabIndex={0}
                 onClick={() => setSelectedId(workflow.id)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault()
+                    setSelectedId(workflow.id)
+                  }
+                }}
                 className={cn(
                   'w-full rounded-lg border bg-card p-4 text-left shadow-sm transition-all hover:border-primary/40',
                   selectedId === workflow.id ? 'border-primary bg-primary/5' : 'border-border',
@@ -507,7 +522,7 @@ export default function AdminWorkflowsPage() {
                     <ChevronRight className={cn('size-4 text-muted-foreground', selectedId === workflow.id && 'rotate-90')} />
                   </div>
                 </div>
-              </button>
+              </div>
             ))
           )}
         </div>
@@ -727,6 +742,16 @@ export default function AdminWorkflowsPage() {
                                 <p>Ended At: <span className="text-foreground">{formatDate(instance.endedAt)}</span></p>
                               </div>
                             </div>
+
+                            {instance.request.sla && (
+                              <div className="rounded-md border border-border p-3 text-xs text-muted-foreground space-y-1">
+                                <p>SLA Due At: <span className="text-foreground">{formatDate(instance.request.sla.dueAt)}</span></p>
+                                <p>First Response: <span className="text-foreground">{instance.request.sla.firstResponseState ?? 'N/A'}</span></p>
+                                <p>Resolution: <span className="text-foreground">{instance.request.sla.resolutionState ?? 'N/A'}</span></p>
+                                <p>Escalated: <span className="text-foreground">{instance.request.sla.escalationTriggered ? 'Yes' : 'No'}</span></p>
+                                <p>Step Overdues: <span className="text-foreground">{instance.request.sla.stepOverdueCount ?? 0}</span></p>
+                              </div>
+                            )}
 
                             {instance.activeAssignment && (
                               <div className="rounded-md border border-border p-3 text-xs text-muted-foreground space-y-1">

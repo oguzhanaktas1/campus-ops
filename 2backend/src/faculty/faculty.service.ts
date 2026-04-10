@@ -8,6 +8,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../core/prisma/prisma.service';
+import { SlaService } from '../workflow/sla.service';
 import {
   RequestStatus,
   WorkflowActionType,
@@ -16,7 +17,10 @@ import {
 
 @Injectable()
 export class FacultyService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private slaService: SlaService,
+  ) {}
 
   private buildRequestDomainData(request: any) {
     switch (request.requestType?.key) {
@@ -454,6 +458,27 @@ export class FacultyService {
             },
           },
         },
+        assignments: {
+          include: {
+            assignedTo: {
+              include: {
+                profile: true,
+                primaryRoles: { include: { role: true } },
+              },
+            },
+            assignedBy: { include: { profile: true } },
+          },
+          orderBy: { assignedAt: 'desc' },
+        },
+        approvalActions: {
+          include: {
+            actionBy: { include: { profile: true } },
+            workflowInstanceStep: {
+              include: { workflowStep: true },
+            },
+          },
+          orderBy: { createdAt: 'desc' },
+        },
         statusHistory: { orderBy: { changedAt: 'desc' } },
         workflowInstance: {
           include: {
@@ -469,12 +494,35 @@ export class FacultyService {
           },
         },
         documentRequest: true,
-        roomReservationRequest: true,
+        roomReservationRequest: {
+          include: {
+            resource: {
+              select: {
+                id: true,
+                name: true,
+                resourceType: true,
+                locationText: true,
+                capacity: true,
+              },
+            },
+          },
+        },
         appointmentRequest: true,
         procurementRequest: true,
         accessRequest: true,
         eventRequest: true,
-        equipmentRequest: true,
+        equipmentRequest: {
+          include: {
+            labResource: {
+              select: {
+                id: true,
+                name: true,
+                resourceType: true,
+                locationText: true,
+              },
+            },
+          },
+        },
         internshipRequest: true,
       },
     });
@@ -547,6 +595,51 @@ export class FacultyService {
         date: h.changedAt,
         note: h.changeReason,
       })),
+      assignments: request.assignments.map((assignment) => ({
+        id: assignment.id,
+        assignedAt: assignment.assignedAt,
+        unassignedAt: assignment.unassignedAt,
+        isActive: assignment.isActive,
+        note: assignment.assignmentNote,
+        assignedTo: assignment.assignedTo
+          ? {
+              id: assignment.assignedTo.id,
+              fullName:
+                assignment.assignedTo.profile?.fullName ||
+                assignment.assignedTo.email,
+              email: assignment.assignedTo.email,
+              role:
+                assignment.assignedTo.primaryRoles?.[0]?.role?.name || null,
+            }
+          : null,
+        assignedBy: assignment.assignedBy
+          ? {
+              id: assignment.assignedBy.id,
+              fullName:
+                assignment.assignedBy.profile?.fullName ||
+                assignment.assignedBy.email,
+              email: assignment.assignedBy.email,
+            }
+          : null,
+      })),
+      approvalHistory: request.approvalActions.map((action) => ({
+        id: action.id,
+        actionType: action.actionType,
+        decisionNote: action.decisionNote,
+        createdAt: action.createdAt,
+        actor: {
+          id: action.actionBy.id,
+          fullName: action.actionBy.profile?.fullName || action.actionBy.email,
+          email: action.actionBy.email,
+        },
+        workflowStep: action.workflowInstanceStep?.workflowStep
+          ? {
+              id: action.workflowInstanceStep.workflowStep.id,
+              key: action.workflowInstanceStep.workflowStep.stepKey,
+              name: action.workflowInstanceStep.workflowStep.stepName,
+            }
+          : null,
+      })),
       workflow: (() => {
         const workflowInstance = request.workflowInstance;
         if (!workflowInstance) return null;
@@ -616,6 +709,10 @@ export class FacultyService {
           },
         },
       },
+    });
+
+    await this.prisma.$transaction(async (tx) => {
+      await this.slaService.markFirstResponse(tx, requestId);
     });
 
     return {

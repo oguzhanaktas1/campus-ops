@@ -22,11 +22,39 @@ interface SLAPolicy {
   isActive: boolean
 }
 
+interface SlaOverview {
+  metrics: {
+    activePolicies: number
+    firstResponseBreaches: number
+    resolutionBreaches: number
+    escalations: number
+    stepOverdues: number
+  }
+  recentEvents: Array<{
+    id: string
+    eventType: string
+    occurredAt: string
+    resolvedAt?: string | null
+    request?: {
+      id: string
+      requestNo: string
+      title: string
+      status: string
+    } | null
+    policy?: {
+      id: string
+      name: string
+      priority?: string | null
+      requestType?: { key: string; name: string } | null
+    } | null
+  }>
+}
+
 const PRIORITY_BADGE: Record<string, string> = {
   LOW: 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800/30 dark:text-slate-400 dark:border-slate-700',
   MEDIUM: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-800',
   HIGH: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-800',
-  CRITICAL: 'bg-red-50 text-red-700 border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-800',
+  URGENT: 'bg-red-50 text-red-700 border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-800',
 }
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000'
@@ -54,6 +82,7 @@ export default function AdminSLAPage() {
   const [policies, setPolicies] = useState<SLAPolicy[]>([])
   const [requestTypes, setRequestTypes] = useState<RequestType[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [overview, setOverview] = useState<SlaOverview | null>(null)
   const [showDialog, setShowDialog] = useState(false)
   const [editTarget, setEditTarget] = useState<SLAPolicy | null>(null)
   const [form, setForm] = useState({ ...EMPTY_FORM })
@@ -62,12 +91,14 @@ export default function AdminSLAPage() {
 
   const fetchPolicies = useCallback(async () => {
     try {
-      const [polRes, rtRes] = await Promise.all([
+      const [polRes, rtRes, overviewRes] = await Promise.all([
         fetch(`${BACKEND}/admin/sla`, { headers: { Authorization: `Bearer ${getToken()}` } }),
         fetch(`${BACKEND}/admin/request-types`, { headers: { Authorization: `Bearer ${getToken()}` } }),
+        fetch(`${BACKEND}/admin/sla/overview`, { headers: { Authorization: `Bearer ${getToken()}` } }),
       ])
       if (polRes.ok) setPolicies(await polRes.json())
       if (rtRes.ok) setRequestTypes(await rtRes.json())
+      if (overviewRes.ok) setOverview(await overviewRes.json())
     } catch {
       toast.error('Failed to load SLA policies.')
     } finally {
@@ -195,7 +226,7 @@ export default function AdminSLAPage() {
                   <option value="LOW">Low</option>
                   <option value="MEDIUM">Medium</option>
                   <option value="HIGH">High</option>
-                  <option value="CRITICAL">Critical</option>
+                  <option value="URGENT">Urgent</option>
                 </select>
               </div>
               <div className="grid grid-cols-3 gap-3">
@@ -272,6 +303,23 @@ export default function AdminSLAPage() {
           <Plus className="size-4" /> Add Policy
         </Button>
       </div>
+
+      {overview && (
+        <div className="grid gap-4 md:grid-cols-5">
+          {[
+            ['Active Policies', overview.metrics.activePolicies],
+            ['First Response Breaches', overview.metrics.firstResponseBreaches],
+            ['Resolution Breaches', overview.metrics.resolutionBreaches],
+            ['Escalations', overview.metrics.escalations],
+            ['Step Overdues', overview.metrics.stepOverdues],
+          ].map(([label, value]) => (
+            <div key={label} className="rounded-xl border border-border bg-card p-4 shadow-sm">
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
+              <p className="mt-2 text-2xl font-semibold text-foreground">{value}</p>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Table */}
       <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
@@ -367,6 +415,41 @@ export default function AdminSLAPage() {
           )}
         </div>
       </div>
+
+      {overview && (
+        <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
+          <div className="border-b border-border px-5 py-4">
+            <h2 className="text-sm font-semibold text-foreground">Recent SLA Events</h2>
+          </div>
+          <div className="divide-y divide-border">
+            {overview.recentEvents.length === 0 ? (
+              <div className="px-5 py-10 text-sm text-muted-foreground">No SLA event recorded yet.</div>
+            ) : (
+              overview.recentEvents.map((event) => (
+                <div key={event.id} className="px-5 py-4 space-y-1.5">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="rounded-full border border-border bg-muted px-2.5 py-0.5 text-xs font-medium text-foreground">
+                      {event.eventType}
+                    </span>
+                    {event.policy?.priority && (
+                      <span className={cn('text-xs font-semibold px-2.5 py-1 rounded-full border', PRIORITY_BADGE[event.policy.priority] ?? PRIORITY_BADGE.LOW)}>
+                        {event.policy.priority}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-sm text-foreground">
+                    {event.request?.requestNo ?? 'Request'} {event.request?.title ? `· ${event.request.title}` : ''}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Policy: {event.policy?.name ?? 'N/A'} · Occurred: {new Date(event.occurredAt).toLocaleString('tr-TR')}
+                    {event.resolvedAt ? ` · Resolved: ${new Date(event.resolvedAt).toLocaleString('tr-TR')}` : ''}
+                  </p>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

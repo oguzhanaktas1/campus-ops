@@ -9,10 +9,14 @@ import {
 import { PrismaService } from '../core/prisma/prisma.service';
 import { RequestStatus, Prisma, AuditActionType } from '@prisma/client'; // 🔥 AuditActionType Eklendi
 import * as bcrypt from 'bcrypt';
+import { SlaService } from '../workflow/sla.service';
 
 @Injectable()
 export class StaffService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private slaService: SlaService,
+  ) {}
 
   // 1. DASHBOARD METRICS
   async getDashboardMetrics() {
@@ -148,6 +152,37 @@ export class StaffService {
             },
           },
         },
+        documentRequest: true,
+        roomReservationRequest: {
+          include: {
+            resource: {
+              select: {
+                id: true,
+                name: true,
+                resourceType: true,
+                locationText: true,
+                capacity: true,
+              },
+            },
+          },
+        },
+        appointmentRequest: true,
+        procurementRequest: true,
+        accessRequest: true,
+        eventRequest: true,
+        equipmentRequest: {
+          include: {
+            labResource: {
+              select: {
+                id: true,
+                name: true,
+                resourceType: true,
+                locationText: true,
+              },
+            },
+          },
+        },
+        internshipRequest: true,
       },
     });
 
@@ -199,6 +234,114 @@ export class StaffService {
               }) ?? [],
           }
         : null,
+      formData: {
+        ...(request.dynamicData as Record<string, unknown> | null),
+        ...(request.documentRequest
+          ? {
+              documentType: request.documentRequest.documentType,
+              language: request.documentRequest.language,
+              copiesCount: request.documentRequest.copiesCount,
+              deliveryMethod: request.documentRequest.deliveryMethod,
+              deliveryAddress: request.documentRequest.deliveryAddress,
+            }
+          : {}),
+        ...(request.roomReservationRequest
+          ? {
+              resourceId: request.roomReservationRequest.resourceId,
+              resourceName: request.roomReservationRequest.resource?.name ?? null,
+              eventName: request.roomReservationRequest.eventName,
+              reservationPurpose:
+                request.roomReservationRequest.reservationPurpose,
+              attendeeCount: request.roomReservationRequest.attendeeCount,
+              startAt: request.roomReservationRequest.startAt,
+              endAt: request.roomReservationRequest.endAt,
+              requiresSecurityApproval:
+                request.roomReservationRequest.requiresSecurityApproval,
+              requiresTechnicalSupport:
+                request.roomReservationRequest.requiresTechnicalSupport,
+              setupNotes: request.roomReservationRequest.setupNotes,
+            }
+          : {}),
+        ...(request.appointmentRequest
+          ? {
+              targetUserId: request.appointmentRequest.targetUserId,
+              appointmentType: request.appointmentRequest.appointmentType,
+              topic: request.appointmentRequest.topic,
+              details: request.appointmentRequest.details,
+              preferredStartAt: request.appointmentRequest.preferredStartAt,
+              preferredEndAt: request.appointmentRequest.preferredEndAt,
+            }
+          : {}),
+        ...(request.procurementRequest
+          ? {
+              itemName: request.procurementRequest.itemName,
+              itemCategory: request.procurementRequest.itemCategory,
+              quantity: request.procurementRequest.quantity,
+              unitPriceEstimate: request.procurementRequest.unitPriceEstimate,
+              totalEstimate: request.procurementRequest.totalEstimate,
+              vendorPreference: request.procurementRequest.vendorPreference,
+              justification: request.procurementRequest.justification,
+              budgetCode: request.procurementRequest.budgetCode,
+            }
+          : {}),
+        ...(request.accessRequest
+          ? {
+              accessType: request.accessRequest.accessType,
+              targetResource: request.accessRequest.targetResource,
+              requestedRoleOrPermission:
+                request.accessRequest.requestedRoleOrPermission,
+              justification: request.accessRequest.justification,
+              startAt: request.accessRequest.startAt,
+              endAt: request.accessRequest.endAt,
+            }
+          : {}),
+        ...(request.eventRequest
+          ? {
+              eventName: request.eventRequest.eventName,
+              eventType: request.eventRequest.eventType,
+              description: request.eventRequest.description,
+              expectedAttendance: request.eventRequest.expectedAttendance,
+              locationPreference: request.eventRequest.locationPreference,
+              startAt: request.eventRequest.startAt,
+              endAt: request.eventRequest.endAt,
+              needsBudget: request.eventRequest.needsBudget,
+              estimatedBudget: request.eventRequest.estimatedBudget,
+              needsPosterApproval: request.eventRequest.needsPosterApproval,
+              needsSecuritySupport: request.eventRequest.needsSecuritySupport,
+              needsTechnicalSupport: request.eventRequest.needsTechnicalSupport,
+            }
+          : {}),
+        ...(request.equipmentRequest
+          ? {
+              labResourceId: request.equipmentRequest.labResourceId,
+              labResourceName:
+                request.equipmentRequest.labResource?.name ?? null,
+              equipmentName: request.equipmentRequest.equipmentName,
+              equipmentCategory: request.equipmentRequest.equipmentCategory,
+              quantity: request.equipmentRequest.quantity,
+              purpose: request.equipmentRequest.purpose,
+              neededFrom: request.equipmentRequest.neededFrom,
+              neededUntil: request.equipmentRequest.neededUntil,
+              urgencyReason: request.equipmentRequest.urgencyReason,
+            }
+          : {}),
+        ...(request.internshipRequest
+          ? {
+              companyName: request.internshipRequest.companyName,
+              companySector: request.internshipRequest.companySector,
+              companyContactName:
+                request.internshipRequest.companyContactName,
+              companyContactEmail:
+                request.internshipRequest.companyContactEmail,
+              internshipType: request.internshipRequest.internshipType,
+              workMode: request.internshipRequest.workMode,
+              startDate: request.internshipRequest.startDate,
+              endDate: request.internshipRequest.endDate,
+              durationDays: request.internshipRequest.durationDays,
+              insuranceRequired: request.internshipRequest.insuranceRequired,
+            }
+          : {}),
+      },
       assignments: request.assignments.map((assignment) => ({
         id: assignment.id,
         assignedAt: assignment.assignedAt,
@@ -394,6 +537,8 @@ export class StaffService {
           actionUrl: '/staff/inbox',
         },
       });
+
+      await this.slaService.markFirstResponse(tx, requestId);
 
       await tx.auditLog.create({
         data: {

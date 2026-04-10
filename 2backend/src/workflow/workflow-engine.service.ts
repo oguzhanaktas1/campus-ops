@@ -11,6 +11,7 @@ import {
   WorkflowStepType,
 } from '@prisma/client';
 import { ProcessActionDto } from './dto/process-action.dto';
+import { SlaService } from './sla.service';
 
 const TERMINAL_STATUSES: RequestStatus[] = [
   'APPROVED',
@@ -53,7 +54,10 @@ const ACTION_MAP: Record<
 
 @Injectable()
 export class WorkflowEngineService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private slaService: SlaService,
+  ) {}
 
   private mapStepTypeToStatus(
     stepType: WorkflowStepType,
@@ -195,6 +199,18 @@ export class WorkflowEngineService {
         currentAssigneeUserId: dedupedUserIds.length === 1 ? dedupedUserIds[0] : null,
       },
     });
+
+    if (dedupedUserIds.length === 1) {
+      await tx.request.updateMany({
+        where: {
+          id: requestId,
+          status: RequestStatus.SUBMITTED,
+        },
+        data: {
+          status: RequestStatus.IN_REVIEW,
+        },
+      });
+    }
   }
 
   private async activateStep(
@@ -338,6 +354,8 @@ export class WorkflowEngineService {
       skipDuplicates: true,
     });
 
+    await this.slaService.startRequestSla(tx, requestId);
+
     if (firstStep.stepType !== 'START') {
       await this.activateStep(
         tx,
@@ -348,7 +366,7 @@ export class WorkflowEngineService {
         `Workflow started at "${firstStep.stepName}".`,
       );
 
-      return this.mapStepTypeToStatus(firstStep.stepType, RequestStatus.IN_REVIEW);
+      return RequestStatus.SUBMITTED;
     }
 
     const submittedStep = await this.createCompletedStep(
@@ -419,7 +437,7 @@ export class WorkflowEngineService {
         request.requesterUserId,
         `Workflow completed at "${nextStep.stepName}".`,
       );
-      return terminalStatus;
+      return RequestStatus.SUBMITTED;
     }
 
     await tx.workflowInstance.update({
@@ -436,7 +454,7 @@ export class WorkflowEngineService {
       `Workflow moved to "${nextStep.stepName}".`,
     );
 
-    return this.mapStepTypeToStatus(nextStep.stepType, RequestStatus.IN_REVIEW);
+    return RequestStatus.SUBMITTED;
   }
 
   /**
@@ -568,6 +586,10 @@ export class WorkflowEngineService {
       });
 
       if (pendingStep) {
+        if (pendingStep.dueAt && pendingStep.dueAt < new Date()) {
+          await this.slaService.markStepOverdue(tx, pendingStep.id);
+        }
+
         await tx.workflowInstanceStep.update({
           where: { id: pendingStep.id },
           data: {
@@ -581,6 +603,10 @@ export class WorkflowEngineService {
       }
 
       const shouldContinue = nextStep && nextStep.stepType !== 'END';
+
+      if (dto.action !== 'submit' && dto.action !== 'cancel') {
+        await this.slaService.markFirstResponse(tx, requestId);
+      }
 
       if (workflowInstance) {
         if (shouldContinue && nextStep) {
@@ -606,6 +632,8 @@ export class WorkflowEngineService {
             `Workflow moved to "${nextStep.stepName}".`,
           );
         } else {
+          await this.slaService.markResolution(tx, requestId, nextStatus);
+
           await tx.workflowInstance.update({
             where: { id: workflowInstance.id },
             data: {

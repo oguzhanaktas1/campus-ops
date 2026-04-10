@@ -104,7 +104,7 @@ export class DocumentsService {
       const wfDefId = reqType.workflowDefinitionId;
       if (wfDefId) {
         const wfStatus = await this.workflowEngine.bootstrapInstance(tx, req.id, wfDefId);
-        if (wfStatus) {
+        if (wfStatus && wfStatus !== s) {
           await tx.request.update({ where: { id: req.id }, data: { status: wfStatus } });
           await tx.requestStatusHistory.create({ data: { requestId: req.id, oldStatus: s, newStatus: wfStatus, changedByUserId: userId, changeReason: 'Workflow started.' } });
         }

@@ -202,7 +202,7 @@ export class AppointmentsService {
           req.id,
           wfDefId,
         );
-        if (wfStatus) {
+        if (wfStatus && wfStatus !== initialStatus) {
           await tx.request.update({
             where: { id: req.id },
             data: { status: wfStatus },

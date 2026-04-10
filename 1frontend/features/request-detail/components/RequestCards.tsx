@@ -146,6 +146,7 @@ export function RelatedEntitiesCard({
             { label: 'Email', value: requester?.email ?? null },
             { label: 'Role', value: requesterRole },
             { label: 'Department', value: requester?.department ?? null },
+            { label: 'Faculty', value: requester?.faculty ?? null },
             { label: 'Academic Title', value: requester?.title ?? null },
             {
               label:
@@ -154,7 +155,17 @@ export function RelatedEntitiesCard({
                   : 'Staff Number',
               value: requesterNumber ?? null,
             },
-            { label: 'Faculty', value: requester?.faculty ?? null },
+            {
+              label: 'Current Assignee',
+              value: detail.currentAssignee?.fullName ?? null,
+            },
+            {
+              label: 'Assigned People',
+              value:
+                detail.assignedPeople.length > 0
+                  ? detail.assignedPeople.join(', ')
+                  : null,
+            },
             {
               label: 'Domain Key',
               value: humanize(detail.requestType.key),

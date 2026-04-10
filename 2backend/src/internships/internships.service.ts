@@ -95,7 +95,7 @@ export class InternshipsService {
       const wfDefId = rt.workflowDefinitionId;
       if (wfDefId) {
         const wfStatus = await this.workflowEngine.bootstrapInstance(tx, r.id, wfDefId);
-        if (wfStatus) {
+        if (wfStatus && wfStatus !== initialStatus) {
           await tx.request.update({
             where: { id: r.id },
             data: { status: wfStatus },

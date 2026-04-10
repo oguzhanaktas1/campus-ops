@@ -392,6 +392,11 @@ export class AdminController {
     return this.adminService.getSLAPolicies();
   }
 
+  @Get('sla/overview')
+  getSLAOverview() {
+    return this.adminService.getSLAOverview();
+  }
+
   @Post('sla')
   createSLAPolicy(@Request() req: any, @Body() data: any) {
     return this.adminService.createSLAPolicy(extractUserId(req), data);

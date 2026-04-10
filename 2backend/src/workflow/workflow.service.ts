@@ -7,10 +7,14 @@ import { PrismaService } from '../core/prisma/prisma.service';
 import { CreateWorkflowDto } from './dto/create-workflow.dto';
 import { CreateWorkflowStepDto } from './dto/create-workflow-step.dto';
 import { CreateWorkflowTransitionDto } from './dto/create-workflow-transition.dto';
+import { SlaService } from './sla.service';
 
 @Injectable()
 export class WorkflowService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private slaService: SlaService,
+  ) {}
 
   private minutesBetween(from: Date | null | undefined, to: Date | null | undefined) {
     if (!from || !to) return null;
@@ -18,6 +22,8 @@ export class WorkflowService {
   }
 
   async getAll() {
+    await this.slaService.runSlaSweep();
+
     const now = new Date();
     const definitions = await this.prisma.workflowDefinition.findMany({
       include: {
@@ -70,6 +76,8 @@ export class WorkflowService {
   }
 
   async getById(id: string) {
+    await this.slaService.runSlaSweep();
+
     const now = new Date();
     const wf = await this.prisma.workflowDefinition.findUnique({
       where: { id },
@@ -113,6 +121,16 @@ export class WorkflowService {
                 createdAt: true,
                 updatedAt: true,
                 submittedAt: true,
+                dueAt: true,
+                slaEvents: {
+                  orderBy: { occurredAt: 'desc' },
+                  select: {
+                    id: true,
+                    eventType: true,
+                    occurredAt: true,
+                    resolvedAt: true,
+                  },
+                },
                 requester: {
                   select: {
                     id: true,
@@ -236,6 +254,37 @@ export class WorkflowService {
             instance.request.currentAssignee?.profile?.fullName ??
             instance.request.currentAssignee?.email ??
             null,
+          sla: {
+            dueAt: instance.request.dueAt,
+            firstResponseState:
+              instance.request.slaEvents.find((event) =>
+                ['FIRST_RESPONSE_MET', 'FIRST_RESPONSE_BREACHED'].includes(
+                  event.eventType,
+                ),
+              )?.eventType ??
+              (instance.request.slaEvents.some(
+                (event) => event.eventType === 'FIRST_RESPONSE_STARTED',
+              )
+                ? 'FIRST_RESPONSE_STARTED'
+                : null),
+            resolutionState:
+              instance.request.slaEvents.find((event) =>
+                ['RESOLUTION_MET', 'RESOLUTION_BREACHED'].includes(
+                  event.eventType,
+                ),
+              )?.eventType ??
+              (instance.request.slaEvents.some(
+                (event) => event.eventType === 'RESOLUTION_STARTED',
+              )
+                ? 'RESOLUTION_STARTED'
+                : null),
+            escalationTriggered: instance.request.slaEvents.some(
+              (event) => event.eventType === 'ESCALATION_TRIGGERED',
+            ),
+            stepOverdueCount: instance.request.slaEvents.filter(
+              (event) => event.eventType === 'STEP_OVERDUE',
+            ).length,
+          },
         },
         activeAssignment: activeAssignment
           ? {

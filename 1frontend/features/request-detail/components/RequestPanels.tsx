@@ -144,6 +144,13 @@ export function RequestTimelineTabs({
 }: {
   detail: RequestDetailViewModel
 }) {
+  const assignments = Array.isArray((detail.raw as any).assignments)
+    ? ((detail.raw as any).assignments as any[])
+    : []
+  const approvalHistory = Array.isArray((detail.raw as any).approvalHistory)
+    ? ((detail.raw as any).approvalHistory as any[])
+    : []
+
   return (
     <Card>
       <CardHeader>
@@ -161,10 +168,45 @@ export function RequestTimelineTabs({
             <RequestTimeline events={detail.statusHistory as any} />
           </TabsContent>
           <TabsContent value="assignments">
-            {detail.currentAssignee ? (
-              <div className="rounded-lg border bg-muted/30 p-4 text-sm">
-                Current assignee:{' '}
-                <span className="font-medium">{detail.currentAssignee.fullName}</span>
+            {assignments.length > 0 ? (
+              <div className="space-y-3">
+                {assignments.map((assignment) => (
+                  <div
+                    key={String(assignment.id)}
+                    className="rounded-lg border bg-muted/30 p-4 text-sm"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="font-medium text-foreground">
+                        {assignment.assignedTo?.fullName ?? 'Unknown assignee'}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        {assignment.isActive ? 'Active' : 'Completed'}
+                      </span>
+                    </div>
+                    <div className="mt-2 space-y-1 text-muted-foreground">
+                      <p>
+                        Assigned:{' '}
+                        {assignment.assignedAt
+                          ? new Date(String(assignment.assignedAt)).toLocaleString(
+                              'en-US',
+                            )
+                          : '-'}
+                      </p>
+                      {assignment.assignedBy?.fullName ? (
+                        <p>Assigned by: {assignment.assignedBy.fullName}</p>
+                      ) : null}
+                      {assignment.unassignedAt ? (
+                        <p>
+                          Closed:{' '}
+                          {new Date(String(assignment.unassignedAt)).toLocaleString(
+                            'en-US',
+                          )}
+                        </p>
+                      ) : null}
+                      {assignment.note ? <p>Note: {assignment.note}</p> : null}
+                    </div>
+                  </div>
+                ))}
               </div>
             ) : (
               <p className="text-sm text-muted-foreground">
@@ -173,9 +215,44 @@ export function RequestTimelineTabs({
             )}
           </TabsContent>
           <TabsContent value="approvals">
-            <p className="text-sm text-muted-foreground">
-              Approval history is not aggregated by the current backend contract yet.
-            </p>
+            {approvalHistory.length > 0 ? (
+              <div className="space-y-3">
+                {approvalHistory.map((action) => (
+                  <div
+                    key={String(action.id)}
+                    className="rounded-lg border bg-muted/30 p-4 text-sm"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="font-medium text-foreground">
+                        {String(action.actionType ?? 'ACTION').replace(/_/g, ' ')}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        {action.createdAt
+                          ? new Date(String(action.createdAt)).toLocaleString(
+                              'en-US',
+                            )
+                          : '-'}
+                      </span>
+                    </div>
+                    <div className="mt-2 space-y-1 text-muted-foreground">
+                      {action.actor?.fullName ? (
+                        <p>Actor: {action.actor.fullName}</p>
+                      ) : null}
+                      {action.workflowStep?.name ? (
+                        <p>Step: {action.workflowStep.name}</p>
+                      ) : null}
+                      {action.decisionNote ? (
+                        <p>Note: {action.decisionNote}</p>
+                      ) : null}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                No approval history available.
+              </p>
+            )}
           </TabsContent>
           <TabsContent value="audit">
             <RequestTimeline events={detail.timeline as any} />

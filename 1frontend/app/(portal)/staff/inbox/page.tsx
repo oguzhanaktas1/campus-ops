@@ -1,9 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import Link from 'next/link'
-import { StatusBadge } from '@/components/status-badge'
-import { PriorityBadge } from '@/components/status-badge'
+import { useRouter } from 'next/navigation'
+import { StatusBadge, PriorityBadge } from '@/components/status-badge'
 import { EmptyState } from '@/components/empty-state'
 import {
   Inbox,
@@ -57,7 +56,7 @@ const CATEGORY_LABELS: Record<string, string> = {
 }
 
 function formatDate(d: string) {
-  if (!d) return '—'
+  if (!d) return '-'
   return new Date(d).toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
@@ -80,6 +79,7 @@ function isOverdue(req: StaffRequest) {
 }
 
 export default function StaffInboxPage() {
+  const router = useRouter()
   const [requests, setRequests] = useState<StaffRequest[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<TabKey>('assigned')
@@ -108,7 +108,7 @@ export default function StaffInboxPage() {
                   requesterName: item.requester?.fullName,
                   assignedToMe: item.assignedToMe === true,
                 }))
-              : []
+              : [],
           )
         } else {
           setRequests([])
@@ -120,7 +120,7 @@ export default function StaffInboxPage() {
         setIsLoading(false)
       }
     }
-    fetchRequests()
+    void fetchRequests()
   }, [])
 
   const getTabRequests = (tab: TabKey): StaffRequest[] => {
@@ -129,11 +129,11 @@ export default function StaffInboxPage() {
         return requests.filter((r) => r.assignedToMe === true)
       case 'pending':
         return requests.filter((r) =>
-          ['pending', 'submitted', 'waiting_approval'].includes(r.status?.toLowerCase())
+          ['pending', 'submitted', 'waiting_approval'].includes(r.status?.toLowerCase()),
         )
       case 'department':
         return requests.filter((r) =>
-          ['pending', 'submitted', 'in_review', 'in_progress'].includes(r.status?.toLowerCase())
+          ['pending', 'submitted', 'in_review', 'in_progress'].includes(r.status?.toLowerCase()),
         )
       case 'overdue':
         return requests.filter(isOverdue)
@@ -151,42 +151,38 @@ export default function StaffInboxPage() {
 
   if (isLoading) {
     return (
-      <div className="h-[60vh] flex items-center justify-center">
+      <div className="flex h-[60vh] items-center justify-center">
         <Loader2 className="size-8 animate-spin text-primary" />
       </div>
     )
   }
 
   return (
-    <div className="p-6 space-y-6 max-w-6xl mx-auto pb-20">
-      {/* Header */}
+    <div className="mx-auto max-w-6xl space-y-6 p-6 pb-20">
       <div>
-        <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
-          <Inbox className="size-5 text-primary" /> Inbox — Work Queue
+        <h1 className="flex items-center gap-2 text-xl font-bold text-foreground">
+          <Inbox className="size-5 text-primary" /> Inbox - Work Queue
         </h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
+        <p className="mt-0.5 text-sm text-muted-foreground">
           Prioritized work queue and department assignments
         </p>
       </div>
 
-      {/* Overdue banner */}
       {tabCounts.overdue > 0 && activeTab !== 'overdue' && (
         <button
           onClick={() => setActiveTab('overdue')}
-          className="w-full flex items-center gap-3 p-3 rounded-lg bg-destructive/8 border border-destructive/20 hover:bg-destructive/12 transition-colors text-left"
+          className="flex w-full items-center gap-3 rounded-lg border border-destructive/20 bg-destructive/8 p-3 text-left transition-colors hover:bg-destructive/12"
         >
-          <AlertTriangle className="size-4 text-destructive flex-shrink-0" />
-          <p className="text-sm text-destructive font-medium">
+          <AlertTriangle className="size-4 flex-shrink-0 text-destructive" />
+          <p className="text-sm font-medium text-destructive">
             {tabCounts.overdue} overdue item{tabCounts.overdue > 1 ? 's' : ''} require immediate attention
           </p>
           <span className="ml-auto text-xs text-destructive underline">View overdue</span>
         </button>
       )}
 
-      {/* Main card */}
-      <div className="bg-card border border-border rounded-lg shadow-sm overflow-hidden">
-        {/* Tabs */}
-        <div className="flex border-b border-border overflow-x-auto">
+      <div className="overflow-hidden rounded-lg border border-border bg-card shadow-sm">
+        <div className="flex overflow-x-auto border-b border-border">
           {TABS.map((tab) => {
             const count = tabCounts[tab.key]
             const isOverdueTab = tab.key === 'overdue'
@@ -195,12 +191,12 @@ export default function StaffInboxPage() {
                 key={tab.key}
                 onClick={() => setActiveTab(tab.key)}
                 className={cn(
-                  'flex items-center gap-2 px-4 py-3.5 text-xs font-medium whitespace-nowrap transition-colors flex-shrink-0',
+                  'flex flex-shrink-0 items-center gap-2 whitespace-nowrap px-4 py-3.5 text-xs font-medium transition-colors',
                   activeTab === tab.key
                     ? isOverdueTab
-                      ? 'text-destructive border-b-2 border-destructive bg-destructive/5'
-                      : 'text-primary border-b-2 border-primary bg-primary/5'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/30'
+                      ? 'border-b-2 border-destructive bg-destructive/5 text-destructive'
+                      : 'border-b-2 border-primary bg-primary/5 text-primary'
+                    : 'text-muted-foreground hover:bg-muted/30 hover:text-foreground',
                 )}
               >
                 {tab.icon}
@@ -208,13 +204,13 @@ export default function StaffInboxPage() {
                 {count > 0 && (
                   <span
                     className={cn(
-                      'text-[9px] font-bold px-1.5 py-0.5 rounded-full',
+                      'rounded-full px-1.5 py-0.5 text-[9px] font-bold',
                       activeTab === tab.key
                         ? isOverdueTab
                           ? 'bg-destructive/15 text-destructive'
                           : 'bg-primary/10 text-primary'
                         : 'bg-muted text-muted-foreground',
-                      isOverdueTab && PRIORITY_PULSE['CRITICAL']
+                      isOverdueTab && PRIORITY_PULSE.CRITICAL,
                     )}
                   >
                     {count}
@@ -225,17 +221,16 @@ export default function StaffInboxPage() {
           })}
         </div>
 
-        {/* Table */}
         {rows.length === 0 ? (
           <EmptyState
             title={
               activeTab === 'assigned'
                 ? 'No assigned requests'
                 : activeTab === 'pending'
-                ? 'No pending approvals'
-                : activeTab === 'department'
-                ? 'Department queue is empty'
-                : 'No overdue items'
+                  ? 'No pending approvals'
+                  : activeTab === 'department'
+                    ? 'Department queue is empty'
+                    : 'No overdue items'
             }
             description={
               activeTab === 'overdue'
@@ -254,26 +249,26 @@ export default function StaffInboxPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-muted/40 border-b border-border">
-                  <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                <tr className="border-b border-border bg-muted/40">
+                  <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                     Request No
                   </th>
-                  <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                     Title
                   </th>
-                  <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                     Type
                   </th>
-                  <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                     Priority
                   </th>
-                  <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                     Due Date
                   </th>
-                  <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                     Status
                   </th>
-                  <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                     Requester
                   </th>
                 </tr>
@@ -283,73 +278,70 @@ export default function StaffInboxPage() {
                   const overdue = isOverdue(req)
                   const isCritical = req.priority?.toUpperCase() === 'CRITICAL'
                   const catLabel =
-                    CATEGORY_LABELS[req.category?.toLowerCase()] || req.category || '—'
+                    CATEGORY_LABELS[req.category?.toLowerCase()] || req.category || '-'
+                  const detailHref = `/staff/requests/${req.category?.toLowerCase() || 'general'}/${req.id}`
 
                   return (
-                    <Link
+                    <tr
                       key={req.id}
-                      href={`/staff/requests/${req.category?.toLowerCase() || 'general'}/${req.id}`}
-                      legacyBehavior
+                      onClick={() => router.push(detailHref)}
+                      className={cn(
+                        'cursor-pointer transition-colors hover:bg-muted/20',
+                        overdue && 'bg-destructive/5 hover:bg-destructive/10',
+                      )}
                     >
-                      <tr
-                        className={cn(
-                          'hover:bg-muted/20 transition-colors cursor-pointer',
-                          overdue && 'bg-destructive/5 hover:bg-destructive/10'
-                        )}
-                      >
-                        <td className="px-5 py-4">
-                          <span className="font-mono text-xs font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded">
-                            {getDisplayRequestNumber(req)}
-                          </span>
-                        </td>
-                        <td className="px-5 py-4">
-                          <div className="flex items-center gap-2">
-                            <p className="font-medium text-foreground max-w-[200px] truncate">
-                              {req.title}
-                            </p>
-                            {isCritical && (
-                              <span className="flex-shrink-0 size-2 rounded-full bg-destructive animate-pulse" />
-                            )}
-                            {overdue && (
-                              <span className="flex-shrink-0 text-[9px] font-bold text-destructive bg-destructive/10 border border-destructive/20 px-1.5 py-0.5 rounded uppercase tracking-wider">
-                                Overdue
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-5 py-4 text-muted-foreground text-xs">{catLabel}</td>
-                        <td className="px-5 py-4">
-                          <PriorityBadge priority={req.priority} />
-                        </td>
-                        <td className="px-5 py-4">
-                          {req.dueDate ? (
-                            <span
-                              className={cn(
-                                'text-xs',
-                                overdue ? 'text-destructive font-semibold' : 'text-muted-foreground'
-                              )}
-                            >
-                              {formatDate(req.dueDate)}
-                            </span>
-                          ) : (
-                            <span className="text-muted-foreground/50 text-xs">—</span>
+                      <td className="px-5 py-4">
+                        <span className="rounded bg-primary/10 px-2 py-0.5 font-mono text-xs font-semibold text-primary">
+                          {getDisplayRequestNumber(req)}
+                        </span>
+                      </td>
+                      <td className="px-5 py-4">
+                        <div className="flex items-center gap-2">
+                          <p className="max-w-[200px] truncate font-medium text-foreground">
+                            {req.title}
+                          </p>
+                          {isCritical && (
+                            <span className="size-2 flex-shrink-0 rounded-full bg-destructive animate-pulse" />
                           )}
-                        </td>
-                        <td className="px-5 py-4">
-                          <StatusBadge status={req.status} />
-                        </td>
-                        <td className="px-5 py-4">
-                          <div className="flex items-center gap-1.5">
-                            <div className="size-5 rounded-full bg-primary/10 flex items-center justify-center text-primary text-[9px] font-bold flex-shrink-0">
-                              {req.requesterName?.charAt(0) || 'U'}
-                            </div>
-                            <span className="text-muted-foreground text-xs truncate max-w-[100px]">
-                              {req.requesterName || 'Unknown'}
+                          {overdue && (
+                            <span className="flex-shrink-0 rounded border border-destructive/20 bg-destructive/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-destructive">
+                              Overdue
                             </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-5 py-4 text-xs text-muted-foreground">{catLabel}</td>
+                      <td className="px-5 py-4">
+                        <PriorityBadge priority={req.priority} />
+                      </td>
+                      <td className="px-5 py-4">
+                        {req.dueDate ? (
+                          <span
+                            className={cn(
+                              'text-xs',
+                              overdue ? 'font-semibold text-destructive' : 'text-muted-foreground',
+                            )}
+                          >
+                            {formatDate(req.dueDate)}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-muted-foreground/50">-</span>
+                        )}
+                      </td>
+                      <td className="px-5 py-4">
+                        <StatusBadge status={req.status} />
+                      </td>
+                      <td className="px-5 py-4">
+                        <div className="flex items-center gap-1.5">
+                          <div className="flex size-5 flex-shrink-0 items-center justify-center rounded-full bg-primary/10 text-[9px] font-bold text-primary">
+                            {req.requesterName?.charAt(0) || 'U'}
                           </div>
-                        </td>
-                      </tr>
-                    </Link>
+                          <span className="max-w-[100px] truncate text-xs text-muted-foreground">
+                            {req.requesterName || 'Unknown'}
+                          </span>
+                        </div>
+                      </td>
+                    </tr>
                   )
                 })}
               </tbody>

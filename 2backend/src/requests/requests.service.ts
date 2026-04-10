@@ -12,6 +12,7 @@ import { PriorityLevel, RequestStatus } from '@prisma/client';
 import { CreateRequestDto } from './dto/create-request.dto';
 import { AddCommentDto } from './dto/add-comment.dto';
 import { WorkflowEngineService } from '../workflow/workflow-engine.service';
+import { SlaService } from '../workflow/sla.service';
 
 const OPEN_STATUSES: RequestStatus[] = ['SUBMITTED', 'IN_REVIEW', 'WAITING_APPROVAL'];
 const INTERNAL_ROLES = ['STAFF', 'FACULTY', 'ADMIN'];
@@ -40,6 +41,7 @@ export class RequestsService {
   constructor(
     private prisma: PrismaService,
     private workflowEngine: WorkflowEngineService,
+    private slaService: SlaService,
   ) {}
 
   // ─── CREATE ────────────────────────────────────────────────────────────────
@@ -90,11 +92,13 @@ export class RequestsService {
         },
       });
 
+      await this.slaService.startRequestSla(tx, req.id);
+
       // Bootstrap workflow if request type has a workflow definition
       const wfDefId = (req.requestType as any).workflowDefinitionId as string | null;
       if (wfDefId) {
         const wfStatus = await this.workflowEngine.bootstrapInstance(tx, req.id, wfDefId);
-        if (wfStatus) {
+        if (wfStatus && wfStatus !== initialStatus) {
           await tx.request.update({ where: { id: req.id }, data: { status: wfStatus } });
           await tx.requestStatusHistory.create({
             data: {
@@ -409,6 +413,16 @@ export class RequestsService {
       },
       include: { user: { select: requesterInclude } },
     });
+
+    const isFirstResponseActor = roles.some((role) =>
+      INTERNAL_ROLES.includes(role),
+    );
+
+    if (isFirstResponseActor) {
+      await this.prisma.$transaction(async (tx) => {
+        await this.slaService.markFirstResponse(tx, requestId);
+      });
+    }
 
     return {
       id: comment.id,

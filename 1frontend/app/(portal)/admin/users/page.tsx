@@ -239,7 +239,7 @@ export default function AdminUsersPage() {
               <th className="px-5 py-3 text-left font-semibold text-muted-foreground">User</th>
               <th className="px-5 py-3 text-left font-semibold text-muted-foreground hidden md:table-cell">Department</th>
               <th className="px-5 py-3 text-left font-semibold text-muted-foreground">Role</th>
-              <th className="px-5 py-3 text-left font-semibold text-muted-foreground">Status</th> {/* 🔥 STATÜ KOLONU 🔥 */}
+              <th className="px-5 py-3 text-left font-semibold text-muted-foreground">Status</th>
               <th className="px-5 py-3 text-right font-semibold text-muted-foreground">Actions</th>
             </tr>
           </thead>
@@ -279,7 +279,7 @@ export default function AdminUsersPage() {
                     </div>
                   </td>
                   <td className="px-5 py-3.5">
-                    {/* 🔥 STATÜ ROZETİ BURADA 🔥 */}
+                    <StatusBadge status={user.status} />
                     <StatusBadge status={user.status} />
                   </td>
                   <td className="px-5 py-3.5 text-right">

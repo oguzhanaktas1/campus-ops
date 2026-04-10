@@ -97,20 +97,27 @@ function deriveRequester(raw: any) {
 }
 
 function deriveAssignee(raw: any) {
-  if (!raw.currentAssignee) return null
+  const currentAssignee =
+    raw.currentAssignee ??
+    raw.request?.currentAssignee ??
+    raw.assignments?.find?.((assignment: any) => assignment?.isActive)?.assignedTo ??
+    null
+
+  if (!currentAssignee) return null
+
   return {
-    id: raw.currentAssignee.id ?? null,
+    id: currentAssignee.id ?? null,
     fullName:
-      raw.currentAssignee.fullName ??
-      raw.currentAssignee.profile?.fullName ??
-      raw.currentAssignee.email ??
+      currentAssignee.fullName ??
+      currentAssignee.profile?.fullName ??
+      currentAssignee.email ??
       'Unknown',
-    email: raw.currentAssignee.email ?? null,
+    email: currentAssignee.email ?? null,
     role:
-      raw.currentAssignee.role ??
-      raw.currentAssignee.primaryRoles?.[0]?.role?.name ??
+      currentAssignee.role ??
+      currentAssignee.primaryRoles?.[0]?.role?.name ??
       null,
-    title: raw.currentAssignee.title ?? raw.currentAssignee.profile?.title ?? null,
+    title: currentAssignee.title ?? currentAssignee.profile?.title ?? null,
   }
 }
 
@@ -155,6 +162,10 @@ export function mapRequestDetailToViewModel(
       ? raw.assignedToNames.filter(Boolean)
       : raw.assignedToName
         ? [raw.assignedToName]
+        : Array.isArray(raw.assignments)
+          ? raw.assignments
+              .map((assignment: any) => assignment?.assignedTo?.fullName)
+              .filter(Boolean)
         : [],
     comments: Array.isArray(raw.comments) ? raw.comments.map(toComment) : [],
     attachments: Array.isArray(raw.attachments)
