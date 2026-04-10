@@ -6,22 +6,22 @@ const prisma = new PrismaClient();
 // REQUEST TYPE KEYS — domain servisleriyle hizalı
 // ─────────────────────────────────────────────────────────────
 const DOMAIN_KEYS = [
-  'DOCUMENT_REQUEST',    // documents.service.ts
-  'ROOM_RESERVATION',    // reservations.service.ts
-  'APPOINTMENT',         // appointments.service.ts
-  'IT_SUPPORT',          // tickets.service.ts
-  'EQUIPMENT',           // equipment-requests.service.ts
-  'INTERNSHIP_REQUEST',  // internships.service.ts
-  'ACCESS_REQUEST',      // access-requests.service.ts
+  'DOCUMENT_REQUEST', // documents.service.ts
+  'ROOM_RESERVATION', // reservations.service.ts
+  'APPOINTMENT', // appointments.service.ts
+  'IT_SUPPORT', // tickets.service.ts
+  'EQUIPMENT', // equipment-requests.service.ts
+  'INTERNSHIP_REQUEST', // internships.service.ts
+  'ACCESS_REQUEST', // access-requests.service.ts
   'PROCUREMENT_REQUEST', // procurement.service.ts
-  'EVENT_REQUEST',       // events.service.ts
+  'EVENT_REQUEST', // events.service.ts
 ];
 
 // Eski key → yeni key (rename listesi)
 const RENAMES: Record<string, string> = {
-  it_support:          'IT_SUPPORT',
-  equipment:           'EQUIPMENT',
-  access_request:      'ACCESS_REQUEST',
+  it_support: 'IT_SUPPORT',
+  equipment: 'EQUIPMENT',
+  access_request: 'ACCESS_REQUEST',
   procurement_request: 'PROCUREMENT_REQUEST',
 };
 
@@ -29,9 +29,13 @@ async function migrate() {
   console.log('🔄 Migrating existing request type keys...');
 
   for (const [oldKey, newKey] of Object.entries(RENAMES)) {
-    const existing = await prisma.requestType.findUnique({ where: { key: oldKey } });
+    const existing = await prisma.requestType.findUnique({
+      where: { key: oldKey },
+    });
     if (!existing) continue;
-    const conflict = await prisma.requestType.findUnique({ where: { key: newKey } });
+    const conflict = await prisma.requestType.findUnique({
+      where: { key: newKey },
+    });
     if (conflict) {
       await prisma.request.updateMany({
         where: { requestTypeId: existing.id },
@@ -48,7 +52,9 @@ async function migrate() {
     }
   }
 
-  const all = await prisma.requestType.findMany({ select: { id: true, key: true } });
+  const all = await prisma.requestType.findMany({
+    select: { id: true, key: true },
+  });
   const toDelete = all.filter((r) => !DOMAIN_KEYS.includes(r.key));
   if (toDelete.length > 0) {
     const ids = toDelete.map((r) => r.id);
@@ -72,7 +78,8 @@ async function main() {
       key: 'DOCUMENT_REQUEST',
       name: 'Document Request',
       category: 'DOCUMENT',
-      description: 'Official document requests (transcript, enrollment certificate, diploma, etc.)',
+      description:
+        'Official document requests (transcript, enrollment certificate, diploma, etc.)',
     },
     {
       key: 'ROOM_RESERVATION',
@@ -102,7 +109,8 @@ async function main() {
       key: 'INTERNSHIP_REQUEST',
       name: 'Internship Application',
       category: 'ACADEMIC',
-      description: 'Student internship application requiring advisor and faculty approval',
+      description:
+        'Student internship application requiring advisor and faculty approval',
     },
     {
       key: 'ACCESS_REQUEST',
@@ -127,8 +135,21 @@ async function main() {
   for (const rt of requestTypes) {
     await prisma.requestType.upsert({
       where: { key: rt.key },
-      update: { name: rt.name, category: rt.category, description: rt.description, isActive: true, formSchemaJson: [] },
-      create: { key: rt.key, name: rt.name, category: rt.category, description: rt.description, isActive: true, formSchemaJson: [] },
+      update: {
+        name: rt.name,
+        category: rt.category,
+        description: rt.description,
+        isActive: true,
+        formSchemaJson: [],
+      },
+      create: {
+        key: rt.key,
+        name: rt.name,
+        category: rt.category,
+        description: rt.description,
+        isActive: true,
+        formSchemaJson: [],
+      },
     });
     console.log(`  ✓ ${rt.key}`);
   }

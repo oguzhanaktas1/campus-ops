@@ -18,6 +18,136 @@ import {
 export class FacultyService {
   constructor(private prisma: PrismaService) {}
 
+  private buildRequestDomainData(request: any) {
+    switch (request.requestType?.key) {
+      case 'DOCUMENT_REQUEST':
+        return request.documentRequest
+          ? {
+              documentType: request.documentRequest.documentType,
+              language: request.documentRequest.language,
+              copiesCount: request.documentRequest.copiesCount,
+              deliveryMethod: request.documentRequest.deliveryMethod,
+              deliveryAddress: request.documentRequest.deliveryAddress,
+              description: request.description,
+            }
+          : null;
+      case 'ROOM_RESERVATION':
+        return request.roomReservationRequest
+          ? {
+              resourceId: request.roomReservationRequest.resourceId,
+              eventName: request.roomReservationRequest.eventName,
+              reservationPurpose:
+                request.roomReservationRequest.reservationPurpose,
+              attendeeCount: request.roomReservationRequest.attendeeCount,
+              startAt: request.roomReservationRequest.startAt,
+              endAt: request.roomReservationRequest.endAt,
+              requiresSecurityApproval:
+                request.roomReservationRequest.requiresSecurityApproval,
+              requiresTechnicalSupport:
+                request.roomReservationRequest.requiresTechnicalSupport,
+              setupNotes: request.roomReservationRequest.setupNotes,
+            }
+          : null;
+      case 'APPOINTMENT':
+        return request.appointmentRequest
+          ? {
+              targetUserId: request.appointmentRequest.targetUserId,
+              appointmentType: request.appointmentRequest.appointmentType,
+              topic: request.appointmentRequest.topic,
+              details: request.appointmentRequest.details,
+              preferredStartAt: request.appointmentRequest.preferredStartAt,
+              preferredEndAt: request.appointmentRequest.preferredEndAt,
+            }
+          : null;
+      case 'PROCUREMENT_REQUEST':
+        return request.procurementRequest
+          ? {
+              itemName: request.procurementRequest.itemName,
+              itemCategory: request.procurementRequest.itemCategory,
+              quantity: request.procurementRequest.quantity,
+              unitPriceEstimate: request.procurementRequest.unitPriceEstimate
+                ? Number(request.procurementRequest.unitPriceEstimate)
+                : null,
+              totalEstimate: request.procurementRequest.totalEstimate
+                ? Number(request.procurementRequest.totalEstimate)
+                : null,
+              vendorPreference: request.procurementRequest.vendorPreference,
+              justification: request.procurementRequest.justification,
+              budgetCode: request.procurementRequest.budgetCode,
+            }
+          : null;
+      case 'ACCESS_REQUEST':
+        return request.accessRequest
+          ? {
+              accessType: request.accessRequest.accessType,
+              targetResource: request.accessRequest.targetResource,
+              requestedRoleOrPermission:
+                request.accessRequest.requestedRoleOrPermission,
+              justification: request.accessRequest.justification,
+              startAt: request.accessRequest.startAt,
+              endAt: request.accessRequest.endAt,
+            }
+          : null;
+      case 'EVENT_REQUEST':
+        return request.eventRequest
+          ? {
+              eventName: request.eventRequest.eventName,
+              eventType: request.eventRequest.eventType,
+              description: request.eventRequest.description,
+              expectedAttendance: request.eventRequest.expectedAttendance,
+              locationPreference: request.eventRequest.locationPreference,
+              startAt: request.eventRequest.startAt,
+              endAt: request.eventRequest.endAt,
+              needsBudget: request.eventRequest.needsBudget,
+              estimatedBudget: request.eventRequest.estimatedBudget
+                ? Number(request.eventRequest.estimatedBudget)
+                : null,
+              needsPosterApproval: request.eventRequest.needsPosterApproval,
+              needsSecuritySupport: request.eventRequest.needsSecuritySupport,
+              needsTechnicalSupport:
+                request.eventRequest.needsTechnicalSupport,
+            }
+          : null;
+      case 'EQUIPMENT':
+        return request.equipmentRequest
+          ? {
+              equipmentName: request.equipmentRequest.equipmentName,
+              equipmentCategory: request.equipmentRequest.equipmentCategory,
+              quantity: request.equipmentRequest.quantity,
+              purpose: request.equipmentRequest.purpose,
+              neededFrom: request.equipmentRequest.neededFrom,
+              neededUntil: request.equipmentRequest.neededUntil,
+              urgencyReason: request.equipmentRequest.urgencyReason,
+              stockCheckStatus: request.equipmentRequest.stockCheckStatus,
+              procurementRequired:
+                request.equipmentRequest.procurementRequired,
+              estimatedCost: request.equipmentRequest.estimatedCost
+                ? Number(request.equipmentRequest.estimatedCost)
+                : null,
+            }
+          : null;
+      case 'INTERNSHIP_REQUEST':
+        return request.internshipRequest
+          ? {
+              companyName: request.internshipRequest.companyName,
+              companySector: request.internshipRequest.companySector,
+              companyContactName: request.internshipRequest.companyContactName,
+              companyContactEmail:
+                request.internshipRequest.companyContactEmail,
+              internshipType: request.internshipRequest.internshipType,
+              workMode: request.internshipRequest.workMode,
+              startDate: request.internshipRequest.startDate,
+              endDate: request.internshipRequest.endDate,
+              durationDays: request.internshipRequest.durationDays,
+              insuranceRequired:
+                request.internshipRequest.insuranceRequired,
+            }
+          : null;
+      default:
+        return request.dynamicData ?? null;
+    }
+  }
+
   // 1. GET PENDING APPROVALS FOR FACULTY
   async getPendingApprovals(userId: string) {
     const requests = await this.prisma.request.findMany({
@@ -293,9 +423,26 @@ export class FacultyService {
         ],
       },
       include: {
-        requester: { include: { profile: true } },
+        requester: {
+          include: {
+            profile: {
+              include: {
+                faculty: { select: { name: true } },
+                department: { select: { name: true } },
+                unit: { select: { name: true } },
+              },
+            },
+            primaryRoles: { include: { role: true } },
+          },
+        },
         requestType: true,
         fileLinks: { include: { file: true } },
+        currentAssignee: {
+          include: {
+            profile: true,
+            primaryRoles: { include: { role: true } },
+          },
+        },
         comments: {
           orderBy: { createdAt: 'asc' },
           include: {
@@ -308,6 +455,27 @@ export class FacultyService {
           },
         },
         statusHistory: { orderBy: { changedAt: 'desc' } },
+        workflowInstance: {
+          include: {
+            currentStep: true,
+            workflowDefinition: {
+              include: {
+                steps: { orderBy: { stepOrder: 'asc' } },
+              },
+            },
+            instanceSteps: {
+              orderBy: { createdAt: 'asc' },
+            },
+          },
+        },
+        documentRequest: true,
+        roomReservationRequest: true,
+        appointmentRequest: true,
+        procurementRequest: true,
+        accessRequest: true,
+        eventRequest: true,
+        equipmentRequest: true,
+        internshipRequest: true,
       },
     });
 
@@ -321,11 +489,45 @@ export class FacultyService {
       status: request.status,
       priority: request.priority,
       createdAt: request.createdAt,
+      submittedAt: request.submittedAt,
       type: request.requestType.key,
       typeName: request.requestType.name,
+      requestType: {
+        key: request.requestType.key,
+        name: request.requestType.name,
+        category: request.requestType.category,
+      },
       submittedByName:
         request.requester.profile?.fullName || request.requester.email,
+      requester: {
+        id: request.requester.id,
+        fullName: request.requester.profile?.fullName || request.requester.email,
+        email: request.requester.email,
+        role:
+          request.requester.primaryRoles?.[0]?.role?.name || null,
+        faculty: request.requester.profile?.faculty?.name || null,
+        department:
+          request.requester.profile?.department?.name ||
+          request.requester.profile?.unit?.name ||
+          null,
+        studentNumber: request.requester.profile?.studentNumber || null,
+        staffNumber: request.requester.profile?.staffNumber || null,
+        title: request.requester.profile?.title || null,
+      },
+      currentAssignee: request.currentAssignee
+        ? {
+            id: request.currentAssignee.id,
+            fullName:
+              request.currentAssignee.profile?.fullName ||
+              request.currentAssignee.email,
+            email: request.currentAssignee.email,
+            role:
+              request.currentAssignee.primaryRoles?.[0]?.role?.name || null,
+            title: request.currentAssignee.profile?.title || null,
+          }
+        : null,
       studentNumber: request.requester.profile?.studentNumber,
+      formData: this.buildRequestDomainData(request),
       attachments: request.fileLinks.map((fl) => ({
         id: fl.file.id,
         name: fl.file.originalFileName,
@@ -345,6 +547,32 @@ export class FacultyService {
         date: h.changedAt,
         note: h.changeReason,
       })),
+      workflow: (() => {
+        const workflowInstance = request.workflowInstance;
+        if (!workflowInstance) return null;
+
+        return {
+          status: workflowInstance.status,
+          currentStep: workflowInstance.currentStep?.stepName || null,
+          workflowName: workflowInstance.workflowDefinition?.name || null,
+          steps:
+            workflowInstance.workflowDefinition?.steps?.map((step) => {
+              const instanceStep = workflowInstance.instanceSteps.find(
+                (item) => item.workflowStepId === step.id,
+              );
+              return {
+                id: step.id,
+                label: step.stepName,
+                status:
+                  step.id === workflowInstance.currentStepId
+                    ? 'active'
+                    : instanceStep?.status === 'COMPLETED'
+                      ? 'completed'
+                      : 'pending',
+              };
+            }) || [],
+        };
+      })(),
     };
   }
 

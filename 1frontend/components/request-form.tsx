@@ -11,6 +11,10 @@ import { Upload, Loader2, FileText, X, Server } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import Link from 'next/link'
+import {
+  getRevisionFieldMode,
+  type RevisionPolicy,
+} from '@/lib/revision-policy'
 
 export interface FormField {
   id: string;
@@ -37,6 +41,7 @@ interface RequestFormProps {
   initialData?: any; 
   isEditMode?: boolean;
   defaultType?: string; 
+  revisionPolicy?: RevisionPolicy | null;
 }
 
 const IT_CATEGORIES = [
@@ -61,7 +66,12 @@ const EQUIPMENT_CATEGORIES = [
   'Other',
 ]
 
-export function RequestForm({ initialData, isEditMode = false, defaultType }: RequestFormProps) {
+export function RequestForm({
+  initialData,
+  isEditMode = false,
+  defaultType,
+  revisionPolicy,
+}: RequestFormProps) {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
@@ -175,6 +185,11 @@ export function RequestForm({ initialData, isEditMode = false, defaultType }: Re
   const handleChange = (id: string, value: any) => {
     setFormData(prev => ({ ...prev, [id]: value }))
   }
+
+  const getFieldMode = (fieldId: string) =>
+    isEditMode ? getRevisionFieldMode(revisionPolicy, fieldId) : 'editable'
+
+  const isFieldLocked = (fieldId: string) => getFieldMode(fieldId) === 'locked'
 
   const handleTypeChange = (val: string) => {
     handleChange('typeKey', val);
@@ -311,11 +326,15 @@ export function RequestForm({ initialData, isEditMode = false, defaultType }: Re
       const submitData = new FormData()
 
       Object.entries(formData).forEach(([key, value]) => {
+        if (isEditMode) {
+          if (key === 'typeKey') return
+          if (isFieldLocked(key)) return
+        }
         submitData.append(key, String(value))
       })
 
       // Sadece Hoca ataması gereken durumlarda ID'yi gönderiyoruz
-      if (requiresFaculty && selectedFacultyId) {
+      if (!isEditMode && requiresFaculty && selectedFacultyId) {
         submitData.append('facultyUserId', selectedFacultyId)
       }
 
@@ -596,7 +615,6 @@ export function RequestForm({ initialData, isEditMode = false, defaultType }: Re
                   {isEditMode ? "Update the requested information below based on faculty feedback." : "Please fill out the required information for this request type."}
                 </p>
               </div>
-              {isEditMode && <span className="text-[10px] bg-primary/10 text-primary px-2 py-1 font-bold rounded uppercase tracking-wider">Editable</span>}
             </div>
             
             {dynamicFields.map((field: FormField) => (
@@ -606,24 +624,37 @@ export function RequestForm({ initialData, isEditMode = false, defaultType }: Re
                 </Label>
                 
                 {['text', 'date', 'time', 'number'].includes(field.type) && (
-                  <Input 
+              <Input 
                     id={field.id} 
                     type={field.type} 
                     required={field.required} 
                     value={formData[field.id] || ''} 
                     onChange={(e) => handleChange(field.id, e.target.value)}
-                    className="border-primary/20 focus-visible:ring-primary/50 bg-background" 
+                    disabled={isFieldLocked(field.id)}
+                    className={cn(
+                      "border-primary/20 focus-visible:ring-primary/50 bg-background",
+                      isFieldLocked(field.id) && "bg-muted/50 cursor-not-allowed opacity-80"
+                    )} 
                   />
                 )}
 
                 {field.type === 'select' && field.options && (
-                  <Select value={formData[field.id] || ""} onValueChange={(val) => handleChange(field.id, val)} required={field.required}>
-                    <SelectTrigger className="border-primary/20 focus:ring-primary/50 bg-background"><SelectValue placeholder="Select..." /></SelectTrigger>
+                  <Select
+                    value={formData[field.id] || ""}
+                    onValueChange={(val) => handleChange(field.id, val)}
+                    required={field.required}
+                    disabled={isFieldLocked(field.id)}
+                  >
+                    <SelectTrigger className={cn(
+                      "border-primary/20 focus:ring-primary/50 bg-background",
+                      isFieldLocked(field.id) && "bg-muted/50 cursor-not-allowed opacity-80"
+                    )}><SelectValue placeholder="Select..." /></SelectTrigger>
                     <SelectContent>
                       {field.options.map(opt => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 )}
+
               </div>
             ))}
           </div>
@@ -632,22 +663,25 @@ export function RequestForm({ initialData, isEditMode = false, defaultType }: Re
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
             <Label htmlFor="description">Additional Notes / Description <span className="text-destructive">*</span></Label>
-            {isEditMode && <span className="text-[10px] text-primary flex items-center gap-1 font-semibold uppercase tracking-wider">Editable</span>}
           </div>
           <Textarea 
             id="description" 
             placeholder="Provide details about your request..." 
-            className={cn("min-h-[120px] resize-none", isEditMode ? "border-primary/20 focus-visible:ring-primary/50 bg-primary/5" : "")} 
+            className={cn(
+              "min-h-[120px] resize-none",
+              isEditMode ? "border-primary/20 focus-visible:ring-primary/50 bg-primary/5" : "",
+              isFieldLocked('description') && "bg-muted/50 cursor-not-allowed opacity-80"
+            )} 
             required 
             value={formData.description} 
-            onChange={(e) => handleChange(e.target.id, e.target.value)} 
+            onChange={(e) => handleChange(e.target.id, e.target.value)}
+            disabled={isFieldLocked('description')}
           />
         </div>
 
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <Label>Attachments (optional)</Label>
-            {isEditMode && <span className="text-[10px] text-primary flex items-center gap-1 font-semibold uppercase tracking-wider">Editable</span>}
           </div>
 
           {existingFiles.length > 0 && (

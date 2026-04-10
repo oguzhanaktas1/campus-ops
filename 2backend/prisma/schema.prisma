@@ -1444,7 +1444,8 @@ model SlaPolicy {
   requestType           RequestType?   @relation(fields: [requestTypeId], references: [id], onDelete: SetNull)
   itTickets             ItTicket[]
   events                SlaEvent[]
-
+  
+  @@unique([requestTypeId, priority])
   @@index([requestTypeId])
   @@index([priority])
 }

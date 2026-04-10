@@ -188,7 +188,15 @@ export function mapRequestDetailToViewModel(
     },
     domainData:
       domainData ??
+      raw.formData ??
+      raw.documentRequest ??
+      raw.roomReservationRequest ??
+      raw.appointmentRequest ??
+      raw.procurementRequest ??
+      raw.accessRequest ??
+      raw.eventRequest ??
       raw.equipment ??
+      raw.equipmentRequest ??
       raw.ticket ??
       raw.internshipRequest ??
       raw.dynamicData ??

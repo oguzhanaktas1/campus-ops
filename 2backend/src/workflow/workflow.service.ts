@@ -12,17 +12,65 @@ import { CreateWorkflowTransitionDto } from './dto/create-workflow-transition.dt
 export class WorkflowService {
   constructor(private prisma: PrismaService) {}
 
-  getAll() {
-    return this.prisma.workflowDefinition.findMany({
+  private minutesBetween(from: Date | null | undefined, to: Date | null | undefined) {
+    if (!from || !to) return null;
+    return Math.max(0, Math.round((to.getTime() - from.getTime()) / 60000));
+  }
+
+  async getAll() {
+    const now = new Date();
+    const definitions = await this.prisma.workflowDefinition.findMany({
       include: {
         steps: { orderBy: { stepOrder: 'asc' } },
-        _count: { select: { instances: true } },
+        instances: {
+          select: {
+            id: true,
+            status: true,
+            startedAt: true,
+            endedAt: true,
+            instanceSteps: {
+              where: { status: 'PENDING' },
+              select: {
+                dueAt: true,
+              },
+            },
+          },
+        },
+        _count: { select: { instances: true, requestTypes: true } },
       },
       orderBy: { createdAt: 'desc' },
+    });
+
+    return definitions.map((definition) => {
+      const activeInstances = definition.instances.filter(
+        (instance) => instance.status === 'ACTIVE',
+      );
+      const completedInstances = definition.instances.filter(
+        (instance) => instance.status === 'COMPLETED',
+      );
+      const overdueInstances = definition.instances.filter((instance) =>
+        instance.instanceSteps.some((step) => step.dueAt && step.dueAt < now),
+      );
+
+      return {
+        ...definition,
+        metrics: {
+          totalInstances: definition._count.instances,
+          requestTypeCount: definition._count.requestTypes,
+          activeInstances: activeInstances.length,
+          completedInstances: completedInstances.length,
+          overdueInstances: overdueInstances.length,
+          lastStartedAt:
+            definition.instances
+              .map((instance) => instance.startedAt)
+              .sort((a, b) => b.getTime() - a.getTime())[0] ?? null,
+        },
+      };
     });
   }
 
   async getById(id: string) {
+    const now = new Date();
     const wf = await this.prisma.workflowDefinition.findUnique({
       where: { id },
       include: {
@@ -30,6 +78,7 @@ export class WorkflowService {
           orderBy: { stepOrder: 'asc' },
           include: {
             assignedRole: { select: { id: true, name: true } },
+            assignedUnit: { select: { id: true, name: true } },
             assignedUser: {
               select: {
                 id: true,
@@ -45,11 +94,222 @@ export class WorkflowService {
             toStep: { select: { id: true, stepKey: true, stepName: true } },
           },
         },
-        _count: { select: { instances: true } },
+        requestTypes: {
+          select: { id: true, key: true, name: true, category: true },
+          orderBy: { name: 'asc' },
+        },
+        instances: {
+          orderBy: { startedAt: 'desc' },
+          take: 50,
+          include: {
+            currentStep: { select: { id: true, stepKey: true, stepName: true, stepType: true } },
+            request: {
+              select: {
+                id: true,
+                requestNo: true,
+                title: true,
+                status: true,
+                priority: true,
+                createdAt: true,
+                updatedAt: true,
+                submittedAt: true,
+                requester: {
+                  select: {
+                    id: true,
+                    email: true,
+                    profile: { select: { fullName: true, studentNumber: true, staffNumber: true } },
+                  },
+                },
+                currentAssignee: {
+                  select: {
+                    id: true,
+                    email: true,
+                    profile: { select: { fullName: true, title: true } },
+                  },
+                },
+                assignments: {
+                  orderBy: { assignedAt: 'desc' },
+                  select: {
+                    id: true,
+                    assignedAt: true,
+                    unassignedAt: true,
+                    isActive: true,
+                    assignmentNote: true,
+                    assignedTo: {
+                      select: {
+                        id: true,
+                        email: true,
+                        profile: { select: { fullName: true, title: true } },
+                      },
+                    },
+                    assignedBy: {
+                      select: {
+                        id: true,
+                        email: true,
+                        profile: { select: { fullName: true } },
+                      },
+                    },
+                  },
+                },
+                approvalActions: {
+                  orderBy: { createdAt: 'desc' },
+                  select: {
+                    id: true,
+                    actionType: true,
+                    decisionNote: true,
+                    createdAt: true,
+                    actionBy: {
+                      select: {
+                        id: true,
+                        email: true,
+                        profile: { select: { fullName: true } },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            instanceSteps: {
+              orderBy: { createdAt: 'asc' },
+              include: {
+                workflowStep: {
+                  select: {
+                    id: true,
+                    stepKey: true,
+                    stepName: true,
+                    stepOrder: true,
+                    stepType: true,
+                  },
+                },
+                assignedTo: {
+                  select: {
+                    id: true,
+                    email: true,
+                    profile: { select: { fullName: true, title: true } },
+                  },
+                },
+                actionBy: {
+                  select: {
+                    id: true,
+                    email: true,
+                    profile: { select: { fullName: true } },
+                  },
+                },
+              },
+            },
+          },
+        },
+        _count: { select: { instances: true, requestTypes: true } },
       },
     });
     if (!wf) throw new NotFoundException('Workflow not found.');
-    return wf;
+
+    const instances = wf.instances.map((instance) => {
+      const pendingStep =
+        instance.instanceSteps.find((step) => step.status === 'PENDING') ?? null;
+      const activeAssignment =
+        instance.request.assignments.find((assignment) => assignment.isActive) ?? null;
+
+      return {
+        id: instance.id,
+        status: instance.status,
+        startedAt: instance.startedAt,
+        endedAt: instance.endedAt,
+        currentStep: instance.currentStep,
+        totalAgeMinutes: this.minutesBetween(
+          instance.startedAt,
+          instance.endedAt ?? now,
+        ),
+        currentStepAgeMinutes: pendingStep
+          ? this.minutesBetween(pendingStep.startedAt ?? pendingStep.createdAt, now)
+          : null,
+        inactiveMinutes: this.minutesBetween(instance.request.updatedAt, now),
+        isOverdue:
+          Boolean(pendingStep?.dueAt && pendingStep.dueAt < now) ||
+          Boolean(pendingStep?.isOverdue),
+        request: {
+          ...instance.request,
+          requesterName:
+            instance.request.requester.profile?.fullName ??
+            instance.request.requester.email,
+          currentAssigneeName:
+            instance.request.currentAssignee?.profile?.fullName ??
+            instance.request.currentAssignee?.email ??
+            null,
+        },
+        activeAssignment: activeAssignment
+          ? {
+              ...activeAssignment,
+              assignedToName:
+                activeAssignment.assignedTo.profile?.fullName ??
+                activeAssignment.assignedTo.email,
+              assignedByName:
+                activeAssignment.assignedBy?.profile?.fullName ??
+                activeAssignment.assignedBy?.email ??
+                null,
+              assignedAgeMinutes: this.minutesBetween(
+                activeAssignment.assignedAt,
+                activeAssignment.unassignedAt ?? now,
+              ),
+            }
+          : null,
+        instanceSteps: instance.instanceSteps.map((step) => ({
+          id: step.id,
+          status: step.status,
+          startedAt: step.startedAt,
+          completedAt: step.completedAt,
+          dueAt: step.dueAt,
+          isOverdue: step.isOverdue || Boolean(step.dueAt && step.dueAt < now),
+          actionTaken: step.actionTaken,
+          actionNote: step.actionNote,
+          ageMinutes: this.minutesBetween(step.startedAt ?? step.createdAt, step.completedAt ?? now),
+          workflowStep: step.workflowStep,
+          assignedTo: step.assignedTo
+            ? {
+                id: step.assignedTo.id,
+                fullName:
+                  step.assignedTo.profile?.fullName ?? step.assignedTo.email,
+                email: step.assignedTo.email,
+                title: step.assignedTo.profile?.title ?? null,
+              }
+            : null,
+          actionBy: step.actionBy
+            ? {
+                id: step.actionBy.id,
+                fullName:
+                  step.actionBy.profile?.fullName ?? step.actionBy.email,
+                email: step.actionBy.email,
+              }
+            : null,
+        })),
+        approvalTimeline: instance.request.approvalActions.map((action) => ({
+          id: action.id,
+          actionType: action.actionType,
+          decisionNote: action.decisionNote,
+          createdAt: action.createdAt,
+          actionBy: {
+            id: action.actionBy.id,
+            fullName: action.actionBy.profile?.fullName ?? action.actionBy.email,
+            email: action.actionBy.email,
+          },
+        })),
+      };
+    });
+
+    return {
+      ...wf,
+      metrics: {
+        totalInstances: wf._count.instances,
+        requestTypeCount: wf._count.requestTypes,
+        activeInstances: instances.filter((instance) => instance.status === 'ACTIVE')
+          .length,
+        completedInstances: instances.filter(
+          (instance) => instance.status === 'COMPLETED',
+        ).length,
+        overdueInstances: instances.filter((instance) => instance.isOverdue).length,
+      },
+      instances,
+    };
   }
 
   async create(adminId: string, dto: CreateWorkflowDto) {

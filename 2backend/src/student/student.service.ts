@@ -12,7 +12,13 @@ import {
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../core/prisma/prisma.service';
-import { RequestStatus, PriorityLevel, FileCategory } from '@prisma/client';
+import {
+  RequestStatus,
+  PriorityLevel,
+  FileCategory,
+  Prisma,
+} from '@prisma/client';
+import { WorkflowEngineService } from '../workflow/workflow-engine.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { CreateInternshipDto } from './dto/create-internship.dto';
 import { CreateGenericRequestDto } from './dto/create-generic-request.dto';
@@ -23,7 +29,10 @@ export class StudentService {
   private supabase: SupabaseClient;
   private readonly MAX_TOTAL_STORAGE = 50 * 1024 * 1024;
 
-  constructor(private prisma: PrismaService) {
+  constructor(
+    private prisma: PrismaService,
+    private workflowEngine: WorkflowEngineService,
+  ) {
     this.supabase = createClient(
       process.env.SUPABASE_URL as string,
       process.env.SUPABASE_KEY as string,
@@ -36,6 +45,606 @@ export class StudentService {
       select: { fileSizeBytes: true },
     });
     return files.reduce((sum, file) => sum + (file.fileSizeBytes || 0), 0);
+  }
+
+  private toTrimmedString(value: unknown): string | null {
+    if (typeof value !== 'string') return null;
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  }
+
+  private toInt(value: unknown): number | null {
+    if (value === null || value === undefined || value === '') return null;
+    const parsed = Number.parseInt(String(value), 10);
+    return Number.isNaN(parsed) ? null : parsed;
+  }
+
+  private toFloat(value: unknown): number | null {
+    if (value === null || value === undefined || value === '') return null;
+    const parsed = Number.parseFloat(String(value));
+    return Number.isNaN(parsed) ? null : parsed;
+  }
+
+  private toBoolean(value: unknown): boolean {
+    if (typeof value === 'boolean') return value;
+    if (typeof value === 'string') {
+      return ['true', '1', 'yes', 'on'].includes(value.toLowerCase());
+    }
+    return Boolean(value);
+  }
+
+  private toDate(value: unknown): Date | null {
+    if (value === null || value === undefined || value === '') return null;
+    const parsed = new Date(String(value));
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  private buildRequestFormData(request: any) {
+    switch (request.requestType?.key) {
+      case 'DOCUMENT_REQUEST':
+        return request.documentRequest
+          ? {
+              documentType: request.documentRequest.documentType,
+              language: request.documentRequest.language,
+              copiesCount: request.documentRequest.copiesCount,
+              deliveryMethod: request.documentRequest.deliveryMethod,
+              deliveryAddress: request.documentRequest.deliveryAddress,
+              description: request.description,
+            }
+          : {};
+      case 'ROOM_RESERVATION':
+        return request.roomReservationRequest
+          ? {
+              resourceId: request.roomReservationRequest.resourceId,
+              eventName: request.roomReservationRequest.eventName,
+              reservationPurpose:
+                request.roomReservationRequest.reservationPurpose,
+              attendeeCount: request.roomReservationRequest.attendeeCount,
+              startAt: request.roomReservationRequest.startAt,
+              endAt: request.roomReservationRequest.endAt,
+              requiresSecurityApproval:
+                request.roomReservationRequest.requiresSecurityApproval,
+              requiresTechnicalSupport:
+                request.roomReservationRequest.requiresTechnicalSupport,
+              setupNotes: request.roomReservationRequest.setupNotes,
+              description: request.description,
+            }
+          : {};
+      case 'APPOINTMENT':
+        return request.appointmentRequest
+          ? {
+              targetUserId: request.appointmentRequest.targetUserId,
+              appointmentType: request.appointmentRequest.appointmentType,
+              topic: request.appointmentRequest.topic,
+              details: request.appointmentRequest.details,
+              preferredStartAt: request.appointmentRequest.preferredStartAt,
+              preferredEndAt: request.appointmentRequest.preferredEndAt,
+            }
+          : {};
+      case 'PROCUREMENT_REQUEST':
+        return request.procurementRequest
+          ? {
+              itemName: request.procurementRequest.itemName,
+              itemCategory: request.procurementRequest.itemCategory,
+              quantity: request.procurementRequest.quantity,
+              unitPriceEstimate: request.procurementRequest.unitPriceEstimate
+                ? Number(request.procurementRequest.unitPriceEstimate)
+                : null,
+              vendorPreference: request.procurementRequest.vendorPreference,
+              justification: request.procurementRequest.justification,
+              budgetCode: request.procurementRequest.budgetCode,
+              priority: request.priority,
+            }
+          : {};
+      case 'ACCESS_REQUEST':
+        return request.accessRequest
+          ? {
+              accessType: request.accessRequest.accessType,
+              targetResource: request.accessRequest.targetResource,
+              requestedRoleOrPermission:
+                request.accessRequest.requestedRoleOrPermission,
+              justification: request.accessRequest.justification,
+              startAt: request.accessRequest.startAt,
+              endAt: request.accessRequest.endAt,
+            }
+          : {};
+      case 'EVENT_REQUEST':
+        return request.eventRequest
+          ? {
+              eventName: request.eventRequest.eventName,
+              eventType: request.eventRequest.eventType,
+              description: request.eventRequest.description,
+              expectedAttendance: request.eventRequest.expectedAttendance,
+              locationPreference: request.eventRequest.locationPreference,
+              startAt: request.eventRequest.startAt,
+              endAt: request.eventRequest.endAt,
+              needsBudget: request.eventRequest.needsBudget,
+              estimatedBudget: request.eventRequest.estimatedBudget
+                ? Number(request.eventRequest.estimatedBudget)
+                : null,
+              needsPosterApproval: request.eventRequest.needsPosterApproval,
+              needsSecuritySupport: request.eventRequest.needsSecuritySupport,
+              needsTechnicalSupport:
+                request.eventRequest.needsTechnicalSupport,
+            }
+          : {};
+      case 'EQUIPMENT':
+        return request.equipmentRequest
+          ? {
+              labResourceId: request.equipmentRequest.labResourceId,
+              equipmentName: request.equipmentRequest.equipmentName,
+              equipmentCategory: request.equipmentRequest.equipmentCategory,
+              quantity: request.equipmentRequest.quantity,
+              purpose: request.equipmentRequest.purpose,
+              neededFrom: request.equipmentRequest.neededFrom,
+              neededUntil: request.equipmentRequest.neededUntil,
+              urgencyReason: request.equipmentRequest.urgencyReason,
+            }
+          : {};
+      case 'INTERNSHIP_REQUEST':
+        return request.internshipRequest
+          ? {
+              companyName: request.internshipRequest.companyName,
+              companySector: request.internshipRequest.companySector,
+              companyContactName: request.internshipRequest.companyContactName,
+              companyContactEmail:
+                request.internshipRequest.companyContactEmail,
+              internshipType: request.internshipRequest.internshipType,
+              workMode: request.internshipRequest.workMode,
+              startDate: request.internshipRequest.startDate,
+              endDate: request.internshipRequest.endDate,
+              durationDays: request.internshipRequest.durationDays,
+              insuranceRequired:
+                request.internshipRequest.insuranceRequired,
+            }
+          : {};
+      default:
+        return request.dynamicData || {};
+    }
+  }
+
+  private async applyTypedRequestUpdate(
+    tx: Prisma.TransactionClient,
+    userId: string,
+    requestId: string,
+    typeKey: string,
+    data: any,
+    existingRequest: any,
+  ): Promise<{
+    title?: string | null;
+    description?: string | null;
+    priority?: PriorityLevel;
+    dynamicData?: Record<string, unknown>;
+  }> {
+    switch (typeKey) {
+      case 'DOCUMENT_REQUEST': {
+        const current = await tx.documentRequest.findUnique({
+          where: { requestId },
+        });
+        if (!current) break;
+
+        const documentType =
+          this.toTrimmedString(data.documentType) ?? current.documentType;
+        const language =
+          this.toTrimmedString(data.language) ?? current.language ?? null;
+        const copiesCount = this.toInt(data.copiesCount) ?? current.copiesCount;
+        const deliveryMethod =
+          this.toTrimmedString(data.deliveryMethod) ?? current.deliveryMethod;
+        const deliveryAddress =
+          this.toTrimmedString(data.deliveryAddress) ?? null;
+        const description = this.toTrimmedString(data.description);
+
+        await tx.documentRequest.update({
+          where: { requestId },
+          data: {
+            documentType,
+            language,
+            copiesCount,
+            deliveryMethod,
+            deliveryAddress,
+          },
+        });
+
+        return {
+          title: `${documentType} Request`,
+          description,
+        };
+      }
+      case 'ROOM_RESERVATION': {
+        const current = await tx.roomReservationRequest.findUnique({
+          where: { requestId },
+        });
+        if (!current) break;
+
+        const resourceId =
+          this.toTrimmedString(data.resourceId) ?? current.resourceId;
+        const resource = await tx.resource.findUnique({ where: { id: resourceId } });
+        if (!resource) {
+          throw new NotFoundException('Selected resource not found.');
+        }
+
+        const eventName =
+          this.toTrimmedString(data.eventName) ?? current.eventName;
+        const reservationPurpose =
+          this.toTrimmedString(data.reservationPurpose) ??
+          current.reservationPurpose;
+        const attendeeCount =
+          this.toInt(data.attendeeCount) ?? current.attendeeCount;
+        const startAt = this.toDate(data.startAt) ?? current.startAt;
+        const endAt = this.toDate(data.endAt) ?? current.endAt;
+        if (startAt >= endAt) {
+          throw new BadRequestException(
+            'End time must be after start time.',
+          );
+        }
+        const requiresSecurityApproval =
+          data.requiresSecurityApproval !== undefined
+            ? this.toBoolean(data.requiresSecurityApproval)
+            : current.requiresSecurityApproval;
+        const requiresTechnicalSupport =
+          data.requiresTechnicalSupport !== undefined
+            ? this.toBoolean(data.requiresTechnicalSupport)
+            : current.requiresTechnicalSupport;
+        const setupNotes = this.toTrimmedString(data.setupNotes);
+        const description =
+          this.toTrimmedString(data.description) ?? reservationPurpose;
+
+        await tx.roomReservationRequest.update({
+          where: { requestId },
+          data: {
+            resourceId,
+            eventName,
+            reservationPurpose,
+            attendeeCount,
+            startAt,
+            endAt,
+            requiresSecurityApproval,
+            requiresTechnicalSupport,
+            setupNotes,
+          },
+        });
+
+        return {
+          title: `${resource.name} - ${eventName}`,
+          description,
+        };
+      }
+      case 'APPOINTMENT': {
+        const current = await tx.appointmentRequest.findUnique({
+          where: { requestId },
+        });
+        if (!current) break;
+
+        const targetUserId =
+          this.toTrimmedString(data.targetUserId) ?? current.targetUserId;
+        if (targetUserId === userId) {
+          throw new BadRequestException('Cannot book appointment with yourself.');
+        }
+        const targetUser = await tx.user.findUnique({ where: { id: targetUserId } });
+        if (!targetUser) {
+          throw new NotFoundException('Selected person not found.');
+        }
+
+        const appointmentType =
+          this.toTrimmedString(data.appointmentType) ??
+          current.appointmentType;
+        const topic = this.toTrimmedString(data.topic) ?? current.topic;
+        const details =
+          this.toTrimmedString(data.details) ?? current.details ?? null;
+        const preferredStartAt =
+          this.toDate(data.preferredStartAt) ?? current.preferredStartAt;
+        const preferredEndAt =
+          this.toDate(data.preferredEndAt) ?? current.preferredEndAt;
+        if (
+          preferredStartAt &&
+          preferredEndAt &&
+          preferredStartAt >= preferredEndAt
+        ) {
+          throw new BadRequestException(
+            'Preferred end must be after preferred start.',
+          );
+        }
+
+        await tx.appointmentRequest.update({
+          where: { requestId },
+          data: {
+            targetUserId,
+            appointmentType,
+            topic,
+            details,
+            preferredStartAt,
+            preferredEndAt,
+          },
+        });
+
+        return {
+          title: `Appointment: ${topic}`,
+          description: details,
+        };
+      }
+      case 'PROCUREMENT_REQUEST': {
+        const current = await tx.procurementRequest.findUnique({
+          where: { requestId },
+        });
+        if (!current) break;
+
+        const itemName = this.toTrimmedString(data.itemName) ?? current.itemName;
+        const itemCategory =
+          this.toTrimmedString(data.itemCategory) ?? current.itemCategory;
+        const quantity = this.toInt(data.quantity) ?? current.quantity;
+        const unitPriceEstimate =
+          this.toFloat(data.unitPriceEstimate) ??
+          (current.unitPriceEstimate ? Number(current.unitPriceEstimate) : null);
+        const vendorPreference =
+          this.toTrimmedString(data.vendorPreference) ?? null;
+        const justification =
+          this.toTrimmedString(data.justification) ?? current.justification;
+        const budgetCode = this.toTrimmedString(data.budgetCode) ?? null;
+        const priority =
+          (this.toTrimmedString(data.priority) as PriorityLevel | null) ??
+          existingRequest.priority;
+        const totalEstimate =
+          unitPriceEstimate !== null ? unitPriceEstimate * quantity : null;
+
+        await tx.procurementRequest.update({
+          where: { requestId },
+          data: {
+            itemName,
+            itemCategory,
+            quantity,
+            unitPriceEstimate,
+            totalEstimate,
+            vendorPreference,
+            justification,
+            budgetCode,
+          },
+        });
+
+        return {
+          title: `Procurement: ${itemName} (${quantity})`,
+          description: justification,
+          priority,
+        };
+      }
+      case 'ACCESS_REQUEST': {
+        const current = await tx.accessRequest.findUnique({
+          where: { requestId },
+        });
+        if (!current) break;
+
+        const accessType =
+          this.toTrimmedString(data.accessType) ?? current.accessType;
+        const targetResource =
+          this.toTrimmedString(data.targetResource) ?? current.targetResource;
+        const requestedRoleOrPermission =
+          this.toTrimmedString(data.requestedRoleOrPermission) ?? null;
+        const justification =
+          this.toTrimmedString(data.justification) ?? current.justification;
+        const startAt = this.toDate(data.startAt) ?? current.startAt;
+        const endAt = this.toDate(data.endAt) ?? current.endAt;
+
+        await tx.accessRequest.update({
+          where: { requestId },
+          data: {
+            accessType,
+            targetResource,
+            requestedRoleOrPermission,
+            justification,
+            startAt,
+            endAt,
+          },
+        });
+
+        return {
+          title: `Access Request: ${targetResource}`,
+          description: justification,
+        };
+      }
+      case 'EVENT_REQUEST': {
+        const current = await tx.eventRequest.findUnique({
+          where: { requestId },
+        });
+        if (!current) break;
+
+        const eventName =
+          this.toTrimmedString(data.eventName) ?? current.eventName;
+        const eventType =
+          this.toTrimmedString(data.eventType) ?? current.eventType;
+        const description =
+          this.toTrimmedString(data.description) ?? current.description;
+        const expectedAttendance =
+          this.toInt(data.expectedAttendance) ?? current.expectedAttendance;
+        const locationPreference =
+          this.toTrimmedString(data.locationPreference) ?? null;
+        const startAt = this.toDate(data.startAt) ?? current.startAt;
+        const endAt = this.toDate(data.endAt) ?? current.endAt;
+        if (startAt >= endAt) {
+          throw new BadRequestException('End date must be after start date.');
+        }
+        const needsBudget =
+          data.needsBudget !== undefined
+            ? this.toBoolean(data.needsBudget)
+            : current.needsBudget;
+        const estimatedBudget =
+          this.toFloat(data.estimatedBudget) ??
+          (current.estimatedBudget ? Number(current.estimatedBudget) : null);
+        const needsPosterApproval =
+          data.needsPosterApproval !== undefined
+            ? this.toBoolean(data.needsPosterApproval)
+            : current.needsPosterApproval;
+        const needsSecuritySupport =
+          data.needsSecuritySupport !== undefined
+            ? this.toBoolean(data.needsSecuritySupport)
+            : current.needsSecuritySupport;
+        const needsTechnicalSupport =
+          data.needsTechnicalSupport !== undefined
+            ? this.toBoolean(data.needsTechnicalSupport)
+            : current.needsTechnicalSupport;
+
+        await tx.eventRequest.update({
+          where: { requestId },
+          data: {
+            eventName,
+            eventType,
+            description,
+            expectedAttendance,
+            locationPreference,
+            startAt,
+            endAt,
+            needsBudget,
+            estimatedBudget: needsBudget ? estimatedBudget : null,
+            needsPosterApproval,
+            needsSecuritySupport,
+            needsTechnicalSupport,
+          },
+        });
+
+        return {
+          title: eventName,
+          description,
+        };
+      }
+      case 'EQUIPMENT': {
+        const current = await tx.equipmentRequest.findUnique({
+          where: { requestId },
+        });
+        if (!current) break;
+
+        const labResourceId =
+          this.toTrimmedString(data.labResourceId) ?? current.labResourceId;
+        const equipmentName =
+          this.toTrimmedString(data.equipmentName) ?? current.equipmentName;
+        const equipmentCategory =
+          this.toTrimmedString(data.equipmentCategory) ??
+          current.equipmentCategory;
+        const quantity = this.toInt(data.quantity) ?? current.quantity;
+        const purpose =
+          this.toTrimmedString(data.purpose) ?? current.purpose;
+        const neededFrom = this.toDate(data.neededFrom) ?? current.neededFrom;
+        const neededUntil =
+          this.toDate(data.neededUntil) ?? current.neededUntil;
+        if (neededFrom && neededUntil && neededFrom >= neededUntil) {
+          throw new BadRequestException(
+            'Return date must be after pickup date.',
+          );
+        }
+        const urgencyReason =
+          this.toTrimmedString(data.urgencyReason) ?? null;
+
+        await tx.equipmentRequest.update({
+          where: { requestId },
+          data: {
+            labResourceId,
+            equipmentName,
+            equipmentCategory,
+            quantity,
+            purpose,
+            neededFrom,
+            neededUntil,
+            urgencyReason,
+          },
+        });
+
+        return {
+          title: `${equipmentCategory} Request: ${equipmentName} (x${quantity})`,
+          description: purpose,
+        };
+      }
+      case 'INTERNSHIP_REQUEST': {
+        const current = await tx.internshipRequest.findUnique({
+          where: { requestId },
+        });
+        if (!current) break;
+
+        const companyName =
+          this.toTrimmedString(data.companyName) ?? current.companyName;
+        const companySector =
+          this.toTrimmedString(data.companySector) ?? null;
+        const companyContactName =
+          this.toTrimmedString(data.companyContactName) ?? null;
+        const companyContactEmail =
+          this.toTrimmedString(data.companyContactEmail) ?? null;
+        const internshipType =
+          this.toTrimmedString(data.internshipType) ??
+          current.internshipType;
+        const workMode =
+          this.toTrimmedString(data.workMode) ?? current.workMode;
+        const startDate = this.toDate(data.startDate) ?? current.startDate;
+        const endDate = this.toDate(data.endDate) ?? current.endDate;
+        if (startDate >= endDate) {
+          throw new BadRequestException('End date cannot be before start date.');
+        }
+        const durationDays =
+          this.toInt(data.durationDays) ?? current.durationDays;
+        const insuranceRequired =
+          data.insuranceRequired !== undefined
+            ? this.toBoolean(data.insuranceRequired)
+            : current.insuranceRequired;
+
+        await tx.internshipRequest.update({
+          where: { requestId },
+          data: {
+            companyName,
+            companySector,
+            companyContactName,
+            companyContactEmail,
+            internshipType,
+            workMode,
+            startDate,
+            endDate,
+            durationDays,
+            insuranceRequired,
+          },
+        });
+
+        return {
+          title: `${internshipType} Internship at ${companyName}`,
+        };
+      }
+      default: {
+        const standardKeys = [
+          'typeKey',
+          'title',
+          'description',
+          'priority',
+          'facultyUserId',
+          'preferredDate',
+          'preferredTime',
+          'deletedFileIds',
+        ];
+        const dynamicData: Record<string, unknown> = {};
+        for (const key in data) {
+          if (!standardKeys.includes(key)) dynamicData[key] = data[key];
+        }
+
+        let finalDescription =
+          this.toTrimmedString(data.description) ?? existingRequest.description;
+        if (data.preferredDate) {
+          finalDescription =
+            (finalDescription ? `${finalDescription}\n` : '') +
+            `Preferred Date: ${data.preferredDate}`;
+        }
+        if (data.preferredTime) {
+          finalDescription =
+            (finalDescription ? `${finalDescription}\n` : '') +
+            `Preferred Time: ${data.preferredTime}`;
+        }
+
+        return {
+          title: data.title || existingRequest.title,
+          description: finalDescription,
+          priority: data.priority || existingRequest.priority,
+          dynamicData,
+        };
+      }
+    }
+
+    return {
+      title: existingRequest.title,
+      description: existingRequest.description,
+      priority: existingRequest.priority,
+      dynamicData: existingRequest.dynamicData || {},
+    };
   }
 
   async createInternshipRequest(
@@ -367,27 +976,6 @@ export class StudentService {
       }
     }
 
-    const standardKeys = [
-      'typeKey',
-      'title',
-      'description',
-      'priority',
-      'facultyUserId',
-      'preferredDate',
-      'preferredTime',
-      'deletedFileIds',
-    ];
-    const dynamicAnswers = {};
-    for (const key in data) {
-      if (!standardKeys.includes(key)) dynamicAnswers[key] = data[key];
-    }
-
-    let finalDescription = data.description;
-    if (data.preferredDate)
-      finalDescription += `\nPreferred Date: ${data.preferredDate}`;
-    if (data.preferredTime)
-      finalDescription += `\nPreferred Time: ${data.preferredTime}`;
-
     if (data.deletedFileIds) {
       try {
         const fileIdsToDelete = JSON.parse(data.deletedFileIds);
@@ -447,25 +1035,39 @@ export class StudentService {
     }
 
     const updatedRequest = await this.prisma.$transaction(async (tx) => {
+      const typedUpdate = await this.applyTypedRequestUpdate(
+        tx,
+        userId,
+        requestId,
+        existingRequest.requestType.key,
+        data,
+        existingRequest,
+      );
+
+      const requestUpdateData: Prisma.RequestUpdateInput = {
+        title: typedUpdate.title ?? existingRequest.title,
+        description:
+          typedUpdate.description !== undefined
+            ? typedUpdate.description
+            : existingRequest.description,
+        priority: typedUpdate.priority ?? existingRequest.priority,
+      };
+
+      if (typedUpdate.dynamicData !== undefined && typedUpdate.dynamicData !== null) {
+        requestUpdateData.dynamicData =
+          typedUpdate.dynamicData as Prisma.InputJsonValue;
+      } else if (
+        typedUpdate.dynamicData === undefined &&
+        existingRequest.dynamicData !== null &&
+        existingRequest.dynamicData !== undefined
+      ) {
+        requestUpdateData.dynamicData =
+          existingRequest.dynamicData as Prisma.InputJsonValue;
+      }
+
       const req = await tx.request.update({
         where: { id: requestId },
-        data: {
-          title: data.title || existingRequest.title,
-          description: finalDescription,
-          priority: data.priority || existingRequest.priority,
-          dynamicData: dynamicAnswers,
-          status: 'SUBMITTED',
-        },
-      });
-
-      await tx.requestStatusHistory.create({
-        data: {
-          requestId: req.id,
-          oldStatus: existingRequest.status,
-          newStatus: 'SUBMITTED',
-          changedByUserId: userId,
-          changeReason: 'Student updated details and resubmitted the request.',
-        },
+        data: requestUpdateData,
       });
 
       for (const meta of uploadedFilesMeta) {
@@ -493,22 +1095,22 @@ export class StudentService {
         });
       }
 
-      if (existingRequest.currentAssigneeUserId) {
+      if (false && existingRequest?.currentAssigneeUserId) {
         await tx.requestAssignment.updateMany({
           where: {
             requestId: req.id,
-            assignedToUserId: existingRequest.currentAssigneeUserId,
+            assignedToUserId: existingRequest?.currentAssigneeUserId ?? undefined,
           },
           data: { isActive: true },
         });
 
         await tx.notification.create({
           data: {
-            userId: existingRequest.currentAssigneeUserId,
+            userId: existingRequest?.currentAssigneeUserId ?? userId,
             requestId: req.id,
             type: 'IN_APP',
             title: '🔄 Request Resubmitted',
-            message: `The student has revised and resubmitted the ${existingRequest.requestType.name} request. It requires your approval again.`,
+            message: `The student has revised and resubmitted the ${existingRequest?.requestType?.name ?? 'request'} request. It requires your approval again.`,
             actionUrl: `/faculty/approvals?id=${req.id}`,
           },
         });
@@ -526,6 +1128,16 @@ export class StudentService {
 
       return req;
     });
+
+    await this.workflowEngine.processAction(
+      userId,
+      ['STUDENT'],
+      updatedRequest.id,
+      {
+        action: 'submit',
+        comment: 'Student updated details and resubmitted the request.',
+      },
+    );
 
     return {
       message: 'Successfully updated and resubmitted',
@@ -637,12 +1249,45 @@ export class StudentService {
             },
           },
         },
+        documentRequest: true,
+        roomReservationRequest: {
+          include: {
+            resource: {
+              select: {
+                id: true,
+                name: true,
+                resourceType: true,
+                locationText: true,
+                capacity: true,
+              },
+            },
+          },
+        },
+        appointmentRequest: true,
+        procurementRequest: true,
+        accessRequest: true,
+        eventRequest: true,
+        equipmentRequest: {
+          include: {
+            labResource: {
+              select: {
+                id: true,
+                name: true,
+                resourceType: true,
+                locationText: true,
+              },
+            },
+          },
+        },
+        internshipRequest: true,
       },
     });
 
     if (!request) {
       throw new NotFoundException('Talep bulunamadı veya erişim yetkiniz yok.');
     }
+
+    const workflowInstance = request.workflowInstance;
 
     return {
       id: request.id,
@@ -656,6 +1301,7 @@ export class StudentService {
       formSchema: request.requestType?.formSchemaJson || null,
 
       dynamicData: request.dynamicData || {},
+      formData: this.buildRequestFormData(request),
       requester: request.requester
         ? {
             id: request.requester.id,
@@ -713,33 +1359,34 @@ export class StudentService {
         date: h.changedAt,
         note: h.changeReason || 'Status updated.',
       })),
-      workflow: request.workflowInstance
-        ? {
-            status: request.workflowInstance.status,
-            currentStep: request.workflowInstance.currentStep?.stepName || null,
-            workflowName:
-              request.workflowInstance.workflowDefinition?.name || null,
-            steps:
-              request.workflowInstance.workflowDefinition?.steps?.map((step) => {
-                const instanceStep = request.workflowInstance.instanceSteps.find(
-                  (item) => item.workflowStepId === step.id,
-                );
-                return {
-                  id: step.id,
-                  label: step.stepName,
-                  status:
-                    step.id === request.workflowInstance.currentStepId
-                      ? 'active'
-                      : instanceStep?.status === 'COMPLETED'
-                        ? 'completed'
-                        : request.status === 'REJECTED' &&
-                            step.id === request.workflowInstance.currentStepId
-                          ? 'failed'
-                          : 'pending',
-                };
-              }) || [],
-          }
-        : null,
+      workflow: (() => {
+        if (!workflowInstance) return null;
+
+        return {
+          status: workflowInstance.status,
+          currentStep: workflowInstance.currentStep?.stepName || null,
+          workflowName: workflowInstance.workflowDefinition?.name || null,
+          steps:
+            workflowInstance.workflowDefinition?.steps?.map((step) => {
+              const instanceStep = workflowInstance.instanceSteps.find(
+                (item) => item.workflowStepId === step.id,
+              );
+              return {
+                id: step.id,
+                label: step.stepName,
+                status:
+                  step.id === workflowInstance.currentStepId
+                    ? 'active'
+                    : instanceStep?.status === 'COMPLETED'
+                      ? 'completed'
+                      : request.status === 'REJECTED' &&
+                          step.id === workflowInstance.currentStepId
+                        ? 'failed'
+                        : 'pending',
+              };
+            }) || [],
+        };
+      })(),
     };
   }
 

@@ -316,6 +316,29 @@ export class StaffService {
         skipDuplicates: true,
       });
 
+      const activeWorkflowStep = await tx.workflowInstanceStep.findFirst({
+        where: {
+          workflowInstance: { requestId },
+          status: 'PENDING',
+        },
+        orderBy: { createdAt: 'desc' },
+        select: { id: true, metadataJson: true },
+      });
+
+      if (activeWorkflowStep) {
+        await tx.workflowInstanceStep.update({
+          where: { id: activeWorkflowStep.id },
+          data: {
+            assignedToUserId: assigneeUserId,
+            metadataJson: {
+              ...(activeWorkflowStep.metadataJson as Record<string, unknown> | null),
+              manuallyAssignedByUserId: staffId,
+              manuallyAssignedAt: new Date().toISOString(),
+            },
+          },
+        });
+      }
+
       const nextStatus =
         request.status === RequestStatus.SUBMITTED
           ? RequestStatus.IN_REVIEW

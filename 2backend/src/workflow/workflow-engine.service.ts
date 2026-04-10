@@ -25,6 +25,10 @@ const ACTION_MAP: Record<
   string,
   { terminalStatus: RequestStatus; wfAction: WorkflowActionType }
 > = {
+  submit: {
+    terminalStatus: RequestStatus.SUBMITTED,
+    wfAction: WorkflowActionType.SUBMIT,
+  },
   approve: {
     terminalStatus: RequestStatus.APPROVED,
     wfAction: WorkflowActionType.APPROVE,
@@ -91,7 +95,7 @@ export class WorkflowEngineService {
     const candidateIds = new Set<string>();
 
     if (step.assignedRoleId) {
-      const scopeFilters = [];
+      const scopeFilters: Array<Record<string, unknown>> = [];
       if (request.facultyId) {
         scopeFilters.push({
           OR: [{ facultyId: null }, { facultyId: request.facultyId }],
@@ -256,6 +260,36 @@ export class WorkflowEngineService {
     }
   }
 
+  private async createCompletedStep(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    tx: any,
+    workflowInstanceId: string,
+    step: {
+      id: string;
+      stepType: WorkflowStepType;
+      slaHours?: number | null;
+      assignedUserId?: string | null;
+    },
+    action: WorkflowActionType,
+    actorUserId: string,
+    note: string | null,
+  ) {
+    return tx.workflowInstanceStep.create({
+      data: {
+        workflowInstanceId,
+        workflowStepId: step.id,
+        status: 'COMPLETED',
+        startedAt: new Date(),
+        completedAt: new Date(),
+        assignedToUserId: step.assignedUserId ?? actorUserId,
+        dueAt: this.buildDueAt(step.slaHours),
+        actionTaken: action,
+        actionByUserId: actorUserId,
+        actionNote: note,
+      },
+    });
+  }
+
   /**
    * Called inside a Prisma transaction when a Request is created.
    * Returns the RequestStatus the request should be set to.
@@ -304,16 +338,105 @@ export class WorkflowEngineService {
       skipDuplicates: true,
     });
 
+    if (firstStep.stepType !== 'START') {
+      await this.activateStep(
+        tx,
+        request,
+        instance.id,
+        firstStep,
+        request.requesterUserId,
+        `Workflow started at "${firstStep.stepName}".`,
+      );
+
+      return this.mapStepTypeToStatus(firstStep.stepType, RequestStatus.IN_REVIEW);
+    }
+
+    const submittedStep = await this.createCompletedStep(
+      tx,
+      instance.id,
+      firstStep,
+      WorkflowActionType.SUBMIT,
+      request.requesterUserId,
+      'Request submitted.',
+    );
+
+    await tx.approvalAction.create({
+      data: {
+        requestId,
+        workflowInstanceStepId: submittedStep.id,
+        actionType: WorkflowActionType.SUBMIT,
+        actionByUserId: request.requesterUserId,
+        decisionNote: 'Request submitted.',
+      },
+    });
+
+    const submitTransition = await tx.workflowTransition.findFirst({
+      where: {
+        workflowDefinitionId,
+        fromStepId: firstStep.id,
+        actionType: WorkflowActionType.SUBMIT,
+      },
+      include: { toStep: true },
+    });
+
+    const nextStep = submitTransition?.toStep ?? null;
+    if (!nextStep) {
+      await tx.workflowInstance.update({
+        where: { id: instance.id },
+        data: {
+          status: 'COMPLETED',
+          endedAt: new Date(),
+          currentStepId: null,
+        },
+      });
+      await this.syncAssignments(
+        tx,
+        request.id,
+        [],
+        request.requesterUserId,
+        'Workflow finished at submit.',
+      );
+      return RequestStatus.SUBMITTED;
+    }
+
+    if (nextStep.stepType === 'END') {
+      const terminalStatus = this.mapStepTypeToStatus(
+        nextStep.stepType,
+        RequestStatus.APPROVED,
+      );
+      await tx.workflowInstance.update({
+        where: { id: instance.id },
+        data: {
+          status: 'COMPLETED',
+          endedAt: new Date(),
+          currentStepId: null,
+        },
+      });
+      await this.syncAssignments(
+        tx,
+        request.id,
+        [],
+        request.requesterUserId,
+        `Workflow completed at "${nextStep.stepName}".`,
+      );
+      return terminalStatus;
+    }
+
+    await tx.workflowInstance.update({
+      where: { id: instance.id },
+      data: { currentStepId: nextStep.id, status: 'ACTIVE' },
+    });
+
     await this.activateStep(
       tx,
       request,
       instance.id,
-      firstStep,
+      nextStep,
       request.requesterUserId,
-      `Workflow started at "${firstStep.stepName}".`,
+      `Workflow moved to "${nextStep.stepName}".`,
     );
 
-    return this.mapStepTypeToStatus(firstStep.stepType, RequestStatus.IN_REVIEW);
+    return this.mapStepTypeToStatus(nextStep.stepType, RequestStatus.IN_REVIEW);
   }
 
   /**
@@ -358,9 +481,11 @@ export class WorkflowEngineService {
     const isPrivileged = roles.some((r) =>
       ['ADMIN', 'FACULTY', 'STAFF'].includes(r),
     );
+    const isRequesterSubmit =
+      dto.action === 'submit' && request.requesterUserId === userId;
     const isRequesterCancel =
       dto.action === 'cancel' && request.requesterUserId === userId;
-    if (!isPrivileged && !isRequesterCancel) {
+    if (!isPrivileged && !isRequesterCancel && !isRequesterSubmit) {
       throw new ForbiddenException('Insufficient permissions.');
     }
 
