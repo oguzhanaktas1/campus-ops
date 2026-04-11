@@ -1,0 +1,106 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: campusops-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: campusops
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d campusops"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: campusops-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./2backend
+      dockerfile: Dockerfile
+    container_name: campusops-backend
+    restart: unless-stopped
+    env_file:
+      - ./2backend/.env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      RUN_MIGRATIONS: "false"
+      BACKEND_PORT: 5000
+      FRONTEND_URL: http://localhost:3000
+      REDIS_URL: ""
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ""
+      REDIS_DB: 0
+      REDIS_TLS: "false"
+      JWT_SECRET: super-gizli-kampus-anahtari
+    ports:
+      - "5000:5000"
+
+  backend-seed:
+    build:
+      context: ./2backend
+      dockerfile: Dockerfile
+      target: builder
+    container_name: campusops-backend-seed
+    restart: "no"
+    profiles:
+      - seed
+    env_file:
+      - ./2backend/.env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: development
+      RUN_MIGRATIONS: "true"
+      REDIS_URL: ""
+    command: ["sh", "-c", "npx prisma migrate deploy && npm run seed"]
+
+  frontend:
+    build:
+      context: ./1frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_BACKEND_URL: http://localhost:5000
+        NEXT_PUBLIC_APP_URL: http://localhost:3000
+    container_name: campusops-frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_started
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      HOSTNAME: 0.0.0.0
+      NEXT_PUBLIC_BACKEND_URL: http://localhost:5000
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+    ports:
+      - "3000:3000"
+
+volumes:
+  postgres_data:
+  redis_data:

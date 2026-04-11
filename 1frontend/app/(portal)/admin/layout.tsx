@@ -58,6 +58,7 @@ const navItems: NavItem[] = [
       { label: "All Requests", href: "/admin/requests" },
       { label: "Request Types", href: "/admin/request-types" },
       { label: "Workflows", href: "/admin/workflows" },
+      { label: "Workflow Instances", href: "/admin/workflow-instances" },
     ],
   },
 

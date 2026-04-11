@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../core/prisma/prisma.service';
 import { NotificationStatus, NotificationType } from '@prisma/client';
+import { CacheService } from '../infrastructure/cache/cache.service';
+import { CacheKeys, CacheTtls } from '../infrastructure/cache/cache-keys';
+import { PrismaService } from '../core/prisma/prisma.service';
 
 export interface CreateNotificationDto {
   userId: string;
@@ -13,7 +15,10 @@ export interface CreateNotificationDto {
 
 @Injectable()
 export class NotificationsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private cacheService: CacheService,
+  ) {}
 
   async getMyNotifications(userId: string) {
     const notifications = await this.prisma.notification.findMany({
@@ -21,28 +26,53 @@ export class NotificationsService {
       orderBy: { createdAt: 'desc' },
       take: 100,
     });
-    const unreadCount = await this.prisma.notification.count({
-      where: { userId, isRead: false },
-    });
+    const unreadCount = await this.cacheService.getOrSet(
+      CacheKeys.notificationsUnread(userId),
+      CacheTtls.notifications,
+      () =>
+        this.prisma.notification.count({
+          where: { userId, isRead: false },
+        }),
+    );
     return { notifications, unreadCount };
   }
 
   async markRead(userId: string, notifId: string) {
-    return this.prisma.notification.updateMany({
+    const result = await this.prisma.notification.updateMany({
       where: { id: notifId, userId },
-      data: { isRead: true, readAt: new Date(), status: NotificationStatus.READ },
+      data: {
+        isRead: true,
+        readAt: new Date(),
+        status: NotificationStatus.READ,
+      },
     });
+    if (result.count > 0) {
+      await this.cacheService.decr(CacheKeys.notificationsUnread(userId));
+    }
+    return result;
   }
 
   async markAllRead(userId: string) {
-    return this.prisma.notification.updateMany({
+    const result = await this.prisma.notification.updateMany({
       where: { userId, isRead: false },
-      data: { isRead: true, readAt: new Date(), status: NotificationStatus.READ },
+      data: {
+        isRead: true,
+        readAt: new Date(),
+        status: NotificationStatus.READ,
+      },
     });
+    await this.cacheService.set(
+      CacheKeys.notificationsUnread(userId),
+      0,
+      CacheTtls.notifications,
+    );
+    return result;
   }
 
   async getPreferences(userId: string) {
-    let prefs = await this.prisma.notificationPreference.findUnique({ where: { userId } });
+    let prefs = await this.prisma.notificationPreference.findUnique({
+      where: { userId },
+    });
     if (!prefs) {
       prefs = await this.prisma.notificationPreference.create({
         data: { userId },
@@ -51,12 +81,15 @@ export class NotificationsService {
     return prefs;
   }
 
-  async updatePreferences(userId: string, dto: Partial<{
-    emailEnabled: boolean;
-    inAppEnabled: boolean;
-    marketingEmailEnabled: boolean;
-    reminderEmailEnabled: boolean;
-  }>) {
+  async updatePreferences(
+    userId: string,
+    dto: Partial<{
+      emailEnabled: boolean;
+      inAppEnabled: boolean;
+      marketingEmailEnabled: boolean;
+      reminderEmailEnabled: boolean;
+    }>,
+  ) {
     return this.prisma.notificationPreference.upsert({
       where: { userId },
       update: dto,
@@ -65,15 +98,16 @@ export class NotificationsService {
   }
 
   async deleteNotifications(userId: string, ids: string[]) {
-    return this.prisma.notification.deleteMany({
+    const result = await this.prisma.notification.deleteMany({
       where: { id: { in: ids }, userId },
     });
+    await this.cacheService.del(CacheKeys.notificationsUnread(userId));
+    return result;
   }
 
-  // ── HELPER: create a notification (fire-and-forget safe) ──────────────────
   async createNotification(dto: CreateNotificationDto) {
     try {
-      return await this.prisma.notification.create({
+      const notification = await this.prisma.notification.create({
         data: {
           userId: dto.userId,
           type: dto.type ?? NotificationType.IN_APP,
@@ -84,12 +118,13 @@ export class NotificationsService {
           status: NotificationStatus.SENT,
         },
       });
+      await this.cacheService.incr(CacheKeys.notificationsUnread(dto.userId));
+      return notification;
     } catch {
-      // Non-blocking — never crash caller
+      // Non-blocking
     }
   }
 
-  // ── HELPER: log an email (no actual sending) ─────────────────────────────
   async logEmail(dto: {
     userId?: string;
     requestId?: string;

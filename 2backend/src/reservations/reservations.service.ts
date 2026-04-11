@@ -9,6 +9,7 @@ import {
 import { PrismaService } from '../core/prisma/prisma.service';
 import { WorkflowEngineService } from '../workflow/workflow-engine.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { CacheService } from '../infrastructure/cache/cache.service';
 import {
   PriorityLevel,
   RequestStatus,
@@ -19,6 +20,7 @@ import {
   ApproveReservationDto,
   RejectReservationDto,
 } from './dto/approve-reservation.dto';
+import { CacheKeys } from '../infrastructure/cache/cache-keys';
 
 const ROOM_RESERVATION_TYPE_KEY = 'ROOM_RESERVATION';
 
@@ -35,6 +37,7 @@ export class ReservationsService {
     private prisma: PrismaService,
     private workflowEngine: WorkflowEngineService,
     private notificationsService: NotificationsService,
+    private cacheService: CacheService,
   ) {}
 
   // ── HELPERS ────────────────────────────────────────────────────────────────
@@ -240,6 +243,15 @@ export class ReservationsService {
         ],
       },
     });
+
+    await Promise.all([
+      this.cacheService.bumpVersion(CacheKeys.version('reference:resources')),
+      this.cacheService.del(CacheKeys.resourceAvailabilityWindow(resource.id)),
+      this.cacheService.bumpVersion(CacheKeys.version('admin:requests:list')),
+      this.cacheService.bumpVersion(
+        CacheKeys.version('admin:dashboard:summary'),
+      ),
+    ]);
 
     return result;
   }
@@ -567,6 +579,18 @@ export class ReservationsService {
       requestId,
       actionUrl: '/student/reservations/' + requestId,
     });
+    await Promise.all([
+      this.cacheService.del(CacheKeys.resourceAvailabilityWindow(rrrData.resourceId)),
+      this.cacheService.bumpVersion(CacheKeys.version('reference:resources')),
+      this.cacheService.bumpVersion(
+        CacheKeys.version(`request:detail:${requestId}`),
+      ),
+      this.cacheService.bumpVersion(CacheKeys.version('admin:requests:list')),
+      this.cacheService.bumpVersion(
+        CacheKeys.version('admin:dashboard:summary'),
+      ),
+    ]);
+
     return result;
   }
 
@@ -624,6 +648,17 @@ export class ReservationsService {
       requestId,
       actionUrl: '/student/reservations/' + requestId,
     });
+    await Promise.all([
+      this.cacheService.del(CacheKeys.resourceAvailabilityWindow(rrrData.resourceId)),
+      this.cacheService.bumpVersion(
+        CacheKeys.version(`request:detail:${requestId}`),
+      ),
+      this.cacheService.bumpVersion(CacheKeys.version('admin:requests:list')),
+      this.cacheService.bumpVersion(
+        CacheKeys.version('admin:dashboard:summary'),
+      ),
+    ]);
+
     return result;
   }
 }

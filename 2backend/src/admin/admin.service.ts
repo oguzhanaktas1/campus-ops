@@ -11,17 +11,24 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../core/prisma/prisma.service';
 import { SlaService } from '../workflow/sla.service';
+import { CacheService } from '../infrastructure/cache/cache.service';
 import * as bcrypt from 'bcrypt';
 import { UserStatus, Gender, AuditActionType } from '@prisma/client';
 import { AssignRoleDto } from './dto/assign-role.dto';
 import { AdminUpdateProfileDto } from './dto/admin-update-profile.dto';
 import { UpdateRequestTypeDto } from '../requests/dto/update-request-type.dto';
+import {
+  CacheKeys,
+  CacheTtls,
+  makeCacheHash,
+} from '../infrastructure/cache/cache-keys';
 
 @Injectable()
 export class AdminService {
   constructor(
     private prisma: PrismaService,
     private slaService: SlaService,
+    private cacheService: CacheService,
   ) {}
 
   private buildRequestDomainData(request: any) {
@@ -426,28 +433,40 @@ export class AdminService {
   }
 
   async getAllRequests() {
-    const requests = await this.prisma.request.findMany({
-      include: {
-        requester: { include: { profile: true } },
-        requestType: true,
-        currentAssignee: { include: { profile: true } },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+    const version = await this.cacheService.getVersion(
+      CacheKeys.version('admin:requests:list'),
+    );
+    const key = CacheKeys.adminRequestsList(
+      makeCacheHash({ scope: 'all' }),
+      version,
+    );
 
-    return requests.map((req) => ({
-      id: req.id,
-      requestNo: req.requestNo,
-      title: req.title,
-      status: req.status,
-      priority: req.priority,
-      type: req.requestType.key,
-      typeName: req.requestType.name,
-      submittedByName: req.requester.profile?.fullName || req.requester.email,
-      assignedToName: req.currentAssignee?.profile?.fullName || 'Unassigned',
-      createdAt: req.createdAt,
-      updatedAt: req.updatedAt,
-    }));
+    return this.cacheService.getOrSet(key, CacheTtls.medium, async () => {
+      const requests = await this.prisma.request.findMany({
+        include: {
+          requester: { include: { profile: true } },
+          requestType: true,
+          currentAssignee: { include: { profile: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      return requests.map((req) => ({
+        id: req.id,
+        requestNo: req.requestNo,
+        title: req.title,
+        status: req.status,
+        priority: req.priority,
+        type: req.requestType.key,
+        typeName: req.requestType.name,
+        submittedByName:
+          req.requester.profile?.fullName || req.requester.email,
+        assignedToName:
+          req.currentAssignee?.profile?.fullName || 'Unassigned',
+        createdAt: req.createdAt,
+        updatedAt: req.updatedAt,
+      }));
+    });
   }
 
   async getRequestById(requestId: string) {
@@ -1693,63 +1712,111 @@ export class AdminService {
   // ─────────────────────────────────────────────────────────────────────────
 
   async getDashboardMetrics() {
-    const now = new Date();
-    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const version = await this.cacheService.getVersion(
+      CacheKeys.version('admin:dashboard:summary'),
+    );
+    const key = CacheKeys.adminDashboardSummary(version);
 
-    const [
-      totalRequests,
-      openRequests,
-      overdueRequests,
-      totalUsers,
-      activeUsers,
-      totalApproved,
-      totalRejected,
-      todayRequests,
-      openTickets,
-      todayReservations,
-      todayAppointments,
-    ] = await Promise.all([
-      this.prisma.request.count({ where: { deletedAt: null } }),
-      this.prisma.request.count({
-        where: {
-          deletedAt: null,
-          status: { notIn: ['COMPLETED', 'APPROVED', 'REJECTED', 'CANCELLED', 'CLOSED', 'EXPIRED'] },
-        },
-      }),
-      this.prisma.request.count({
-        where: {
-          deletedAt: null,
-          dueAt: { lt: now },
-          status: { notIn: ['COMPLETED', 'APPROVED', 'REJECTED', 'CANCELLED', 'CLOSED', 'EXPIRED'] },
-        },
-      }),
-      this.prisma.user.count({ where: { deletedAt: null } }),
-      this.prisma.user.count({ where: { deletedAt: null, status: 'ACTIVE' } }),
-      this.prisma.request.count({ where: { deletedAt: null, status: 'APPROVED' } }),
-      this.prisma.request.count({ where: { deletedAt: null, status: 'REJECTED' } }),
-      this.prisma.request.count({ where: { deletedAt: null, createdAt: { gte: todayStart } } }),
-      this.prisma.itTicket.count({
-        where: { ticketStatus: { in: ['OPEN', 'IN_PROGRESS', 'TRIAGED', 'WAITING_USER', 'REOPENED'] } },
-      }),
-      this.prisma.reservation.count({ where: { startAt: { gte: todayStart } } }),
-      this.prisma.appointment.count({ where: { startAt: { gte: todayStart } } }),
-    ]);
+    return this.cacheService.getOrSet(key, CacheTtls.medium, async () => {
+      const now = new Date();
+      const todayStart = new Date(
+        now.getFullYear(),
+        now.getMonth(),
+        now.getDate(),
+      );
 
-    const total = totalApproved + totalRejected;
-    const approvalRate = total > 0 ? Math.round((totalApproved / total) * 100) : 0;
+      const [
+        totalRequests,
+        openRequests,
+        overdueRequests,
+        totalUsers,
+        activeUsers,
+        totalApproved,
+        totalRejected,
+        todayRequests,
+        openTickets,
+        todayReservations,
+        todayAppointments,
+      ] = await Promise.all([
+        this.prisma.request.count({ where: { deletedAt: null } }),
+        this.prisma.request.count({
+          where: {
+            deletedAt: null,
+            status: {
+              notIn: [
+                'COMPLETED',
+                'APPROVED',
+                'REJECTED',
+                'CANCELLED',
+                'CLOSED',
+                'EXPIRED',
+              ],
+            },
+          },
+        }),
+        this.prisma.request.count({
+          where: {
+            deletedAt: null,
+            dueAt: { lt: now },
+            status: {
+              notIn: [
+                'COMPLETED',
+                'APPROVED',
+                'REJECTED',
+                'CANCELLED',
+                'CLOSED',
+                'EXPIRED',
+              ],
+            },
+          },
+        }),
+        this.prisma.user.count({ where: { deletedAt: null } }),
+        this.prisma.user.count({
+          where: { deletedAt: null, status: 'ACTIVE' },
+        }),
+        this.prisma.request.count({
+          where: { deletedAt: null, status: 'APPROVED' },
+        }),
+        this.prisma.request.count({
+          where: { deletedAt: null, status: 'REJECTED' },
+        }),
+        this.prisma.request.count({
+          where: { deletedAt: null, createdAt: { gte: todayStart } },
+        }),
+        this.prisma.itTicket.count({
+          where: {
+            ticketStatus: {
+              in: [
+                'OPEN',
+                'IN_PROGRESS',
+                'TRIAGED',
+                'WAITING_USER',
+                'REOPENED',
+              ],
+            },
+          },
+        }),
+        this.prisma.reservation.count({ where: { startAt: { gte: todayStart } } }),
+        this.prisma.appointment.count({ where: { startAt: { gte: todayStart } } }),
+      ]);
 
-    return {
-      totalRequests,
-      openRequests,
-      overdueRequests,
-      totalUsers,
-      activeUsers,
-      approvalRate,
-      todayRequests,
-      openTickets,
-      todayReservations,
-      todayAppointments,
-    };
+      const total = totalApproved + totalRejected;
+      const approvalRate =
+        total > 0 ? Math.round((totalApproved / total) * 100) : 0;
+
+      return {
+        totalRequests,
+        openRequests,
+        overdueRequests,
+        totalUsers,
+        activeUsers,
+        approvalRate,
+        todayRequests,
+        openTickets,
+        todayReservations,
+        todayAppointments,
+      };
+    });
   }
 
   async getLoginHistory(userId: string) {

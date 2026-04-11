@@ -6,15 +6,15 @@ const prisma = new PrismaClient();
 // REQUEST TYPE KEYS — domain servisleriyle hizalı
 // ─────────────────────────────────────────────────────────────
 const DOMAIN_KEYS = [
-  'DOCUMENT_REQUEST', // documents.service.ts
-  'ROOM_RESERVATION', // reservations.service.ts
-  'APPOINTMENT', // appointments.service.ts
-  'IT_SUPPORT', // tickets.service.ts
-  'EQUIPMENT', // equipment-requests.service.ts
-  'INTERNSHIP_REQUEST', // internships.service.ts
-  'ACCESS_REQUEST', // access-requests.service.ts
-  'PROCUREMENT_REQUEST', // procurement.service.ts
-  'EVENT_REQUEST', // events.service.ts
+  'DOCUMENT_REQUEST',
+  'ROOM_RESERVATION',
+  'APPOINTMENT',
+  'IT_SUPPORT',
+  'EQUIPMENT',
+  'INTERNSHIP_REQUEST',
+  'ACCESS_REQUEST',
+  'PROCUREMENT_REQUEST',
+  'EVENT_REQUEST',
 ];
 
 // Eski key → yeni key (rename listesi)

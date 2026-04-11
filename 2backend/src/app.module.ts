@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PrismaModule } from './core/prisma/prisma.module';
@@ -21,9 +22,16 @@ import { InternshipsModule } from './internships/internships.module';
 import { AccessRequestsModule } from './access-requests/access-requests.module';
 import { ProcurementModule } from './procurement/procurement.module';
 import { EventsModule } from './events/events.module';
+import { RedisModule } from './infrastructure/redis/redis.module';
+import { CacheModule } from './infrastructure/cache/cache.module';
+import { QueueModule } from './infrastructure/queue/queue.module';
 
 @Module({
   imports: [
+    ConfigModule.forRoot({ isGlobal: true }),
+    RedisModule,
+    CacheModule,
+    QueueModule,
     PrismaModule,
     AuthModule,
     NotificationsModule,

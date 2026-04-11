@@ -5,6 +5,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import {
   Injectable,
+  Logger,
   InternalServerErrorException,
   NotFoundException,
   BadRequestException,
@@ -26,17 +27,35 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import 'multer';
 @Injectable()
 export class StudentService {
-  private supabase: SupabaseClient;
+  private readonly logger = new Logger(StudentService.name);
+  private supabase: SupabaseClient | null;
   private readonly MAX_TOTAL_STORAGE = 50 * 1024 * 1024;
 
   constructor(
     private prisma: PrismaService,
     private workflowEngine: WorkflowEngineService,
   ) {
-    this.supabase = createClient(
-      process.env.SUPABASE_URL as string,
-      process.env.SUPABASE_KEY as string,
-    );
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_KEY;
+
+    if (supabaseUrl && supabaseKey) {
+      this.supabase = createClient(supabaseUrl, supabaseKey);
+    } else {
+      this.supabase = null;
+      this.logger.warn(
+        'SUPABASE_URL or SUPABASE_KEY is missing. File storage features are disabled.',
+      );
+    }
+  }
+
+  private getSupabaseClient(): SupabaseClient {
+    if (!this.supabase) {
+      throw new InternalServerErrorException(
+        'File storage is not configured. Set SUPABASE_URL and SUPABASE_KEY to enable uploads.',
+      );
+    }
+
+    return this.supabase;
   }
 
   async getTotalUsedStorage(userId: string): Promise<number> {
@@ -835,7 +854,7 @@ export class StudentService {
     if (files && files.length > 0) {
       for (const file of files) {
         const uniqueFileName = `${Date.now()}-${file.originalname.replace(/\s+/g, '_')}`;
-        const { error: uploadError } = await this.supabase.storage
+        const { error: uploadError } = await this.getSupabaseClient().storage
           .from('campusops-files')
           .upload(uniqueFileName, file.buffer, { contentType: file.mimetype });
 
@@ -844,7 +863,7 @@ export class StudentService {
             `Supabase Error: ${uploadError.message}`,
           );
 
-        const { data: urlData } = this.supabase.storage
+        const { data: urlData } = this.getSupabaseClient().storage
           .from('campusops-files')
           .getPublicUrl(uniqueFileName);
 
@@ -988,7 +1007,7 @@ export class StudentService {
             .map((f) => f.storagePath.split('/').pop())
             .filter(Boolean);
           if (fileNames.length > 0)
-            await this.supabase.storage
+            await this.getSupabaseClient().storage
               .from('campusops-files')
               .remove(fileNames as string[]);
 
@@ -1012,7 +1031,7 @@ export class StudentService {
     if (files && files.length > 0) {
       for (const file of files) {
         const uniqueFileName = `${Date.now()}-${file.originalname.replace(/\s+/g, '_')}`;
-        const { error: uploadError } = await this.supabase.storage
+        const { error: uploadError } = await this.getSupabaseClient().storage
           .from('campusops-files')
           .upload(uniqueFileName, file.buffer, { contentType: file.mimetype });
 
@@ -1021,7 +1040,7 @@ export class StudentService {
             `Supabase Error: ${uploadError.message}`,
           );
 
-        const { data: urlData } = this.supabase.storage
+        const { data: urlData } = this.getSupabaseClient().storage
           .from('campusops-files')
           .getPublicUrl(uniqueFileName);
 
@@ -1689,7 +1708,7 @@ export class StudentService {
     }
 
     const uniqueFileName = `${Date.now()}-${file.originalname.replace(/\s+/g, '_')}`;
-    const { error: uploadError } = await this.supabase.storage
+    const { error: uploadError } = await this.getSupabaseClient().storage
       .from('campusops-files')
       .upload(uniqueFileName, file.buffer, { contentType: file.mimetype });
 
@@ -1699,7 +1718,7 @@ export class StudentService {
       );
     }
 
-    const { data: urlData } = this.supabase.storage
+    const { data: urlData } = this.getSupabaseClient().storage
       .from('campusops-files')
       .getPublicUrl(uniqueFileName);
 
@@ -1739,7 +1758,9 @@ export class StudentService {
     try {
       const fileName = file.storagePath.split('/').pop();
       if (fileName) {
-        await this.supabase.storage.from('campusops-files').remove([fileName]);
+        await this.getSupabaseClient().storage
+          .from('campusops-files')
+          .remove([fileName]);
       }
     } catch (error) {
       console.error('Supabase file deletion error:', error);

@@ -11,6 +11,12 @@ import { PriorityLevel, RequestStatus, TicketStatus } from '@prisma/client';
 import { CreateItTicketDto } from './dto/create-it-ticket.dto';
 import { TriageItTicketDto } from './dto/triage-it-ticket.dto';
 import { ResolveItTicketDto } from './dto/resolve-it-ticket.dto';
+import { CacheService } from '../infrastructure/cache/cache.service';
+import {
+  CacheKeys,
+  CacheTtls,
+  makeCacheHash,
+} from '../infrastructure/cache/cache-keys';
 
 const IT_REQUEST_TYPE_KEY = 'IT_SUPPORT';
 
@@ -34,6 +40,7 @@ export class TicketsService {
   constructor(
     private prisma: PrismaService,
     private workflowEngine: WorkflowEngineService,
+    private cacheService: CacheService,
   ) {}
 
   // ── HELPERS ────────────────────────────────────────────────────────────────
@@ -107,7 +114,7 @@ export class TicketsService {
 
     const priority = dto.priority ?? PriorityLevel.MEDIUM;
 
-    return this.prisma.$transaction(async (tx) => {
+    const created = await this.prisma.$transaction(async (tx) => {
       let initialStatus = RequestStatus.SUBMITTED;
 
       const req = await tx.request.create({
@@ -194,6 +201,16 @@ export class TicketsService {
 
       return { requestId: req.id, ticketId: ticket.id, requestNo: req.requestNo };
     });
+
+    await Promise.all([
+      this.cacheService.bumpVersion(CacheKeys.version('staff:tickets:list')),
+      this.cacheService.bumpVersion(CacheKeys.version('admin:requests:list')),
+      this.cacheService.bumpVersion(
+        CacheKeys.version('admin:dashboard:summary'),
+      ),
+    ]);
+
+    return created;
   }
 
   // ── MY TICKETS ─────────────────────────────────────────────────────────────
@@ -237,43 +254,52 @@ export class TicketsService {
       where.assignedItUserId = filters.assignedItUserId || null;
     }
 
-    const records = await this.prisma.itTicket.findMany({
-      where,
-      include: {
-        request: {
-          include: {
-            requestType: { select: { id: true, key: true, name: true } },
-            requester: {
-              include: {
-                profile: { select: { fullName: true, studentNumber: true } },
+    const version = await this.cacheService.getVersion(
+      CacheKeys.version('staff:tickets:list'),
+    );
+    const key = CacheKeys.staffTicketsList(makeCacheHash(filters ?? {}), version);
+
+    return this.cacheService.getOrSet(key, CacheTtls.short, async () => {
+      const records = await this.prisma.itTicket.findMany({
+        where,
+        include: {
+          request: {
+            include: {
+              requestType: { select: { id: true, key: true, name: true } },
+              requester: {
+                include: {
+                  profile: { select: { fullName: true, studentNumber: true } },
+                },
+              },
+              currentAssignee: {
+                include: { profile: { select: { fullName: true } } },
               },
             },
-            currentAssignee: {
-              include: { profile: { select: { fullName: true } } },
-            },
+          },
+          assignedTo: { include: { profile: { select: { fullName: true } } } },
+          slaPolicy: {
+            select: { id: true, name: true, resolutionMinutes: true },
           },
         },
-        assignedTo: { include: { profile: { select: { fullName: true } } } },
-        slaPolicy: { select: { id: true, name: true, resolutionMinutes: true } },
-      },
-      orderBy: [{ request: { priority: 'desc' } }, { createdAt: 'asc' }],
-    });
+        orderBy: [{ request: { priority: 'desc' } }, { createdAt: 'asc' }],
+      });
 
-    return records.map((r) => ({
-      ...this.toListItem(r),
-      requesterName:
-        (r.request as any).requester?.profile?.fullName ??
-        (r.request as any).requester?.email ??
-        'Unknown',
-      assignedTo: r.assignedTo
-        ? {
-            id: r.assignedTo.id,
-            fullName:
-              (r.assignedTo as any).profile?.fullName ?? r.assignedTo.email,
-          }
-        : null,
-      slaPolicy: r.slaPolicy ?? null,
-    }));
+      return records.map((r) => ({
+        ...this.toListItem(r),
+        requesterName:
+          (r.request as any).requester?.profile?.fullName ??
+          (r.request as any).requester?.email ??
+          'Unknown',
+        assignedTo: r.assignedTo
+          ? {
+              id: r.assignedTo.id,
+              fullName:
+                (r.assignedTo as any).profile?.fullName ?? r.assignedTo.email,
+            }
+          : null,
+        slaPolicy: r.slaPolicy ?? null,
+      }));
+    });
   }
 
   // ── DETAIL ─────────────────────────────────────────────────────────────────
@@ -445,7 +471,7 @@ export class TicketsService {
     };
     const newRequestStatus = requestStatusMap[newTicketStatus] ?? RequestStatus.IN_REVIEW;
 
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       const prev = await tx.itTicket.findUnique({ where: { id: ticket.id } });
       const prevReq = await tx.request.findUnique({ where: { id: requestId } });
 
@@ -511,6 +537,19 @@ export class TicketsService {
 
       return { ticketId: updated.id, ticketStatus: updated.ticketStatus, requestStatus: newRequestStatus };
     });
+
+    await Promise.all([
+      this.cacheService.bumpVersion(CacheKeys.version('staff:tickets:list')),
+      this.cacheService.bumpVersion(
+        CacheKeys.version(`request:detail:${requestId}`),
+      ),
+      this.cacheService.bumpVersion(CacheKeys.version('admin:requests:list')),
+      this.cacheService.bumpVersion(
+        CacheKeys.version('admin:dashboard:summary'),
+      ),
+    ]);
+
+    return result;
   }
 
   // ── RESOLVE ────────────────────────────────────────────────────────────────
@@ -529,7 +568,7 @@ export class TicketsService {
 
     const resolvedAt = new Date();
 
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       const prevReq = await tx.request.findUnique({ where: { id: requestId } });
 
       const updated = await tx.itTicket.update({
@@ -570,6 +609,19 @@ export class TicketsService {
 
       return { ticketId: updated.id, ticketStatus: updated.ticketStatus };
     });
+
+    await Promise.all([
+      this.cacheService.bumpVersion(CacheKeys.version('staff:tickets:list')),
+      this.cacheService.bumpVersion(
+        CacheKeys.version(`request:detail:${requestId}`),
+      ),
+      this.cacheService.bumpVersion(CacheKeys.version('admin:requests:list')),
+      this.cacheService.bumpVersion(
+        CacheKeys.version('admin:dashboard:summary'),
+      ),
+    ]);
+
+    return result;
   }
 
   // ── CLOSE ──────────────────────────────────────────────────────────────────
@@ -581,7 +633,7 @@ export class TicketsService {
     const ticket = await this.prisma.itTicket.findFirst({ where: { requestId } });
     if (!ticket) throw new NotFoundException('IT ticket not found.');
 
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       const prevReq = await tx.request.findUnique({ where: { id: requestId } });
 
       const updated = await tx.itTicket.update({
@@ -606,6 +658,19 @@ export class TicketsService {
 
       return { ticketId: updated.id, ticketStatus: updated.ticketStatus };
     });
+
+    await Promise.all([
+      this.cacheService.bumpVersion(CacheKeys.version('staff:tickets:list')),
+      this.cacheService.bumpVersion(
+        CacheKeys.version(`request:detail:${requestId}`),
+      ),
+      this.cacheService.bumpVersion(CacheKeys.version('admin:requests:list')),
+      this.cacheService.bumpVersion(
+        CacheKeys.version('admin:dashboard:summary'),
+      ),
+    ]);
+
+    return result;
   }
 
   // ── REOPEN ─────────────────────────────────────────────────────────────────
@@ -617,7 +682,7 @@ export class TicketsService {
     const ticket = await this.prisma.itTicket.findFirst({ where: { requestId } });
     if (!ticket) throw new NotFoundException('IT ticket not found.');
 
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       const prevReq = await tx.request.findUnique({ where: { id: requestId } });
 
       const updated = await tx.itTicket.update({
@@ -647,6 +712,19 @@ export class TicketsService {
 
       return { ticketId: updated.id, ticketStatus: updated.ticketStatus };
     });
+
+    await Promise.all([
+      this.cacheService.bumpVersion(CacheKeys.version('staff:tickets:list')),
+      this.cacheService.bumpVersion(
+        CacheKeys.version(`request:detail:${requestId}`),
+      ),
+      this.cacheService.bumpVersion(CacheKeys.version('admin:requests:list')),
+      this.cacheService.bumpVersion(
+        CacheKeys.version('admin:dashboard:summary'),
+      ),
+    ]);
+
+    return result;
   }
 
   // ── STAFF MEMBERS (for assignment dropdown) ─────────────────────────────────

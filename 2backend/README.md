@@ -44,6 +44,51 @@ $ npm run start:dev
 $ npm run start:prod
 ```
 
+## Redis cache
+
+The backend now includes a shared Redis infrastructure with:
+
+- `src/infrastructure/redis`
+- `src/infrastructure/cache`
+- `src/infrastructure/queue`
+
+For local Docker usage:
+
+```bash
+REDIS_HOST=localhost
+REDIS_PORT=6379
+REDIS_PASSWORD=
+REDIS_DB=0
+REDIS_TLS=false
+```
+
+If you prefer a single connection string, this also works:
+
+```bash
+REDIS_URL=redis://localhost:6379
+```
+
+The full local stack is now defined at repo root in `docker-compose.yml`.
+
+```bash
+docker compose up --build
+```
+
+For a fresh Docker database, seeded demo users are not created automatically with the default stack. Run the seed profile once:
+
+```bash
+docker compose --profile seed up --build
+```
+
+Demo login credentials after seeding:
+
+```bash
+admin@campusops.edu.tr / aaaaaa
+student@campusops.edu.tr / aaaaaa
+faculty@campusops.edu.tr / aaaaaa
+staff@campusops.edu.tr / aaaaaa
+```
+
 ## Run tests
 
 ```bash

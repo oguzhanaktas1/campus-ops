@@ -13,6 +13,12 @@ import { CreateRequestDto } from './dto/create-request.dto';
 import { AddCommentDto } from './dto/add-comment.dto';
 import { WorkflowEngineService } from '../workflow/workflow-engine.service';
 import { SlaService } from '../workflow/sla.service';
+import { CacheService } from '../infrastructure/cache/cache.service';
+import {
+  CacheKeys,
+  CacheTtls,
+  getPortalFromRoles,
+} from '../infrastructure/cache/cache-keys';
 
 const OPEN_STATUSES: RequestStatus[] = ['SUBMITTED', 'IN_REVIEW', 'WAITING_APPROVAL'];
 const INTERNAL_ROLES = ['STAFF', 'FACULTY', 'ADMIN'];
@@ -42,6 +48,7 @@ export class RequestsService {
     private prisma: PrismaService,
     private workflowEngine: WorkflowEngineService,
     private slaService: SlaService,
+    private cacheService: CacheService,
   ) {}
 
   // ─── CREATE ────────────────────────────────────────────────────────────────
@@ -56,7 +63,7 @@ export class RequestsService {
       requestNo = makeRequestNo();
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    const created = await this.prisma.$transaction(async (tx) => {
       // Determine initial status: bootstrap workflow if request type has one
       let initialStatus = RequestStatus.SUBMITTED;
 
@@ -114,6 +121,15 @@ export class RequestsService {
 
       return req;
     });
+
+    await Promise.all([
+      this.cacheService.bumpVersion(CacheKeys.version('admin:requests:list')),
+      this.cacheService.bumpVersion(
+        CacheKeys.version('admin:dashboard:summary'),
+      ),
+    ]);
+
+    return created;
   }
 
   // ─── MY REQUESTS ──────────────────────────────────────────────────────────
@@ -178,86 +194,109 @@ export class RequestsService {
   // ─── DETAIL ───────────────────────────────────────────────────────────────
 
   async findById(userId: string, roles: string[], requestId: string) {
-    const isAdmin = roles.includes('ADMIN');
-    const isStudent = roles.includes('STUDENT') && !isAdmin;
-    const canSeeInternal = roles.some((r) => INTERNAL_ROLES.includes(r));
+    const portal = getPortalFromRoles(roles);
+    const version = await this.cacheService.getVersion(
+      CacheKeys.version(`request:detail:${requestId}`),
+    );
+    const cacheKey = CacheKeys.requestDetail(portal, requestId, userId, version);
 
-    const req: any = await this.prisma.request.findUnique({
-      where: { id: requestId },
-      include: {
-        requestType: true,
-        requester: {
-          include: {
-            profile: { include: { faculty: true, department: true } },
-          },
-        },
-        currentAssignee: { select: assigneeInclude },
-        statusHistory: { orderBy: { changedAt: 'asc' } },
-        comments: {
-          where: canSeeInternal ? {} : { isInternal: false },
-          include: {
-            user: { select: requesterInclude },
-            replies: {
-              where: canSeeInternal ? {} : { isInternal: false },
-              include: { user: { select: requesterInclude } },
-              orderBy: { createdAt: 'asc' },
+    return this.cacheService.getOrSet(cacheKey, CacheTtls.medium, async () => {
+      const isAdmin = roles.includes('ADMIN');
+      const isStudent = roles.includes('STUDENT') && !isAdmin;
+      const canSeeInternal = roles.some((r) => INTERNAL_ROLES.includes(r));
+
+      const req: any = await this.prisma.request.findUnique({
+        where: { id: requestId },
+        include: {
+          requestType: true,
+          requester: {
+            include: {
+              profile: { include: { faculty: true, department: true } },
             },
           },
-          orderBy: { createdAt: 'asc' },
-        },
-        watchers: {
-          include: { user: { select: { id: true, email: true, profile: { select: { fullName: true } } } } },
-        },
-        assignments: {
-          include: {
-            assignedTo: { select: assigneeInclude },
-            assignedBy: { select: assigneeInclude },
+          currentAssignee: { select: assigneeInclude },
+          statusHistory: { orderBy: { changedAt: 'asc' } },
+          comments: {
+            where: canSeeInternal ? {} : { isInternal: false },
+            include: {
+              user: { select: requesterInclude },
+              replies: {
+                where: canSeeInternal ? {} : { isInternal: false },
+                include: { user: { select: requesterInclude } },
+                orderBy: { createdAt: 'asc' },
+              },
+            },
+            orderBy: { createdAt: 'asc' },
           },
-          orderBy: { assignedAt: 'desc' },
-        },
-        approvalActions: {
-          include: {
-            actionBy: { select: requesterInclude },
-            workflowInstanceStep: {
-              include: { workflowStep: true },
+          watchers: {
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  email: true,
+                  profile: { select: { fullName: true } },
+                },
+              },
             },
           },
-          orderBy: { createdAt: 'desc' },
-        },
-        workflowInstance: {
-          include: {
-            currentStep: true,
-            workflowDefinition: { include: { steps: { orderBy: { stepOrder: 'asc' } } } },
-            instanceSteps: { orderBy: { createdAt: 'asc' } },
+          assignments: {
+            include: {
+              assignedTo: { select: assigneeInclude },
+              assignedBy: { select: assigneeInclude },
+            },
+            orderBy: { assignedAt: 'desc' },
           },
-        },
-        fileLinks: {
-          include: {
-            file: {
-              select: { id: true, originalFileName: true, fileSizeBytes: true, mimeType: true, storagePath: true },
+          approvalActions: {
+            include: {
+              actionBy: { select: requesterInclude },
+              workflowInstanceStep: {
+                include: { workflowStep: true },
+              },
+            },
+            orderBy: { createdAt: 'desc' },
+          },
+          workflowInstance: {
+            include: {
+              currentStep: true,
+              workflowDefinition: {
+                include: { steps: { orderBy: { stepOrder: 'asc' } } },
+              },
+              instanceSteps: { orderBy: { createdAt: 'asc' } },
             },
           },
+          fileLinks: {
+            include: {
+              file: {
+                select: {
+                  id: true,
+                  originalFileName: true,
+                  fileSizeBytes: true,
+                  mimeType: true,
+                  storagePath: true,
+                },
+              },
+            },
+          },
+          _count: { select: { comments: true } },
         },
-        _count: { select: { comments: true } },
-      },
-    });
+      });
 
-    if (!req) throw new NotFoundException('Request not found.');
+      if (!req) throw new NotFoundException('Request not found.');
 
-    // Access control
-    if (!isAdmin) {
-      const isOwner = req.requesterUserId === userId;
-      const isAssigned = req.currentAssigneeUserId === userId;
-      const isWatcher = req.watchers.some((w: any) => w.userId === userId);
+      if (!isAdmin) {
+        const isOwner = req.requesterUserId === userId;
+        const isAssigned = req.currentAssigneeUserId === userId;
+        const isWatcher = req.watchers.some((w: any) => w.userId === userId);
 
-      if (!isOwner && !isAssigned && !isWatcher) {
-        if (isStudent) throw new ForbiddenException('Access denied.');
-        // Staff/faculty: allow for open requests (they can triage from inbox)
-        if (!OPEN_STATUSES.includes(req.status)) throw new ForbiddenException('Access denied.');
+        if (!isOwner && !isAssigned && !isWatcher) {
+          if (isStudent) throw new ForbiddenException('Access denied.');
+          if (!OPEN_STATUSES.includes(req.status)) {
+            throw new ForbiddenException('Access denied.');
+          }
+        }
       }
-    }
 
-    return {
+      return {
       request: {
         id: req.id,
         requestNo: req.requestNo,
@@ -385,13 +424,38 @@ export class RequestsService {
         mimeType: fl.file.mimeType,
         path: fl.file.storagePath,
       })),
-    };
+      };
+    });
   }
 
   // ─── ACTIONS ──────────────────────────────────────────────────────────────
 
-  processAction(userId: string, roles: string[], requestId: string, dto: import('../workflow/dto/process-action.dto').ProcessActionDto) {
-    return this.workflowEngine.processAction(userId, roles, requestId, dto);
+  async processAction(
+    userId: string,
+    roles: string[],
+    requestId: string,
+    dto: import('../workflow/dto/process-action.dto').ProcessActionDto,
+  ) {
+    const result = await this.workflowEngine.processAction(
+      userId,
+      roles,
+      requestId,
+      dto,
+    );
+
+    await Promise.all([
+      this.cacheService.bumpVersion(
+        CacheKeys.version(`request:detail:${requestId}`),
+      ),
+      this.cacheService.bumpVersion(CacheKeys.version('admin:requests:list')),
+      this.cacheService.bumpVersion(
+        CacheKeys.version('admin:dashboard:summary'),
+      ),
+      this.cacheService.bumpVersion(CacheKeys.version('faculty:approvals:list')),
+      this.cacheService.bumpVersion(CacheKeys.version('staff:tickets:list')),
+    ]);
+
+    return result;
   }
 
   // ─── COMMENTS ─────────────────────────────────────────────────────────────
@@ -424,7 +488,7 @@ export class RequestsService {
       });
     }
 
-    return {
+    const response = {
       id: comment.id,
       commentText: comment.commentText,
       isInternal: comment.isInternal,
@@ -435,6 +499,12 @@ export class RequestsService {
         fullName: comment.user.profile?.fullName ?? comment.user.email,
       },
     };
+
+    await this.cacheService.bumpVersion(
+      CacheKeys.version(`request:detail:${requestId}`),
+    );
+
+    return response;
   }
 
   async getComments(userId: string, roles: string[], requestId: string) {
@@ -464,7 +534,13 @@ export class RequestsService {
       throw new NotFoundException('Request not found.');
     }
     try {
-      return await this.prisma.requestWatcher.create({ data: { requestId, userId: watchUserId } });
+      const watcher = await this.prisma.requestWatcher.create({
+        data: { requestId, userId: watchUserId },
+      });
+      await this.cacheService.bumpVersion(
+        CacheKeys.version(`request:detail:${requestId}`),
+      );
+      return watcher;
     } catch {
       throw new ConflictException('User is already watching this request.');
     }
@@ -478,6 +554,9 @@ export class RequestsService {
     await this.prisma.requestWatcher.delete({
       where: { requestId_userId: { requestId, userId: watchUserId } },
     });
+    await this.cacheService.bumpVersion(
+      CacheKeys.version(`request:detail:${requestId}`),
+    );
     return { message: 'Watcher removed.' };
   }
 

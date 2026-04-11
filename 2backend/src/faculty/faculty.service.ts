@@ -9,6 +9,12 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../core/prisma/prisma.service';
 import { SlaService } from '../workflow/sla.service';
+import { CacheService } from '../infrastructure/cache/cache.service';
+import {
+  CacheKeys,
+  CacheTtls,
+  makeCacheHash,
+} from '../infrastructure/cache/cache-keys';
 import {
   RequestStatus,
   WorkflowActionType,
@@ -20,6 +26,7 @@ export class FacultyService {
   constructor(
     private prisma: PrismaService,
     private slaService: SlaService,
+    private cacheService: CacheService,
   ) {}
 
   private buildRequestDomainData(request: any) {
@@ -154,7 +161,17 @@ export class FacultyService {
 
   // 1. GET PENDING APPROVALS FOR FACULTY
   async getPendingApprovals(userId: string) {
-    const requests = await this.prisma.request.findMany({
+    const version = await this.cacheService.getVersion(
+      CacheKeys.version('faculty:approvals:list'),
+    );
+    const key = CacheKeys.facultyApprovalsList(
+      userId,
+      makeCacheHash({ scope: 'pending' }),
+      version,
+    );
+
+    return this.cacheService.getOrSet(key, CacheTtls.short, async () => {
+      const requests = await this.prisma.request.findMany({
       where: {
         // 🔥 CRITICAL FILTER: Fetch only unresolved requests
         status: {
@@ -180,29 +197,30 @@ export class FacultyService {
         statusHistory: { orderBy: { changedAt: 'desc' } },
       },
       orderBy: { createdAt: 'desc' },
-    });
+      });
 
-    return requests.map((req) => ({
-      id: req.id,
-      title: req.title,
-      description: req.description,
-      status: req.status,
-      priority: req.priority,
-      createdAt: req.createdAt,
-      submittedByName:
-        req.requester.profile?.fullName ||
-        req.requester.email ||
-        'Unnamed User',
-      typeName: req.requestType?.name || 'General Request',
-      formSchema: req.requestType?.formSchemaJson || [],
-      dynamicData: (req as any).dynamicData || {},
-      timeline: req.statusHistory.map((h) => ({
-        id: h.id,
-        status: h.newStatus,
-        date: h.changedAt,
-        note: h.changeReason,
-      })),
-    }));
+      return requests.map((req) => ({
+        id: req.id,
+        title: req.title,
+        description: req.description,
+        status: req.status,
+        priority: req.priority,
+        createdAt: req.createdAt,
+        submittedByName:
+          req.requester.profile?.fullName ||
+          req.requester.email ||
+          'Unnamed User',
+        typeName: req.requestType?.name || 'General Request',
+        formSchema: req.requestType?.formSchemaJson || [],
+        dynamicData: (req as any).dynamicData || {},
+        timeline: req.statusHistory.map((h) => ({
+          id: h.id,
+          status: h.newStatus,
+          date: h.changedAt,
+          note: h.changeReason,
+        })),
+      }));
+    });
   }
 
   // 2. PROCESS ACTION (Approve / Reject / Revise) + IN-APP NOTIFICATION & AUDIT
@@ -262,7 +280,7 @@ export class FacultyService {
       throw new BadRequestException('Invalid action type.');
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       // A. Update the main request status
       const updatedReq = await tx.request.update({
         where: { id: requestId },
@@ -381,6 +399,19 @@ export class FacultyService {
 
       return updatedReq;
     });
+
+    await Promise.all([
+      this.cacheService.bumpVersion(CacheKeys.version('faculty:approvals:list')),
+      this.cacheService.bumpVersion(
+        CacheKeys.version(`request:detail:${requestId}`),
+      ),
+      this.cacheService.bumpVersion(CacheKeys.version('admin:requests:list')),
+      this.cacheService.bumpVersion(
+        CacheKeys.version('admin:dashboard:summary'),
+      ),
+    ]);
+
+    return result;
   }
 
   // 3. GET ALL REQUESTS INVOLVING THE FACULTY (ARCHIVE)
@@ -715,7 +746,7 @@ export class FacultyService {
       await this.slaService.markFirstResponse(tx, requestId);
     });
 
-    return {
+    const response = {
       id: comment.id,
       author: comment.user.profile?.fullName || comment.user.email,
       authorRole:
@@ -723,6 +754,12 @@ export class FacultyService {
       content: comment.commentText,
       createdAt: comment.createdAt,
     };
+
+    await this.cacheService.bumpVersion(
+      CacheKeys.version(`request:detail:${requestId}`),
+    );
+
+    return response;
   }
 
   async getInternships(userId: string) {
