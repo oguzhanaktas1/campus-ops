@@ -57,6 +57,24 @@ function makeRequestNo(): string {
   return `IT-${ymd}-${rand}`;
 }
 
+function deriveWorkflowStepStatus(params: {
+  instanceStep: any;
+  isCurrent: boolean;
+  requestStatus: RequestStatus;
+}) {
+  const { instanceStep, isCurrent, requestStatus } = params;
+
+  if (instanceStep?.isOverdue) return 'warning';
+  if (isCurrent && requestStatus === RequestStatus.REJECTED) return 'failed';
+  if (isCurrent && requestStatus === RequestStatus.REVISION_REQUESTED) {
+    return 'warning';
+  }
+  if (isCurrent) return 'active';
+  if (instanceStep?.status === 'COMPLETED') return 'completed';
+  if (instanceStep?.status === 'FAILED') return 'failed';
+  return 'pending';
+}
+
 @Injectable()
 export class TicketsService {
   constructor(
@@ -473,29 +491,42 @@ export class TicketsService {
       status: workflowInstance.status,
       workflowName: workflowInstance.workflowDefinition?.name ?? null,
       currentStep: workflowInstance.currentStep?.stepName ?? null,
-      steps: workflowInstance.instanceSteps.map((step: any) => ({
-        id: step.id,
-        workflowStepId: step.workflowStepId,
-        name: step.workflowStep?.stepName ?? null,
-        status: step.status,
-        startedAt: step.startedAt,
-        completedAt: step.completedAt,
-        dueAt: step.dueAt,
-        isOverdue: step.isOverdue,
-        assignedTo: step.assignedTo
-          ? {
-              id: step.assignedTo.id,
-              fullName:
-                step.assignedTo.profile?.fullName ?? step.assignedTo.email,
-            }
-          : null,
-        actionBy: step.actionBy
-          ? {
-              id: step.actionBy.id,
-              fullName: step.actionBy.profile?.fullName ?? step.actionBy.email,
-            }
-          : null,
-      })),
+      steps: (workflowInstance.workflowDefinition?.steps ?? []).map((definitionStep: any) => {
+        const instanceStep = workflowInstance.instanceSteps.find(
+          (step: any) => step.workflowStepId === definitionStep.id,
+        );
+
+        return {
+          id: instanceStep?.id ?? definitionStep.id,
+          workflowStepId: definitionStep.id,
+          name: definitionStep.stepName ?? null,
+          status: deriveWorkflowStepStatus({
+            instanceStep,
+            isCurrent: definitionStep.id === workflowInstance.currentStepId,
+            requestStatus: ticket.request.status,
+          }),
+          startedAt: instanceStep?.startedAt ?? null,
+          completedAt: instanceStep?.completedAt ?? null,
+          dueAt: instanceStep?.dueAt ?? null,
+          isOverdue: instanceStep?.isOverdue ?? false,
+          assignedTo: instanceStep?.assignedTo
+            ? {
+                id: instanceStep.assignedTo.id,
+                fullName:
+                  instanceStep.assignedTo.profile?.fullName ??
+                  instanceStep.assignedTo.email,
+              }
+            : null,
+          actionBy: instanceStep?.actionBy
+            ? {
+                id: instanceStep.actionBy.id,
+                fullName:
+                  instanceStep.actionBy.profile?.fullName ??
+                  instanceStep.actionBy.email,
+              }
+            : null,
+        };
+      }),
     };
   }
 

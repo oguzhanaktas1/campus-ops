@@ -31,8 +31,38 @@ type WorkflowInstanceRecord = {
   workflowId: string
   workflowKey: string
   workflowName: string
+  workflowSteps: WorkflowDetail['steps']
   requestTypes: WorkflowRequestType[]
   instance: WorkflowInstance
+}
+
+function getTimelineStepState(record: WorkflowInstanceRecord, stepId: string) {
+  const instanceStep = record.instance.instanceSteps.find(
+    (step) => step.workflowStep.id === stepId,
+  )
+
+  if (instanceStep?.status === 'COMPLETED') {
+    return {
+      label: 'Completed',
+      className: 'bg-emerald-100 text-emerald-700',
+      step: instanceStep,
+    }
+  }
+
+  if (record.instance.currentStep?.id === stepId) {
+    const isOverdue = record.instance.isOverdue || Boolean(instanceStep?.isOverdue)
+    return {
+      label: isOverdue ? 'Overdue' : 'Active',
+      className: isOverdue ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700',
+      step: instanceStep ?? null,
+    }
+  }
+
+  return {
+    label: 'Pending',
+    className: 'bg-amber-100 text-amber-700',
+    step: instanceStep ?? null,
+  }
 }
 
 export default function AdminWorkflowInstancesPage() {
@@ -58,9 +88,11 @@ export default function AdminWorkflowInstancesPage() {
             const detailRes = await fetch(`${BACKEND}/admin/workflows/${workflow.id}`, {
               headers: authHeaders(),
             })
+
             if (!detailRes.ok) {
               throw new Error(`Failed to load instances for ${workflow.name}.`)
             }
+
             return (await detailRes.json()) as WorkflowDetail
           }),
         )
@@ -69,9 +101,7 @@ export default function AdminWorkflowInstancesPage() {
       } catch (error) {
         setWorkflowDetails([])
         toast.error(
-          error instanceof Error
-            ? error.message
-            : 'Failed to load workflow instances.',
+          error instanceof Error ? error.message : 'Failed to load workflow instances.',
         )
       } finally {
         setIsLoading(false)
@@ -83,11 +113,13 @@ export default function AdminWorkflowInstancesPage() {
 
   const requestTypeOptions = useMemo(() => {
     const seen = new Map<string, WorkflowRequestType>()
+
     workflowDetails.forEach((workflow) => {
       workflow.requestTypes?.forEach((type) => {
         seen.set(type.id, type)
       })
     })
+
     return Array.from(seen.values()).sort((a, b) => a.name.localeCompare(b.name))
   }, [workflowDetails])
 
@@ -98,6 +130,7 @@ export default function AdminWorkflowInstancesPage() {
           workflowId: workflow.id,
           workflowKey: workflow.key,
           workflowName: workflow.name,
+          workflowSteps: workflow.steps ?? [],
           requestTypes: workflow.requestTypes ?? [],
           instance,
         })),
@@ -163,7 +196,7 @@ export default function AdminWorkflowInstancesPage() {
         <div>
           <h1 className="text-xl font-bold text-foreground">Workflow Instances</h1>
           <p className="mt-0.5 text-sm text-muted-foreground">
-            Request bazlı arama, request type filtreleme ve adım timeline detayları tek ekranda.
+            Request bazli arama, request type filtreleme ve adim timeline detaylari tek ekranda.
           </p>
         </div>
         <Button asChild variant="outline" className="gap-1.5">
@@ -208,7 +241,7 @@ export default function AdminWorkflowInstancesPage() {
           <select
             value={workflowFilter}
             onChange={(event) => setWorkflowFilter(event.target.value)}
-            className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+            className="h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground"
           >
             <option value="all">All workflows</option>
             {workflowDetails.map((workflow) => (
@@ -221,7 +254,7 @@ export default function AdminWorkflowInstancesPage() {
           <select
             value={statusFilter}
             onChange={(event) => setStatusFilter(event.target.value)}
-            className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+            className="h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground"
           >
             <option value="all">All statuses</option>
             <option value="ACTIVE">Active</option>
@@ -276,7 +309,7 @@ export default function AdminWorkflowInstancesPage() {
             <Workflow className="mx-auto mb-3 size-10 text-muted-foreground/30" />
             <p className="text-sm font-medium text-foreground">No workflow instances found</p>
             <p className="mt-1 text-xs text-muted-foreground">
-              Mevcut filtrelerle eşleşen request kaydı bulunamadı.
+              Mevcut filtrelerle eslesen request kaydi bulunamadi.
             </p>
           </div>
         ) : (
@@ -400,53 +433,51 @@ export default function AdminWorkflowInstancesPage() {
                       <div className="rounded-lg border border-border p-4">
                         <h3 className="text-sm font-semibold text-foreground">Step Timeline</h3>
                         <div className="mt-3 space-y-3">
-                          {instance.instanceSteps.map((step, index) => (
-                            <div key={step.id} className="flex gap-3">
-                              <div className="flex flex-col items-center">
-                                <div className="flex size-7 items-center justify-center rounded-full bg-primary/10 text-[11px] font-semibold text-primary">
-                                  {index + 1}
-                                </div>
-                                {index < instance.instanceSteps.length - 1 && (
-                                  <div className="mt-1 h-full w-px bg-border" />
-                                )}
-                              </div>
+                          {record.workflowSteps
+                            .slice()
+                            .sort((a, b) => a.stepOrder - b.stepOrder)
+                            .map((workflowStep, index) => {
+                              const timeline = getTimelineStepState(record, workflowStep.id)
 
-                              <div className="min-w-0 flex-1 rounded-lg bg-muted/10 p-3 text-xs text-muted-foreground">
-                                <div className="flex flex-wrap items-center justify-between gap-2">
-                                  <p className="font-medium text-foreground">
-                                    {step.workflowStep.stepName}
-                                  </p>
-                                  <Badge
-                                    className={cn(
-                                      'border-transparent',
-                                      step.status === 'COMPLETED'
-                                        ? 'bg-emerald-100 text-emerald-700'
-                                        : step.isOverdue
-                                          ? 'bg-red-100 text-red-700'
-                                          : 'bg-amber-100 text-amber-700',
+                              return (
+                                <div key={workflowStep.id} className="flex gap-3">
+                                  <div className="flex flex-col items-center">
+                                    <div className="flex size-7 items-center justify-center rounded-full bg-primary/10 text-[11px] font-semibold text-primary">
+                                      {index + 1}
+                                    </div>
+                                    {index < record.workflowSteps.length - 1 && (
+                                      <div className="mt-1 h-full w-px bg-border" />
                                     )}
-                                  >
-                                    {formatEnumLabel(step.status)}
-                                  </Badge>
-                                </div>
+                                  </div>
 
-                                <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                                  <p>Type: <span className="text-foreground">{formatEnumLabel(step.workflowStep.stepType)}</span></p>
-                                  <p>Assigned To: <span className="text-foreground">{step.assignedTo?.fullName ?? 'Queue'}</span></p>
-                                  <p>Started: <span className="text-foreground">{formatDate(step.startedAt)}</span></p>
-                                  <p>Due: <span className="text-foreground">{formatDate(step.dueAt)}</span></p>
-                                  <p>Completed: <span className="text-foreground">{formatDate(step.completedAt)}</span></p>
-                                  <p>Action: <span className="text-foreground">{formatEnumLabel(step.actionTaken)}</span></p>
-                                </div>
+                                  <div className="min-w-0 flex-1 rounded-lg bg-muted/10 p-3 text-xs text-muted-foreground">
+                                    <div className="flex flex-wrap items-center justify-between gap-2">
+                                      <p className="font-medium text-foreground">
+                                        {workflowStep.stepName}
+                                      </p>
+                                      <Badge className={cn('border-transparent', timeline.className)}>
+                                        {timeline.label}
+                                      </Badge>
+                                    </div>
 
-                                {step.actionBy && (
-                                  <p className="mt-2">
-                                    Action By: <span className="text-foreground">{step.actionBy.fullName}</span>
-                                  </p>
-                                )}
-                              </div>
-                            </div>
-                          ))}
+                                    <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                                      <p>Type: <span className="text-foreground">{formatEnumLabel(workflowStep.stepType)}</span></p>
+                                      <p>Assigned To: <span className="text-foreground">{timeline.step?.assignedTo?.fullName ?? 'Queue'}</span></p>
+                                      <p>Started: <span className="text-foreground">{formatDate(timeline.step?.startedAt)}</span></p>
+                                      <p>Due: <span className="text-foreground">{formatDate(timeline.step?.dueAt)}</span></p>
+                                      <p>Completed: <span className="text-foreground">{formatDate(timeline.step?.completedAt)}</span></p>
+                                      <p>Action: <span className="text-foreground">{formatEnumLabel(timeline.step?.actionTaken)}</span></p>
+                                    </div>
+
+                                    {timeline.step?.actionBy && (
+                                      <p className="mt-2">
+                                        Action By: <span className="text-foreground">{timeline.step.actionBy.fullName}</span>
+                                      </p>
+                                    )}
+                                  </div>
+                                </div>
+                              )
+                            })}
                         </div>
                       </div>
                     </div>

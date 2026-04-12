@@ -71,7 +71,14 @@ export type WorkflowInstance = {
   currentStepAgeMinutes?: number | null
   inactiveMinutes?: number | null
   isOverdue: boolean
-  currentStep?: { stepName?: string | null } | null
+  currentStep?:
+    | {
+        id: string
+        stepKey?: string | null
+        stepName?: string | null
+        stepType?: string | null
+      }
+    | null
   request: {
     id: string
     requestNo: string

@@ -42,6 +42,24 @@ const assigneeInclude = {
   profile: { select: { fullName: true, title: true } },
 } as const;
 
+function deriveWorkflowStepStatus(params: {
+  instanceStep: any;
+  isCurrent: boolean;
+  requestStatus: RequestStatus;
+}) {
+  const { instanceStep, isCurrent, requestStatus } = params;
+
+  if (instanceStep?.isOverdue) return 'warning';
+  if (isCurrent && requestStatus === RequestStatus.REJECTED) return 'failed';
+  if (isCurrent && requestStatus === RequestStatus.REVISION_REQUESTED) {
+    return 'warning';
+  }
+  if (isCurrent) return 'active';
+  if (instanceStep?.status === 'COMPLETED') return 'completed';
+  if (instanceStep?.status === 'FAILED') return 'failed';
+  return 'pending';
+}
+
 @Injectable()
 export class RequestsService {
   constructor(
@@ -406,13 +424,13 @@ export class RequestsService {
                 return {
                   id: step.id,
                   label: step.stepName,
-                  status:
-                    step.id === req.workflowInstance.currentStepId
-                      ? 'active'
-                      : instanceStep?.status === 'COMPLETED'
-                        ? 'completed'
-                        : 'pending',
+                  status: deriveWorkflowStepStatus({
+                    instanceStep,
+                    isCurrent: step.id === req.workflowInstance.currentStepId,
+                    requestStatus: req.status,
+                  }),
                   dueAt: instanceStep?.dueAt ?? null,
+                  isOverdue: instanceStep?.isOverdue ?? false,
                 };
               }) ?? [],
           }

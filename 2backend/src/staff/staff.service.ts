@@ -11,6 +11,24 @@ import { RequestStatus, Prisma, AuditActionType } from '@prisma/client'; // 🔥
 import * as bcrypt from 'bcrypt';
 import { SlaService } from '../workflow/sla.service';
 
+function deriveWorkflowStepStatus(params: {
+  instanceStep: any;
+  isCurrent: boolean;
+  requestStatus: RequestStatus;
+}) {
+  const { instanceStep, isCurrent, requestStatus } = params;
+
+  if (instanceStep?.isOverdue) return 'warning';
+  if (isCurrent && requestStatus === RequestStatus.REJECTED) return 'failed';
+  if (isCurrent && requestStatus === RequestStatus.REVISION_REQUESTED) {
+    return 'warning';
+  }
+  if (isCurrent) return 'active';
+  if (instanceStep?.status === 'COMPLETED') return 'completed';
+  if (instanceStep?.status === 'FAILED') return 'failed';
+  return 'pending';
+}
+
 @Injectable()
 export class StaffService {
   constructor(
@@ -414,15 +432,12 @@ export class StaffService {
                 return {
                   id: step.id,
                   label: step.stepName,
-                  status:
-                    step.id === request.workflowInstance?.currentStepId
-                      ? 'active'
-                      : instanceStep?.status === 'COMPLETED'
-                        ? 'completed'
-                        : request.status === 'REJECTED' &&
-                            step.id === request.workflowInstance?.currentStepId
-                          ? 'failed'
-                          : 'pending',
+                  status: deriveWorkflowStepStatus({
+                    instanceStep,
+                    isCurrent: step.id === request.workflowInstance?.currentStepId,
+                    requestStatus: request.status,
+                  }),
+                  isOverdue: instanceStep?.isOverdue ?? false,
                 };
               }) ?? [],
           }
