@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
 import { Ticket, Loader2, AlertCircle } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { getToken } from '@/lib/auth'
@@ -31,7 +32,7 @@ export default function FacultyTicketsPage() {
 
   const fetchTickets = useCallback(async () => {
     try {
-      const res = await fetch(`${BACKEND}/tickets`, {
+      const res = await fetch(`${BACKEND}/it-tickets/my`, {
         headers: { Authorization: `Bearer ${getToken()}` },
       })
       if (res.ok) setTickets(await res.json())
@@ -61,8 +62,14 @@ export default function FacultyTicketsPage() {
           <Ticket className="size-5 text-primary" /> IT Tickets
         </h1>
         <p className="text-sm text-muted-foreground mt-0.5">
-          Track IT support tickets related to your faculty.
+          Create and track your IT support tickets.
         </p>
+      </div>
+
+      <div className="flex justify-end">
+        <Button asChild>
+          <Link href="/faculty/tickets/new">New Ticket</Link>
+        </Button>
       </div>
 
       <div className="flex gap-2 flex-wrap">

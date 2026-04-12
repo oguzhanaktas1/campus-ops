@@ -121,6 +121,62 @@ function deriveAssignee(raw: any) {
   }
 }
 
+function normalizeWorkflowStepStatus(
+  raw: any,
+  step: any,
+): 'pending' | 'active' | 'completed' | 'failed' | 'warning' {
+  const normalized = String(step.status ?? '').toLowerCase()
+
+  if (
+    normalized === 'pending' ||
+    normalized === 'active' ||
+    normalized === 'completed' ||
+    normalized === 'failed' ||
+    normalized === 'warning'
+  ) {
+    return normalized
+  }
+
+  const currentStepName =
+    raw.workflow?.currentStep?.stepName ??
+    raw.workflow?.currentStep ??
+    raw.workflow?.currentStepName ??
+    null
+
+  const stepLabel = String(step.label ?? step.stepName ?? '')
+  const requestStatus = String(raw.status ?? '').toUpperCase()
+  const workflowStatus = String(raw.workflow?.status ?? '').toUpperCase()
+
+  if (step.isOverdue === true) {
+    return 'warning'
+  }
+
+  if (
+    currentStepName &&
+    stepLabel &&
+    String(currentStepName).toLowerCase() === stepLabel.toLowerCase()
+  ) {
+    if (requestStatus === 'REJECTED' || workflowStatus === 'REJECTED') {
+      return 'failed'
+    }
+
+    if (
+      requestStatus === 'REVISION_REQUESTED' ||
+      workflowStatus === 'REVISION_REQUESTED'
+    ) {
+      return 'warning'
+    }
+
+    return 'active'
+  }
+
+  if (normalized === 'done' || normalized === 'success') {
+    return 'completed'
+  }
+
+  return 'pending'
+}
+
 export function mapRequestDetailToViewModel(
   portal: RequestPortal,
   raw: any,
@@ -187,13 +243,7 @@ export function mapRequestDetailToViewModel(
         ? raw.workflow.steps.map((step: any) => ({
             id: String(step.id ?? fallbackId()),
             label: String(step.label ?? step.stepName ?? 'Step'),
-            status:
-              step.status === 'active' ||
-              step.status === 'completed' ||
-              step.status === 'failed' ||
-              step.status === 'warning'
-                ? step.status
-                : 'pending',
+            status: normalizeWorkflowStepStatus(raw, step),
           }))
         : [],
     },

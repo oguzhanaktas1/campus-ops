@@ -31,6 +31,11 @@ export class StaffController {
     return this.staffService.getDashboardMetrics();
   }
 
+  @Get('reports')
+  getReports(@Request() req: any) {
+    return this.staffService.getReports(extractUserId(req));
+  }
+
   @Get('requests')
   getAllRequests(
     @Query('filter') filter?: string,

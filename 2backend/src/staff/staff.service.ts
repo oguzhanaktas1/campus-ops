@@ -44,6 +44,199 @@ export class StaffService {
     };
   }
 
+  async getReports(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        primaryRoles: { include: { role: true } },
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found.');
+    }
+
+    const isManager = user.primaryRoles.some((item) =>
+      ['IT_MANAGER', 'ADMIN'].includes(item.role.name.toUpperCase()),
+    );
+
+    const ticketWhere: Prisma.ItTicketWhereInput = isManager
+      ? {}
+      : { assignedItUserId: userId };
+
+    const [tickets, openCount, resolvedCount, slaBreaches] = await Promise.all([
+      this.prisma.itTicket.findMany({
+        where: ticketWhere,
+        include: {
+          request: {
+            select: {
+              id: true,
+              priority: true,
+              createdAt: true,
+              dueAt: true,
+            },
+          },
+        },
+        orderBy: { createdAt: 'asc' },
+      }),
+      this.prisma.itTicket.count({
+        where: {
+          ...ticketWhere,
+          ticketStatus: {
+            in: ['OPEN', 'TRIAGED', 'IN_PROGRESS', 'WAITING_USER', 'REOPENED'],
+          },
+        },
+      }),
+      this.prisma.itTicket.count({
+        where: {
+          ...ticketWhere,
+          ticketStatus: { in: ['RESOLVED', 'CLOSED'] },
+        },
+      }),
+      this.prisma.slaEvent.count({
+        where: {
+          request: isManager
+            ? undefined
+            : {
+                itTicket: {
+                  assignedItUserId: userId,
+                },
+              },
+          eventType: { in: ['FIRST_RESPONSE_BREACHED', 'RESOLUTION_BREACHED'] },
+        },
+      }),
+    ]);
+
+    const now = new Date();
+    const dayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+    const weeklyThroughput = Array.from({ length: 7 }, (_, index) => {
+      const date = new Date(now);
+      date.setDate(now.getDate() - (6 - index));
+      date.setHours(0, 0, 0, 0);
+      const next = new Date(date);
+      next.setDate(date.getDate() + 1);
+
+      const opened = tickets.filter(
+        (ticket) => ticket.createdAt >= date && ticket.createdAt < next,
+      ).length;
+      const resolved = tickets.filter((ticket) => {
+        const completedAt = ticket.closedAt ?? ticket.resolvedAt;
+        return completedAt && completedAt >= date && completedAt < next;
+      }).length;
+
+      return {
+        day: dayLabels[date.getDay()],
+        opened,
+        resolved,
+      };
+    });
+
+    const resolutionTrend = Array.from({ length: 4 }, (_, index) => {
+      const end = new Date(now);
+      end.setDate(now.getDate() - index * 7);
+      end.setHours(23, 59, 59, 999);
+      const start = new Date(end);
+      start.setDate(end.getDate() - 6);
+      start.setHours(0, 0, 0, 0);
+
+      const completedThisWeek = tickets.filter((ticket) => {
+        const completedAt = ticket.closedAt ?? ticket.resolvedAt;
+        return completedAt && completedAt >= start && completedAt <= end;
+      });
+
+      const avgHours =
+        completedThisWeek.length > 0
+          ? Number(
+              (
+                completedThisWeek.reduce((sum, ticket) => {
+                  const completedAt = ticket.closedAt ?? ticket.resolvedAt;
+                  const startedAt = ticket.request.createdAt;
+                  return (
+                    sum +
+                    ((completedAt?.getTime() ?? startedAt.getTime()) -
+                      startedAt.getTime()) /
+                      (1000 * 60 * 60)
+                  );
+                }, 0) / completedThisWeek.length
+              ).toFixed(1),
+            )
+          : 0;
+
+      return {
+        week: `W${4 - index}`,
+        avgHours,
+      };
+    }).reverse();
+
+    const typeBreakdownMap = new Map<string, number>();
+    const priorityBreakdownMap = new Map<string, number>();
+
+    for (const ticket of tickets) {
+      const category = ticket.category || 'Uncategorized';
+      typeBreakdownMap.set(category, (typeBreakdownMap.get(category) ?? 0) + 1);
+
+      const priority = ticket.request.priority || 'MEDIUM';
+      priorityBreakdownMap.set(
+        priority,
+        (priorityBreakdownMap.get(priority) ?? 0) + 1,
+      );
+    }
+
+    const completedTickets = tickets.filter((ticket) =>
+      ['RESOLVED', 'CLOSED'].includes(ticket.ticketStatus),
+    );
+
+    const avgResolutionHours =
+      completedTickets.length > 0
+        ? Number(
+            (
+              completedTickets.reduce((sum, ticket) => {
+                const completedAt = ticket.closedAt ?? ticket.resolvedAt;
+                return (
+                  sum +
+                  ((completedAt?.getTime() ?? ticket.createdAt.getTime()) -
+                    ticket.createdAt.getTime()) /
+                    (1000 * 60 * 60)
+                );
+              }, 0) / completedTickets.length
+            ).toFixed(1),
+          )
+        : 0;
+
+    const overdueCount = tickets.filter(
+      (ticket) =>
+        ticket.request.dueAt &&
+        ticket.request.dueAt < now &&
+        !['RESOLVED', 'CLOSED'].includes(ticket.ticketStatus),
+    ).length;
+
+    const resolvedWithinSla = Math.max(completedTickets.length - slaBreaches, 0);
+    const slaCompliance =
+      completedTickets.length > 0
+        ? Math.round((resolvedWithinSla / completedTickets.length) * 100)
+        : 100;
+
+    return {
+      scope: isManager ? 'TEAM' : 'ASSIGNED_TO_ME',
+      totalTickets: tickets.length,
+      openTickets: openCount,
+      resolvedTickets: resolvedCount,
+      avgResolutionHours,
+      overdueCount,
+      slaCompliance,
+      slaBreaches,
+      weeklyThroughput,
+      resolutionTrend,
+      typeBreakdown: Array.from(typeBreakdownMap.entries())
+        .map(([type, count]) => ({ type, count }))
+        .sort((a, b) => b.count - a.count),
+      priorityBreakdown: Array.from(priorityBreakdownMap.entries())
+        .map(([priority, count]) => ({ priority, count }))
+        .sort((a, b) => b.count - a.count),
+    };
+  }
+
   // 2. WORK POOL (GET ALL REQUESTS)
   async getAllRequests(statusFilter?: string, category?: string) {
     const whereClause: Prisma.RequestWhereInput = {};

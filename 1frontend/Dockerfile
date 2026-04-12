@@ -13,7 +13,7 @@ RUN npm ci
 
 COPY . .
 
-RUN npx next build --webpack
+RUN npm run build
 RUN npm prune --omit=dev
 
 FROM node:22-bookworm-slim AS runner
