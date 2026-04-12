@@ -87,6 +87,23 @@ export type WorkflowInstance = {
     priority: string
     requesterName: string
     currentAssigneeName?: string | null
+    ticketLifecycle?: {
+      status: string
+      openedAt?: string | null
+      openedBy?: string | null
+      resolvedAt?: string | null
+      resolvedBy?: string | null
+      closedAt?: string | null
+      closedBy?: string | null
+      reopenedCount?: number
+      stages?: Array<{
+        key: string
+        label: string
+        at?: string | null
+        by?: string | null
+        note?: string | null
+      }>
+    } | null
     sla?: {
       dueAt?: string | null
       firstResponseState?: string | null

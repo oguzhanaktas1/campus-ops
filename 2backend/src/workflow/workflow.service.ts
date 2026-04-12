@@ -21,6 +21,92 @@ export class WorkflowService {
     return Math.max(0, Math.round((to.getTime() - from.getTime()) / 60000));
   }
 
+  private buildTicketLifecycle(request: any) {
+    if (!request?.itTicket) return null;
+
+    const actorName = (user: any) => user?.profile?.fullName ?? user?.email ?? null;
+    const statusHistory = [...(request.statusHistory ?? [])].sort(
+      (a: any, b: any) =>
+        new Date(a.changedAt).getTime() - new Date(b.changedAt).getTime(),
+    );
+    const assignmentsAsc = [...(request.assignments ?? [])].sort(
+      (a: any, b: any) =>
+        new Date(a.assignedAt).getTime() - new Date(b.assignedAt).getTime(),
+    );
+    const findHistory = (predicate: (item: any) => boolean) =>
+      statusHistory.find(predicate) ?? null;
+
+    const triagedAssignment = assignmentsAsc[0] ?? null;
+    const inProgressHistory = findHistory(
+      (item: any) => item.changeReason === 'Work started on the IT ticket.',
+    );
+    const waitingUserHistory = findHistory(
+      (item: any) => item.newStatus === 'REVISION_REQUESTED',
+    );
+    const resolvedHistory = findHistory(
+      (item: any) =>
+        item.newStatus === 'COMPLETED' && item.changeReason === 'Ticket resolved.',
+    );
+    const closedHistory = findHistory((item: any) => item.newStatus === 'CLOSED');
+
+    return {
+      status: request.itTicket.ticketStatus,
+      openedAt: request.itTicket.createdAt ?? request.createdAt,
+      openedBy: actorName(request.itTicket.reportedBy) ?? actorName(request.requester),
+      currentAssigneeName:
+        request.currentAssignee?.profile?.fullName ?? request.currentAssignee?.email ?? null,
+      resolvedAt: request.itTicket.resolvedAt ?? null,
+      resolvedBy: actorName(resolvedHistory?.changedBy),
+      closedAt: request.itTicket.closedAt ?? null,
+      closedBy: actorName(closedHistory?.changedBy),
+      reopenedCount: request.itTicket.reopenedCount ?? 0,
+      stages: [
+        {
+          key: 'OPEN',
+          label: 'Open',
+          at: request.itTicket.createdAt ?? request.createdAt ?? null,
+          by: actorName(request.itTicket.reportedBy) ?? actorName(request.requester),
+          note: 'Ticket submitted.',
+        },
+        {
+          key: 'TRIAGED',
+          label: 'Triaged',
+          at: triagedAssignment?.assignedAt ?? null,
+          by: actorName(triagedAssignment?.assignedBy),
+          note: triagedAssignment?.assignmentNote ?? null,
+        },
+        {
+          key: 'IN_PROGRESS',
+          label: 'In Progress',
+          at: inProgressHistory?.changedAt ?? null,
+          by: actorName(inProgressHistory?.changedBy),
+          note: inProgressHistory?.changeReason ?? null,
+        },
+        {
+          key: 'WAITING_USER',
+          label: 'Waiting for User',
+          at: waitingUserHistory?.changedAt ?? null,
+          by: actorName(waitingUserHistory?.changedBy),
+          note: waitingUserHistory?.changeReason ?? null,
+        },
+        {
+          key: 'RESOLVED',
+          label: 'Resolved',
+          at: request.itTicket.resolvedAt ?? null,
+          by: actorName(resolvedHistory?.changedBy),
+          note: request.itTicket.resolutionSummary ?? resolvedHistory?.changeReason ?? null,
+        },
+        {
+          key: 'CLOSED',
+          label: 'Closed',
+          at: request.itTicket.closedAt ?? null,
+          by: actorName(closedHistory?.changedBy),
+          note: closedHistory?.changeReason ?? null,
+        },
+      ],
+    };
+  }
+
   async getAll() {
     await this.slaService.runSlaSweep();
 
@@ -169,6 +255,23 @@ export class WorkflowService {
                     },
                   },
                 },
+                statusHistory: {
+                  orderBy: { changedAt: 'asc' },
+                  select: {
+                    id: true,
+                    oldStatus: true,
+                    newStatus: true,
+                    changeReason: true,
+                    changedAt: true,
+                    changedBy: {
+                      select: {
+                        id: true,
+                        email: true,
+                        profile: { select: { fullName: true } },
+                      },
+                    },
+                  },
+                },
                 approvalActions: {
                   orderBy: { createdAt: 'desc' },
                   select: {
@@ -177,6 +280,28 @@ export class WorkflowService {
                     decisionNote: true,
                     createdAt: true,
                     actionBy: {
+                      select: {
+                        id: true,
+                        email: true,
+                        profile: { select: { fullName: true } },
+                      },
+                    },
+                  },
+                },
+                itTicket: {
+                  select: {
+                    id: true,
+                    ticketStatus: true,
+                    category: true,
+                    subcategory: true,
+                    affectedSystem: true,
+                    locationText: true,
+                    resolutionSummary: true,
+                    resolvedAt: true,
+                    closedAt: true,
+                    reopenedCount: true,
+                    createdAt: true,
+                    reportedBy: {
                       select: {
                         id: true,
                         email: true,
@@ -285,6 +410,7 @@ export class WorkflowService {
               (event) => event.eventType === 'STEP_OVERDUE',
             ).length,
           },
+          ticketLifecycle: this.buildTicketLifecycle(instance.request),
         },
         activeAssignment: activeAssignment
           ? {

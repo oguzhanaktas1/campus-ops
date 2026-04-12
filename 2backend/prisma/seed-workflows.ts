@@ -213,6 +213,15 @@ async function seedWorkflow(
     createdByUserId,
   });
 
+  await prisma.workflowStep.updateMany({
+    where: { workflowDefinitionId: workflow.id },
+    data: {
+      stepOrder: {
+        increment: 100,
+      },
+    },
+  });
+
   const stepMap = new Map<string, string>();
 
   for (const step of input.steps) {
@@ -347,7 +356,7 @@ const workflows: WorkflowSeedInput[] = [
 
   {
     requestTypeKey: 'EQUIPMENT',
-    workflowKey: 'WF_EQUIPMENT_REQUEST_V1',
+    workflowKey: 'WF_EQUIPMENT_REQUEST_V2',
     workflowName: 'Equipment Request Workflow',
     description: 'Equipment request and review workflow',
     steps: [
@@ -358,19 +367,19 @@ const workflows: WorkflowSeedInput[] = [
         stepType: WorkflowStepType.START,
       },
       {
-        stepKey: 'STAFF_REVIEW',
-        stepName: 'Staff Review',
+        stepKey: 'RESOURCE_REVIEW',
+        stepName: 'Resource Manager Review',
         stepOrder: 2,
         stepType: WorkflowStepType.REVIEW,
-        assignedRoleName: 'STAFF',
+        assignedRoleName: 'RESOURCE_MANAGER',
         slaHours: 24,
       },
       {
-        stepKey: 'PROCUREMENT_REVIEW',
-        stepName: 'Procurement Review',
+        stepKey: 'LAB_TECHNICIAN_REVIEW',
+        stepName: 'Lab Technician Review',
         stepOrder: 3,
         stepType: WorkflowStepType.APPROVAL,
-        assignedRoleName: 'PROCUREMENT_OFFICER',
+        assignedRoleName: 'LAB_TECHNICIAN',
         slaHours: 48,
       },
       {
@@ -396,41 +405,41 @@ const workflows: WorkflowSeedInput[] = [
     transitions: [
       {
         fromStepKey: 'SUBMIT',
-        toStepKey: 'STAFF_REVIEW',
+        toStepKey: 'RESOURCE_REVIEW',
         actionType: WorkflowActionType.SUBMIT,
       },
       {
-        fromStepKey: 'STAFF_REVIEW',
-        toStepKey: 'PROCUREMENT_REVIEW',
+        fromStepKey: 'RESOURCE_REVIEW',
+        toStepKey: 'LAB_TECHNICIAN_REVIEW',
         actionType: WorkflowActionType.APPROVE,
       },
       {
-        fromStepKey: 'STAFF_REVIEW',
+        fromStepKey: 'RESOURCE_REVIEW',
         toStepKey: 'REVISION',
         actionType: WorkflowActionType.REQUEST_REVISION,
       },
       {
-        fromStepKey: 'STAFF_REVIEW',
+        fromStepKey: 'RESOURCE_REVIEW',
         toStepKey: 'REJECTED_END',
         actionType: WorkflowActionType.REJECT,
       },
       {
         fromStepKey: 'REVISION',
-        toStepKey: 'STAFF_REVIEW',
+        toStepKey: 'RESOURCE_REVIEW',
         actionType: WorkflowActionType.SUBMIT,
       },
       {
-        fromStepKey: 'PROCUREMENT_REVIEW',
+        fromStepKey: 'LAB_TECHNICIAN_REVIEW',
         toStepKey: 'APPROVED_END',
         actionType: WorkflowActionType.APPROVE,
       },
       {
-        fromStepKey: 'PROCUREMENT_REVIEW',
+        fromStepKey: 'LAB_TECHNICIAN_REVIEW',
         toStepKey: 'REVISION',
         actionType: WorkflowActionType.REQUEST_REVISION,
       },
       {
-        fromStepKey: 'PROCUREMENT_REVIEW',
+        fromStepKey: 'LAB_TECHNICIAN_REVIEW',
         toStepKey: 'REJECTED_END',
         actionType: WorkflowActionType.REJECT,
       },
@@ -692,7 +701,7 @@ const workflows: WorkflowSeedInput[] = [
 
   {
     requestTypeKey: 'EVENT_REQUEST',
-    workflowKey: 'WF_EVENT_REQUEST_V1',
+    workflowKey: 'WF_EVENT_REQUEST_V2',
     workflowName: 'Event Request Workflow',
     description: 'Event request approval workflow',
     steps: [
@@ -703,25 +712,33 @@ const workflows: WorkflowSeedInput[] = [
         stepType: WorkflowStepType.START,
       },
       {
-        stepKey: 'FACULTY_SECRETARY_REVIEW',
-        stepName: 'Faculty Secretary Review',
+        stepKey: 'EVENT_COORDINATOR_REVIEW',
+        stepName: 'Event Coordinator Review',
         stepOrder: 2,
         stepType: WorkflowStepType.REVIEW,
-        assignedRoleName: 'FACULTY_SECRETARY',
+        assignedRoleName: 'EVENT_COORDINATOR',
+        slaHours: 24,
+      },
+      {
+        stepKey: 'DEPARTMENT_CHAIR_APPROVAL',
+        stepName: 'Department Chair Approval',
+        stepOrder: 3,
+        stepType: WorkflowStepType.APPROVAL,
+        assignedRoleName: 'DEPARTMENT_CHAIR',
         slaHours: 24,
       },
       {
         stepKey: 'SECURITY_APPROVAL',
         stepName: 'Security Approval',
-        stepOrder: 3,
+        stepOrder: 4,
         stepType: WorkflowStepType.APPROVAL,
         assignedRoleName: 'SECURITY_OFFICER',
         slaHours: 24,
       },
       {
         stepKey: 'RESOURCE_REVIEW',
-        stepName: 'Resource Review',
-        stepOrder: 4,
+        stepName: 'Resource Manager Approval',
+        stepOrder: 5,
         stepType: WorkflowStepType.APPROVAL,
         assignedRoleName: 'RESOURCE_MANAGER',
         slaHours: 24,
@@ -729,41 +746,56 @@ const workflows: WorkflowSeedInput[] = [
       {
         stepKey: 'REVISION',
         stepName: 'Revision',
-        stepOrder: 5,
+        stepOrder: 6,
         stepType: WorkflowStepType.REVISION,
         slaHours: 72,
       },
       {
         stepKey: 'APPROVED_END',
         stepName: 'Approved',
-        stepOrder: 6,
+        stepOrder: 7,
         stepType: WorkflowStepType.END,
       },
       {
         stepKey: 'REJECTED_END',
         stepName: 'Rejected',
-        stepOrder: 7,
+        stepOrder: 8,
         stepType: WorkflowStepType.END,
       },
     ],
     transitions: [
       {
         fromStepKey: 'SUBMIT',
-        toStepKey: 'FACULTY_SECRETARY_REVIEW',
+        toStepKey: 'EVENT_COORDINATOR_REVIEW',
         actionType: WorkflowActionType.SUBMIT,
       },
       {
-        fromStepKey: 'FACULTY_SECRETARY_REVIEW',
-        toStepKey: 'SECURITY_APPROVAL',
+        fromStepKey: 'EVENT_COORDINATOR_REVIEW',
+        toStepKey: 'DEPARTMENT_CHAIR_APPROVAL',
         actionType: WorkflowActionType.APPROVE,
       },
       {
-        fromStepKey: 'FACULTY_SECRETARY_REVIEW',
+        fromStepKey: 'EVENT_COORDINATOR_REVIEW',
         toStepKey: 'REVISION',
         actionType: WorkflowActionType.REQUEST_REVISION,
       },
       {
-        fromStepKey: 'FACULTY_SECRETARY_REVIEW',
+        fromStepKey: 'EVENT_COORDINATOR_REVIEW',
+        toStepKey: 'REJECTED_END',
+        actionType: WorkflowActionType.REJECT,
+      },
+      {
+        fromStepKey: 'DEPARTMENT_CHAIR_APPROVAL',
+        toStepKey: 'SECURITY_APPROVAL',
+        actionType: WorkflowActionType.APPROVE,
+      },
+      {
+        fromStepKey: 'DEPARTMENT_CHAIR_APPROVAL',
+        toStepKey: 'REVISION',
+        actionType: WorkflowActionType.REQUEST_REVISION,
+      },
+      {
+        fromStepKey: 'DEPARTMENT_CHAIR_APPROVAL',
         toStepKey: 'REJECTED_END',
         actionType: WorkflowActionType.REJECT,
       },
@@ -799,7 +831,7 @@ const workflows: WorkflowSeedInput[] = [
       },
       {
         fromStepKey: 'REVISION',
-        toStepKey: 'FACULTY_SECRETARY_REVIEW',
+        toStepKey: 'EVENT_COORDINATOR_REVIEW',
         actionType: WorkflowActionType.SUBMIT,
       },
     ],
@@ -807,7 +839,7 @@ const workflows: WorkflowSeedInput[] = [
 
   {
     requestTypeKey: 'ACCESS_REQUEST',
-    workflowKey: 'WF_ACCESS_REQUEST_V1',
+    workflowKey: 'WF_ACCESS_REQUEST_V2',
     workflowName: 'Access Request Workflow',
     description: 'Access request approval workflow',
     steps: [
@@ -826,30 +858,38 @@ const workflows: WorkflowSeedInput[] = [
         slaHours: 24,
       },
       {
-        stepKey: 'IT_APPROVAL',
-        stepName: 'IT Manager Approval',
+        stepKey: 'IT_AGENT_REVIEW',
+        stepName: 'IT Agent Review',
         stepOrder: 3,
+        stepType: WorkflowStepType.REVIEW,
+        assignedRoleName: 'IT_AGENT',
+        slaHours: 24,
+      },
+      {
+        stepKey: 'SYSTEM_OWNER_APPROVAL',
+        stepName: 'System Owner Approval',
+        stepOrder: 4,
         stepType: WorkflowStepType.APPROVAL,
-        assignedRoleName: 'IT_MANAGER',
+        assignedRoleName: 'SYSTEM_OWNER',
         slaHours: 24,
       },
       {
         stepKey: 'REVISION',
         stepName: 'Revision',
-        stepOrder: 4,
+        stepOrder: 5,
         stepType: WorkflowStepType.REVISION,
         slaHours: 72,
       },
       {
         stepKey: 'APPROVED_END',
         stepName: 'Approved',
-        stepOrder: 5,
+        stepOrder: 6,
         stepType: WorkflowStepType.END,
       },
       {
         stepKey: 'REJECTED_END',
         stepName: 'Rejected',
-        stepOrder: 6,
+        stepOrder: 7,
         stepType: WorkflowStepType.END,
       },
     ],
@@ -861,7 +901,7 @@ const workflows: WorkflowSeedInput[] = [
       },
       {
         fromStepKey: 'SECURITY_REVIEW',
-        toStepKey: 'IT_APPROVAL',
+        toStepKey: 'IT_AGENT_REVIEW',
         actionType: WorkflowActionType.APPROVE,
       },
       {
@@ -875,17 +915,32 @@ const workflows: WorkflowSeedInput[] = [
         actionType: WorkflowActionType.REJECT,
       },
       {
-        fromStepKey: 'IT_APPROVAL',
-        toStepKey: 'APPROVED_END',
+        fromStepKey: 'IT_AGENT_REVIEW',
+        toStepKey: 'SYSTEM_OWNER_APPROVAL',
         actionType: WorkflowActionType.APPROVE,
       },
       {
-        fromStepKey: 'IT_APPROVAL',
+        fromStepKey: 'IT_AGENT_REVIEW',
         toStepKey: 'REVISION',
         actionType: WorkflowActionType.REQUEST_REVISION,
       },
       {
-        fromStepKey: 'IT_APPROVAL',
+        fromStepKey: 'IT_AGENT_REVIEW',
+        toStepKey: 'REJECTED_END',
+        actionType: WorkflowActionType.REJECT,
+      },
+      {
+        fromStepKey: 'SYSTEM_OWNER_APPROVAL',
+        toStepKey: 'APPROVED_END',
+        actionType: WorkflowActionType.APPROVE,
+      },
+      {
+        fromStepKey: 'SYSTEM_OWNER_APPROVAL',
+        toStepKey: 'REVISION',
+        actionType: WorkflowActionType.REQUEST_REVISION,
+      },
+      {
+        fromStepKey: 'SYSTEM_OWNER_APPROVAL',
         toStepKey: 'REJECTED_END',
         actionType: WorkflowActionType.REJECT,
       },
@@ -899,7 +954,7 @@ const workflows: WorkflowSeedInput[] = [
 
   {
     requestTypeKey: 'PROCUREMENT_REQUEST',
-    workflowKey: 'WF_PROCUREMENT_REQUEST_V1',
+    workflowKey: 'WF_PROCUREMENT_REQUEST_V2',
     workflowName: 'Procurement Request Workflow',
     description: 'Procurement approval workflow',
     steps: [
@@ -910,17 +965,41 @@ const workflows: WorkflowSeedInput[] = [
         stepType: WorkflowStepType.START,
       },
       {
-        stepKey: 'STAFF_REVIEW',
-        stepName: 'Staff Review',
+        stepKey: 'PROCUREMENT_INTAKE',
+        stepName: 'Procurement Officer Intake',
         stepOrder: 2,
         stepType: WorkflowStepType.REVIEW,
-        assignedRoleName: 'STAFF',
+        assignedRoleName: 'PROCUREMENT_OFFICER',
         slaHours: 24,
       },
       {
-        stepKey: 'PROCUREMENT_APPROVAL',
-        stepName: 'Procurement Officer Approval',
+        stepKey: 'DEPARTMENT_CHAIR_APPROVAL',
+        stepName: 'Department Chair Approval',
         stepOrder: 3,
+        stepType: WorkflowStepType.APPROVAL,
+        assignedRoleName: 'DEPARTMENT_CHAIR',
+        slaHours: 24,
+      },
+      {
+        stepKey: 'BUDGET_APPROVAL',
+        stepName: 'Budget Approval',
+        stepOrder: 4,
+        stepType: WorkflowStepType.APPROVAL,
+        assignedRoleName: 'BUDGET_APPROVER',
+        slaHours: 24,
+      },
+      {
+        stepKey: 'FINANCE_APPROVAL',
+        stepName: 'Finance Approval',
+        stepOrder: 5,
+        stepType: WorkflowStepType.APPROVAL,
+        assignedRoleName: 'FINANCE_OFFICER',
+        slaHours: 24,
+      },
+      {
+        stepKey: 'PROCUREMENT_FINAL_APPROVAL',
+        stepName: 'Procurement Final Approval',
+        stepOrder: 6,
         stepType: WorkflowStepType.APPROVAL,
         assignedRoleName: 'PROCUREMENT_OFFICER',
         slaHours: 48,
@@ -928,62 +1007,107 @@ const workflows: WorkflowSeedInput[] = [
       {
         stepKey: 'REVISION',
         stepName: 'Revision',
-        stepOrder: 4,
+        stepOrder: 7,
         stepType: WorkflowStepType.REVISION,
         slaHours: 72,
       },
       {
         stepKey: 'APPROVED_END',
         stepName: 'Approved',
-        stepOrder: 5,
+        stepOrder: 8,
         stepType: WorkflowStepType.END,
       },
       {
         stepKey: 'REJECTED_END',
         stepName: 'Rejected',
-        stepOrder: 6,
+        stepOrder: 9,
         stepType: WorkflowStepType.END,
       },
     ],
     transitions: [
       {
         fromStepKey: 'SUBMIT',
-        toStepKey: 'STAFF_REVIEW',
+        toStepKey: 'PROCUREMENT_INTAKE',
         actionType: WorkflowActionType.SUBMIT,
       },
       {
-        fromStepKey: 'STAFF_REVIEW',
-        toStepKey: 'PROCUREMENT_APPROVAL',
+        fromStepKey: 'PROCUREMENT_INTAKE',
+        toStepKey: 'DEPARTMENT_CHAIR_APPROVAL',
         actionType: WorkflowActionType.APPROVE,
       },
       {
-        fromStepKey: 'STAFF_REVIEW',
+        fromStepKey: 'PROCUREMENT_INTAKE',
         toStepKey: 'REVISION',
         actionType: WorkflowActionType.REQUEST_REVISION,
       },
       {
-        fromStepKey: 'STAFF_REVIEW',
+        fromStepKey: 'PROCUREMENT_INTAKE',
         toStepKey: 'REJECTED_END',
         actionType: WorkflowActionType.REJECT,
       },
       {
-        fromStepKey: 'PROCUREMENT_APPROVAL',
-        toStepKey: 'APPROVED_END',
+        fromStepKey: 'DEPARTMENT_CHAIR_APPROVAL',
+        toStepKey: 'BUDGET_APPROVAL',
         actionType: WorkflowActionType.APPROVE,
       },
       {
-        fromStepKey: 'PROCUREMENT_APPROVAL',
+        fromStepKey: 'DEPARTMENT_CHAIR_APPROVAL',
         toStepKey: 'REVISION',
         actionType: WorkflowActionType.REQUEST_REVISION,
       },
       {
-        fromStepKey: 'PROCUREMENT_APPROVAL',
+        fromStepKey: 'DEPARTMENT_CHAIR_APPROVAL',
+        toStepKey: 'REJECTED_END',
+        actionType: WorkflowActionType.REJECT,
+      },
+      {
+        fromStepKey: 'BUDGET_APPROVAL',
+        toStepKey: 'FINANCE_APPROVAL',
+        actionType: WorkflowActionType.APPROVE,
+      },
+      {
+        fromStepKey: 'BUDGET_APPROVAL',
+        toStepKey: 'REVISION',
+        actionType: WorkflowActionType.REQUEST_REVISION,
+      },
+      {
+        fromStepKey: 'BUDGET_APPROVAL',
+        toStepKey: 'REJECTED_END',
+        actionType: WorkflowActionType.REJECT,
+      },
+      {
+        fromStepKey: 'FINANCE_APPROVAL',
+        toStepKey: 'PROCUREMENT_FINAL_APPROVAL',
+        actionType: WorkflowActionType.APPROVE,
+      },
+      {
+        fromStepKey: 'FINANCE_APPROVAL',
+        toStepKey: 'REVISION',
+        actionType: WorkflowActionType.REQUEST_REVISION,
+      },
+      {
+        fromStepKey: 'FINANCE_APPROVAL',
+        toStepKey: 'REJECTED_END',
+        actionType: WorkflowActionType.REJECT,
+      },
+      {
+        fromStepKey: 'PROCUREMENT_FINAL_APPROVAL',
+        toStepKey: 'APPROVED_END',
+        actionType: WorkflowActionType.APPROVE,
+      },
+      {
+        fromStepKey: 'PROCUREMENT_FINAL_APPROVAL',
+        toStepKey: 'REVISION',
+        actionType: WorkflowActionType.REQUEST_REVISION,
+      },
+      {
+        fromStepKey: 'PROCUREMENT_FINAL_APPROVAL',
         toStepKey: 'REJECTED_END',
         actionType: WorkflowActionType.REJECT,
       },
       {
         fromStepKey: 'REVISION',
-        toStepKey: 'STAFF_REVIEW',
+        toStepKey: 'PROCUREMENT_INTAKE',
         actionType: WorkflowActionType.SUBMIT,
       },
     ],
@@ -1082,7 +1206,7 @@ const workflows: WorkflowSeedInput[] = [
   },
 ];
 
-async function main() {
+export async function seedWorkflows() {
   const createdByUserId = await getAdminUserId();
 
   for (const workflow of workflows) {
@@ -1094,11 +1218,13 @@ async function main() {
   console.log('All workflows seeded successfully.');
 }
 
-main()
-  .catch((error) => {
-    console.error('Workflow seed failed:', error);
-    process.exit(1);
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+if (require.main === module) {
+  seedWorkflows()
+    .catch((error) => {
+      console.error('Workflow seed failed:', error);
+      process.exit(1);
+    })
+    .finally(async () => {
+      await prisma.$disconnect();
+    });
+}

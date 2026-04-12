@@ -15,6 +15,11 @@ COPY nest-cli.json tsconfig*.json ./
 COPY src ./src
 
 RUN npm run build
+
+FROM builder AS seedrunner
+
+FROM builder AS prunedbuilder
+
 RUN npm prune --omit=dev
 
 FROM node:22-bookworm-slim AS runner
@@ -27,8 +32,8 @@ RUN apt-get update -y && apt-get install -y openssl && rm -rf /var/lib/apt/lists
 COPY package*.json ./
 COPY prisma ./prisma
 COPY prisma.config.ts ./
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/dist ./dist
+COPY --from=prunedbuilder /app/node_modules ./node_modules
+COPY --from=prunedbuilder /app/dist ./dist
 
 EXPOSE 5000
 

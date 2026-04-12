@@ -1,10 +1,11 @@
 'use client'
 
+import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import Link from 'next/link'
-import { ArrowLeft, Loader2, AlertTriangle } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
+import { WorkflowStepIndicator, type Step } from '@/components/workflow-step-indicator'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -14,7 +15,7 @@ import { getStoredUser, getToken } from '@/lib/auth'
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000'
 
 function fmt(d: string | null | undefined) {
-  if (!d) return '—'
+  if (!d) return '-'
   return new Date(d).toLocaleString('en-US', {
     month: 'short',
     day: 'numeric',
@@ -22,6 +23,32 @@ function fmt(d: string | null | undefined) {
     hour: '2-digit',
     minute: '2-digit',
   })
+}
+
+function mapTicketWorkflowSteps(workflow: any): Step[] {
+  if (!Array.isArray(workflow?.steps)) return []
+
+  return workflow.steps.map((step: any, index: number) => ({
+    id: index + 1,
+    label: String(step.name ?? step.label ?? 'Step'),
+    status:
+      step.status === 'completed' ||
+      step.status === 'active' ||
+      step.status === 'pending' ||
+      step.status === 'failed' ||
+      step.status === 'warning'
+        ? step.status
+        : 'pending',
+  }))
+}
+
+function renderLifecycleMeta(step: any) {
+  const parts = [
+    step?.actorName ? `By ${step.actorName}` : null,
+    step?.startedAt ? fmt(step.startedAt) : null,
+  ].filter(Boolean)
+
+  return parts.length > 0 ? parts.join(' | ') : '-'
 }
 
 export default function StaffTicketDetailPage() {
@@ -92,7 +119,11 @@ export default function StaffTicketDetailPage() {
   }
 
   if (isLoading) {
-    return <div className="flex h-[80vh] items-center justify-center"><Loader2 className="size-8 animate-spin text-primary" /></div>
+    return (
+      <div className="flex h-[80vh] items-center justify-center">
+        <Loader2 className="size-8 animate-spin text-primary" />
+      </div>
+    )
   }
 
   if (!data) {
@@ -100,20 +131,32 @@ export default function StaffTicketDetailPage() {
       <div className="mx-auto flex max-w-3xl flex-col items-center p-6 py-16">
         <AlertTriangle className="mb-3 size-8 text-muted-foreground/40" />
         <p className="text-sm font-medium">Ticket not found</p>
-        <Link href="/staff/tickets"><Button variant="outline" size="sm" className="mt-3">Back</Button></Link>
+        <Link href="/staff/tickets">
+          <Button variant="outline" size="sm" className="mt-3">
+            Back
+          </Button>
+        </Link>
       </div>
     )
   }
 
   const isAssignedToMe = data.ticket?.assignedTo?.id === user?.id
   const canAssignToMe = !data.ticket?.assignedTo && user?.id
-  const canResolve = isAssignedToMe || user?.roles?.includes('IT_MANAGER') || user?.roles?.includes('ADMIN')
+  const canResolve =
+    isAssignedToMe ||
+    user?.roles?.includes('IT_MANAGER') ||
+    user?.roles?.includes('ADMIN')
   const isResolveLocked =
     data.ticket?.ticketStatus === 'RESOLVED' || data.ticket?.ticketStatus === 'CLOSED'
+  const lifecycleSteps = mapTicketWorkflowSteps(data.workflow)
 
   return (
     <div className="mx-auto max-w-5xl space-y-5 p-6 pb-20">
-      <Link href="/staff/tickets"><Button variant="ghost" size="sm" className="gap-1.5"><ArrowLeft className="size-4" /> Back</Button></Link>
+      <Link href="/staff/tickets">
+        <Button variant="ghost" size="sm" className="gap-1.5">
+          <ArrowLeft className="size-4" /> Back
+        </Button>
+      </Link>
 
       <div className="rounded-xl border border-border bg-card p-5">
         <div className="flex flex-wrap items-start justify-between gap-4">
@@ -130,26 +173,28 @@ export default function StaffTicketDetailPage() {
 
       <div className="grid gap-5 lg:grid-cols-[1.35fr,1fr]">
         <div className="space-y-5">
-          <div className="rounded-xl border border-border bg-card p-5 space-y-3">
+          <div className="space-y-3 rounded-xl border border-border bg-card p-5">
             <p className="text-sm font-semibold">Overview</p>
-            <div className="grid gap-3 md:grid-cols-2 text-sm">
+            <div className="grid gap-3 text-sm md:grid-cols-2">
               <div><span className="text-muted-foreground">Reporter:</span> {data.requester?.fullName}</div>
               <div><span className="text-muted-foreground">Ticket Status:</span> {data.ticket?.ticketStatus}</div>
               <div><span className="text-muted-foreground">Category:</span> {data.ticket?.category}</div>
-              <div><span className="text-muted-foreground">Subcategory:</span> {data.ticket?.subcategory || '—'}</div>
-              <div><span className="text-muted-foreground">Affected System:</span> {data.ticket?.affectedSystem || '—'}</div>
-              <div><span className="text-muted-foreground">Location:</span> {data.ticket?.locationText || '—'}</div>
+              <div><span className="text-muted-foreground">Subcategory:</span> {data.ticket?.subcategory || '-'}</div>
+              <div><span className="text-muted-foreground">Affected System:</span> {data.ticket?.affectedSystem || '-'}</div>
+              <div><span className="text-muted-foreground">Location:</span> {data.ticket?.locationText || '-'}</div>
               <div><span className="text-muted-foreground">Assigned To:</span> {data.ticket?.assignedTo?.fullName || 'Unassigned'}</div>
               <div><span className="text-muted-foreground">Due At:</span> {fmt(data.sla?.resolutionDeadline || data.dueAt)}</div>
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">{data.description || 'No description provided.'}</p>
+              <p className="text-sm text-muted-foreground">
+                {data.description || 'No description provided.'}
+              </p>
             </div>
           </div>
 
-          <div className="rounded-xl border border-border bg-card p-5 space-y-3">
+          <div className="space-y-3 rounded-xl border border-border bg-card p-5">
             <p className="text-sm font-semibold">SLA</p>
-            <div className="grid gap-3 md:grid-cols-2 text-sm">
+            <div className="grid gap-3 text-sm md:grid-cols-2">
               <div><span className="text-muted-foreground">First Response:</span> {data.sla?.firstResponseState}</div>
               <div><span className="text-muted-foreground">Resolution:</span> {data.sla?.resolutionState}</div>
               <div><span className="text-muted-foreground">First Response Deadline:</span> {fmt(data.sla?.firstResponseDeadline)}</div>
@@ -157,7 +202,49 @@ export default function StaffTicketDetailPage() {
             </div>
           </div>
 
-          <div className="rounded-xl border border-border bg-card p-5 space-y-3">
+          {lifecycleSteps.length > 0 ? (
+            <div className="space-y-4 rounded-xl border border-border bg-card p-5">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-semibold">Ticket Lifecycle</p>
+                <p className="text-xs text-muted-foreground">
+                  {data.workflow?.currentStep ?? 'In progress'}
+                </p>
+              </div>
+              <WorkflowStepIndicator steps={lifecycleSteps} />
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="rounded-md bg-muted/20 p-3 text-xs text-muted-foreground space-y-1">
+                  <p>Opened By: <span className="text-foreground">{data.workflow?.openedBy ?? '-'}</span></p>
+                  <p>Opened At: <span className="text-foreground">{fmt(data.workflow?.openedAt)}</span></p>
+                  <p>Resolved By: <span className="text-foreground">{data.workflow?.resolvedBy ?? '-'}</span></p>
+                  <p>Resolved At: <span className="text-foreground">{fmt(data.workflow?.resolvedAt)}</span></p>
+                </div>
+                <div className="rounded-md bg-muted/20 p-3 text-xs text-muted-foreground space-y-1">
+                  <p>Closed By: <span className="text-foreground">{data.workflow?.closedBy ?? '-'}</span></p>
+                  <p>Closed At: <span className="text-foreground">{fmt(data.workflow?.closedAt)}</span></p>
+                  <p>Reopened By: <span className="text-foreground">{data.workflow?.reopenedBy ?? '-'}</span></p>
+                  <p>Reopened At: <span className="text-foreground">{fmt(data.workflow?.reopenedAt)}</span></p>
+                </div>
+              </div>
+              <div className="space-y-2">
+                {Array.isArray(data.workflow?.steps)
+                  ? data.workflow.steps.map((step: any) => (
+                      <div key={String(step.id)} className="rounded-md border border-border p-3 text-xs text-muted-foreground">
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="font-medium text-foreground">{step.name}</p>
+                          <p>{String(step.status ?? 'pending').toUpperCase()}</p>
+                        </div>
+                        <p className="mt-2">{renderLifecycleMeta(step)}</p>
+                        {step?.note ? (
+                          <p className="mt-1 text-foreground">{step.note}</p>
+                        ) : null}
+                      </div>
+                    ))
+                  : null}
+              </div>
+            </div>
+          ) : null}
+
+          <div className="space-y-3 rounded-xl border border-border bg-card p-5">
             <p className="text-sm font-semibold">Comments</p>
             <div className="space-y-3">
               {data.comments?.map((comment: any) => (
@@ -165,7 +252,7 @@ export default function StaffTicketDetailPage() {
                   <div className="flex items-center justify-between gap-3">
                     <p className="text-sm font-medium">
                       {comment.author}
-                      {comment.isInternal ? ' • Internal' : ''}
+                      {comment.isInternal ? ' | Internal' : ''}
                     </p>
                     <p className="text-xs text-muted-foreground">{fmt(comment.createdAt)}</p>
                   </div>
@@ -188,16 +275,30 @@ export default function StaffTicketDetailPage() {
         </div>
 
         <div className="space-y-5">
-          <div className="rounded-xl border border-border bg-card p-5 space-y-3">
+          <div className="space-y-3 rounded-xl border border-border bg-card p-5">
             <p className="text-sm font-semibold">Actions</p>
 
             {canAssignToMe ? (
-              <Button className="w-full" disabled={isSubmitting} onClick={() => postAction('assign', { assignedItUserId: user?.id, note: 'Self-assigned from staff queue.' })}>
+              <Button
+                className="w-full"
+                disabled={isSubmitting}
+                onClick={() =>
+                  postAction('assign', {
+                    assignedItUserId: user?.id,
+                    note: 'Self-assigned from staff queue.',
+                  })
+                }
+              >
                 Assign to Me
               </Button>
             ) : null}
 
-            <Button className="w-full" variant="outline" disabled={isSubmitting || !canResolve} onClick={() => postAction('start-progress', { note: actionNote })}>
+            <Button
+              className="w-full"
+              variant="outline"
+              disabled={isSubmitting || !canResolve}
+              onClick={() => postAction('start-progress', { note: actionNote })}
+            >
               Start Progress
             </Button>
 
@@ -217,7 +318,12 @@ export default function StaffTicketDetailPage() {
               className="w-full"
               variant="outline"
               disabled={isSubmitting || !requestInfoText.trim() || !canResolve}
-              onClick={() => postAction('request-user-info', { message: requestInfoText, internalNote: actionNote })}
+              onClick={() =>
+                postAction('request-user-info', {
+                  message: requestInfoText,
+                  internalNote: actionNote,
+                })
+              }
             >
               Request User Info
             </Button>
@@ -257,14 +363,18 @@ export default function StaffTicketDetailPage() {
             </Button>
           </div>
 
-          <div className="rounded-xl border border-border bg-card p-5 space-y-3">
+          <div className="space-y-3 rounded-xl border border-border bg-card p-5">
             <p className="text-sm font-semibold">Activity</p>
             <div className="space-y-3">
               {data.activity?.slice(0, 8)?.map((item: any) => (
                 <div key={item.id} className="border-l-2 border-border pl-3">
                   <p className="text-sm font-medium">{item.label}</p>
-                  <p className="text-xs text-muted-foreground">{item.actor} • {fmt(item.createdAt)}</p>
-                  {item.note ? <p className="mt-1 text-xs text-muted-foreground">{item.note}</p> : null}
+                  <p className="text-xs text-muted-foreground">
+                    {item.actor} | {fmt(item.createdAt)}
+                  </p>
+                  {item.note ? (
+                    <p className="mt-1 text-xs text-muted-foreground">{item.note}</p>
+                  ) : null}
                 </div>
               ))}
             </div>

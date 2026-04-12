@@ -648,6 +648,17 @@ export default function AdminWorkflowsPage() {
                               </div>
                             )}
 
+                            {instance.request.ticketLifecycle && (
+                              <div className="rounded-md border border-border p-3 text-xs text-muted-foreground space-y-1">
+                                <p>Ticket Status: <span className="text-foreground">{instance.request.ticketLifecycle.status}</span></p>
+                                <p>Opened By: <span className="text-foreground">{instance.request.ticketLifecycle.openedBy ?? 'N/A'}</span></p>
+                                <p>Opened At: <span className="text-foreground">{formatDate(instance.request.ticketLifecycle.openedAt)}</span></p>
+                                <p>Resolved By: <span className="text-foreground">{instance.request.ticketLifecycle.resolvedBy ?? 'N/A'}</span></p>
+                                <p>Resolved At: <span className="text-foreground">{formatDate(instance.request.ticketLifecycle.resolvedAt)}</span></p>
+                                <p>Closed At: <span className="text-foreground">{formatDate(instance.request.ticketLifecycle.closedAt)}</span></p>
+                              </div>
+                            )}
+
                             <div className="space-y-2">
                               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                                 Step Timeline

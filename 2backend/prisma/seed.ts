@@ -1,5 +1,6 @@
 import { PrismaClient, Gender, RoleScope, UserStatus } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+import { seedWorkflows } from './seed-workflows';
 
 const prisma = new PrismaClient();
 
@@ -294,6 +295,31 @@ async function main() {
       description: 'Document processing officer',
       scopeType: RoleScope.UNIT,
     },
+    {
+      name: 'SYSTEM_OWNER',
+      description: 'System owner responsible for platform governance',
+      scopeType: RoleScope.UNIT,
+    },
+    {
+      name: 'BUDGET_APPROVER',
+      description: 'Budget approval authority for financial requests',
+      scopeType: RoleScope.UNIT,
+    },
+    {
+      name: 'FINANCE_OFFICER',
+      description: 'Finance operations officer',
+      scopeType: RoleScope.UNIT,
+    },
+    {
+      name: 'LAB_TECHNICIAN',
+      description: 'Laboratory technician for equipment and lab operations',
+      scopeType: RoleScope.UNIT,
+    },
+    {
+      name: 'EVENT_COORDINATOR',
+      description: 'Event coordination and operational planning role',
+      scopeType: RoleScope.UNIT,
+    },
   ];
 
   for (const role of [...baseRoles, ...operationalRoles]) {
@@ -396,6 +422,23 @@ async function main() {
   await assignRolePermissions('PROCUREMENT_OFFICER', ['requests.approve']);
   await assignRolePermissions('SECURITY_OFFICER', ['requests.approve']);
   await assignRolePermissions('DOCUMENT_OFFICER', ['requests.view.assigned']);
+  await assignRolePermissions('SYSTEM_OWNER', [
+    'admin.workflows.manage',
+    'requests.view.assigned',
+  ]);
+  await assignRolePermissions('BUDGET_APPROVER', ['requests.approve']);
+  await assignRolePermissions('FINANCE_OFFICER', [
+    'requests.view.assigned',
+    'requests.approve',
+  ]);
+  await assignRolePermissions('LAB_TECHNICIAN', [
+    'equipment.manage',
+    'requests.view.assigned',
+  ]);
+  await assignRolePermissions('EVENT_COORDINATOR', [
+    'requests.view.assigned',
+    'reservations.manage',
+  ]);
 
   const campus = await prisma.campus.upsert({
     where: { code: 'MAIN' },
@@ -668,6 +711,90 @@ async function main() {
       departmentId: mathDepartment.id,
       name: 'Document Services',
       code: 'DOCS',
+      type: 'ADMINISTRATIVE',
+      isActive: true,
+    },
+  });
+
+  const systemOpsUnit = await prisma.unit.upsert({
+    where: { code: 'SYSOPS' },
+    update: {
+      campusId: campus.id,
+      facultyId: engineeringFaculty.id,
+      departmentId: csDepartment.id,
+      name: 'System Operations',
+      type: 'ADMINISTRATIVE',
+      isActive: true,
+    },
+    create: {
+      campusId: campus.id,
+      facultyId: engineeringFaculty.id,
+      departmentId: csDepartment.id,
+      name: 'System Operations',
+      code: 'SYSOPS',
+      type: 'ADMINISTRATIVE',
+      isActive: true,
+    },
+  });
+
+  const financeUnit = await prisma.unit.upsert({
+    where: { code: 'FINANCE' },
+    update: {
+      campusId: campus.id,
+      facultyId: businessFaculty.id,
+      departmentId: businessDepartment.id,
+      name: 'Finance Office',
+      type: 'ADMINISTRATIVE',
+      isActive: true,
+    },
+    create: {
+      campusId: campus.id,
+      facultyId: businessFaculty.id,
+      departmentId: businessDepartment.id,
+      name: 'Finance Office',
+      code: 'FINANCE',
+      type: 'ADMINISTRATIVE',
+      isActive: true,
+    },
+  });
+
+  const labUnit = await prisma.unit.upsert({
+    where: { code: 'LABOPS' },
+    update: {
+      campusId: campus.id,
+      facultyId: engineeringFaculty.id,
+      departmentId: eeDepartment.id,
+      name: 'Laboratory Operations',
+      type: 'ACADEMIC',
+      isActive: true,
+    },
+    create: {
+      campusId: campus.id,
+      facultyId: engineeringFaculty.id,
+      departmentId: eeDepartment.id,
+      name: 'Laboratory Operations',
+      code: 'LABOPS',
+      type: 'ACADEMIC',
+      isActive: true,
+    },
+  });
+
+  const eventUnit = await prisma.unit.upsert({
+    where: { code: 'EVENTS' },
+    update: {
+      campusId: cityCampus.id,
+      facultyId: artsFaculty.id,
+      departmentId: mathDepartment.id,
+      name: 'Event Coordination Office',
+      type: 'ADMINISTRATIVE',
+      isActive: true,
+    },
+    create: {
+      campusId: cityCampus.id,
+      facultyId: artsFaculty.id,
+      departmentId: mathDepartment.id,
+      name: 'Event Coordination Office',
+      code: 'EVENTS',
       type: 'ADMINISTRATIVE',
       isActive: true,
     },
@@ -1022,6 +1149,146 @@ async function main() {
         },
       ],
     },
+    {
+      email: 'system.owner@campusops.edu.tr',
+      firstName: 'Kerem',
+      lastName: 'Owner',
+      fullName: 'Kerem Owner',
+      title: 'System Owner',
+      gender: Gender.MALE,
+      staffNumber: 'STF-2024-010',
+      facultyId: engineeringFaculty.id,
+      departmentId: csDepartment.id,
+      unitId: systemOpsUnit.id,
+      roles: [
+        {
+          roleName: 'STAFF',
+          isPrimary: true,
+          facultyId: engineeringFaculty.id,
+          departmentId: csDepartment.id,
+          unitId: systemOpsUnit.id,
+        },
+        {
+          roleName: 'SYSTEM_OWNER',
+          isPrimary: false,
+          facultyId: engineeringFaculty.id,
+          departmentId: csDepartment.id,
+          unitId: systemOpsUnit.id,
+        },
+      ],
+    },
+    {
+      email: 'budget.approver@campusops.edu.tr',
+      firstName: 'Buse',
+      lastName: 'Budget',
+      fullName: 'Buse Budget',
+      title: 'Budget Approver',
+      gender: Gender.FEMALE,
+      staffNumber: 'STF-2024-011',
+      facultyId: businessFaculty.id,
+      departmentId: businessDepartment.id,
+      unitId: financeUnit.id,
+      roles: [
+        {
+          roleName: 'STAFF',
+          isPrimary: true,
+          facultyId: businessFaculty.id,
+          departmentId: businessDepartment.id,
+          unitId: financeUnit.id,
+        },
+        {
+          roleName: 'BUDGET_APPROVER',
+          isPrimary: false,
+          facultyId: businessFaculty.id,
+          departmentId: businessDepartment.id,
+          unitId: financeUnit.id,
+        },
+      ],
+    },
+    {
+      email: 'finance.officer@campusops.edu.tr',
+      firstName: 'Selma',
+      lastName: 'Finance',
+      fullName: 'Selma Finance',
+      title: 'Finance Officer',
+      gender: Gender.FEMALE,
+      staffNumber: 'STF-2024-012',
+      facultyId: businessFaculty.id,
+      departmentId: businessDepartment.id,
+      unitId: financeUnit.id,
+      roles: [
+        {
+          roleName: 'STAFF',
+          isPrimary: true,
+          facultyId: businessFaculty.id,
+          departmentId: businessDepartment.id,
+          unitId: financeUnit.id,
+        },
+        {
+          roleName: 'FINANCE_OFFICER',
+          isPrimary: false,
+          facultyId: businessFaculty.id,
+          departmentId: businessDepartment.id,
+          unitId: financeUnit.id,
+        },
+      ],
+    },
+    {
+      email: 'lab.technician@campusops.edu.tr',
+      firstName: 'Emre',
+      lastName: 'Lab',
+      fullName: 'Emre Lab',
+      title: 'Lab Technician',
+      gender: Gender.MALE,
+      staffNumber: 'STF-2024-013',
+      facultyId: engineeringFaculty.id,
+      departmentId: eeDepartment.id,
+      unitId: labUnit.id,
+      roles: [
+        {
+          roleName: 'STAFF',
+          isPrimary: true,
+          facultyId: engineeringFaculty.id,
+          departmentId: eeDepartment.id,
+          unitId: labUnit.id,
+        },
+        {
+          roleName: 'LAB_TECHNICIAN',
+          isPrimary: false,
+          facultyId: engineeringFaculty.id,
+          departmentId: eeDepartment.id,
+          unitId: labUnit.id,
+        },
+      ],
+    },
+    {
+      email: 'event.coordinator@campusops.edu.tr',
+      firstName: 'Ceren',
+      lastName: 'Event',
+      fullName: 'Ceren Event',
+      title: 'Event Coordinator',
+      gender: Gender.FEMALE,
+      staffNumber: 'STF-2024-014',
+      facultyId: artsFaculty.id,
+      departmentId: mathDepartment.id,
+      unitId: eventUnit.id,
+      roles: [
+        {
+          roleName: 'STAFF',
+          isPrimary: true,
+          facultyId: artsFaculty.id,
+          departmentId: mathDepartment.id,
+          unitId: eventUnit.id,
+        },
+        {
+          roleName: 'EVENT_COORDINATOR',
+          isPrimary: false,
+          facultyId: artsFaculty.id,
+          departmentId: mathDepartment.id,
+          unitId: eventUnit.id,
+        },
+      ],
+    },
   ];
 
   const adminUser = await upsertUser(
@@ -1073,6 +1340,8 @@ async function main() {
     update: {},
     create: { userId: adminUser.id },
   });
+
+  await seedWorkflows();
 
   const userSummary = await prisma.user.findMany({
     where: { email: { in: users.map((user) => user.email) } },

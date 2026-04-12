@@ -87,14 +87,23 @@ export class WorkflowEngineService {
       facultyId?: string | null;
       departmentId?: string | null;
       unitId?: string | null;
+      currentAssigneeUserId?: string | null;
     },
     step: {
       assignedUserId?: string | null;
       assignedRoleId?: string | null;
       assignedUnitId?: string | null;
+      assignedRole?: { name: string } | null;
     },
   ): Promise<string[]> {
     if (step.assignedUserId) return [step.assignedUserId];
+
+    if (
+      request.currentAssigneeUserId &&
+      step.assignedRole?.name === 'FACULTY'
+    ) {
+      return [request.currentAssigneeUserId];
+    }
 
     const candidateIds = new Set<string>();
 
@@ -326,6 +335,7 @@ export class WorkflowEngineService {
         facultyId: true,
         departmentId: true,
         unitId: true,
+        currentAssigneeUserId: true,
       },
     });
 
@@ -333,7 +343,14 @@ export class WorkflowEngineService {
 
     const definition = await tx.workflowDefinition.findUnique({
       where: { id: workflowDefinitionId },
-      include: { steps: { orderBy: { stepOrder: 'asc' } } },
+      include: {
+        steps: {
+          include: {
+            assignedRole: { select: { name: true } },
+          },
+          orderBy: { stepOrder: 'asc' },
+        },
+      },
     });
 
     if (!definition?.isActive || !definition.steps.length) return null;

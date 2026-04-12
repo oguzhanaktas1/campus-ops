@@ -430,6 +430,38 @@ export default function AdminWorkflowInstancesPage() {
                         </div>
                       )}
 
+                      {instance.request.ticketLifecycle ? (
+                        <div className="rounded-lg border border-border p-4">
+                          <h3 className="text-sm font-semibold text-foreground">Ticket Lifecycle</h3>
+                          <div className="mt-3 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
+                            <p>Ticket Status: <span className="text-foreground">{formatEnumLabel(instance.request.ticketLifecycle.status)}</span></p>
+                            <p>Opened By: <span className="text-foreground">{instance.request.ticketLifecycle.openedBy ?? 'N/A'}</span></p>
+                            <p>Opened At: <span className="text-foreground">{formatDate(instance.request.ticketLifecycle.openedAt)}</span></p>
+                            <p>Resolved By: <span className="text-foreground">{instance.request.ticketLifecycle.resolvedBy ?? 'N/A'}</span></p>
+                            <p>Resolved At: <span className="text-foreground">{formatDate(instance.request.ticketLifecycle.resolvedAt)}</span></p>
+                            <p>Closed By: <span className="text-foreground">{instance.request.ticketLifecycle.closedBy ?? 'N/A'}</span></p>
+                            <p>Closed At: <span className="text-foreground">{formatDate(instance.request.ticketLifecycle.closedAt)}</span></p>
+                            <p>Reopened Count: <span className="text-foreground">{instance.request.ticketLifecycle.reopenedCount ?? 0}</span></p>
+                          </div>
+                          {instance.request.ticketLifecycle.stages?.length ? (
+                            <div className="mt-3 space-y-2">
+                              {instance.request.ticketLifecycle.stages.map((stage) => (
+                                <div key={stage.key} className="rounded-md bg-muted/20 p-3 text-xs text-muted-foreground">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <p className="font-medium text-foreground">{stage.label}</p>
+                                    <span>{formatDate(stage.at)}</span>
+                                  </div>
+                                  <p className="mt-1">By <span className="text-foreground">{stage.by ?? 'N/A'}</span></p>
+                                  {stage.note ? (
+                                    <p className="mt-1 text-foreground">{stage.note}</p>
+                                  ) : null}
+                                </div>
+                              ))}
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : null}
+
                       <div className="rounded-lg border border-border p-4">
                         <h3 className="text-sm font-semibold text-foreground">Step Timeline</h3>
                         <div className="mt-3 space-y-3">

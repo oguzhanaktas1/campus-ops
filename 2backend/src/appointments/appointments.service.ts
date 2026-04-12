@@ -163,6 +163,7 @@ export class AppointmentsService {
           requestNo,
           requestTypeId: reqType.id,
           requesterUserId: userId,
+          currentAssigneeUserId: dto.targetUserId,
           title: `Appointment: ${dto.topic}`,
           description: dto.details ?? null,
           priority: dto.priority ?? PriorityLevel.MEDIUM,

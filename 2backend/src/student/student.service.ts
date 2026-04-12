@@ -804,6 +804,12 @@ export class StudentService {
       });
     }
 
+    if (reqType.key === 'IT_SUPPORT') {
+      throw new BadRequestException(
+        'Students cannot create IT tickets. IT tickets are only available for faculty and eligible staff.',
+      );
+    }
+
     if (files && files.length > 0) {
       const incomingSize = files.reduce((sum, f) => sum + f.size, 0);
       const usedStorage = await this.getTotalUsedStorage(userId);
@@ -877,6 +883,7 @@ export class StudentService {
     }
 
     const newRequest = await this.prisma.$transaction(async (tx) => {
+      const initialStatus = 'SUBMITTED';
       const req = await tx.request.create({
         data: {
           requestNo,
@@ -885,7 +892,7 @@ export class StudentService {
           requestTypeId: reqType.id,
           requesterUserId: userId,
           currentAssigneeUserId: assignedUserId,
-          status: 'SUBMITTED',
+          status: initialStatus,
           submittedAt: new Date(),
           priority: data.priority || 'MEDIUM',
           dynamicData: dynamicAnswers,
@@ -896,13 +903,13 @@ export class StudentService {
         data: {
           requestId: req.id,
           oldStatus: null,
-          newStatus: 'SUBMITTED',
+          newStatus: initialStatus,
           changedByUserId: userId,
           changeReason: 'Request submitted by student.',
         },
       });
 
-      if (assignedUserId) {
+      if (!reqType.workflowDefinitionId && assignedUserId) {
         await tx.requestAssignment.create({
           data: {
             requestId: req.id,
@@ -937,7 +944,7 @@ export class StudentService {
         });
       }
 
-      if (assignedUserId) {
+      if (!reqType.workflowDefinitionId && assignedUserId) {
         await tx.notification.create({
           data: {
             userId: assignedUserId,
@@ -948,6 +955,31 @@ export class StudentService {
             actionUrl: `/faculty/approvals?id=${req.id}`,
           },
         });
+      }
+
+      if (reqType.workflowDefinitionId) {
+        const workflowStatus = await this.workflowEngine.bootstrapInstance(
+          tx,
+          req.id,
+          reqType.workflowDefinitionId,
+        );
+
+        if (workflowStatus && workflowStatus !== initialStatus) {
+          await tx.request.update({
+            where: { id: req.id },
+            data: { status: workflowStatus },
+          });
+
+          await tx.requestStatusHistory.create({
+            data: {
+              requestId: req.id,
+              oldStatus: initialStatus,
+              newStatus: workflowStatus,
+              changedByUserId: userId,
+              changeReason: 'Workflow started.',
+            },
+          });
+        }
       }
 
       // 🔥 AUDIT LOG EKLENDİ 🔥
@@ -1412,7 +1444,20 @@ export class StudentService {
   // Öğrenci için Talep Türlerini (Request Types) getiren servis
   async getRequestTypes() {
     return this.prisma.requestType.findMany({
-      where: { isActive: true },
+      where: {
+        key: {
+          in: [
+            'ACCESS_REQUEST',
+            'APPOINTMENT',
+            'DOCUMENT_REQUEST',
+            'EQUIPMENT',
+            'EVENT_REQUEST',
+            'INTERNSHIP_REQUEST',
+            'PROCUREMENT_REQUEST',
+            'ROOM_RESERVATION',
+          ],
+        },
+      },
       select: {
         id: true,
         key: true,

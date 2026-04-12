@@ -1,10 +1,18 @@
 'use client'
 
+import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
-import Link from 'next/link'
-import { ArrowLeft, Loader2, AlertTriangle, Ticket as TicketIcon, Monitor, User } from 'lucide-react'
+import {
+  AlertTriangle,
+  ArrowLeft,
+  Loader2,
+  Monitor,
+  Ticket as TicketIcon,
+  User,
+} from 'lucide-react'
 import { toast } from 'sonner'
+import { WorkflowStepIndicator, type Step } from '@/components/workflow-step-indicator'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -15,7 +23,7 @@ import { getToken } from '@/lib/auth'
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000'
 
 function fmt(d: string | null | undefined) {
-  if (!d) return '—'
+  if (!d) return '-'
   return new Date(d).toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
@@ -23,11 +31,39 @@ function fmt(d: string | null | undefined) {
   })
 }
 
+function mapTicketWorkflowSteps(workflow: any): Step[] {
+  if (!Array.isArray(workflow?.steps)) return []
+
+  return workflow.steps.map((step: any, index: number) => ({
+    id: index + 1,
+    label: String(step.name ?? step.label ?? 'Step'),
+    status:
+      step.status === 'completed' ||
+      step.status === 'active' ||
+      step.status === 'pending' ||
+      step.status === 'failed' ||
+      step.status === 'warning'
+        ? step.status
+        : 'pending',
+  }))
+}
+
+function renderLifecycleMeta(step: any) {
+  const parts = [
+    step?.actorName ? `By ${step.actorName}` : null,
+    step?.startedAt ? fmt(step.startedAt) : null,
+  ].filter(Boolean)
+
+  return parts.length > 0 ? parts.join(' | ') : '-'
+}
+
 function InfoRow({ label, value }: { label: string; value?: string | null }) {
   return (
     <div>
-      <p className="mb-0.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">{label}</p>
-      <p className="text-sm text-foreground">{value || '—'}</p>
+      <p className="mb-0.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+        {label}
+      </p>
+      <p className="text-sm text-foreground">{value || '-'}</p>
     </div>
   )
 }
@@ -101,7 +137,11 @@ export default function FacultyTicketDetailPage() {
   }
 
   if (isLoading) {
-    return <div className="flex h-[80vh] items-center justify-center"><Loader2 className="size-8 animate-spin text-primary" /></div>
+    return (
+      <div className="flex h-[80vh] items-center justify-center">
+        <Loader2 className="size-8 animate-spin text-primary" />
+      </div>
+    )
   }
 
   if (!data) {
@@ -109,7 +149,11 @@ export default function FacultyTicketDetailPage() {
       <div className="mx-auto flex max-w-3xl flex-col items-center p-6 py-16">
         <AlertTriangle className="mb-3 size-8 text-muted-foreground/40" />
         <p className="text-sm font-medium">Ticket not found</p>
-        <Link href="/faculty/tickets"><Button variant="outline" size="sm" className="mt-3">Back</Button></Link>
+        <Link href="/faculty/tickets">
+          <Button variant="outline" size="sm" className="mt-3">
+            Back
+          </Button>
+        </Link>
       </div>
     )
   }
@@ -117,10 +161,15 @@ export default function FacultyTicketDetailPage() {
   const t = data.ticket
   const canClose = t?.ticketStatus === 'RESOLVED'
   const canReopen = t?.ticketStatus === 'RESOLVED' || t?.ticketStatus === 'CLOSED'
+  const lifecycleSteps = mapTicketWorkflowSteps(data.workflow)
 
   return (
     <div className="mx-auto max-w-4xl space-y-5 p-6 pb-20">
-      <Link href="/faculty/tickets"><Button variant="ghost" size="sm" className="gap-1.5"><ArrowLeft className="size-4" /> Back</Button></Link>
+      <Link href="/faculty/tickets">
+        <Button variant="ghost" size="sm" className="gap-1.5">
+          <ArrowLeft className="size-4" /> Back
+        </Button>
+      </Link>
 
       <div className="flex items-start justify-between gap-4 rounded-lg border border-border bg-card p-5">
         <div className="flex items-start gap-3">
@@ -129,19 +178,25 @@ export default function FacultyTicketDetailPage() {
           </div>
           <div>
             <h1 className="text-lg font-bold">{data.title}</h1>
-            <p className="mt-0.5 text-xs text-muted-foreground">{data.requestNo} • Submitted {fmt(data.createdAt)}</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              {data.requestNo} | Submitted {fmt(data.createdAt)}
+            </p>
           </div>
         </div>
         <div className="flex flex-col items-end gap-2">
           <StatusBadge status={data.status} />
-          <p className="text-xs text-muted-foreground">Ticket: {t?.ticketStatus?.replace(/_/g, ' ')}</p>
+          <p className="text-xs text-muted-foreground">
+            Ticket: {t?.ticketStatus?.replace(/_/g, ' ')}
+          </p>
         </div>
       </div>
 
       <div className="grid gap-5 lg:grid-cols-[1.4fr,1fr]">
         <div className="space-y-5">
-          <div className="rounded-lg border border-border bg-card p-5 space-y-4">
-            <p className="text-sm font-semibold flex items-center gap-2"><Monitor className="size-4 text-muted-foreground" /> Ticket Details</p>
+          <div className="space-y-4 rounded-lg border border-border bg-card p-5">
+            <p className="flex items-center gap-2 text-sm font-semibold">
+              <Monitor className="size-4 text-muted-foreground" /> Ticket Details
+            </p>
             <div className="grid grid-cols-2 gap-4">
               <InfoRow label="Category" value={t?.category} />
               <InfoRow label="Subcategory" value={t?.subcategory} />
@@ -152,7 +207,9 @@ export default function FacultyTicketDetailPage() {
             </div>
             {t?.resolutionSummary ? (
               <div>
-                <p className="mb-1 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Resolution</p>
+                <p className="mb-1 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                  Resolution
+                </p>
                 <p className="text-sm text-muted-foreground">{t.resolutionSummary}</p>
               </div>
             ) : null}
@@ -195,14 +252,53 @@ export default function FacultyTicketDetailPage() {
         </div>
 
         <div className="space-y-5">
-          <div className="rounded-lg border border-border bg-card p-5 space-y-3">
-            <p className="text-sm font-semibold flex items-center gap-2"><User className="size-4 text-muted-foreground" /> Submitted By</p>
+          <div className="space-y-3 rounded-lg border border-border bg-card p-5">
+            <p className="flex items-center gap-2 text-sm font-semibold">
+              <User className="size-4 text-muted-foreground" /> Submitted By
+            </p>
             <p className="text-sm font-medium">{data.requester?.fullName}</p>
             <p className="text-xs text-muted-foreground">{data.requester?.email}</p>
-            <p className="text-xs text-muted-foreground">{data.requester?.faculty || data.requester?.department || '—'}</p>
+            <p className="text-xs text-muted-foreground">
+              {data.requester?.faculty || data.requester?.department || '-'}
+            </p>
           </div>
 
-          <div className="rounded-lg border border-border bg-card p-5 space-y-3">
+          {lifecycleSteps.length > 0 ? (
+            <div className="space-y-4 rounded-lg border border-border bg-card p-5">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-semibold">Ticket Lifecycle</p>
+                <p className="text-xs text-muted-foreground">
+                  {data.workflow?.currentStep ?? 'In progress'}
+                </p>
+              </div>
+              <WorkflowStepIndicator steps={lifecycleSteps} />
+              <div className="grid gap-3 text-xs text-muted-foreground">
+                <div className="rounded-md bg-muted/20 p-3 space-y-1">
+                  <p>Opened By: <span className="text-foreground">{data.workflow?.openedBy ?? '-'}</span></p>
+                  <p>Opened At: <span className="text-foreground">{fmt(data.workflow?.openedAt)}</span></p>
+                  <p>Resolved By: <span className="text-foreground">{data.workflow?.resolvedBy ?? '-'}</span></p>
+                  <p>Resolved At: <span className="text-foreground">{fmt(data.workflow?.resolvedAt)}</span></p>
+                  <p>Closed At: <span className="text-foreground">{fmt(data.workflow?.closedAt)}</span></p>
+                </div>
+                {Array.isArray(data.workflow?.steps)
+                  ? data.workflow.steps.map((step: any) => (
+                      <div key={String(step.id)} className="rounded-md border border-border p-3 text-xs text-muted-foreground">
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="font-medium text-foreground">{step.name}</p>
+                          <p>{String(step.status ?? 'pending').toUpperCase()}</p>
+                        </div>
+                        <p className="mt-2">{renderLifecycleMeta(step)}</p>
+                        {step?.note ? (
+                          <p className="mt-1 text-foreground">{step.note}</p>
+                        ) : null}
+                      </div>
+                    ))
+                  : null}
+              </div>
+            </div>
+          ) : null}
+
+          <div className="space-y-3 rounded-lg border border-border bg-card p-5">
             <p className="text-sm font-semibold">Requester Actions</p>
             <Input
               value={actionNote}

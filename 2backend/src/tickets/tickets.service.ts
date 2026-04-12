@@ -75,6 +75,13 @@ function deriveWorkflowStepStatus(params: {
   return 'pending';
 }
 
+type TicketLifecycleStepStatus =
+  | 'completed'
+  | 'active'
+  | 'pending'
+  | 'failed'
+  | 'warning';
+
 @Injectable()
 export class TicketsService {
   constructor(
@@ -483,50 +490,269 @@ export class TicketsService {
   }
 
   private buildWorkflowSummary(ticket: any) {
+    const statusHistory = ticket.request.statusHistory ?? [];
     const workflowInstance = ticket.request.workflowInstance;
-    if (!workflowInstance) return null;
+    const currentStatus = ticket.ticketStatus as TicketStatus;
+    const assignmentsAsc = [...(ticket.request.assignments ?? [])].sort(
+      (a: any, b: any) =>
+        new Date(a.assignedAt).getTime() - new Date(b.assignedAt).getTime(),
+    );
+
+    const actorName = (user: any) =>
+      user?.profile?.fullName ?? user?.email ?? null;
+
+    const hasRequestStatus = (status: RequestStatus) =>
+      statusHistory.some((item: any) => item.newStatus === status);
+
+    const findHistory = (predicate: (item: any) => boolean) =>
+      statusHistory.find(predicate) ?? null;
+
+    const openActor = actorName(ticket.reportedBy) ?? actorName(ticket.request.requester);
+    const triagedAssignment = assignmentsAsc[0] ?? null;
+    const triagedHistory =
+      findHistory(
+        (item: any) =>
+          item.changeReason === 'Ticket triaged.' ||
+          item.changeReason === 'Ticket assigned.',
+      ) ??
+      findHistory(
+        (item: any) =>
+          item.newStatus === RequestStatus.IN_REVIEW &&
+          item.changeReason !== 'Work started on the IT ticket.',
+      );
+    const inProgressHistory = findHistory(
+      (item: any) => item.changeReason === 'Work started on the IT ticket.',
+    );
+    const waitingUserHistory = findHistory(
+      (item: any) => item.newStatus === RequestStatus.REVISION_REQUESTED,
+    );
+    const resolvedHistory = findHistory(
+      (item: any) =>
+        item.newStatus === RequestStatus.COMPLETED &&
+        item.changeReason === 'Ticket resolved.',
+    );
+    const closedHistory = findHistory(
+      (item: any) => item.newStatus === RequestStatus.CLOSED,
+    );
+    const reopenedHistory = findHistory(
+      (item: any) => item.changeReason === 'Ticket reopened.',
+    );
+
+    const reached = {
+      open: true,
+      triaged:
+        currentStatus === TicketStatus.TRIAGED ||
+        currentStatus === TicketStatus.IN_PROGRESS ||
+        currentStatus === TicketStatus.WAITING_USER ||
+        currentStatus === TicketStatus.RESOLVED ||
+        currentStatus === TicketStatus.CLOSED ||
+        currentStatus === TicketStatus.REOPENED,
+      inProgress:
+        currentStatus === TicketStatus.IN_PROGRESS ||
+        currentStatus === TicketStatus.WAITING_USER ||
+        currentStatus === TicketStatus.RESOLVED ||
+        currentStatus === TicketStatus.CLOSED ||
+        currentStatus === TicketStatus.REOPENED,
+      waitingUser:
+        currentStatus === TicketStatus.WAITING_USER ||
+        hasRequestStatus(RequestStatus.REVISION_REQUESTED),
+      resolved:
+        currentStatus === TicketStatus.RESOLVED ||
+        currentStatus === TicketStatus.CLOSED ||
+        Boolean(ticket.resolvedAt) ||
+        hasRequestStatus(RequestStatus.COMPLETED),
+      closed:
+        currentStatus === TicketStatus.CLOSED ||
+        Boolean(ticket.closedAt) ||
+        hasRequestStatus(RequestStatus.CLOSED),
+    };
+
+    const currentStepByStatus: Record<TicketStatus, string> = {
+      OPEN: 'Open',
+      TRIAGED: 'Triaged',
+      IN_PROGRESS: 'In Progress',
+      WAITING_USER: 'Waiting for User',
+      RESOLVED: 'Resolved',
+      CLOSED: 'Closed',
+      REOPENED: 'Reopened',
+    };
+
+    const baseSteps: Array<{
+      id: string;
+      name: string;
+      status: TicketLifecycleStepStatus;
+      completedAt: Date | null;
+      occurredAt: Date | null;
+      actorName: string | null;
+      note: string | null;
+    }> = [
+      {
+        id: 'ticket-open',
+        name: 'Open',
+        status: 'pending',
+        completedAt: ticket.createdAt ?? ticket.request.createdAt ?? null,
+        occurredAt: ticket.createdAt ?? ticket.request.createdAt ?? null,
+        actorName: openActor,
+        note: 'Ticket submitted.',
+      },
+      {
+        id: 'ticket-triaged',
+        name: 'Triaged',
+        status: 'pending',
+        completedAt:
+          triagedAssignment?.assignedAt ?? triagedHistory?.changedAt ?? null,
+        occurredAt:
+          triagedAssignment?.assignedAt ?? triagedHistory?.changedAt ?? null,
+        actorName:
+          actorName(triagedAssignment?.assignedBy) ??
+          actorName(triagedHistory?.changedBy),
+        note:
+          triagedAssignment?.assignmentNote ??
+          triagedHistory?.changeReason ??
+          null,
+      },
+      {
+        id: 'ticket-in-progress',
+        name: 'In Progress',
+        status: 'pending',
+        completedAt: inProgressHistory?.changedAt ?? null,
+        occurredAt: inProgressHistory?.changedAt ?? null,
+        actorName: actorName(inProgressHistory?.changedBy),
+        note: inProgressHistory?.changeReason ?? null,
+      },
+      {
+        id: 'ticket-waiting-user',
+        name: 'Waiting for User',
+        status: 'pending',
+        completedAt: waitingUserHistory?.changedAt ?? null,
+        occurredAt: waitingUserHistory?.changedAt ?? null,
+        actorName: actorName(waitingUserHistory?.changedBy),
+        note: waitingUserHistory?.changeReason ?? null,
+      },
+      {
+        id: 'ticket-resolved',
+        name: 'Resolved',
+        status: 'pending',
+        completedAt: ticket.resolvedAt ?? null,
+        occurredAt: ticket.resolvedAt ?? resolvedHistory?.changedAt ?? null,
+        actorName: actorName(resolvedHistory?.changedBy),
+        note: resolvedHistory?.changeReason ?? ticket.resolutionSummary ?? null,
+      },
+      {
+        id: 'ticket-closed',
+        name: 'Closed',
+        status: 'pending',
+        completedAt: ticket.closedAt ?? null,
+        occurredAt: ticket.closedAt ?? closedHistory?.changedAt ?? null,
+        actorName: actorName(closedHistory?.changedBy),
+        note: closedHistory?.changeReason ?? null,
+      },
+    ];
+
+    const applyCompleted = (index: number) => {
+      if (baseSteps[index]) {
+        baseSteps[index].status = 'completed';
+      }
+    };
+
+    applyCompleted(0);
+    if (reached.triaged) applyCompleted(1);
+    if (reached.inProgress) applyCompleted(2);
+    if (reached.waitingUser) applyCompleted(3);
+    if (reached.resolved) applyCompleted(4);
+    if (reached.closed) applyCompleted(5);
+
+    switch (currentStatus) {
+      case TicketStatus.OPEN:
+        baseSteps[0].status = 'active';
+        break;
+      case TicketStatus.TRIAGED:
+        baseSteps[1].status = 'active';
+        break;
+      case TicketStatus.IN_PROGRESS:
+        baseSteps[2].status = 'active';
+        break;
+      case TicketStatus.WAITING_USER:
+        baseSteps[3].status = 'warning';
+        break;
+      case TicketStatus.RESOLVED:
+        baseSteps[4].status = 'active';
+        break;
+      case TicketStatus.CLOSED:
+        baseSteps.forEach((step) => {
+          step.status = 'completed';
+        });
+        break;
+      case TicketStatus.REOPENED:
+        baseSteps[2].status = 'active';
+        if (reached.resolved) {
+          baseSteps[4].status = 'warning';
+          baseSteps[4].note =
+            reopenedHistory?.changeReason ??
+            `Ticket reopened ${ticket.reopenedCount ?? 1} time(s).`;
+        }
+        break;
+      default:
+        break;
+    }
 
     return {
-      id: workflowInstance.id,
-      status: workflowInstance.status,
-      workflowName: workflowInstance.workflowDefinition?.name ?? null,
-      currentStep: workflowInstance.currentStep?.stepName ?? null,
-      steps: (workflowInstance.workflowDefinition?.steps ?? []).map((definitionStep: any) => {
-        const instanceStep = workflowInstance.instanceSteps.find(
-          (step: any) => step.workflowStepId === definitionStep.id,
-        );
+      id: ticket.id,
+      status: currentStatus,
+      workflowName: 'IT Ticket Lifecycle',
+      currentStep: currentStepByStatus[currentStatus] ?? 'Open',
+      openedAt: ticket.createdAt ?? ticket.request.createdAt ?? null,
+      openedBy: openActor,
+      resolvedAt: ticket.resolvedAt ?? null,
+      resolvedBy: actorName(resolvedHistory?.changedBy),
+      closedAt: ticket.closedAt ?? null,
+      closedBy: actorName(closedHistory?.changedBy),
+      reopenedAt: reopenedHistory?.changedAt ?? null,
+      reopenedBy: actorName(reopenedHistory?.changedBy),
+      engineWorkflow: workflowInstance
+        ? {
+            id: workflowInstance.id,
+            status: workflowInstance.status,
+            workflowName: workflowInstance.workflowDefinition?.name ?? null,
+            currentStep: workflowInstance.currentStep?.stepName ?? null,
+            steps: (workflowInstance.workflowDefinition?.steps ?? []).map(
+              (definitionStep: any) => {
+                const instanceStep = workflowInstance.instanceSteps.find(
+                  (step: any) => step.workflowStepId === definitionStep.id,
+                );
 
-        return {
-          id: instanceStep?.id ?? definitionStep.id,
-          workflowStepId: definitionStep.id,
-          name: definitionStep.stepName ?? null,
-          status: deriveWorkflowStepStatus({
-            instanceStep,
-            isCurrent: definitionStep.id === workflowInstance.currentStepId,
-            requestStatus: ticket.request.status,
-          }),
-          startedAt: instanceStep?.startedAt ?? null,
-          completedAt: instanceStep?.completedAt ?? null,
-          dueAt: instanceStep?.dueAt ?? null,
-          isOverdue: instanceStep?.isOverdue ?? false,
-          assignedTo: instanceStep?.assignedTo
-            ? {
-                id: instanceStep.assignedTo.id,
-                fullName:
-                  instanceStep.assignedTo.profile?.fullName ??
-                  instanceStep.assignedTo.email,
-              }
-            : null,
-          actionBy: instanceStep?.actionBy
-            ? {
-                id: instanceStep.actionBy.id,
-                fullName:
-                  instanceStep.actionBy.profile?.fullName ??
-                  instanceStep.actionBy.email,
-              }
-            : null,
-        };
-      }),
+                return {
+                  id: instanceStep?.id ?? definitionStep.id,
+                  workflowStepId: definitionStep.id,
+                  name: definitionStep.stepName ?? null,
+                  status: deriveWorkflowStepStatus({
+                    instanceStep,
+                    isCurrent: definitionStep.id === workflowInstance.currentStepId,
+                    requestStatus: ticket.request.status,
+                  }),
+                  startedAt: instanceStep?.startedAt ?? null,
+                  completedAt: instanceStep?.completedAt ?? null,
+                  dueAt: instanceStep?.dueAt ?? null,
+                  isOverdue: instanceStep?.isOverdue ?? false,
+                };
+              },
+            ),
+          }
+        : null,
+      steps: baseSteps.map((step) => ({
+        id: step.id,
+        workflowStepId: step.id,
+        name: step.name,
+        status: step.status,
+        startedAt: step.occurredAt,
+        completedAt: step.completedAt,
+        dueAt: null,
+        isOverdue: false,
+        assignedTo: null,
+        actionBy: null,
+        actorName: step.actorName,
+        note: step.note,
+      })),
     };
   }
 

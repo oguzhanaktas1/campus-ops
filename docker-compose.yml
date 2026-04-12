@@ -64,7 +64,7 @@ services:
     build:
       context: ./2backend
       dockerfile: Dockerfile
-      target: builder
+      target: seedrunner
     container_name: campusops-backend-seed
     restart: "no"
     profiles:
