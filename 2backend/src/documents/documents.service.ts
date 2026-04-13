@@ -145,7 +145,11 @@ export class DocumentsService {
     return records.map((r) => this.toListItem(r));
   }
 
-  async findInbox() {
+  async findInbox(roles: string[]) {
+    if (!roles.some((role) => ['ADMIN', 'STAFF'].includes(role))) {
+      throw new ForbiddenException('Insufficient permissions.');
+    }
+
     const records = await this.prisma.documentRequest.findMany({
       include: {
         request: { select: { id: true, requestNo: true, title: true, status: true, priority: true, createdAt: true } },

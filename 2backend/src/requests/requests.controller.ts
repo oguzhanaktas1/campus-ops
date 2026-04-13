@@ -87,13 +87,31 @@ export class RequestsController {
 
   /** POST /requests/:id/watchers  body: { userId } */
   @Post(':id/watchers')
-  addWatcher(@Param('id') requestId: string, @Body('userId') watchUserId: string) {
-    return this.requestsService.addWatcher(requestId, watchUserId);
+  addWatcher(
+    @CurrentUser() user: ReqUser,
+    @Param('id') requestId: string,
+    @Body('userId') watchUserId: string,
+  ) {
+    return this.requestsService.addWatcher(
+      requestId,
+      watchUserId,
+      user.userId,
+      user.roles,
+    );
   }
 
   /** DELETE /requests/:id/watchers/:userId */
   @Delete(':id/watchers/:userId')
-  removeWatcher(@Param('id') requestId: string, @Param('userId') watchUserId: string) {
-    return this.requestsService.removeWatcher(requestId, watchUserId);
+  removeWatcher(
+    @CurrentUser() user: ReqUser,
+    @Param('id') requestId: string,
+    @Param('userId') watchUserId: string,
+  ) {
+    return this.requestsService.removeWatcher(
+      requestId,
+      watchUserId,
+      user.userId,
+      user.roles,
+    );
   }
 }

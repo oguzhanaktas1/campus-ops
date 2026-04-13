@@ -1,8 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { fetchMe, getToken, isTokenExpired, clearAuth, type MeResponse } from '@/lib/auth';
+import {
+  clearAuth,
+  fetchMe,
+  getStoredUser,
+  type MeResponse,
+} from '@/lib/auth';
 
 export type { MeResponse };
 
@@ -10,7 +15,6 @@ export interface UseCurrentUserResult {
   user: MeResponse | null;
   loading: boolean;
   error: string | null;
-  /** Primary role name, upper-cased (e.g. 'STUDENT') */
   primaryRole: string | null;
   refetch: () => void;
 }
@@ -29,8 +33,7 @@ export function useCurrentUser(): UseCurrentUserResult {
       setLoading(true);
       setError(null);
 
-      const token = getToken();
-      if (!token || isTokenExpired(token)) {
+      if (!getStoredUser()) {
         clearAuth();
         router.replace('/login');
         return;

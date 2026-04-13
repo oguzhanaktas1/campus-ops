@@ -283,7 +283,11 @@ export class ReservationsService {
 
   // ── ALL (admin) ─────────────────────────────────────────────────────────────
 
-  async findAll() {
+  async findAll(roles: string[]) {
+    if (!roles.some((role) => ['ADMIN', 'STAFF'].includes(role))) {
+      throw new ForbiddenException('Insufficient permissions.');
+    }
+
     const records = await this.prisma.roomReservationRequest.findMany({
       include: {
         request: {
@@ -318,7 +322,11 @@ export class ReservationsService {
 
   // ── INBOX ───────────────────────────────────────────────────────────────────
 
-  async findInbox() {
+  async findInbox(roles: string[]) {
+    if (!roles.some((role) => ['ADMIN', 'STAFF'].includes(role))) {
+      throw new ForbiddenException('Insufficient permissions.');
+    }
+
     const records = await this.prisma.roomReservationRequest.findMany({
       where: {
         reservationStatus: { in: [ReservationStatus.PENDING] },

@@ -1,12 +1,15 @@
 import {
-  Controller,
-  Post,
   Body,
+  Controller,
+  Get,
   HttpCode,
   HttpStatus,
-  Get,
+  Post,
+  Req,
+  Res,
   UseGuards,
 } from '@nestjs/common';
+import type { Request, Response } from 'express';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { RolesGuard } from './roles.guard';
@@ -14,39 +17,108 @@ import { Roles } from './roles.decorator';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { AuthRateLimitService } from './auth-rate-limit.service';
+import { AUTH_COOKIE_NAME, getCookieOptions } from './auth-cookie';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private authService: AuthService) {}
+  constructor(
+    private authService: AuthService,
+    private authRateLimitService: AuthRateLimitService,
+  ) {}
 
-  /** POST /auth/login */
+  private getClientIp(request: Request): string {
+    const forwardedFor = request.headers['x-forwarded-for'];
+    if (typeof forwardedFor === 'string' && forwardedFor.length > 0) {
+      return forwardedFor.split(',')[0].trim();
+    }
+
+    return request.ip ?? 'unknown';
+  }
+
   @HttpCode(HttpStatus.OK)
   @Post('login')
-  login(@Body() dto: LoginDto) {
-    return this.authService.login(dto.email, dto.password);
+  async login(
+    @Req() request: Request,
+    @Res({ passthrough: true }) response: Response,
+    @Body() dto: LoginDto,
+  ) {
+    const ip = this.getClientIp(request);
+    const normalizedEmail = dto.email.trim().toLowerCase();
+    const ipKey = `login:ip:${ip}`;
+    const userKey = `login:email:${normalizedEmail}`;
+
+    this.authRateLimitService.assertAllowed(ipKey);
+    this.authRateLimitService.assertAllowed(userKey);
+
+    try {
+      const result = await this.authService.login(dto.email, dto.password, {
+        ipAddress: ip,
+        userAgent: request.headers['user-agent'] ?? 'unknown',
+      });
+      response.cookie(
+        AUTH_COOKIE_NAME,
+        result.access_token,
+        getCookieOptions(),
+      );
+      this.authRateLimitService.clear(ipKey);
+      this.authRateLimitService.clear(userKey);
+      return result;
+    } catch (error) {
+      this.authRateLimitService.recordFailure(ipKey);
+      this.authRateLimitService.recordFailure(userKey);
+      throw error;
+    }
   }
 
-  /** POST /auth/register — creates a STUDENT account by default */
   @Post('register')
-  register(@Body() dto: RegisterDto) {
-    return this.authService.register(dto);
+  async register(
+    @Req() request: Request,
+    @Res({ passthrough: true }) response: Response,
+    @Body() dto: RegisterDto,
+  ) {
+    const ipKey = `register:ip:${this.getClientIp(request)}`;
+    this.authRateLimitService.assertAllowed(ipKey);
+
+    try {
+      const result = await this.authService.register(dto, {
+        ipAddress: this.getClientIp(request),
+        userAgent: request.headers['user-agent'] ?? 'unknown',
+      });
+      response.cookie(
+        AUTH_COOKIE_NAME,
+        result.access_token,
+        getCookieOptions(),
+      );
+      this.authRateLimitService.clear(ipKey);
+      return result;
+    } catch (error) {
+      this.authRateLimitService.recordFailure(ipKey);
+      throw error;
+    }
   }
 
-  /** GET /auth/me — structured response with roles array */
   @UseGuards(JwtAuthGuard)
   @Get('me')
   getMe(@CurrentUser('userId') userId: string) {
     return this.authService.getMe(userId);
   }
 
-  /** GET /auth/profile — legacy flat response, kept for portal layout compatibility */
   @UseGuards(JwtAuthGuard)
   @Get('profile')
   getProfile(@CurrentUser('userId') userId: string) {
     return this.authService.getFullProfile(userId);
   }
 
-  // ─── Role-check test routes ────────────────────────────────────────────────
+  @HttpCode(HttpStatus.OK)
+  @Post('logout')
+  logout(@Res({ passthrough: true }) response: Response) {
+    response.clearCookie(AUTH_COOKIE_NAME, {
+      ...getCookieOptions(),
+      maxAge: undefined,
+    });
+    return { success: true };
+  }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('STUDENT')

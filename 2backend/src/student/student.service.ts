@@ -25,6 +25,11 @@ import { CreateInternshipDto } from './dto/create-internship.dto';
 import { CreateGenericRequestDto } from './dto/create-generic-request.dto';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import 'multer';
+import {
+  assertSafeUpload,
+  buildStorageObjectKey,
+} from '../files/file-security';
+import { FilesService } from '../files/files.service';
 @Injectable()
 export class StudentService {
   private readonly logger = new Logger(StudentService.name);
@@ -34,6 +39,7 @@ export class StudentService {
   constructor(
     private prisma: PrismaService,
     private workflowEngine: WorkflowEngineService,
+    private filesService: FilesService,
   ) {
     const supabaseUrl = process.env.SUPABASE_URL;
     const supabaseKey = process.env.SUPABASE_KEY;
@@ -854,30 +860,27 @@ export class StudentService {
       originalName: string;
       mimeType: string;
       size: number;
-      url: string;
+      objectPath: string;
     }> = [];
 
     if (files && files.length > 0) {
       for (const file of files) {
-        const uniqueFileName = `${Date.now()}-${file.originalname.replace(/\s+/g, '_')}`;
+        assertSafeUpload(file);
+        const objectPath = buildStorageObjectKey(userId, file.originalname);
         const { error: uploadError } = await this.getSupabaseClient().storage
           .from('campusops-files')
-          .upload(uniqueFileName, file.buffer, { contentType: file.mimetype });
+          .upload(objectPath, file.buffer, { contentType: file.mimetype });
 
         if (uploadError)
           throw new InternalServerErrorException(
             `Supabase Error: ${uploadError.message}`,
           );
 
-        const { data: urlData } = this.getSupabaseClient().storage
-          .from('campusops-files')
-          .getPublicUrl(uniqueFileName);
-
         uploadedFilesMeta.push({
           originalName: file.originalname,
           mimeType: file.mimetype,
           size: file.size,
-          url: urlData.publicUrl,
+          objectPath,
         });
       }
     }
@@ -924,7 +927,7 @@ export class StudentService {
           data: {
             storageProvider: 'SUPABASE',
             bucketName: 'campusops-files',
-            storagePath: meta.url,
+            storagePath: meta.objectPath,
             originalFileName: meta.originalName,
             mimeType: meta.mimeType,
             fileSizeBytes: meta.size,
@@ -1057,30 +1060,27 @@ export class StudentService {
       originalName: string;
       mimeType: string;
       size: number;
-      url: string;
+      objectPath: string;
     }> = [];
 
     if (files && files.length > 0) {
       for (const file of files) {
-        const uniqueFileName = `${Date.now()}-${file.originalname.replace(/\s+/g, '_')}`;
+        assertSafeUpload(file);
+        const objectPath = buildStorageObjectKey(userId, file.originalname);
         const { error: uploadError } = await this.getSupabaseClient().storage
           .from('campusops-files')
-          .upload(uniqueFileName, file.buffer, { contentType: file.mimetype });
+          .upload(objectPath, file.buffer, { contentType: file.mimetype });
 
         if (uploadError)
           throw new InternalServerErrorException(
             `Supabase Error: ${uploadError.message}`,
           );
 
-        const { data: urlData } = this.getSupabaseClient().storage
-          .from('campusops-files')
-          .getPublicUrl(uniqueFileName);
-
         uploadedFilesMeta.push({
           originalName: file.originalname,
           mimeType: file.mimetype,
           size: file.size,
-          url: urlData.publicUrl,
+          objectPath,
         });
       }
     }
@@ -1126,7 +1126,7 @@ export class StudentService {
           data: {
             storageProvider: 'SUPABASE',
             bucketName: 'campusops-files',
-            storagePath: meta.url,
+            storagePath: meta.objectPath,
             originalFileName: meta.originalName,
             mimeType: meta.mimeType,
             fileSizeBytes: meta.size,
@@ -1382,14 +1382,18 @@ export class StudentService {
         .map((a) => a.assignedTo.profile?.fullName)
         .filter(Boolean),
       attachments:
-        (request as any).fileLinks?.map((fl: any) => ({
-          id: fl.file?.id,
-          name: fl.file?.originalFileName,
-          size: fl.file?.fileSizeBytes
-            ? `${(fl.file.fileSizeBytes / 1024 / 1024).toFixed(2)} MB`
-            : '0 MB',
-          url: fl.file?.storagePath,
-        })) || [],
+        (request as any).fileLinks
+          ? await Promise.all(
+              (request as any).fileLinks.map(async (fl: any) => ({
+                id: fl.file?.id,
+                name: fl.file?.originalFileName,
+                size: fl.file?.fileSizeBytes
+                  ? `${(fl.file.fileSizeBytes / 1024 / 1024).toFixed(2)} MB`
+                  : '0 MB',
+                url: fl.file ? await this.filesService.createSignedUrl(fl.file) : null,
+              })),
+            )
+          : [],
       comments:
         (request as any).comments?.map((c: any) => ({
           id: c.id,
@@ -1632,12 +1636,11 @@ export class StudentService {
           }
         : null,
       term: r.term ?? null,
-      attachments: r.request.fileLinks.map((fl: any) => ({
-        id: fl.file.id,
-        name: fl.file.originalFileName,
-        size: fl.file.fileSizeBytes,
-        url: fl.file.storagePath,
-      })),
+      attachments: await Promise.all(
+        r.request.fileLinks.map((fl: any) =>
+          this.filesService.buildAttachmentResponse(fl.file),
+        ),
+      ),
       comments: r.request.comments.map((c: any) => ({
         id: c.id,
         author: c.user?.profile?.fullName ?? c.user?.email ?? 'Unknown',
@@ -1714,7 +1717,7 @@ export class StudentService {
         orderBy: { createdAt: 'desc' },
       });
 
-      return files.map((file) => {
+      return await Promise.all(files.map(async (file) => {
         const extension =
           file.originalFileName?.split('.').pop()?.toUpperCase() || 'FILE';
         let formattedDate = 'Unknown Date';
@@ -1731,11 +1734,11 @@ export class StudentService {
           size: `${((file.fileSizeBytes || 0) / 1024 / 1024).toFixed(2)} MB`,
           rawSize: file.fileSizeBytes || 0,
           type: extension,
-          url: file.storagePath,
+          url: await this.filesService.createSignedUrl(file),
           uploadedAt: formattedDate,
           relatedTo: file.links?.[0]?.request?.title || 'Personal Storage',
         };
-      });
+      }));
     } catch (error) {
       console.error('getMyFiles Hatası:', error);
       throw new InternalServerErrorException(
@@ -1745,6 +1748,7 @@ export class StudentService {
   }
 
   async uploadGeneralFile(userId: string, file: Express.Multer.File) {
+    assertSafeUpload(file);
     const usedStorage = await this.getTotalUsedStorage(userId);
     if (usedStorage + file.size > this.MAX_TOTAL_STORAGE) {
       throw new PayloadTooLargeException(
@@ -1752,10 +1756,10 @@ export class StudentService {
       );
     }
 
-    const uniqueFileName = `${Date.now()}-${file.originalname.replace(/\s+/g, '_')}`;
+    const objectPath = buildStorageObjectKey(userId, file.originalname);
     const { error: uploadError } = await this.getSupabaseClient().storage
       .from('campusops-files')
-      .upload(uniqueFileName, file.buffer, { contentType: file.mimetype });
+      .upload(objectPath, file.buffer, { contentType: file.mimetype });
 
     if (uploadError) {
       throw new InternalServerErrorException(
@@ -1763,15 +1767,11 @@ export class StudentService {
       );
     }
 
-    const { data: urlData } = this.getSupabaseClient().storage
-      .from('campusops-files')
-      .getPublicUrl(uniqueFileName);
-
     const savedFile = await this.prisma.file.create({
       data: {
         storageProvider: 'SUPABASE',
         bucketName: 'campusops-files',
-        storagePath: urlData.publicUrl,
+        storagePath: objectPath,
         originalFileName: file.originalname,
         mimeType: file.mimetype,
         fileSizeBytes: file.size,
@@ -1801,11 +1801,11 @@ export class StudentService {
     if (!file) throw new NotFoundException('File not found or access denied.');
 
     try {
-      const fileName = file.storagePath.split('/').pop();
-      if (fileName) {
+      const objectPath = this.filesService.extractObjectPath(file.storagePath);
+      if (objectPath) {
         await this.getSupabaseClient().storage
           .from('campusops-files')
-          .remove([fileName]);
+          .remove([objectPath]);
       }
     } catch (error) {
       console.error('Supabase file deletion error:', error);
@@ -1996,4 +1996,3 @@ export class StudentService {
     });
   }
 }
-

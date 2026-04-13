@@ -25,6 +25,7 @@ import { EventsModule } from './events/events.module';
 import { RedisModule } from './infrastructure/redis/redis.module';
 import { CacheModule } from './infrastructure/cache/cache.module';
 import { QueueModule } from './infrastructure/queue/queue.module';
+import { FilesModule } from './files/files.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { QueueModule } from './infrastructure/queue/queue.module';
     RedisModule,
     CacheModule,
     QueueModule,
+    FilesModule,
     PrismaModule,
     AuthModule,
     NotificationsModule,

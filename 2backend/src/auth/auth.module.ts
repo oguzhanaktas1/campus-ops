@@ -6,17 +6,30 @@ import { AuthController } from './auth.controller';
 import { JwtStrategy } from './jwt.strategy';
 import { RolesGuard } from './roles.guard';
 import { PermissionsGuard } from './guards/permissions.guard';
+import { AuthRateLimitService } from './auth-rate-limit.service';
 
 @Module({
   imports: [
     PassportModule,
     JwtModule.register({
       global: true,
-      secret: process.env.JWT_SECRET ?? 'super-gizli-kampus-anahtari',
+      secret:
+        process.env.JWT_SECRET ??
+        (process.env.NODE_ENV === 'production'
+          ? (() => {
+              throw new Error('JWT_SECRET must be configured in production.');
+            })()
+          : 'dev-only-insecure-secret-change-me'),
       signOptions: { expiresIn: '8h' },
     }),
   ],
-  providers: [AuthService, JwtStrategy, RolesGuard, PermissionsGuard],
+  providers: [
+    AuthService,
+    JwtStrategy,
+    RolesGuard,
+    PermissionsGuard,
+    AuthRateLimitService,
+  ],
   controllers: [AuthController],
   exports: [RolesGuard, PermissionsGuard],
 })

@@ -22,6 +22,10 @@ import { CreateInternshipDto } from './dto/create-internship.dto';
 import { CreateGenericRequestDto } from './dto/create-generic-request.dto';
 import { Query } from '@nestjs/common';
 import { extractUserId } from '../core/auth/extract-user-id';
+import {
+  MAX_MULTI_FILE_COUNT,
+  MAX_SINGLE_FILE_BYTES,
+} from '../files/file-security';
 
 export interface RequestWithUser extends Request {
   user?: {
@@ -51,7 +55,11 @@ export class StudentController {
   }
 
   @Post('requests')
-  @UseInterceptors(FilesInterceptor('attachments'))
+  @UseInterceptors(
+    FilesInterceptor('attachments', MAX_MULTI_FILE_COUNT, {
+      limits: { fileSize: MAX_SINGLE_FILE_BYTES, files: MAX_MULTI_FILE_COUNT },
+    }),
+  )
   createGenericRequest(
     @Request() req: RequestWithUser,
     @Body() body: CreateGenericRequestDto,
@@ -71,7 +79,11 @@ export class StudentController {
 
   // 🔥 ÖĞRENCİ REVİZE GÖNDERME ENDPOINTİ 🔥
   @Put('requests/:id')
-  @UseInterceptors(FilesInterceptor('attachments'))
+  @UseInterceptors(
+    FilesInterceptor('attachments', MAX_MULTI_FILE_COUNT, {
+      limits: { fileSize: MAX_SINGLE_FILE_BYTES, files: MAX_MULTI_FILE_COUNT },
+    }),
+  )
   updateGenericRequest(
     @Request() req: RequestWithUser,
     @Param('id') id: string,
@@ -157,7 +169,11 @@ export class StudentController {
   }
 
   @Post('upload')
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(
+    FileInterceptor('file', {
+      limits: { fileSize: MAX_SINGLE_FILE_BYTES, files: 1 },
+    }),
+  )
   uploadFile(
     @Request() req: RequestWithUser,
     @UploadedFile() file: Express.Multer.File,

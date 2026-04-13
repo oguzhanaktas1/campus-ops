@@ -25,8 +25,8 @@ export class DocumentsController {
 
   /** GET /document-requests/inbox */
   @Get('inbox')
-  findInbox() {
-    return this.svc.findInbox();
+  findInbox(@CurrentUser() user: ReqUser) {
+    return this.svc.findInbox(user.roles);
   }
 
   /** GET /document-requests/:id */

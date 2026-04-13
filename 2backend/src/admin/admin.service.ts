@@ -22,6 +22,7 @@ import {
   CacheTtls,
   makeCacheHash,
 } from '../infrastructure/cache/cache-keys';
+import { FilesService } from '../files/files.service';
 
 @Injectable()
 export class AdminService {
@@ -29,6 +30,7 @@ export class AdminService {
     private prisma: PrismaService,
     private slaService: SlaService,
     private cacheService: CacheService,
+    private filesService: FilesService,
   ) {}
 
   private buildRequestDomainData(request: any) {
@@ -620,12 +622,9 @@ export class AdminService {
           }
         : null,
       formData: this.buildRequestDomainData(request),
-      attachments: request.fileLinks.map((fl) => ({
-        id: fl.file.id,
-        name: fl.file.originalFileName,
-        size: `${(fl.file.fileSizeBytes / 1024 / 1024).toFixed(2)} MB`,
-        url: fl.file.storagePath,
-      })),
+      attachments: await Promise.all(
+        request.fileLinks.map((fl) => this.filesService.buildAttachmentResponse(fl.file)),
+      ),
       comments: request.comments.map((c) => ({
         id: c.id,
         author: c.user.profile?.fullName || c.user.email,

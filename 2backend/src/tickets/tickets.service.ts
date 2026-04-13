@@ -28,6 +28,7 @@ import { RejectItTicketDto } from './dto/reject-it-ticket.dto';
 import { EscalateItTicketDto } from './dto/escalate-it-ticket.dto';
 import { ChangePriorityDto } from './dto/change-priority.dto';
 import { ChangeCategoryDto } from './dto/change-category.dto';
+import { FilesService } from '../files/files.service';
 import { AddCommentDto } from '../requests/dto/add-comment.dto';
 import { CacheService } from '../infrastructure/cache/cache.service';
 import {
@@ -90,6 +91,7 @@ export class TicketsService {
     private slaService: SlaService,
     private notificationsService: NotificationsService,
     private cacheService: CacheService,
+    private filesService: FilesService,
   ) {}
 
   private hasAnyRole(roles: string[], allowed: string[]) {
@@ -1365,12 +1367,11 @@ export class TicketsService {
           isInternal: comment.isInternal,
           createdAt: comment.createdAt,
         })),
-      attachments: ticket.request.fileLinks.map((link: any) => ({
-        id: link.file.id,
-        name: link.file.originalFileName,
-        size: link.file.fileSizeBytes,
-        url: link.file.storagePath,
-      })),
+      attachments: await Promise.all(
+        ticket.request.fileLinks.map((link: any) =>
+          this.filesService.buildAttachmentResponse(link.file),
+        ),
+      ),
       assignmentHistory: ticket.request.assignments.map((assignment: any) => ({
         id: assignment.id,
         assignedAt: assignment.assignedAt,

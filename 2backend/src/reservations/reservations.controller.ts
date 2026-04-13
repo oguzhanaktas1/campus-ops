@@ -30,8 +30,8 @@ export class ReservationsController {
 
   /** GET /room-reservation-requests — all (admin/staff) */
   @Get()
-  findAll() {
-    return this.reservationsService.findAll();
+  findAll(@CurrentUser() user: ReqUser) {
+    return this.reservationsService.findAll(user.roles);
   }
 
   /** GET /room-reservation-requests/my */
@@ -42,8 +42,8 @@ export class ReservationsController {
 
   /** GET /room-reservation-requests/inbox */
   @Get('inbox')
-  findInbox() {
-    return this.reservationsService.findInbox();
+  findInbox(@CurrentUser() user: ReqUser) {
+    return this.reservationsService.findInbox(user.roles);
   }
 
   /** GET /room-reservation-requests/:id */

@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import { Analytics } from '@vercel/analytics/next'
 import { ThemeProvider } from '@/components/theme-provider'
+import { AuthFetchProvider } from '@/components/auth-fetch-provider'
 import './globals.css'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://campusops.app'
@@ -168,7 +169,7 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          {children}
+          <AuthFetchProvider>{children}</AuthFetchProvider>
           <Analytics />
         </ThemeProvider>
       </body>

@@ -14,6 +14,7 @@ import { AddCommentDto } from './dto/add-comment.dto';
 import { WorkflowEngineService } from '../workflow/workflow-engine.service';
 import { SlaService } from '../workflow/sla.service';
 import { CacheService } from '../infrastructure/cache/cache.service';
+import { FilesService } from '../files/files.service';
 import {
   CacheKeys,
   CacheTtls,
@@ -67,7 +68,35 @@ export class RequestsService {
     private workflowEngine: WorkflowEngineService,
     private slaService: SlaService,
     private cacheService: CacheService,
+    private filesService: FilesService,
   ) {}
+
+  private assertRequestAccess(req: any, userId: string, roles: string[]) {
+    const isAdmin = roles.includes('ADMIN');
+    const isStudent = roles.includes('STUDENT') && !isAdmin;
+
+    if (isAdmin) return;
+
+    const isOwner = req.requesterUserId === userId;
+    const isAssigned =
+      req.currentAssigneeUserId === userId ||
+      (req.assignments ?? []).some(
+        (assignment: any) =>
+          assignment.assignedToUserId === userId && assignment.isActive !== false,
+      );
+    const isWatcher = (req.watchers ?? []).some((w: any) => w.userId === userId);
+
+    if (isOwner || isAssigned || isWatcher) return;
+
+    if (isStudent || !OPEN_STATUSES.includes(req.status)) {
+      throw new ForbiddenException('Access denied.');
+    }
+  }
+
+  private canManageWatcher(targetUserId: string, actorUserId: string, roles: string[]) {
+    if (targetUserId === actorUserId) return true;
+    return roles.some((role) => INTERNAL_ROLES.includes(role));
+  }
 
   // ─── CREATE ────────────────────────────────────────────────────────────────
 
@@ -219,8 +248,6 @@ export class RequestsService {
     const cacheKey = CacheKeys.requestDetail(portal, requestId, userId, version);
 
     return this.cacheService.getOrSet(cacheKey, CacheTtls.medium, async () => {
-      const isAdmin = roles.includes('ADMIN');
-      const isStudent = roles.includes('STUDENT') && !isAdmin;
       const canSeeInternal = roles.some((r) => INTERNAL_ROLES.includes(r));
 
       const req: any = await this.prisma.request.findUnique({
@@ -290,6 +317,7 @@ export class RequestsService {
                   originalFileName: true,
                   fileSizeBytes: true,
                   mimeType: true,
+                  bucketName: true,
                   storagePath: true,
                 },
               },
@@ -301,18 +329,11 @@ export class RequestsService {
 
       if (!req) throw new NotFoundException('Request not found.');
 
-      if (!isAdmin) {
-        const isOwner = req.requesterUserId === userId;
-        const isAssigned = req.currentAssigneeUserId === userId;
-        const isWatcher = req.watchers.some((w: any) => w.userId === userId);
+      this.assertRequestAccess(req, userId, roles);
 
-        if (!isOwner && !isAssigned && !isWatcher) {
-          if (isStudent) throw new ForbiddenException('Access denied.');
-          if (!OPEN_STATUSES.includes(req.status)) {
-            throw new ForbiddenException('Access denied.');
-          }
-        }
-      }
+      const attachments = await Promise.all(
+        req.fileLinks.map((fl: any) => this.filesService.buildAttachmentResponse(fl.file)),
+      );
 
       return {
       request: {
@@ -435,13 +456,7 @@ export class RequestsService {
               }) ?? [],
           }
         : null,
-      attachments: req.fileLinks.map((fl: any) => ({
-        id: fl.file.id,
-        name: fl.file.originalFileName,
-        size: fl.file.fileSizeBytes,
-        mimeType: fl.file.mimeType,
-        path: fl.file.storagePath,
-      })),
+      attachments,
       };
     });
   }
@@ -479,8 +494,15 @@ export class RequestsService {
   // ─── COMMENTS ─────────────────────────────────────────────────────────────
 
   async addComment(userId: string, roles: string[], requestId: string, dto: AddCommentDto) {
-    const req = await this.prisma.request.findUnique({ where: { id: requestId } });
+    const req = await this.prisma.request.findUnique({
+      where: { id: requestId },
+      include: {
+        watchers: true,
+        assignments: { where: { isActive: true } },
+      },
+    });
     if (!req) throw new NotFoundException('Request not found.');
+    this.assertRequestAccess(req, userId, roles);
 
     const canSeeInternal = roles.some((r) => INTERNAL_ROLES.includes(r));
     const isInternal = dto.isInternal === true && canSeeInternal;
@@ -526,6 +548,16 @@ export class RequestsService {
   }
 
   async getComments(userId: string, roles: string[], requestId: string) {
+    const req = await this.prisma.request.findUnique({
+      where: { id: requestId },
+      include: {
+        watchers: true,
+        assignments: { where: { isActive: true } },
+      },
+    });
+    if (!req) throw new NotFoundException('Request not found.');
+    this.assertRequestAccess(req, userId, roles);
+
     const canSeeInternal = roles.some((r) => INTERNAL_ROLES.includes(r));
     return this.prisma.requestComment.findMany({
       where: {
@@ -547,9 +579,18 @@ export class RequestsService {
 
   // ─── WATCHERS ─────────────────────────────────────────────────────────────
 
-  async addWatcher(requestId: string, watchUserId: string) {
-    if (!(await this.prisma.request.findUnique({ where: { id: requestId } }))) {
-      throw new NotFoundException('Request not found.');
+  async addWatcher(requestId: string, watchUserId: string, actorUserId: string, roles: string[]) {
+    const req = await this.prisma.request.findUnique({
+      where: { id: requestId },
+      include: {
+        watchers: true,
+        assignments: { where: { isActive: true } },
+      },
+    });
+    if (!req) throw new NotFoundException('Request not found.');
+    this.assertRequestAccess(req, actorUserId, roles);
+    if (!this.canManageWatcher(watchUserId, actorUserId, roles)) {
+      throw new ForbiddenException('You cannot manage watchers for another user.');
     }
     try {
       const watcher = await this.prisma.requestWatcher.create({
@@ -564,7 +605,25 @@ export class RequestsService {
     }
   }
 
-  async removeWatcher(requestId: string, watchUserId: string) {
+  async removeWatcher(
+    requestId: string,
+    watchUserId: string,
+    actorUserId: string,
+    roles: string[],
+  ) {
+    const req = await this.prisma.request.findUnique({
+      where: { id: requestId },
+      include: {
+        watchers: true,
+        assignments: { where: { isActive: true } },
+      },
+    });
+    if (!req) throw new NotFoundException('Request not found.');
+    this.assertRequestAccess(req, actorUserId, roles);
+    if (!this.canManageWatcher(watchUserId, actorUserId, roles)) {
+      throw new ForbiddenException('You cannot manage watchers for another user.');
+    }
+
     const w = await this.prisma.requestWatcher.findUnique({
       where: { requestId_userId: { requestId, userId: watchUserId } },
     });

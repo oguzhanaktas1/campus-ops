@@ -1,6 +1,5 @@
 'use client'
 
-import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
@@ -12,9 +11,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { LogOut, Settings, User } from 'lucide-react'
+import { LogOut, Settings } from 'lucide-react'
 import type { User as UserType } from '@/lib/mock-data'
-import { cn } from '@/lib/utils'
+import { apiLogout, clearAuth } from '@/lib/auth'
 
 function getInitials(name: string) {
   return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
@@ -28,13 +27,9 @@ interface ProfileDropdownProps {
 export function ProfileDropdown({ user, settingsHref = '/student/settings' }: ProfileDropdownProps) {
   const router = useRouter()
 
-  // Çıkış yapma işlemini yönetecek fonksiyon
-  const handleSignOut = () => {
-    // 1. Tarayıcıdaki JWT token'ı ve kullanıcı bilgilerini temizle
-    localStorage.removeItem('access_token')
-    localStorage.removeItem('user')
-    
-    // 2. Kullanıcıyı Login sayfasına yönlendir
+  const handleSignOut = async () => {
+    await apiLogout()
+    clearAuth()
     router.push('/login')
   }
 
@@ -66,8 +61,6 @@ export function ProfileDropdown({ user, settingsHref = '/student/settings' }: Pr
           Settings
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        
-        {/* onClick eventini handleSignOut ile değiştirdik */}
         <DropdownMenuItem onClick={handleSignOut} className="text-destructive focus:text-destructive cursor-pointer">
           <LogOut className="size-4 mr-2" />
           Sign out

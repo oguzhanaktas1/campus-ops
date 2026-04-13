@@ -1,15 +1,20 @@
 import {
-  Injectable,
-  UnauthorizedException,
-  NotFoundException,
-  ForbiddenException,
   ConflictException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
-import { PrismaService } from '../core/prisma/prisma.service';
-import * as bcrypt from 'bcrypt';
 import { UserStatus } from '@prisma/client';
+import { JwtService } from '@nestjs/jwt';
+import * as bcrypt from 'bcrypt';
+import { PrismaService } from '../core/prisma/prisma.service';
 import { RegisterDto } from './dto/register.dto';
+
+type AuthRequestMetadata = {
+  ipAddress?: string;
+  userAgent?: string | string[];
+};
 
 @Injectable()
 export class AuthService {
@@ -18,11 +23,25 @@ export class AuthService {
     private jwtService: JwtService,
   ) {}
 
-  // ─── LOGIN ────────────────────────────────────────────────────────────────
+  private normalizeMetadata(metadata?: AuthRequestMetadata) {
+    return {
+      ipAddress: metadata?.ipAddress ?? 'unknown',
+      userAgent: Array.isArray(metadata?.userAgent)
+        ? metadata.userAgent.join(', ')
+        : metadata?.userAgent ?? 'unknown',
+    };
+  }
 
-  async login(email: string, password: string) {
+  async login(
+    email: string,
+    password: string,
+    metadata?: AuthRequestMetadata,
+  ) {
+    const normalizedEmail = email.trim().toLowerCase();
+    const requestMeta = this.normalizeMetadata(metadata);
+
     const user = await this.prisma.user.findUnique({
-      where: { email },
+      where: { email: normalizedEmail },
       include: {
         primaryRoles: {
           include: { role: true },
@@ -31,25 +50,63 @@ export class AuthService {
       },
     });
 
-    if (!user) throw new UnauthorizedException('Invalid email or password.');
+    if (!user) {
+      await this.prisma.auditLog.create({
+        data: {
+          actionType: 'LOGIN',
+          entityType: 'AuthAttempt',
+          entityId: normalizedEmail,
+          ipAddress: requestMeta.ipAddress,
+          userAgent: requestMeta.userAgent,
+          newValuesJson: { success: false, reason: 'invalid_credentials' },
+        },
+      });
+      throw new UnauthorizedException('Invalid email or password.');
+    }
 
-    if (user.status === UserStatus.SUSPENDED)
+    if (user.status === UserStatus.SUSPENDED) {
       throw new ForbiddenException('Your account has been suspended.');
-    if (user.status === UserStatus.INACTIVE)
-      throw new ForbiddenException('Your account is inactive. Contact an administrator.');
-    if (user.status === UserStatus.PENDING)
+    }
+    if (user.status === UserStatus.INACTIVE) {
+      throw new ForbiddenException(
+        'Your account is inactive. Contact an administrator.',
+      );
+    }
+    if (user.status === UserStatus.PENDING) {
       throw new ForbiddenException('Your account is pending approval.');
+    }
 
     const valid = await bcrypt.compare(password, user.password);
-    if (!valid) throw new UnauthorizedException('Invalid email or password.');
+    if (!valid) {
+      await this.prisma.loginHistory.create({
+        data: {
+          userId: user.id,
+          success: false,
+          ipAddress: requestMeta.ipAddress,
+          userAgent: requestMeta.userAgent,
+          failureReason: 'invalid_credentials',
+        },
+      });
+      throw new UnauthorizedException('Invalid email or password.');
+    }
 
-    // Record login history
     await this.prisma.loginHistory.create({
       data: {
         userId: user.id,
         success: true,
-        ipAddress: 'web',
-        userAgent: 'web-browser',
+        ipAddress: requestMeta.ipAddress,
+        userAgent: requestMeta.userAgent,
+      },
+    });
+
+    await this.prisma.auditLog.create({
+      data: {
+        userId: user.id,
+        actionType: 'LOGIN',
+        entityType: 'UserSession',
+        entityId: user.id,
+        ipAddress: requestMeta.ipAddress,
+        userAgent: requestMeta.userAgent,
       },
     });
 
@@ -60,7 +117,6 @@ export class AuthService {
 
     const roles = user.primaryRoles.map((ur) => ur.role.name.toUpperCase());
     const primaryRole = roles[0] ?? 'STUDENT';
-
     const payload = { sub: user.id, email: user.email, roles };
 
     return {
@@ -68,31 +124,34 @@ export class AuthService {
       user: {
         id: user.id,
         email: user.email,
-        role: primaryRole, // kept for AuthGuard localStorage check
+        role: primaryRole,
         roles,
       },
     };
   }
 
-  // ─── REGISTER ─────────────────────────────────────────────────────────────
+  async register(dto: RegisterDto, metadata?: AuthRequestMetadata) {
+    const normalizedEmail = dto.email.trim().toLowerCase();
+    const requestMeta = this.normalizeMetadata(metadata);
 
-  async register(dto: RegisterDto) {
     const existing = await this.prisma.user.findUnique({
-      where: { email: dto.email },
+      where: { email: normalizedEmail },
     });
-    if (existing) throw new ConflictException('This email is already registered.');
+    if (existing) {
+      throw new ConflictException('This email is already registered.');
+    }
 
-    const hashed = await bcrypt.hash(dto.password, 10);
+    const hashed = await bcrypt.hash(dto.password, 12);
+    const firstName = dto.firstName?.trim() ?? '';
+    const lastName = dto.lastName?.trim() ?? '';
+    const fullName =
+      [firstName, lastName].filter(Boolean).join(' ') ||
+      normalizedEmail.split('@')[0];
 
-    const firstName = dto.firstName ?? '';
-    const lastName = dto.lastName ?? '';
-    const fullName = [firstName, lastName].filter(Boolean).join(' ') || dto.email.split('@')[0];
-
-    // Create user + profile in a transaction
     const user = await this.prisma.$transaction(async (tx) => {
       const created = await tx.user.create({
         data: {
-          email: dto.email,
+          email: normalizedEmail,
           password: hashed,
           status: UserStatus.ACTIVE,
           profile: {
@@ -105,7 +164,6 @@ export class AuthService {
         },
       });
 
-      // Assign default STUDENT role (must exist in DB via seed)
       const studentRole = await tx.role.findFirst({
         where: { name: { equals: 'STUDENT', mode: 'insensitive' } },
       });
@@ -123,6 +181,17 @@ export class AuthService {
       return created;
     });
 
+    await this.prisma.auditLog.create({
+      data: {
+        userId: user.id,
+        actionType: 'CREATE',
+        entityType: 'User',
+        entityId: user.id,
+        ipAddress: requestMeta.ipAddress,
+        userAgent: requestMeta.userAgent,
+      },
+    });
+
     const payload = { sub: user.id, email: user.email, roles: ['STUDENT'] };
 
     return {
@@ -135,8 +204,6 @@ export class AuthService {
       },
     };
   }
-
-  // ─── GET /auth/me (structured response) ───────────────────────────────────
 
   async getMe(userId: string) {
     const user = await this.prisma.user.findUnique({
@@ -182,8 +249,6 @@ export class AuthService {
       })),
     };
   }
-
-  // ─── GET /auth/profile (legacy flat response — kept for portal layouts) ───
 
   async getFullProfile(userId: string) {
     const user = await this.prisma.user.findUnique({
@@ -231,7 +296,9 @@ export class AuthService {
       bio: profile?.bio ?? '',
       address: profile?.address ?? '',
       gender: profile?.gender ?? '',
-      birthDate: profile?.birthDate ? profile.birthDate.toISOString().split('T')[0] : '',
+      birthDate: profile?.birthDate
+        ? profile.birthDate.toISOString().split('T')[0]
+        : '',
       avatarUrl: profile?.avatarUrl ?? '',
       role: roleName.toLowerCase(),
       roles: user.primaryRoles.map((ur) => ur.role.name.toUpperCase()),

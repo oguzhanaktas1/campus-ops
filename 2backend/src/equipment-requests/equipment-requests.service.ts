@@ -11,6 +11,7 @@ import { PriorityLevel, RequestStatus } from '@prisma/client';
 import { CreateEquipmentRequestDto } from './dto/create-equipment-request.dto';
 import { ReviewEquipmentRequestDto } from './dto/review-equipment-request.dto';
 import { Prisma } from '@prisma/client';
+import { FilesService } from '../files/files.service';
 
 const OPEN_STATUSES: RequestStatus[] = [
   RequestStatus.SUBMITTED,
@@ -33,6 +34,7 @@ export class EquipmentRequestsService {
   constructor(
     private prisma: PrismaService,
     private workflowEngine: WorkflowEngineService,
+    private filesService: FilesService,
   ) {}
 
   private async getOrCreateRequestType() {
@@ -161,7 +163,11 @@ export class EquipmentRequestsService {
 
   // ─── INBOX (STAFF / ADMIN) ─────────────────────────────────────────────────
 
-  async findInbox() {
+  async findInbox(roles: string[]) {
+    if (!roles.some((role) => ['ADMIN', 'STAFF'].includes(role))) {
+      throw new ForbiddenException('Insufficient permissions.');
+    }
+
     const records = await this.prisma.equipmentRequest.findMany({
       where: {
         request: { status: { in: OPEN_STATUSES } },
@@ -263,6 +269,10 @@ export class EquipmentRequestsService {
       throw new ForbiddenException('Access denied.');
     }
 
+    const attachments = await Promise.all(
+      req.fileLinks.map((fl: any) => this.filesService.buildAttachmentResponse(fl.file)),
+    );
+
     return {
       id: req.id,
       requestNo: req.requestNo,
@@ -323,12 +333,7 @@ export class EquipmentRequestsService {
         isInternal: c.isInternal,
         createdAt: c.createdAt,
       })),
-      attachments: req.fileLinks.map((fl: any) => ({
-        id: fl.file.id,
-        name: fl.file.originalFileName,
-        size: fl.file.fileSizeBytes,
-        url: fl.file.storagePath,
-      })),
+      attachments,
     };
   }
 

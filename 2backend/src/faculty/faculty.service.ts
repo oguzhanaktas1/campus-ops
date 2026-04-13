@@ -10,6 +10,7 @@ import {
 import { PrismaService } from '../core/prisma/prisma.service';
 import { SlaService } from '../workflow/sla.service';
 import { CacheService } from '../infrastructure/cache/cache.service';
+import { FilesService } from '../files/files.service';
 import {
   CacheKeys,
   CacheTtls,
@@ -27,6 +28,7 @@ export class FacultyService {
     private prisma: PrismaService,
     private slaService: SlaService,
     private cacheService: CacheService,
+    private filesService: FilesService,
   ) {}
 
   private buildRequestDomainData(request: any) {
@@ -607,12 +609,9 @@ export class FacultyService {
         : null,
       studentNumber: request.requester.profile?.studentNumber,
       formData: this.buildRequestDomainData(request),
-      attachments: request.fileLinks.map((fl) => ({
-        id: fl.file.id,
-        name: fl.file.originalFileName,
-        size: `${(fl.file.fileSizeBytes / 1024 / 1024).toFixed(2)} MB`,
-        url: fl.file.storagePath,
-      })),
+      attachments: await Promise.all(
+        request.fileLinks.map((fl) => this.filesService.buildAttachmentResponse(fl.file)),
+      ),
       comments: request.comments.map((c) => ({
         id: c.id,
         author: c.user.profile?.fullName || c.user.email,
@@ -871,12 +870,11 @@ export class FacultyService {
         department: (r.student?.profile as any)?.department?.name ?? null,
       },
       term: r.term ?? null,
-      attachments: (r.request as any).fileLinks.map((fl: any) => ({
-        id: fl.file.id,
-        name: fl.file.originalFileName,
-        size: fl.file.fileSizeBytes,
-        url: fl.file.storagePath,
-      })),
+      attachments: await Promise.all(
+        (r.request as any).fileLinks.map((fl: any) =>
+          this.filesService.buildAttachmentResponse(fl.file),
+        ),
+      ),
       comments: (r.request as any).comments.map((c: any) => ({
         id: c.id,
         author: c.user?.profile?.fullName ?? c.user?.email ?? 'Unknown',

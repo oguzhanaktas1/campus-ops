@@ -42,8 +42,8 @@ export class EquipmentRequestsController {
 
   /** GET /equipment-requests/inbox — open requests (STAFF / ADMIN) */
   @Get('inbox')
-  findInbox() {
-    return this.equipmentRequestsService.findInbox();
+  findInbox(@CurrentUser() user: ReqUser) {
+    return this.equipmentRequestsService.findInbox(user.roles);
   }
 
   /** GET /equipment-requests/:id — full detail with role-based access */
