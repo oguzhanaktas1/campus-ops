@@ -8,12 +8,18 @@ import { Label } from '@/components/ui/label'
 import { Loader2, PartyPopper } from 'lucide-react'
 import { toast } from 'sonner'
 import { getToken } from '@/lib/auth'
+import {
+  getCurrentDateTimeInputValue,
+  validateDateWindow,
+} from '@/lib/date-time'
 
 const EVENT_TYPES = ['Conference', 'Workshop', 'Club Activity', 'Social Event', 'Sports', 'Cultural', 'Academic', 'Other']
 
 export default function NewStudentEventPage() {
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [dateError, setDateError] = useState<string | null>(null)
+  const minDateTime = getCurrentDateTimeInputValue()
   const [form, setForm] = useState({
     eventName: '',
     eventType: 'Club Activity',
@@ -30,11 +36,36 @@ export default function NewStudentEventPage() {
   })
 
   const set = (k: string, v: any) => setForm((p) => ({ ...p, [k]: v }))
+  const setDateField = (key: 'startAt' | 'endAt', value: string) => {
+    const nextForm = { ...form, [key]: value }
+    const error = validateDateWindow({
+      start: nextForm.startAt,
+      end: nextForm.endAt,
+      type: 'datetime-local',
+      startLabel: 'Baslangic tarihi',
+      endLabel: 'Bitis tarihi',
+    })
+    setForm(nextForm)
+    setDateError(error)
+    if (error) toast.error(error)
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!form.eventName.trim() || !form.startAt || !form.endAt || !form.expectedAttendance) {
       toast.error('Please fill in all required fields.')
+      return
+    }
+    const validationError = validateDateWindow({
+      start: form.startAt,
+      end: form.endAt,
+      type: 'datetime-local',
+      startLabel: 'Baslangic tarihi',
+      endLabel: 'Bitis tarihi',
+    })
+    if (validationError) {
+      setDateError(validationError)
+      toast.error(validationError)
       return
     }
     setIsSubmitting(true)
@@ -90,13 +121,14 @@ export default function NewStudentEventPage() {
         <div className="grid sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">
             <Label>Start Date & Time <span className="text-destructive">*</span></Label>
-            <Input type="datetime-local" value={form.startAt} onChange={(e) => set('startAt', e.target.value)} />
+            <Input type="datetime-local" min={minDateTime} value={form.startAt} onChange={(e) => setDateField('startAt', e.target.value)} />
           </div>
           <div className="space-y-1.5">
             <Label>End Date & Time <span className="text-destructive">*</span></Label>
-            <Input type="datetime-local" value={form.endAt} onChange={(e) => set('endAt', e.target.value)} />
+            <Input type="datetime-local" min={form.startAt || minDateTime} value={form.endAt} onChange={(e) => setDateField('endAt', e.target.value)} />
           </div>
         </div>
+        {dateError && <p className="text-sm text-destructive">{dateError}</p>}
 
         <div className="space-y-1.5">
           <Label>Preferred Location</Label>

@@ -16,6 +16,10 @@ import { Loader2, ArrowLeft, Briefcase } from 'lucide-react'
 import { toast } from 'sonner'
 import { getToken } from '@/lib/auth'
 import Link from 'next/link'
+import {
+  getCurrentDateInputValue,
+  validateDateWindow,
+} from '@/lib/date-time'
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000'
 
@@ -25,6 +29,8 @@ const WORK_MODES = ['ONSITE', 'REMOTE', 'HYBRID']
 export default function NewInternshipPage() {
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [dateError, setDateError] = useState<string | null>(null)
+  const minDate = getCurrentDateInputValue()
 
   const [form, setForm] = useState({
     companyName: '',
@@ -39,6 +45,20 @@ export default function NewInternshipPage() {
     insuranceRequired: false,
   })
 
+  const setDateField = (key: 'startDate' | 'endDate', value: string) => {
+    const nextForm = { ...form, [key]: value }
+    const error = validateDateWindow({
+      start: nextForm.startDate,
+      end: nextForm.endDate,
+      type: 'date',
+      startLabel: 'Baslangic tarihi',
+      endLabel: 'Bitis tarihi',
+    })
+    setForm(nextForm)
+    setDateError(error)
+    if (error) toast.error(error)
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!form.companyName.trim()) {
@@ -49,8 +69,16 @@ export default function NewInternshipPage() {
       toast.error('Start and end dates are required.')
       return
     }
-    if (new Date(form.endDate) < new Date(form.startDate)) {
-      toast.error('End date cannot be before start date.')
+    const validationError = validateDateWindow({
+      start: form.startDate,
+      end: form.endDate,
+      type: 'date',
+      startLabel: 'Baslangic tarihi',
+      endLabel: 'Bitis tarihi',
+    })
+    if (validationError) {
+      setDateError(validationError)
+      toast.error(validationError)
       return
     }
 
@@ -187,8 +215,30 @@ export default function NewInternshipPage() {
                 </SelectContent>
               </Select>
             </div>
-            {field('Start Date', 'startDate', 'date', '', true)}
-            {field('End Date', 'endDate', 'date', '', true)}
+            <div className="space-y-1.5">
+              <Label>
+                Start Date <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                type="date"
+                min={minDate}
+                value={form.startDate}
+                onChange={(e) => setDateField('startDate', e.target.value)}
+                required
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>
+                End Date <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                type="date"
+                min={form.startDate || minDate}
+                value={form.endDate}
+                onChange={(e) => setDateField('endDate', e.target.value)}
+                required
+              />
+            </div>
             <div className="space-y-1.5">
               <Label>Duration (days)</Label>
               <Input
@@ -240,6 +290,7 @@ export default function NewInternshipPage() {
             </div>
           </div>
         </div>
+        {dateError && <p className="text-sm text-destructive">{dateError}</p>}
 
         <div className="rounded-lg border border-border bg-card p-5">
           <p className="text-sm text-muted-foreground">

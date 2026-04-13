@@ -17,14 +17,12 @@ import {
   Building2,
   Activity,
   ClipboardList,
-  Workflow,
 } from "lucide-react";
 import AuthGuard from "@/components/AuthGuard/auth-guard";
+import { fetchProfile, getStoredUser } from "@/lib/auth";
 
 const navItems: NavItem[] = [
   { label: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
-
-  // ── Kullanıcı & Erişim ─────────────────────────────────────────
   {
     label: "Users & Access",
     href: "#",
@@ -35,8 +33,6 @@ const navItems: NavItem[] = [
       { label: "Permissions", href: "/admin/permissions" },
     ],
   },
-
-  // ── Organizasyon ───────────────────────────────────────────────
   {
     label: "Organization",
     href: "#",
@@ -48,8 +44,6 @@ const navItems: NavItem[] = [
       { label: "Units", href: "/admin/units" },
     ],
   },
-
-  // ── Talepler & İş Akışı ────────────────────────────────────────
   {
     label: "Requests & Workflows",
     href: "#",
@@ -61,27 +55,23 @@ const navItems: NavItem[] = [
       { label: "Workflow Instances", href: "/admin/workflow-instances" },
     ],
   },
-
-  // ── Operasyonlar ───────────────────────────────────────────────
   {
     label: "Operations",
     href: "#",
     icon: ClipboardList,
     children: [
-      { label: "Appointments",     href: "/admin/appointments" },
-      { label: "Reservations",     href: "/admin/reservations" },
-      { label: "Resources",        href: "/admin/resources" },
-      { label: "IT Tickets",       href: "/admin/tickets" },
-      { label: "Equipment",        href: "/admin/equipment" },
-      { label: "Internships",      href: "/admin/internships" },
-      { label: "Procurement",      href: "/admin/procurement" },
-      { label: "Events",           href: "/admin/events" },
-      { label: "Access Requests",  href: "/admin/access-requests" },
-      { label: "SLA Policies",     href: "/admin/sla" },
+      { label: "Appointments", href: "/admin/appointments" },
+      { label: "Reservations", href: "/admin/reservations" },
+      { label: "Resources", href: "/admin/resources" },
+      { label: "IT Tickets", href: "/admin/tickets" },
+      { label: "Equipment", href: "/admin/equipment" },
+      { label: "Internships", href: "/admin/internships" },
+      { label: "Procurement", href: "/admin/procurement" },
+      { label: "Events", href: "/admin/events" },
+      { label: "Access Requests", href: "/admin/access-requests" },
+      { label: "SLA Policies", href: "/admin/sla" },
     ],
   },
-
-  // ── Analitik & Raporlar ────────────────────────────────────────
   {
     label: "Analytics & Reports",
     href: "#",
@@ -91,8 +81,6 @@ const navItems: NavItem[] = [
       { label: "Reports", href: "/admin/reports" },
     ],
   },
-
-  // ── Sistem ─────────────────────────────────────────────────────
   {
     label: "System",
     href: "#",
@@ -104,7 +92,6 @@ const navItems: NavItem[] = [
       { label: "Audit Logs", href: "/admin/audit-logs" },
     ],
   },
-
   { label: "Notifications", href: "/admin/notifications", icon: Bell },
   { label: "Settings", href: "/admin/settings", icon: Settings },
 ];
@@ -114,41 +101,30 @@ export default function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
-  // DB'den gelecek kullanıcı verisini tutacağımız state
   const [user, setUser] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const fetchUserProfile = async () => {
-      const token = localStorage.getItem("access_token");
-      if (!token) {
+      const storedUser = getStoredUser();
+      if (!storedUser) {
         setIsLoading(false);
         return;
       }
 
       try {
-        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
-        const res = await fetch(`${backendUrl}/auth/profile`, {
-          headers: {
-            Authorization: `Bearer ${token}`, // Guard'dan geçmek için biletimiz
-          },
-        });
-
-        if (res.ok) {
-          const data = await res.json();
-          setUser(data);
-        }
+        const profile = await fetchProfile();
+        setUser(profile);
       } catch (error) {
-        console.error("Profil çekilirken hata oluştu:", error);
+        console.error("Profile fetch failed:", error);
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchUserProfile();
+    void fetchUserProfile();
   }, []);
 
-  // Veri yüklenirken kısa bir yükleme ekranı göster
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -157,7 +133,6 @@ export default function AdminLayout({
     );
   }
 
-  // Veri çekilemediyse boş döndür, AuthGuard logine şutlayacak
   if (!user) return null;
 
   const topbar = (
@@ -165,10 +140,7 @@ export default function AdminLayout({
       <div className="hidden sm:flex items-center gap-2">
         <ShieldCheck className="size-4 text-primary" />
         <div>
-          <h1 className="text-sm font-semibold text-foreground">
-            Admin Portal
-          </h1>
-          {/* Admin için unvanı ve departmanı (bio) yan yana gösterelim */}
+          <h1 className="text-sm font-semibold text-foreground">Admin Portal</h1>
           <p className="text-xs text-muted-foreground">
             {user.title} · {user.department}
           </p>

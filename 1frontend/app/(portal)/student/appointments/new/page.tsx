@@ -11,6 +11,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ArrowLeft, Loader2, Calendar, Clock } from 'lucide-react'
 import { toast } from 'sonner'
 import { getToken } from '@/lib/auth'
+import {
+  getCurrentDateTimeInputValue,
+  validateDateWindow,
+} from '@/lib/date-time'
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000'
 const APPOINTMENT_TYPES = ['ACADEMIC', 'ADVISING', 'CONSULTATION', 'OFFICE_HOURS', 'OTHER']
@@ -22,6 +26,7 @@ export default function NewAppointmentPage() {
   const [availability, setAvailability] = useState<any[]>([])
   const [isLoadingUsers, setIsLoadingUsers] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [dateError, setDateError] = useState<string | null>(null)
   const [form, setForm] = useState({
     targetUserId: '',
     appointmentType: '',
@@ -54,6 +59,21 @@ export default function NewAppointmentPage() {
   }, [])
 
   const set = (key: string, value: string) => setForm((p) => ({ ...p, [key]: value }))
+  const minDateTime = getCurrentDateTimeInputValue()
+
+  const setDateField = (key: 'preferredStartAt' | 'preferredEndAt', value: string) => {
+    const nextForm = { ...form, [key]: value }
+    const error = validateDateWindow({
+      start: nextForm.preferredStartAt,
+      end: nextForm.preferredEndAt,
+      type: 'datetime-local',
+      startLabel: 'Baslangic tarihi',
+      endLabel: 'Bitis tarihi',
+    })
+    setForm(nextForm)
+    setDateError(error)
+    if (error) toast.error(error)
+  }
 
   const handleTargetChange = (userId: string) => {
     set('targetUserId', userId)
@@ -65,6 +85,18 @@ export default function NewAppointmentPage() {
     if (!form.targetUserId) { toast.error('Please select a person.'); return }
     if (!form.appointmentType) { toast.error('Please select appointment type.'); return }
     if (!form.topic.trim()) { toast.error('Please enter a topic.'); return }
+    const validationError = validateDateWindow({
+      start: form.preferredStartAt,
+      end: form.preferredEndAt,
+      type: 'datetime-local',
+      startLabel: 'Baslangic tarihi',
+      endLabel: 'Bitis tarihi',
+    })
+    if (validationError) {
+      setDateError(validationError)
+      toast.error(validationError)
+      return
+    }
     setIsSubmitting(true)
     try {
       const res = await fetch(`${BACKEND}/appointment-requests`, {
@@ -196,8 +228,9 @@ export default function NewAppointmentPage() {
             <Input
               id="preferredStartAt"
               type="datetime-local"
+              min={minDateTime}
               value={form.preferredStartAt}
-              onChange={(e) => set('preferredStartAt', e.target.value)}
+              onChange={(e) => setDateField('preferredStartAt', e.target.value)}
             />
           </div>
           <div className="space-y-1.5">
@@ -205,11 +238,13 @@ export default function NewAppointmentPage() {
             <Input
               id="preferredEndAt"
               type="datetime-local"
+              min={form.preferredStartAt || minDateTime}
               value={form.preferredEndAt}
-              onChange={(e) => set('preferredEndAt', e.target.value)}
+              onChange={(e) => setDateField('preferredEndAt', e.target.value)}
             />
           </div>
         </div>
+        {dateError && <p className="text-sm text-destructive">{dateError}</p>}
 
         {/* Details */}
         <div className="space-y-1.5">

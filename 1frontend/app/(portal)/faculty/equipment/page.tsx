@@ -10,16 +10,16 @@ import { getToken } from '@/lib/auth'
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000'
 
 const STATUS_BADGE: Record<string, string> = {
-  SUBMITTED:        'bg-blue-50 text-blue-700 border-blue-200',
-  IN_REVIEW:        'bg-yellow-50 text-yellow-700 border-yellow-200',
+  SUBMITTED: 'bg-blue-50 text-blue-700 border-blue-200',
+  IN_REVIEW: 'bg-yellow-50 text-yellow-700 border-yellow-200',
   WAITING_APPROVAL: 'bg-amber-50 text-amber-700 border-amber-200',
-  APPROVED:         'bg-green-50 text-green-700 border-green-200',
-  REJECTED:         'bg-red-50 text-red-700 border-red-200',
-  COMPLETED:        'bg-gray-50 text-gray-500 border-gray-200',
+  APPROVED: 'bg-green-50 text-green-700 border-green-200',
+  REJECTED: 'bg-red-50 text-red-700 border-red-200',
+  COMPLETED: 'bg-gray-50 text-gray-500 border-gray-200',
 }
 
 function fmt(d: any) {
-  if (!d) return '—'
+  if (!d) return '-'
   return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
@@ -30,10 +30,15 @@ export default function FacultyEquipmentPage() {
 
   const fetchRequests = useCallback(async () => {
     try {
-      const res = await fetch(`${BACKEND}/equipment-requests`, {
+      const res = await fetch(`${BACKEND}/faculty/requests/all`, {
         headers: { Authorization: `Bearer ${getToken()}` },
       })
-      if (res.ok) setRequests(await res.json())
+      if (res.ok) {
+        const data = await res.json()
+        setRequests(data.filter((request: any) => request.type === 'EQUIPMENT'))
+      } else {
+        setRequests([])
+      }
     } catch {
       toast.error('Failed to load equipment requests.')
     } finally {
@@ -41,7 +46,9 @@ export default function FacultyEquipmentPage() {
     }
   }, [])
 
-  useEffect(() => { fetchRequests() }, [fetchRequests])
+  useEffect(() => {
+    void fetchRequests()
+  }, [fetchRequests])
 
   const filtered = filter === 'all' ? requests : requests.filter((r) => r.status === filter)
 
@@ -71,7 +78,7 @@ export default function FacultyEquipmentPage() {
               'text-xs px-3 py-1.5 rounded-full border font-semibold transition-colors',
               filter === s
                 ? 'bg-foreground text-background border-foreground'
-                : 'bg-background text-muted-foreground border-border hover:border-foreground'
+                : 'bg-background text-muted-foreground border-border hover:border-foreground',
             )}
           >
             {s === 'all' ? 'All' : s.replace(/_/g, ' ')}
@@ -93,19 +100,15 @@ export default function FacultyEquipmentPage() {
               className="flex items-center justify-between px-5 py-4 hover:bg-muted/20 transition-colors"
             >
               <div className="min-w-0">
-                <p className="text-sm font-semibold truncate">
-                  {r.equipmentName || r.title || 'Equipment Request'}
-                </p>
+                <p className="text-sm font-semibold truncate">{r.title || 'Equipment Request'}</p>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  {r.requestNo} · {r.requesterName}
-                  {r.category && ` · ${r.category}`}
-                  {r.quantity && ` · Qty: ${r.quantity}`}
+                  {r.typeName || 'Equipment Request'} · {r.submittedByName}
                   {r.createdAt && ` · ${fmt(r.createdAt)}`}
                 </p>
               </div>
               <span className={cn(
                 'text-xs font-semibold px-2 py-0.5 rounded-full border shrink-0 ml-4',
-                STATUS_BADGE[r.status] ?? STATUS_BADGE.SUBMITTED
+                STATUS_BADGE[r.status] ?? STATUS_BADGE.SUBMITTED,
               )}>
                 {r.status?.replace(/_/g, ' ')}
               </span>

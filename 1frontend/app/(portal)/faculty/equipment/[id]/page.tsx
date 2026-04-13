@@ -12,7 +12,7 @@ import { getToken } from '@/lib/auth'
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000'
 
 function fmt(d: any) {
-  if (!d) return '—'
+  if (!d) return '-'
   return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
@@ -20,7 +20,7 @@ function InfoRow({ label, value }: { label: string; value?: string | null }) {
   return (
     <div>
       <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-0.5">{label}</p>
-      <p className="text-sm text-foreground">{value || '—'}</p>
+      <p className="text-sm text-foreground">{value || '-'}</p>
     </div>
   )
 }
@@ -32,8 +32,8 @@ export default function FacultyEquipmentDetailPage() {
 
   useEffect(() => {
     if (!id) return
-    fetch(`${BACKEND}/equipment-requests/${id}`, { headers: { Authorization: `Bearer ${getToken()}` } })
-      .then((r) => r.ok ? r.json() : null)
+    fetch(`${BACKEND}/faculty/requests/${id}`, { headers: { Authorization: `Bearer ${getToken()}` } })
+      .then((r) => (r.ok ? r.json() : null))
       .then(setData)
       .catch(() => {})
       .finally(() => setIsLoading(false))
@@ -48,7 +48,7 @@ export default function FacultyEquipmentDetailPage() {
     </div>
   )
 
-  const eq = data.equipment
+  const eq = data.formData ?? {}
 
   return (
     <div className="p-6 space-y-5 max-w-3xl mx-auto pb-20">
@@ -85,15 +85,15 @@ export default function FacultyEquipmentDetailPage() {
       <div className="bg-card border border-border rounded-lg p-5 space-y-4">
         <p className="text-sm font-semibold flex items-center gap-2"><Package className="size-4 text-muted-foreground" /> Equipment Details</p>
         <div className="grid grid-cols-2 gap-4">
-          <InfoRow label="Equipment" value={eq?.equipmentName} />
-          <InfoRow label="Category" value={eq?.equipmentCategory} />
-          <InfoRow label="Quantity" value={eq?.quantity?.toString()} />
-          <InfoRow label="Purpose" value={eq?.purpose} />
-          <InfoRow label="Needed From" value={fmt(eq?.neededFrom)} />
-          <InfoRow label="Needed Until" value={fmt(eq?.neededUntil)} />
-          {eq?.estimatedCost && <InfoRow label="Est. Cost" value={`$${eq.estimatedCost}`} />}
+          <InfoRow label="Equipment" value={eq.equipmentName} />
+          <InfoRow label="Category" value={eq.equipmentCategory} />
+          <InfoRow label="Quantity" value={eq.quantity?.toString()} />
+          <InfoRow label="Purpose" value={eq.purpose} />
+          <InfoRow label="Needed From" value={fmt(eq.neededFrom)} />
+          <InfoRow label="Needed Until" value={fmt(eq.neededUntil)} />
+          {eq.estimatedCost && <InfoRow label="Est. Cost" value={`$${eq.estimatedCost}`} />}
         </div>
-        {eq?.urgencyReason && <div><p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Urgency Reason</p><p className="text-sm text-muted-foreground">{eq.urgencyReason}</p></div>}
+        {eq.urgencyReason && <div><p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Urgency Reason</p><p className="text-sm text-muted-foreground">{eq.urgencyReason}</p></div>}
       </div>
 
       {data.description && (
@@ -103,10 +103,10 @@ export default function FacultyEquipmentDetailPage() {
         </div>
       )}
 
-      {data.statusHistory?.length > 0 && (
+      {data.timeline?.length > 0 && (
         <div className="bg-card border border-border rounded-lg p-5">
           <p className="text-sm font-semibold mb-4">Status History</p>
-          <RequestTimeline events={data.statusHistory} />
+          <RequestTimeline events={data.timeline} />
         </div>
       )}
     </div>

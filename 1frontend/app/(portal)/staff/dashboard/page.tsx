@@ -4,8 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { MetricCard } from '@/components/metric-card'
-import { StatusBadge } from '@/components/status-badge'
-import { PriorityBadge } from '@/components/status-badge'
+import { StatusBadge, PriorityBadge } from '@/components/status-badge'
 import {
   Ticket,
   AlertTriangle,
@@ -14,10 +13,11 @@ import {
   ArrowRight,
   Zap,
   Activity,
-  Loader2
+  Loader2,
 } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import { cn } from '@/lib/utils'
+import { fetchProfile, getStoredUser } from '@/lib/auth'
 
 const requestTypeLabels: Record<string, string> = {
   it_support: 'IT Support',
@@ -49,7 +49,7 @@ export default function StaffDashboard() {
     overdueCount: 0,
     completedToday: 0,
     slaBreaches: 0,
-    avgResponseHours: 0
+    avgResponseHours: 0,
   })
   const [assigned, setAssigned] = useState<any[]>([])
   const [urgent, setUrgent] = useState<any[]>([])
@@ -60,38 +60,37 @@ export default function StaffDashboard() {
     const fetchDashboardData = async () => {
       try {
         const token = localStorage.getItem('access_token')
+        const storedUser = getStoredUser()
         const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
-        
-        // 0. PROFİL ÇEK
-        const resProfile = await fetch(`${backendUrl}/auth/profile`, {
-          headers: { Authorization: `Bearer ${token}` }
-        })
-        if (resProfile.ok) setUser(await resProfile.json())
 
-        // 1. METRİKLERİ ÇEK
+        if (storedUser) {
+          try {
+            setUser(await fetchProfile())
+          } catch {}
+        }
+
         const resMetrics = await fetch(`${backendUrl}/staff/metrics`, {
-          headers: { Authorization: `Bearer ${token}` }
+          headers: { Authorization: `Bearer ${token}` },
         })
-        
+
         if (resMetrics.ok) {
           const mData = await resMetrics.json()
-          setMetrics(prev => ({
+          setMetrics((prev) => ({
             ...prev,
             assignedCount: mData.unassignedRequests || 0,
-            completedToday: 12, 
-            slaBreaches: 2,     
-            avgResponseHours: 4 
+            completedToday: 12,
+            slaBreaches: 2,
+            avgResponseHours: 4,
           }))
         }
 
-        // 2. TÜM TALEPLERİ ÇEK (Aktif olanlar)
         const resRequests = await fetch(`${backendUrl}/staff/requests?filter=active`, {
-          headers: { Authorization: `Bearer ${token}` }
+          headers: { Authorization: `Bearer ${token}` },
         })
 
         if (resRequests.ok) {
           const reqData = await resRequests.json()
-          
+
           const parsedRequests = reqData.map((r: any) => ({
             id: r.id,
             title: r.title,
@@ -104,16 +103,16 @@ export default function StaffDashboard() {
 
           setAssigned(parsedRequests)
           setUrgent(parsedRequests.filter((r: any) => r.priority === 'URGENT' || r.priority === 'HIGH'))
-          setOverdue([]) 
+          setOverdue([])
         }
       } catch (error) {
-        console.error('Dashboard verileri çekilemedi:', error)
+        console.error('Dashboard data fetch failed:', error)
       } finally {
         setIsLoading(false)
       }
     }
 
-    fetchDashboardData()
+    void fetchDashboardData()
   }, [])
 
   if (isLoading) {
@@ -131,46 +130,14 @@ export default function StaffDashboard() {
         </p>
       </div>
 
-      {/* Metrics */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-        <MetricCard
-          title="Assigned Tickets"
-          value={metrics.assignedCount}
-          description="In your queue"
-          icon={<Ticket className="size-4" />}
-        />
-        <MetricCard
-          title="Overdue"
-          value={metrics.overdueCount}
-          description="Past SLA"
-          icon={<AlertTriangle className="size-4" />}
-          valueClassName="text-destructive"
-        />
-        <MetricCard
-          title="Completed Today"
-          value={metrics.completedToday}
-          icon={<CheckCircle2 className="size-4" />}
-          trend={12}
-          trendLabel="vs yesterday"
-        />
-        <MetricCard
-          title="SLA Breaches"
-          value={metrics.slaBreaches}
-          description="This week"
-          icon={<Zap className="size-4" />}
-          valueClassName={metrics.slaBreaches > 0 ? 'text-amber-600' : undefined}
-        />
-        <MetricCard
-          title="Avg Response"
-          value={`${metrics.avgResponseHours}h`}
-          description="Time to first action"
-          icon={<Clock className="size-4" />}
-          trend={-5}
-          trendLabel="vs last week"
-        />
+        <MetricCard title="Assigned Tickets" value={metrics.assignedCount} description="In your queue" icon={<Ticket className="size-4" />} />
+        <MetricCard title="Overdue" value={metrics.overdueCount} description="Past SLA" icon={<AlertTriangle className="size-4" />} valueClassName="text-destructive" />
+        <MetricCard title="Completed Today" value={metrics.completedToday} icon={<CheckCircle2 className="size-4" />} trend={12} trendLabel="vs yesterday" />
+        <MetricCard title="SLA Breaches" value={metrics.slaBreaches} description="This week" icon={<Zap className="size-4" />} valueClassName={metrics.slaBreaches > 0 ? 'text-amber-600' : undefined} />
+        <MetricCard title="Avg Response" value={`${metrics.avgResponseHours}h`} description="Time to first action" icon={<Clock className="size-4" />} trend={-5} trendLabel="vs last week" />
       </div>
 
-      {/* Overdue Alert */}
       {overdue.length > 0 && (
         <div className="flex items-start gap-3 p-4 rounded-lg bg-destructive/8 border border-destructive/20">
           <AlertTriangle className="size-4 text-destructive mt-0.5 flex-shrink-0" />
@@ -191,7 +158,6 @@ export default function StaffDashboard() {
       )}
 
       <div className="grid lg:grid-cols-3 gap-5">
-        {/* Ticket Queue */}
         <div className="lg:col-span-2 bg-card border border-border rounded-lg shadow-sm">
           <div className="flex items-center justify-between px-5 py-4 border-b border-border">
             <div>
@@ -206,8 +172,7 @@ export default function StaffDashboard() {
           </div>
           <div className="divide-y divide-border h-[400px] overflow-y-auto">
             {assigned.map((req) => {
-              // 🔥 24 SAAT KONTROLÜ (NEW ROZETİ İÇİN) 🔥
-              const isNew = (Date.now() - new Date(req.createdAt).getTime()) < 24 * 60 * 60 * 1000;
+              const isNew = (Date.now() - new Date(req.createdAt).getTime()) < 24 * 60 * 60 * 1000
 
               return (
                 <Link key={req.id} href={`/staff/requests/${req.type}/${req.id}`}>
@@ -215,7 +180,6 @@ export default function StaffDashboard() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-0.5">
                         <p className="text-sm font-medium text-foreground truncate">{req.title}</p>
-                        {/* 🔥 YENİ İSE ROZETİ BAS 🔥 */}
                         {isNew && (
                           <span className="px-1.5 py-0.5 rounded bg-blue-500/10 border border-blue-500/20 text-blue-600 dark:text-blue-400 text-[9px] font-bold uppercase tracking-wider flex-shrink-0">
                             New
@@ -242,9 +206,7 @@ export default function StaffDashboard() {
           </div>
         </div>
 
-        {/* Right column */}
         <div className="space-y-5">
-          {/* Urgent tickets */}
           <div className="bg-card border border-border rounded-lg shadow-sm">
             <div className="flex items-center justify-between px-4 py-3 border-b border-border">
               <div className="flex items-center gap-2">
@@ -255,8 +217,7 @@ export default function StaffDashboard() {
             </div>
             <div className="divide-y divide-border max-h-[200px] overflow-y-auto">
               {urgent.map((req) => {
-                // 🔥 URGENT KISMINA DA YENİ ROZETİNİ EKLEDİK 🔥
-                const isNew = (Date.now() - new Date(req.createdAt).getTime()) < 24 * 60 * 60 * 1000;
+                const isNew = (Date.now() - new Date(req.createdAt).getTime()) < 24 * 60 * 60 * 1000
 
                 return (
                   <Link key={req.id} href={`/staff/requests/${req.type}/${req.id}`}>
@@ -284,7 +245,6 @@ export default function StaffDashboard() {
             </div>
           </div>
 
-          {/* SLA Summary */}
           <div className="bg-card border border-border rounded-lg shadow-sm p-4">
             <div className="flex items-center gap-2 mb-3">
               <Activity className="size-3.5 text-muted-foreground" />
@@ -316,7 +276,6 @@ export default function StaffDashboard() {
         </div>
       </div>
 
-      {/* Throughput Chart */}
       <div className="bg-card border border-border rounded-lg shadow-sm p-5">
         <h2 className="text-sm font-semibold text-foreground mb-4">Weekly Throughput</h2>
         <ResponsiveContainer width="100%" height={200}>

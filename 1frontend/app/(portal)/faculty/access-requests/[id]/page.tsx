@@ -20,7 +20,7 @@ type ActionType = 'approve' | 'reject' | 'revision'
 const TERMINAL = ['APPROVED', 'REJECTED', 'CANCELLED', 'COMPLETED']
 
 function fmt(d: any) {
-  if (!d) return '—'
+  if (!d) return '-'
   return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
@@ -28,7 +28,7 @@ function InfoRow({ label, value }: { label: string; value?: string | null }) {
   return (
     <div>
       <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-0.5">{label}</p>
-      <p className="text-sm text-foreground">{value || '—'}</p>
+      <p className="text-sm text-foreground">{value || '-'}</p>
     </div>
   )
 }
@@ -43,8 +43,8 @@ export default function FacultyAccessRequestDetailPage() {
 
   useEffect(() => {
     if (!id) return
-    fetch(`${BACKEND}/access-requests/${id}`, { headers: { Authorization: `Bearer ${getToken()}` } })
-      .then((r) => r.ok ? r.json() : null)
+    fetch(`${BACKEND}/faculty/requests/${id}`, { headers: { Authorization: `Bearer ${getToken()}` } })
+      .then((r) => (r.ok ? r.json() : null))
       .then(setData)
       .catch(() => {})
       .finally(() => setIsLoading(false))
@@ -74,8 +74,11 @@ export default function FacultyAccessRequestDetailPage() {
         const err = await res.json().catch(() => ({})) as { message?: string }
         toast.error(err.message ?? 'Failed.')
       }
-    } catch { toast.error('Network error.') }
-    finally { setIsProcessing(false) }
+    } catch {
+      toast.error('Network error.')
+    } finally {
+      setIsProcessing(false)
+    }
   }
 
   if (isLoading) return <div className="flex h-[80vh] items-center justify-center"><Loader2 className="size-8 animate-spin text-primary" /></div>
@@ -87,7 +90,7 @@ export default function FacultyAccessRequestDetailPage() {
     </div>
   )
 
-  const ar = data.accessRequest
+  const ar = data.formData ?? {}
   const isTerminal = TERMINAL.includes(data.status) || !!doneAction
 
   return (
@@ -122,19 +125,17 @@ export default function FacultyAccessRequestDetailPage() {
         </div>
       )}
 
-      {ar && (
-        <div className="bg-card border border-border rounded-lg p-5 space-y-4">
-          <p className="text-sm font-semibold">Access Details</p>
-          <div className="grid grid-cols-2 gap-4">
-            <InfoRow label="Access Type" value={ar.accessType} />
-            <InfoRow label="Target Resource" value={ar.targetResource} />
-            <InfoRow label="Requested Role" value={ar.requestedRoleOrPermission} />
-            <InfoRow label="Start Date" value={fmt(ar.requestedStartDate)} />
-            <InfoRow label="End Date" value={fmt(ar.requestedEndDate)} />
-          </div>
-          {ar.justification && <div><p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Justification</p><p className="text-sm text-muted-foreground">{ar.justification}</p></div>}
+      <div className="bg-card border border-border rounded-lg p-5 space-y-4">
+        <p className="text-sm font-semibold">Access Details</p>
+        <div className="grid grid-cols-2 gap-4">
+          <InfoRow label="Access Type" value={ar.accessType} />
+          <InfoRow label="Target Resource" value={ar.targetResource} />
+          <InfoRow label="Requested Role" value={ar.requestedRoleOrPermission} />
+          <InfoRow label="Start Date" value={fmt(ar.startAt)} />
+          <InfoRow label="End Date" value={fmt(ar.endAt)} />
         </div>
-      )}
+        {ar.justification && <div><p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Justification</p><p className="text-sm text-muted-foreground">{ar.justification}</p></div>}
+      </div>
 
       {isTerminal ? (
         <div className="bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900 p-6 rounded-lg flex flex-col items-center text-center gap-3">
@@ -165,10 +166,10 @@ export default function FacultyAccessRequestDetailPage() {
         </div>
       )}
 
-      {data.statusHistory?.length > 0 && (
+      {data.timeline?.length > 0 && (
         <div className="bg-card border border-border rounded-lg p-5">
           <p className="text-sm font-semibold mb-4">Status History</p>
-          <RequestTimeline events={data.statusHistory} />
+          <RequestTimeline events={data.timeline} />
         </div>
       )}
     </div>

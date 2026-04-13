@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback, useMemo } from 'react'
+import Link from 'next/link'
 import { Briefcase, Search, Loader2, AlertCircle } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
@@ -10,17 +11,17 @@ import { getToken } from '@/lib/auth'
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000'
 
 const STATUS_BADGE: Record<string, string> = {
-  SUBMITTED:        'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-800',
-  IN_REVIEW:        'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-800',
+  SUBMITTED: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-800',
+  IN_REVIEW: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-800',
   WAITING_APPROVAL: 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/30 dark:text-orange-400 dark:border-orange-800',
-  APPROVED:         'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800',
-  REJECTED:         'bg-red-50 text-red-700 border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-800',
-  COMPLETED:        'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800/30 dark:text-slate-400 dark:border-slate-700',
-  CLOSED:           'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800/30 dark:text-slate-400 dark:border-slate-700',
+  APPROVED: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800',
+  REJECTED: 'bg-red-50 text-red-700 border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-800',
+  COMPLETED: 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800/30 dark:text-slate-400 dark:border-slate-700',
+  CLOSED: 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800/30 dark:text-slate-400 dark:border-slate-700',
 }
 
 function fmt(d: string) {
-  if (!d) return '—'
+  if (!d) return '-'
   return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
@@ -44,7 +45,7 @@ export default function AdminInternshipsPage() {
     }
   }, [])
 
-  useEffect(() => { fetchData() }, [fetchData])
+  useEffect(() => { void fetchData() }, [fetchData])
 
   const filtered = useMemo(() => {
     if (!data) return []
@@ -80,6 +81,7 @@ export default function AdminInternshipsPage() {
           <Briefcase className="size-5 text-primary" /> Internship Requests
         </h1>
         <p className="text-sm text-muted-foreground mt-0.5">Manage and track all student internship applications.</p>
+        <p className="text-xs text-muted-foreground mt-1">Open request details from the request number.</p>
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -99,18 +101,9 @@ export default function AdminInternshipsPage() {
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-          <Input
-            placeholder="Search by student, company, advisor..."
-            className="pl-9"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+          <Input placeholder="Search by student, company, advisor..." className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          className="bg-background border border-input rounded-md px-3 h-9 text-sm outline-none focus:ring-2 focus:ring-ring"
-        >
+        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="bg-background border border-input rounded-md px-3 h-9 text-sm outline-none focus:ring-2 focus:ring-ring">
           <option value="all">All Statuses</option>
           {['SUBMITTED', 'IN_REVIEW', 'WAITING_APPROVAL', 'APPROVED', 'REJECTED', 'COMPLETED', 'CLOSED'].map((s) => (
             <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>
@@ -142,11 +135,19 @@ export default function AdminInternshipsPage() {
               <tbody className="divide-y divide-border">
                 {filtered.map((r) => (
                   <tr key={r.id} className="hover:bg-muted/20 transition-colors">
-                    <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{r.request?.requestNo ?? '—'}</td>
-                    <td className="px-4 py-3 font-medium">{r.student?.profile?.fullName ?? '—'}</td>
+                    <td className="px-4 py-3 font-mono text-xs">
+                      {r.request?.id ? (
+                        <Link href={`/admin/requests/${r.request.id}`} className="text-primary hover:underline">
+                          {r.request?.requestNo ?? 'Open'}
+                        </Link>
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 font-medium">{r.student?.profile?.fullName ?? '-'}</td>
                     <td className="px-4 py-3">{r.companyName}</td>
                     <td className="px-4 py-3 text-muted-foreground">{r.internshipType}</td>
-                    <td className="px-4 py-3 text-muted-foreground">{r.advisor?.profile?.fullName ?? '—'}</td>
+                    <td className="px-4 py-3 text-muted-foreground">{r.advisor?.profile?.fullName ?? '-'}</td>
                     <td className="px-4 py-3 text-muted-foreground">{r.durationDays}d</td>
                     <td className="px-4 py-3">
                       <span className={cn('text-xs font-semibold px-2 py-0.5 rounded-full border', STATUS_BADGE[r.request?.status] ?? STATUS_BADGE.SUBMITTED)}>

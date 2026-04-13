@@ -8,6 +8,7 @@ import { Switch } from '@/components/ui/switch'
 import { Button } from '@/components/ui/button'
 import { Loader2, Lock, User, Plus, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
+import { fetchProfile, getStoredUser, getToken } from '@/lib/auth'
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000'
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
@@ -19,9 +20,9 @@ function ProfileField({ label, value, wide = false }: { label: string; value: st
     <div className={`space-y-1.5 ${wide ? 'sm:col-span-2' : ''}`}>
       <Label className="text-xs text-muted-foreground">{label}</Label>
       {label === 'Bio' || label === 'Address' ? (
-        <Textarea value={value || '—'} readOnly className="bg-muted/50 cursor-not-allowed text-muted-foreground resize-none min-h-[70px]" />
+        <Textarea value={value || '-'} readOnly className="bg-muted/50 cursor-not-allowed text-muted-foreground resize-none min-h-[70px]" />
       ) : (
-        <Input value={value || '—'} readOnly className="bg-muted/50 cursor-not-allowed text-muted-foreground" />
+        <Input value={value || '-'} readOnly className="bg-muted/50 cursor-not-allowed text-muted-foreground" />
       )}
     </div>
   )
@@ -38,30 +39,38 @@ export default function FacultySettingsPage() {
 
   useEffect(() => {
     const fetch_ = async () => {
-      const token = localStorage.getItem('access_token')
-      if (!token) return
+      const storedUser = getStoredUser()
+      const token = getToken()
+      if (!storedUser || !token) {
+        setIsLoading(false)
+        return
+      }
+
       const headers = { Authorization: `Bearer ${token}` }
       try {
-        const [profileRes, prefsRes, hoursRes, availRes] = await Promise.all([
-          fetch(`${BACKEND}/auth/profile`, { headers }),
+        const [profile, prefsRes, hoursRes, availRes] = await Promise.all([
+          fetchProfile(),
           fetch(`${BACKEND}/faculty/preferences`, { headers }),
           fetch(`${BACKEND}/faculty/office-hours`, { headers }),
           fetch(`${BACKEND}/availability/me`, { headers }),
         ])
-        if (profileRes.ok) setUser(await profileRes.json())
+        setUser(profile)
         if (prefsRes.ok) setPreferences(await prefsRes.json())
         if (hoursRes.ok) setOfficeHours(await hoursRes.json())
         if (availRes.ok) setAvailability(await availRes.json())
-      } catch { toast.error('Failed to load settings.') }
-      finally { setIsLoading(false) }
+      } catch {
+        toast.error('Failed to load settings.')
+      } finally {
+        setIsLoading(false)
+      }
     }
-    fetch_()
+    void fetch_()
   }, [])
 
   const handlePreferenceChange = async (key: string, checked: boolean) => {
     setPreferences((prev: any) => ({ ...prev, [key]: checked }))
     try {
-      const token = localStorage.getItem('access_token')
+      const token = getToken()
       const res = await fetch(`${BACKEND}/faculty/preferences`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -69,7 +78,10 @@ export default function FacultySettingsPage() {
       })
       if (!res.ok) throw new Error()
       toast.success('Preference updated.')
-    } catch { toast.error('Failed.'); setPreferences((prev: any) => ({ ...prev, [key]: !checked })) }
+    } catch {
+      toast.error('Failed.')
+      setPreferences((prev: any) => ({ ...prev, [key]: !checked }))
+    }
   }
 
   const addSlot = () => setAvailability(prev => [...prev, { dayOfWeek: 1, startTime: '09:00', endTime: '17:00', isActive: true }])
@@ -80,7 +92,7 @@ export default function FacultySettingsPage() {
   const handleSaveAvailability = async () => {
     setIsSavingAvailability(true)
     try {
-      const token = localStorage.getItem('access_token')
+      const token = getToken()
       const res = await fetch(`${BACKEND}/availability/me`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -89,14 +101,17 @@ export default function FacultySettingsPage() {
       if (!res.ok) throw new Error()
       setAvailability(await res.json())
       toast.success('Availability saved.')
-    } catch { toast.error('Could not save availability.') }
-    finally { setIsSavingAvailability(false) }
+    } catch {
+      toast.error('Could not save availability.')
+    } finally {
+      setIsSavingAvailability(false)
+    }
   }
 
   const handleUpdateOfficeHours = async () => {
     setIsSavingHours(true)
     try {
-      const token = localStorage.getItem('access_token')
+      const token = getToken()
       const res = await fetch(`${BACKEND}/faculty/office-hours`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -104,8 +119,11 @@ export default function FacultySettingsPage() {
       })
       if (!res.ok) throw new Error()
       toast.success('Office hours updated.')
-    } catch { toast.error('Could not save office hours.') }
-    finally { setIsSavingHours(false) }
+    } catch {
+      toast.error('Could not save office hours.')
+    } finally {
+      setIsSavingHours(false)
+    }
   }
 
   if (isLoading) return <div className="flex h-[50vh] items-center justify-center"><Loader2 className="size-8 animate-spin text-primary" /></div>
@@ -119,8 +137,6 @@ export default function FacultySettingsPage() {
       </div>
 
       <div className="bg-card border border-border rounded-lg shadow-sm divide-y divide-border">
-
-        {/* Profile — read-only */}
         <div className="p-5 space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold text-foreground flex items-center gap-2"><User className="size-4 text-emerald-600" /> Profile Information</h2>
@@ -136,22 +152,21 @@ export default function FacultySettingsPage() {
             </div>
           )}
           <div className="grid sm:grid-cols-2 gap-4">
-            <ProfileField label="First Name"    value={user.firstName} />
-            <ProfileField label="Last Name"     value={user.lastName} />
-            <ProfileField label="Email"         value={user.email} />
-            <ProfileField label="Phone"         value={user.phoneNumber} />
-            <ProfileField label="Staff Number"  value={user.staffNumber} />
+            <ProfileField label="First Name" value={user.firstName} />
+            <ProfileField label="Last Name" value={user.lastName} />
+            <ProfileField label="Email" value={user.email} />
+            <ProfileField label="Phone" value={user.phoneNumber} />
+            <ProfileField label="Staff Number" value={user.staffNumber} />
             <ProfileField label="Academic Title" value={user.title} />
-            <ProfileField label="Faculty"       value={user.faculty} />
-            <ProfileField label="Department"    value={user.department} />
-            <ProfileField label="Gender"        value={user.gender} />
-            <ProfileField label="Birth Date"    value={user.birthDate} />
-            <ProfileField label="Address"       value={user.address} wide />
-            <ProfileField label="Bio"           value={user.bio} wide />
+            <ProfileField label="Faculty" value={user.faculty} />
+            <ProfileField label="Department" value={user.department} />
+            <ProfileField label="Gender" value={user.gender} />
+            <ProfileField label="Birth Date" value={user.birthDate} />
+            <ProfileField label="Address" value={user.address} wide />
+            <ProfileField label="Bio" value={user.bio} wide />
           </div>
         </div>
 
-        {/* Availability Slots */}
         <div className="p-5 space-y-4">
           <div className="flex items-center justify-between">
             <div>
@@ -185,7 +200,6 @@ export default function FacultySettingsPage() {
           </Button>
         </div>
 
-        {/* Office Hours */}
         <div className="p-5 space-y-4">
           <h2 className="text-sm font-semibold text-foreground">Office Hours</h2>
           <p className="text-xs text-muted-foreground -mt-3">General weekday office hours.</p>
@@ -198,7 +212,6 @@ export default function FacultySettingsPage() {
           </Button>
         </div>
 
-        {/* Notification Preferences */}
         <div className="p-5 space-y-4">
           <h2 className="text-sm font-semibold text-foreground">Notification Preferences</h2>
           <div className="space-y-4">

@@ -26,6 +26,10 @@ import {
 import { toast } from 'sonner'
 import { getToken } from '@/lib/auth'
 import { cn } from '@/lib/utils'
+import {
+  getCurrentDateTimeInputValue,
+  validateDateWindow,
+} from '@/lib/date-time'
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000'
 
@@ -44,6 +48,7 @@ export default function NewReservationPage() {
   const [isLoadingResources, setIsLoadingResources] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [conflicts, setConflicts] = useState<any[]>([])
+  const [dateError, setDateError] = useState<string | null>(null)
 
   const [form, setForm] = useState({
     resourceId: '',
@@ -78,15 +83,38 @@ export default function NewReservationPage() {
   useEffect(() => { void fetchResources() }, [fetchResources])
 
   const selectedResource = resources.find((r) => r.id === form.resourceId)
+  const minDateTime = getCurrentDateTimeInputValue()
 
   const set = (key: string, value: any) => setForm((p) => ({ ...p, [key]: value }))
+
+  const setDateField = (key: 'startAt' | 'endAt', value: string) => {
+    const nextForm = { ...form, [key]: value }
+    const error = validateDateWindow({
+      start: nextForm.startAt,
+      end: nextForm.endAt,
+      type: 'datetime-local',
+      startLabel: 'Baslangic tarihi',
+      endLabel: 'Bitis tarihi',
+    })
+    setForm(nextForm)
+    setDateError(error)
+    if (error) toast.error(error)
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!form.resourceId) { toast.error('Please select a resource.'); return }
     if (!form.startAt || !form.endAt) { toast.error('Please set start and end time.'); return }
-    if (new Date(form.startAt) >= new Date(form.endAt)) {
-      toast.error('End time must be after start time.')
+    const validationError = validateDateWindow({
+      start: form.startAt,
+      end: form.endAt,
+      type: 'datetime-local',
+      startLabel: 'Baslangic tarihi',
+      endLabel: 'Bitis tarihi',
+    })
+    if (validationError) {
+      setDateError(validationError)
+      toast.error(validationError)
       return
     }
 
@@ -237,8 +265,9 @@ export default function NewReservationPage() {
               id="startAt"
               type="datetime-local"
               required
+              min={minDateTime}
               value={form.startAt}
-              onChange={(e) => set('startAt', e.target.value)}
+              onChange={(e) => setDateField('startAt', e.target.value)}
             />
           </div>
           <div className="space-y-1.5">
@@ -247,11 +276,13 @@ export default function NewReservationPage() {
               id="endAt"
               type="datetime-local"
               required
+              min={form.startAt || minDateTime}
               value={form.endAt}
-              onChange={(e) => set('endAt', e.target.value)}
+              onChange={(e) => setDateField('endAt', e.target.value)}
             />
           </div>
         </div>
+        {dateError && <p className="text-sm text-destructive">{dateError}</p>}
 
         {/* Purpose */}
         <div className="space-y-1.5">

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback, useMemo } from 'react'
+import Link from 'next/link'
 import { CalendarDays, Search, Loader2, Clock } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
@@ -8,6 +9,7 @@ import { cn } from '@/lib/utils'
 
 interface Appointment {
   id: string
+  requestId?: string | null
   hostName: string
   requesterName: string
   scheduledAt: string
@@ -27,14 +29,14 @@ const STATUS_BADGE: Record<string, string> = {
 }
 
 function formatDateTime(d: string) {
-  if (!d) return '—'
+  if (!d) return '-'
   return new Date(d).toLocaleString('en-US', {
     month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit',
   })
 }
 
 function formatDate(d: string) {
-  if (!d) return '—'
+  if (!d) return '-'
   return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
@@ -62,7 +64,7 @@ export default function AdminAppointmentsPage() {
     }
   }, [])
 
-  useEffect(() => { fetchAppointments() }, [fetchAppointments])
+  useEffect(() => { void fetchAppointments() }, [fetchAppointments])
 
   const filtered = useMemo(() => {
     return appointments.filter(a => {
@@ -92,10 +94,10 @@ export default function AdminAppointmentsPage() {
     <div className="p-6 space-y-6 max-w-6xl mx-auto pb-20">
       <div>
         <h1 className="text-xl font-bold text-foreground">Appointments</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">All appointments across the platform — read-only overview.</p>
+        <p className="text-sm text-muted-foreground mt-0.5">All appointments across the platform.</p>
+        <p className="text-xs text-muted-foreground mt-1">Use the request link to open the unified admin request detail.</p>
       </div>
 
-      {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3 flex-wrap">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
@@ -126,12 +128,12 @@ export default function AdminAppointmentsPage() {
 
       <p className="text-xs text-muted-foreground font-medium">{filtered.length} appointments</p>
 
-      {/* Table */}
       <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border bg-muted/40">
+                <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Request</th>
                 <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Host</th>
                 <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden sm:table-cell">Requester</th>
                 <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden md:table-cell">Scheduled</th>
@@ -143,6 +145,15 @@ export default function AdminAppointmentsPage() {
             <tbody className="divide-y divide-border">
               {filtered.map(a => (
                 <tr key={a.id} className="hover:bg-muted/20 transition-colors">
+                  <td className="px-5 py-3.5">
+                    {a.requestId ? (
+                      <Link href={`/admin/requests/${a.requestId}`} className="text-xs font-mono text-primary hover:underline">
+                        Open request
+                      </Link>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">-</span>
+                    )}
+                  </td>
                   <td className="px-5 py-3.5">
                     <div className="flex items-center gap-2">
                       <div className="size-7 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-bold text-primary border border-primary/20">
@@ -167,13 +178,13 @@ export default function AdminAppointmentsPage() {
                   <td className="px-5 py-3.5">
                     <span className={cn(
                       'text-xs font-semibold px-2.5 py-1 rounded-full border',
-                      STATUS_BADGE[a.status?.toUpperCase()] ?? STATUS_BADGE.PENDING
+                      STATUS_BADGE[a.status?.toUpperCase()] ?? STATUS_BADGE.PENDING,
                     )}>
                       {a.status}
                     </span>
                   </td>
                   <td className="px-5 py-3.5 hidden lg:table-cell max-w-[180px]">
-                    <p className="text-xs text-muted-foreground truncate">{a.notes || '—'}</p>
+                    <p className="text-xs text-muted-foreground truncate">{a.notes || '-'}</p>
                   </td>
                   <td className="px-5 py-3.5 hidden xl:table-cell text-xs text-muted-foreground">
                     {formatDate(a.createdAt)}

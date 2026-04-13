@@ -16,9 +16,10 @@ import { toast } from 'sonner'
 import { getToken } from '@/lib/auth'
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000'
+const TERMINAL = ['APPROVED', 'REJECTED', 'CANCELLED', 'COMPLETED', 'ISSUED']
 
 function fmt(d: any) {
-  if (!d) return '—'
+  if (!d) return '-'
   return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
@@ -26,12 +27,10 @@ function InfoRow({ label, value }: { label: string; value?: string | null }) {
   return (
     <div>
       <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-0.5">{label}</p>
-      <p className="text-sm text-foreground">{value || '—'}</p>
+      <p className="text-sm text-foreground">{value || '-'}</p>
     </div>
   )
 }
-
-const TERMINAL = ['APPROVED', 'REJECTED', 'CANCELLED', 'COMPLETED', 'ISSUED']
 
 export default function FacultyDocumentDetailPage() {
   const { id } = useParams() as { id: string }
@@ -44,32 +43,44 @@ export default function FacultyDocumentDetailPage() {
 
   useEffect(() => {
     if (!id) return
-    fetch(`${BACKEND}/document-requests/${id}`, { headers: { Authorization: `Bearer ${getToken()}` } })
-      .then((r) => r.ok ? r.json() : null)
+    fetch(`${BACKEND}/faculty/requests/${id}`, { headers: { Authorization: `Bearer ${getToken()}` } })
+      .then((r) => (r.ok ? r.json() : null))
       .then(setData)
       .catch(() => {})
       .finally(() => setIsLoading(false))
   }, [id])
 
-  const handleProcess = async (newStatus: 'APPROVED' | 'REJECTED') => {
-    if (newStatus === 'REJECTED' && !rejectReason.trim()) { toast.error('Rejection reason required.'); return }
+  const handleProcess = async (action: 'approve' | 'reject') => {
+    if (action === 'reject' && !rejectReason.trim()) {
+      toast.error('Rejection reason required.')
+      return
+    }
     setIsProcessing(true)
     try {
-      const res = await fetch(`${BACKEND}/document-requests/${id}/status`, {
-        method: 'PATCH',
+      const res = await fetch(`${BACKEND}/faculty/requests/${id}/action`, {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
-        body: JSON.stringify({ status: newStatus, note: newStatus === 'REJECTED' ? rejectReason.trim() : note.trim() || undefined }),
+        body: JSON.stringify({
+          action,
+          comment: action === 'reject' ? rejectReason.trim() : note.trim() || undefined,
+        }),
       })
       if (res.ok) {
-        toast.success(newStatus === 'APPROVED' ? 'Document request approved.' : 'Document request rejected.')
-        setData((prev: any) => ({ ...prev, status: newStatus }))
+        toast.success(action === 'approve' ? 'Document request approved.' : 'Document request rejected.')
+        setData((prev: any) => ({
+          ...prev,
+          status: action === 'approve' ? 'APPROVED' : 'REJECTED',
+        }))
         setShowReject(false)
       } else {
         const err = await res.json().catch(() => ({})) as { message?: string }
         toast.error(err.message ?? 'Failed.')
       }
-    } catch { toast.error('Network error.') }
-    finally { setIsProcessing(false) }
+    } catch {
+      toast.error('Network error.')
+    } finally {
+      setIsProcessing(false)
+    }
   }
 
   if (isLoading) return <div className="flex h-[80vh] items-center justify-center"><Loader2 className="size-8 animate-spin text-primary" /></div>
@@ -82,6 +93,7 @@ export default function FacultyDocumentDetailPage() {
   )
 
   const canAct = !TERMINAL.includes(data.status)
+  const documentData = data.formData ?? {}
 
   return (
     <div className="p-6 space-y-5 max-w-4xl mx-auto pb-20">
@@ -93,7 +105,7 @@ export default function FacultyDocumentDetailPage() {
             <FileText className="size-5 text-blue-700 dark:text-blue-300" />
           </div>
           <div>
-            <h1 className="text-lg font-bold">{data.title || data.documentType}</h1>
+            <h1 className="text-lg font-bold">{data.title || documentData.documentType}</h1>
             <p className="text-xs text-muted-foreground mt-0.5">{data.requestNo} · Submitted {fmt(data.createdAt)}</p>
           </div>
         </div>
@@ -120,12 +132,11 @@ export default function FacultyDocumentDetailPage() {
           <div className="bg-card border border-border rounded-lg p-5 space-y-4">
             <p className="text-sm font-semibold">Document Details</p>
             <div className="grid grid-cols-2 gap-4">
-              <InfoRow label="Document Type" value={data.documentType} />
-              <InfoRow label="Language" value={data.language} />
-              <InfoRow label="Copies" value={data.copiesCount?.toString()} />
-              <InfoRow label="Delivery Method" value={data.deliveryMethod} />
-              {data.deliveryAddress && <InfoRow label="Delivery Address" value={data.deliveryAddress} />}
-              {data.issuedAt && <InfoRow label="Issued At" value={fmt(data.issuedAt)} />}
+              <InfoRow label="Document Type" value={documentData.documentType} />
+              <InfoRow label="Language" value={documentData.language} />
+              <InfoRow label="Copies" value={documentData.copiesCount?.toString()} />
+              <InfoRow label="Delivery Method" value={documentData.deliveryMethod} />
+              {documentData.deliveryAddress && <InfoRow label="Delivery Address" value={documentData.deliveryAddress} />}
             </div>
           </div>
 
@@ -136,10 +147,10 @@ export default function FacultyDocumentDetailPage() {
             </div>
           )}
 
-          {data.statusHistory?.length > 0 && (
+          {data.timeline?.length > 0 && (
             <div className="bg-card border border-border rounded-lg p-5">
               <p className="text-sm font-semibold mb-4">Status History</p>
-              <RequestTimeline events={data.statusHistory} />
+              <RequestTimeline events={data.timeline} />
             </div>
           )}
         </div>
@@ -154,7 +165,7 @@ export default function FacultyDocumentDetailPage() {
                   <Textarea className="resize-none min-h-[80px]" placeholder="Add a processing note..." value={note} onChange={(e) => setNote(e.target.value)} disabled={isProcessing} />
                 </div>
                 <div className="flex gap-3">
-                  <Button className="flex-1 gap-2 bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => handleProcess('APPROVED')} disabled={isProcessing}>
+                  <Button className="flex-1 gap-2 bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => handleProcess('approve')} disabled={isProcessing}>
                     {isProcessing ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />} Approve
                   </Button>
                   <Button variant="outline" className="flex-1 gap-2 border-destructive text-destructive hover:bg-destructive/10" onClick={() => setShowReject(true)} disabled={isProcessing}>
@@ -170,7 +181,7 @@ export default function FacultyDocumentDetailPage() {
                   <Textarea className="resize-none min-h-[80px]" placeholder="Explain why..." value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} disabled={isProcessing} />
                 </div>
                 <div className="flex gap-3">
-                  <Button className="flex-1 gap-2 bg-destructive hover:bg-destructive/90 text-white" onClick={() => handleProcess('REJECTED')} disabled={isProcessing}>
+                  <Button className="flex-1 gap-2 bg-destructive hover:bg-destructive/90 text-white" onClick={() => handleProcess('reject')} disabled={isProcessing}>
                     {isProcessing ? <Loader2 className="size-4 animate-spin" /> : <XCircle className="size-4" />} Confirm
                   </Button>
                   <Button variant="outline" onClick={() => setShowReject(false)} disabled={isProcessing}>Cancel</Button>

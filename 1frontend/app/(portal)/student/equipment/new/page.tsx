@@ -10,6 +10,10 @@ import { ArrowLeft, Loader2, Package, Info } from 'lucide-react'
 import { toast } from 'sonner'
 import { getToken } from '@/lib/auth'
 import { cn } from '@/lib/utils'
+import {
+  getCurrentDateInputValue,
+  validateDateWindow,
+} from '@/lib/date-time'
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000'
 
@@ -28,6 +32,8 @@ export default function NewStudentEquipmentPage() {
   const [resources, setResources] = useState<any[]>([])
   const [isLoadingResources, setIsLoadingResources] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [dateError, setDateError] = useState<string | null>(null)
+  const minDate = getCurrentDateInputValue()
 
   const [form, setForm] = useState({
     labResourceId: '',       // seçilen ekipman resource ID'si
@@ -58,6 +64,19 @@ export default function NewStudentEquipmentPage() {
   const selectedResource = resources.find((r) => r.id === form.labResourceId)
 
   const set = (k: string, v: any) => setForm((p) => ({ ...p, [k]: v }))
+  const setDateField = (key: 'neededFrom' | 'neededUntil', value: string) => {
+    const nextForm = { ...form, [key]: value }
+    const error = validateDateWindow({
+      start: nextForm.neededFrom,
+      end: nextForm.neededUntil,
+      type: 'date',
+      startLabel: 'Baslangic tarihi',
+      endLabel: 'Bitis tarihi',
+    })
+    setForm(nextForm)
+    setDateError(error)
+    if (error) toast.error(error)
+  }
 
   // Resource seçince adı ve kategoriyi otomatik doldur
   const handleResourceSelect = (resourceId: string) => {
@@ -84,8 +103,16 @@ export default function NewStudentEquipmentPage() {
 
     if (!equipmentName) { toast.error('Please select or specify an equipment item.'); return }
     if (!form.purpose.trim()) { toast.error('Purpose is required.'); return }
-    if (form.neededFrom && form.neededUntil && new Date(form.neededFrom) >= new Date(form.neededUntil)) {
-      toast.error('Return date must be after pickup date.')
+    const validationError = validateDateWindow({
+      start: form.neededFrom,
+      end: form.neededUntil,
+      type: 'date',
+      startLabel: 'Baslangic tarihi',
+      endLabel: 'Bitis tarihi',
+    })
+    if (validationError) {
+      setDateError(validationError)
+      toast.error(validationError)
       return
     }
 
@@ -208,13 +235,14 @@ export default function NewStudentEquipmentPage() {
         <div className="grid sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">
             <Label>Needed From (optional)</Label>
-            <Input type="date" value={form.neededFrom} onChange={(e) => set('neededFrom', e.target.value)} />
+            <Input type="date" min={minDate} value={form.neededFrom} onChange={(e) => setDateField('neededFrom', e.target.value)} />
           </div>
           <div className="space-y-1.5">
             <Label>Return By (optional)</Label>
-            <Input type="date" value={form.neededUntil} onChange={(e) => set('neededUntil', e.target.value)} />
+            <Input type="date" min={form.neededFrom || minDate} value={form.neededUntil} onChange={(e) => setDateField('neededUntil', e.target.value)} />
           </div>
         </div>
+        {dateError && <p className="text-sm text-destructive">{dateError}</p>}
 
         <div className="space-y-1.5">
           <Label>Purpose <span className="text-destructive">*</span></Label>

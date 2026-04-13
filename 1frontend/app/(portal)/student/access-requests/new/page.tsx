@@ -8,12 +8,18 @@ import { Label } from '@/components/ui/label'
 import { Loader2, ShieldCheck } from 'lucide-react'
 import { toast } from 'sonner'
 import { getToken } from '@/lib/auth'
+import {
+  getCurrentDateInputValue,
+  validateDateWindow,
+} from '@/lib/date-time'
 
 const ACCESS_TYPES = ['System / Portal', 'Lab Access', 'Network Resource', 'Software License', 'Campus Area', 'Other']
 
 export default function NewStudentAccessRequestPage() {
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [dateError, setDateError] = useState<string | null>(null)
+  const minDate = getCurrentDateInputValue()
   const [form, setForm] = useState({
     accessType: 'System / Portal',
     targetResource: '',
@@ -24,11 +30,36 @@ export default function NewStudentAccessRequestPage() {
   })
 
   const set = (k: string, v: string) => setForm((p) => ({ ...p, [k]: v }))
+  const setDateField = (key: 'startAt' | 'endAt', value: string) => {
+    const nextForm = { ...form, [key]: value }
+    const error = validateDateWindow({
+      start: nextForm.startAt,
+      end: nextForm.endAt,
+      type: 'date',
+      startLabel: 'Baslangic tarihi',
+      endLabel: 'Bitis tarihi',
+    })
+    setForm(nextForm)
+    setDateError(error)
+    if (error) toast.error(error)
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!form.targetResource.trim() || !form.justification.trim()) {
       toast.error('Target resource and justification are required.')
+      return
+    }
+    const validationError = validateDateWindow({
+      start: form.startAt,
+      end: form.endAt,
+      type: 'date',
+      startLabel: 'Baslangic tarihi',
+      endLabel: 'Bitis tarihi',
+    })
+    if (validationError) {
+      setDateError(validationError)
+      toast.error(validationError)
       return
     }
     setIsSubmitting(true)
@@ -84,13 +115,14 @@ export default function NewStudentAccessRequestPage() {
         <div className="grid sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">
             <Label>Access Start Date (optional)</Label>
-            <Input type="date" value={form.startAt} onChange={(e) => set('startAt', e.target.value)} />
+            <Input type="date" min={minDate} value={form.startAt} onChange={(e) => setDateField('startAt', e.target.value)} />
           </div>
           <div className="space-y-1.5">
             <Label>Access End Date (optional)</Label>
-            <Input type="date" value={form.endAt} onChange={(e) => set('endAt', e.target.value)} />
+            <Input type="date" min={form.startAt || minDate} value={form.endAt} onChange={(e) => setDateField('endAt', e.target.value)} />
           </div>
         </div>
+        {dateError && <p className="text-sm text-destructive">{dateError}</p>}
 
         <div className="space-y-1.5">
           <Label>Justification <span className="text-destructive">*</span></Label>

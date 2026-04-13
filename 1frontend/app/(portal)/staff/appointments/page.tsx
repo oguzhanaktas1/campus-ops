@@ -34,7 +34,7 @@ export default function StaffAppointmentsPage() {
 
   const fetchAppointments = useCallback(async () => {
     try {
-      const res = await fetch(`${BACKEND}/appointment-requests`, {
+      const res = await fetch(`${BACKEND}/appointment-requests/incoming`, {
         headers: { Authorization: `Bearer ${getToken()}` },
       })
       if (res.ok) setAppointments(await res.json())

@@ -24,25 +24,24 @@ import {
   CalendarDays,
 } from "lucide-react";
 import AuthGuard from "@/components/AuthGuard/auth-guard";
+import { fetchProfile, getStoredUser } from "@/lib/auth";
 
 const navItems: NavItem[] = [
-  { label: "Dashboard",        href: "/staff/dashboard",       icon: LayoutDashboard },
-  { label: "Inbox",            href: "/staff/inbox",           icon: Inbox },
-  // ── Domain Modules ────────────────────────────────────────────
-  { label: "IT Tickets",       href: "/staff/tickets",         icon: Ticket },
-  { label: "Equipment",        href: "/staff/equipment",       icon: Package },
-  { label: "Reservations",     href: "/staff/reservations",    icon: BookMarked },
-  { label: "Documents",        href: "/staff/documents",       icon: Files },
-  { label: "Procurement",      href: "/staff/procurement",     icon: ShoppingCart },
-  { label: "Events",           href: "/staff/events",          icon: PartyPopper },
-  { label: "Internships",      href: "/staff/internships",     icon: Briefcase },
-  { label: "Appointments",     href: "/staff/appointments",    icon: CalendarDays },
-  { label: "Access Requests",  href: "/staff/access-requests", icon: ShieldCheck },
-  // ── Personal ──────────────────────────────────────────────────
-  { label: "Reports",          href: "/staff/reports",         icon: BarChart3 },
-  { label: "Calendar",         href: "/staff/calendar",        icon: Calendar },
-  { label: "Notifications",    href: "/staff/notifications",   icon: Bell },
-  { label: "Settings",         href: "/staff/settings",        icon: Settings },
+  { label: "Dashboard", href: "/staff/dashboard", icon: LayoutDashboard },
+  { label: "Inbox", href: "/staff/inbox", icon: Inbox },
+  { label: "IT Tickets", href: "/staff/tickets", icon: Ticket },
+  { label: "Equipment", href: "/staff/equipment", icon: Package },
+  { label: "Reservations", href: "/staff/reservations", icon: BookMarked },
+  { label: "Documents", href: "/staff/documents", icon: Files },
+  { label: "Procurement", href: "/staff/procurement", icon: ShoppingCart },
+  { label: "Events", href: "/staff/events", icon: PartyPopper },
+  { label: "Internships", href: "/staff/internships", icon: Briefcase },
+  { label: "Appointments", href: "/staff/appointments", icon: CalendarDays },
+  { label: "Access Requests", href: "/staff/access-requests", icon: ShieldCheck },
+  { label: "Reports", href: "/staff/reports", icon: BarChart3 },
+  { label: "Calendar", href: "/staff/calendar", icon: Calendar },
+  { label: "Notifications", href: "/staff/notifications", icon: Bell },
+  { label: "Settings", href: "/staff/settings", icon: Settings },
 ];
 
 export default function StaffLayout({
@@ -55,32 +54,23 @@ export default function StaffLayout({
 
   useEffect(() => {
     const fetchUserProfile = async () => {
-      const token = localStorage.getItem("access_token");
-      if (!token) {
+      const storedUser = getStoredUser();
+      if (!storedUser) {
         setIsLoading(false);
         return;
       }
 
       try {
-        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
-        const res = await fetch(`${backendUrl}/auth/profile`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-
-        if (res.ok) {
-          const data = await res.json();
-          setUser(data);
-        }
+        const data = await fetchProfile();
+        setUser(data);
       } catch (error) {
-        console.error("Profil çekilirken hata oluştu:", error);
+        console.error("Profile fetch failed:", error);
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchUserProfile();
+    void fetchUserProfile();
   }, []);
 
   if (isLoading) {
