@@ -60,26 +60,6 @@ services:
     ports:
       - "5000:5000"
 
-  backend-seed:
-    build:
-      context: ./2backend
-      dockerfile: Dockerfile
-      target: seedrunner
-    container_name: campusops-backend-seed
-    restart: "no"
-    profiles:
-      - seed
-    env_file:
-      - ./2backend/.env
-    depends_on:
-      postgres:
-        condition: service_healthy
-    environment:
-      NODE_ENV: development
-      RUN_MIGRATIONS: "true"
-      REDIS_URL: ""
-    command: ["sh", "-c", "npx prisma migrate deploy && npm run seed"]
-
   frontend:
     build:
       context: ./1frontend

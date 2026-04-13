@@ -3,6 +3,7 @@ import {
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../core/prisma/prisma.service';
 import { CreateWorkflowDto } from './dto/create-workflow.dto';
 import { CreateWorkflowStepDto } from './dto/create-workflow-step.dto';
@@ -543,6 +544,9 @@ export class WorkflowService {
         fromStepId: dto.fromStepId,
         toStepId: dto.toStepId ?? null,
         actionType: dto.actionType,
+        ...(dto.conditionJson !== undefined
+          ? { conditionJson: dto.conditionJson as Prisma.InputJsonValue }
+          : {}),
       },
     });
   }

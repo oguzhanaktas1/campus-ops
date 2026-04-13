@@ -11,6 +11,7 @@ import { WorkflowEngineService } from '../workflow/workflow-engine.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import {
   AppointmentStatus,
+  Prisma,
   PriorityLevel,
   RequestStatus,
 } from '@prisma/client';
@@ -23,6 +24,16 @@ function makeRequestNo(): string {
   return `APT-${ymd}-${Math.floor(Math.random() * 9000) + 1000}`;
 }
 
+type CalendarMetadata = {
+  requiresManagerApproval: boolean;
+  managerUserId: string | null;
+  targetUserId: string | null;
+  availabilityValidated: boolean;
+  hasConflict: boolean;
+  hostConflictCount: number;
+  requesterConflictCount: number;
+};
+
 @Injectable()
 export class AppointmentsService {
   constructor(
@@ -30,8 +41,6 @@ export class AppointmentsService {
     private workflowEngine: WorkflowEngineService,
     private notificationsService: NotificationsService,
   ) {}
-
-  // ── HELPERS ────────────────────────────────────────────────────────────────
 
   private async getOrCreateRequestType() {
     let rt = await this.prisma.requestType.findUnique({
@@ -51,8 +60,124 @@ export class AppointmentsService {
     return rt;
   }
 
+  private buildRequestMetadata(input: CalendarMetadata) {
+    return {
+      calendar: {
+        requiresManagerApproval: input.requiresManagerApproval,
+        managerUserId: input.managerUserId,
+        targetUserId: input.targetUserId,
+        availabilityValidated: input.availabilityValidated,
+        hasConflict: input.hasConflict,
+        hostConflictCount: input.hostConflictCount,
+        requesterConflictCount: input.requesterConflictCount,
+      },
+    };
+  }
+
+  private extractCalendarMetadata(
+    value: Prisma.JsonValue | null | undefined,
+  ): CalendarMetadata {
+    const raw =
+      value && typeof value === 'object' && !Array.isArray(value)
+        ? (value as Record<string, unknown>)
+        : {};
+    const calendar =
+      raw.calendar && typeof raw.calendar === 'object' && !Array.isArray(raw.calendar)
+        ? (raw.calendar as Record<string, unknown>)
+        : {};
+
+    return {
+      requiresManagerApproval: calendar.requiresManagerApproval === true,
+      managerUserId:
+        typeof calendar.managerUserId === 'string'
+          ? calendar.managerUserId
+          : null,
+      targetUserId:
+        typeof calendar.targetUserId === 'string'
+          ? calendar.targetUserId
+          : null,
+      availabilityValidated: calendar.availabilityValidated === true,
+      hasConflict: calendar.hasConflict === true,
+      hostConflictCount:
+        typeof calendar.hostConflictCount === 'number'
+          ? calendar.hostConflictCount
+          : 0,
+      requesterConflictCount:
+        typeof calendar.requesterConflictCount === 'number'
+          ? calendar.requesterConflictCount
+          : 0,
+    };
+  }
+
+  private async validateAgainstAvailability(
+    userId: string,
+    startAt: Date | null,
+    endAt: Date | null,
+  ) {
+    if (!startAt || !endAt) {
+      return false;
+    }
+
+    const dayOfWeek = startAt.getUTCDay();
+    const slotStart = `${String(startAt.getUTCHours()).padStart(2, '0')}:${String(
+      startAt.getUTCMinutes(),
+    ).padStart(2, '0')}`;
+    const slotEnd = `${String(endAt.getUTCHours()).padStart(2, '0')}:${String(
+      endAt.getUTCMinutes(),
+    ).padStart(2, '0')}`;
+
+    const availability = await this.prisma.userAvailabilitySlot.findFirst({
+      where: {
+        userId,
+        dayOfWeek,
+        isActive: true,
+        startTime: { lte: slotStart },
+        endTime: { gte: slotEnd },
+      },
+    });
+
+    if (!availability) {
+      throw new BadRequestException(
+        'Selected time is outside the host availability window.',
+      );
+    }
+
+    return true;
+  }
+
+  private async findConflictingAppointments(
+    userId: string,
+    startAt: Date | null,
+    endAt: Date | null,
+    excludeAppointmentId?: string | null,
+  ) {
+    if (!startAt || !endAt) {
+      return [];
+    }
+
+    return this.prisma.appointment.findMany({
+      where: {
+        OR: [{ requesterUserId: userId }, { hostUserId: userId }],
+        status: {
+          in: [AppointmentStatus.REQUESTED, AppointmentStatus.CONFIRMED],
+        },
+        startAt: { lt: endAt },
+        endAt: { gt: startAt },
+        ...(excludeAppointmentId ? { id: { not: excludeAppointmentId } } : {}),
+      },
+      select: {
+        id: true,
+        title: true,
+        startAt: true,
+        endAt: true,
+        status: true,
+      },
+    });
+  }
+
   private toListItem(ar: any) {
     const req = ar.request;
+    const metadata = this.extractCalendarMetadata(req.dynamicData);
     const durationMin =
       ar.preferredStartAt && ar.preferredEndAt
         ? Math.round(
@@ -61,6 +186,7 @@ export class AppointmentsService {
               60000,
           )
         : null;
+
     return {
       id: req.id,
       appointmentRequestId: ar.id,
@@ -84,11 +210,14 @@ export class AppointmentsService {
         avatarUrl: ar.targetUser.profile?.avatarUrl ?? null,
       },
       actualAppointmentId: ar.actualAppointmentId ?? null,
+      requiresManagerApproval: metadata.requiresManagerApproval,
+      availabilityValidated: metadata.availabilityValidated,
+      hasCalendarConflict: metadata.hasConflict,
+      hostConflictCount: metadata.hostConflictCount,
+      requesterConflictCount: metadata.requesterConflictCount,
       createdAt: ar.createdAt,
     };
   }
-
-  // ── FACULTY/STAFF LIST FOR FORM ────────────────────────────────────────────
 
   async getFacultyUsers() {
     const users = await this.prisma.user.findMany({
@@ -113,8 +242,6 @@ export class AppointmentsService {
     }));
   }
 
-  // ── CREATE REQUEST ─────────────────────────────────────────────────────────
-
   async create(
     userId: string,
     dto: {
@@ -129,10 +256,15 @@ export class AppointmentsService {
   ) {
     const target = await this.prisma.user.findUnique({
       where: { id: dto.targetUserId },
+      include: {
+        profile: { select: { unitId: true } },
+        primaryRoles: { include: { role: { select: { name: true } } } },
+      },
     });
     if (!target) throw new NotFoundException('Target user not found.');
-    if (dto.targetUserId === userId)
+    if (dto.targetUserId === userId) {
       throw new BadRequestException('Cannot book appointment with yourself.');
+    }
 
     const preferredStartAt = dto.preferredStartAt
       ? new Date(dto.preferredStartAt)
@@ -149,6 +281,47 @@ export class AppointmentsService {
         'preferredStartAt must be before preferredEndAt.',
       );
     }
+
+    const availabilityValidated = await this.validateAgainstAvailability(
+      dto.targetUserId,
+      preferredStartAt,
+      preferredEndAt,
+    );
+    const hostConflicts = await this.findConflictingAppointments(
+      dto.targetUserId,
+      preferredStartAt,
+      preferredEndAt,
+    );
+    const requesterConflicts = await this.findConflictingAppointments(
+      userId,
+      preferredStartAt,
+      preferredEndAt,
+    );
+    if (hostConflicts.length > 0 || requesterConflicts.length > 0) {
+      throw new BadRequestException(
+        'Selected time conflicts with an existing appointment.',
+      );
+    }
+
+    const requestedDurationMin =
+      preferredStartAt && preferredEndAt
+        ? Math.round(
+            (preferredEndAt.getTime() - preferredStartAt.getTime()) / 60000,
+          )
+        : 0;
+    const targetRoleNames = target.primaryRoles.map((role) => role.role.name);
+    const managerUserId = target.profile?.unitId
+      ? (
+          await this.prisma.unit.findUnique({
+            where: { id: target.profile.unitId },
+            select: { managerUserId: true },
+          })
+        )?.managerUserId ?? null
+      : null;
+    const requiresManagerApproval =
+      requestedDurationMin > 60 ||
+      targetRoleNames.includes('STAFF') ||
+      dto.appointmentType === 'CONSULTATION';
 
     const reqType = await this.getOrCreateRequestType();
     let requestNo = makeRequestNo();
@@ -169,6 +342,15 @@ export class AppointmentsService {
           priority: dto.priority ?? PriorityLevel.MEDIUM,
           status: initialStatus,
           submittedAt: new Date(),
+          dynamicData: this.buildRequestMetadata({
+            requiresManagerApproval,
+            managerUserId,
+            targetUserId: dto.targetUserId,
+            availabilityValidated,
+            hasConflict: false,
+            hostConflictCount: hostConflicts.length,
+            requesterConflictCount: requesterConflicts.length,
+          }),
         },
       });
 
@@ -195,7 +377,6 @@ export class AppointmentsService {
         },
       });
 
-      // Bootstrap workflow if defined
       const wfDefId = reqType.workflowDefinitionId;
       if (wfDefId) {
         const wfStatus = await this.workflowEngine.bootstrapInstance(
@@ -220,26 +401,46 @@ export class AppointmentsService {
         }
       }
 
-      return { requestId: req.id, requestNo: req.requestNo };
+      return {
+        requestId: req.id,
+        requestNo: req.requestNo,
+        requiresManagerApproval,
+        availabilityValidated,
+      };
     });
 
     void this.notificationsService.createNotification({
       userId: dto.targetUserId,
       title: 'New Appointment Request',
-      message: `${dto.topic} — appointment requested.`,
+      message: `${dto.topic} - appointment requested.`,
+      requestId: result.requestId,
       actionUrl: '/faculty/appointments',
     });
+    if (requiresManagerApproval && managerUserId && managerUserId !== dto.targetUserId) {
+      void this.notificationsService.createNotification({
+        userId: managerUserId,
+        title: 'Appointment Requires Manager Review',
+        message: `${dto.topic} was submitted with manager-review flag.`,
+        requestId: result.requestId,
+        actionUrl: '/staff/appointments',
+      });
+    }
+
     return result;
   }
-
-  // ── MY REQUESTS (as requester) ─────────────────────────────────────────────
 
   async findMy(userId: string) {
     const records = await this.prisma.appointmentRequest.findMany({
       where: { requesterUserId: userId },
       include: {
         request: {
-          select: { id: true, requestNo: true, status: true, priority: true },
+          select: {
+            id: true,
+            requestNo: true,
+            status: true,
+            priority: true,
+            dynamicData: true,
+          },
         },
         requester: {
           include: {
@@ -258,15 +459,19 @@ export class AppointmentsService {
     });
     return records.map((r) => this.toListItem(r));
   }
-
-  // ── INCOMING (as target) ───────────────────────────────────────────────────
 
   async findIncoming(userId: string) {
     const records = await this.prisma.appointmentRequest.findMany({
       where: { targetUserId: userId },
       include: {
         request: {
-          select: { id: true, requestNo: true, status: true, priority: true },
+          select: {
+            id: true,
+            requestNo: true,
+            status: true,
+            priority: true,
+            dynamicData: true,
+          },
         },
         requester: {
           include: {
@@ -285,8 +490,6 @@ export class AppointmentsService {
     });
     return records.map((r) => this.toListItem(r));
   }
-
-  // ── DETAIL ─────────────────────────────────────────────────────────────────
 
   async findById(userId: string, roles: string[], requestId: string) {
     const ar = await this.prisma.appointmentRequest.findFirst({
@@ -353,6 +556,7 @@ export class AppointmentsService {
           (ar.targetUser as any).email,
       },
       actualAppointment: ar.actualAppointment ?? null,
+      calendar: this.extractCalendarMetadata(req.dynamicData),
       statusHistory: req.statusHistory.map((h: any) => ({
         id: h.id,
         status: h.newStatus,
@@ -367,8 +571,6 @@ export class AppointmentsService {
       })),
     };
   }
-
-  // ── CONFIRM ────────────────────────────────────────────────────────────────
 
   async confirm(
     userId: string,
@@ -385,8 +587,9 @@ export class AppointmentsService {
       where: { requestId },
     });
     if (!ar) throw new NotFoundException('Appointment request not found.');
-    if (ar.targetUserId !== userId)
+    if (ar.targetUserId !== userId) {
       throw new ForbiddenException('Only the target user can confirm.');
+    }
 
     const startAt = dto.confirmedStartAt
       ? new Date(dto.confirmedStartAt)
@@ -395,6 +598,10 @@ export class AppointmentsService {
       ? new Date(dto.confirmedEndAt)
       : (ar.preferredEndAt ?? new Date(startAt.getTime() + 60 * 60 * 1000));
 
+    if (startAt >= endAt) {
+      throw new BadRequestException('confirmedStartAt must be before confirmedEndAt.');
+    }
+
     const prevReq = await this.prisma.request.findUnique({
       where: { id: requestId },
     });
@@ -402,11 +609,31 @@ export class AppointmentsService {
       throw new BadRequestException('Already confirmed.');
     }
 
+    await this.validateAgainstAvailability(userId, startAt, endAt);
+    const hostConflicts = await this.findConflictingAppointments(
+      userId,
+      startAt,
+      endAt,
+      ar.actualAppointmentId,
+    );
+    const requesterConflicts = await this.findConflictingAppointments(
+      ar.requesterUserId,
+      startAt,
+      endAt,
+      ar.actualAppointmentId,
+    );
+    if (hostConflicts.length > 0 || requesterConflicts.length > 0) {
+      throw new BadRequestException(
+        'Confirmed time conflicts with an existing appointment.',
+      );
+    }
+
     await this.workflowEngine.processAction(userId, roles, requestId, {
       action: 'approve',
       comment: dto.note?.trim() || undefined,
     });
 
+    const previousMetadata = this.extractCalendarMetadata(prevReq?.dynamicData);
     const confirmResult = await this.prisma.$transaction(async (tx) => {
       const appointment = await tx.appointment.create({
         data: {
@@ -427,13 +654,29 @@ export class AppointmentsService {
         data: { actualAppointmentId: appointment.id },
       });
 
+      await tx.request.update({
+        where: { id: requestId },
+        data: {
+          dynamicData: this.buildRequestMetadata({
+            ...previousMetadata,
+            availabilityValidated: true,
+            hasConflict: false,
+            hostConflictCount: hostConflicts.length,
+            requesterConflictCount: requesterConflicts.length,
+          }),
+        },
+      });
+
       if (dto.note?.trim()) {
         await tx.requestComment.create({
           data: { requestId, userId, commentText: dto.note, isInternal: false },
         });
       }
 
-      // CalendarEvent for requester
+      await tx.calendarEvent.deleteMany({
+        where: { requestId },
+      });
+
       await tx.calendarEvent.create({
         data: {
           userId: ar.requesterUserId,
@@ -445,7 +688,6 @@ export class AppointmentsService {
         },
       });
 
-      // CalendarEvent for host
       await tx.calendarEvent.create({
         data: {
           userId,
@@ -468,22 +710,26 @@ export class AppointmentsService {
     void this.notificationsService.createNotification({
       userId: confirmResult.requesterUserId,
       title: 'Appointment Confirmed',
-      message: `Your appointment request has been confirmed.`,
+      message: 'Your appointment request has been confirmed.',
       requestId,
       actionUrl: '/student/appointments',
     });
     return confirmResult;
   }
 
-  // ── DECLINE ────────────────────────────────────────────────────────────────
-
-  async decline(userId: string, roles: string[], requestId: string, dto: { reason?: string }) {
+  async decline(
+    userId: string,
+    roles: string[],
+    requestId: string,
+    dto: { reason?: string },
+  ) {
     const ar = await this.prisma.appointmentRequest.findFirst({
       where: { requestId },
     });
     if (!ar) throw new NotFoundException('Appointment request not found.');
-    if (ar.targetUserId !== userId)
+    if (ar.targetUserId !== userId) {
       throw new ForbiddenException('Only the target user can decline.');
+    }
 
     await this.workflowEngine.processAction(userId, roles, requestId, {
       action: 'reject',
@@ -514,15 +760,19 @@ export class AppointmentsService {
     return { requestId, status: RequestStatus.REJECTED };
   }
 
-  // ── CANCEL ─────────────────────────────────────────────────────────────────
-
-  async cancel(userId: string, roles: string[], requestId: string, dto: { reason?: string }) {
+  async cancel(
+    userId: string,
+    roles: string[],
+    requestId: string,
+    dto: { reason?: string },
+  ) {
     const ar = await this.prisma.appointmentRequest.findFirst({
       where: { requestId },
     });
     if (!ar) throw new NotFoundException('Appointment request not found.');
-    if (ar.requesterUserId !== userId)
+    if (ar.requesterUserId !== userId) {
       throw new ForbiddenException('Only the requester can cancel.');
+    }
 
     await this.workflowEngine.processAction(userId, roles, requestId, {
       action: 'cancel',
@@ -538,12 +788,13 @@ export class AppointmentsService {
             cancelledAt: new Date(),
           },
         });
+        await tx.calendarEvent.deleteMany({
+          where: { requestId },
+        });
       }
       return { requestId, status: RequestStatus.CANCELLED };
     });
   }
-
-  // ── MY APPOINTMENTS (confirmed/actual) ────────────────────────────────────
 
   async getMyAppointments(userId: string) {
     const appointments = await this.prisma.appointment.findMany({
@@ -578,8 +829,6 @@ export class AppointmentsService {
     }));
   }
 
-  // ── APPOINTMENT DETAIL ────────────────────────────────────────────────────
-
   async getAppointmentById(userId: string, id: string) {
     const a = await this.prisma.appointment.findUnique({
       where: { id },
@@ -594,8 +843,9 @@ export class AppointmentsService {
       },
     });
     if (!a) throw new NotFoundException('Appointment not found.');
-    if (a.requesterUserId !== userId && a.hostUserId !== userId)
+    if (a.requesterUserId !== userId && a.hostUserId !== userId) {
       throw new ForbiddenException('Access denied.');
+    }
     return a;
   }
 }

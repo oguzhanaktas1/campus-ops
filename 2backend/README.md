@@ -74,10 +74,13 @@ The full local stack is now defined at repo root in `docker-compose.yml`.
 docker compose up --build
 ```
 
-For a fresh Docker database, seeded demo users are not created automatically with the default stack. Run the seed profile once:
+For a fresh Docker database, seeded demo users are not created automatically with the default stack. Start the database stack, then run the seed once from the backend project:
 
 ```bash
-docker compose --profile seed up --build
+docker compose up -d postgres redis
+cd 2backend
+npx prisma migrate deploy
+npm run seed
 ```
 
 Demo login credentials after seeding:

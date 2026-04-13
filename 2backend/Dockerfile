@@ -16,8 +16,6 @@ COPY src ./src
 
 RUN npm run build
 
-FROM builder AS seedrunner
-
 FROM builder AS prunedbuilder
 
 RUN npm prune --omit=dev

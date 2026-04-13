@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import {
   Calendar as CalendarIcon,
@@ -8,31 +8,27 @@ import {
   ChevronRight,
   Clock,
   Loader2,
-  AlertTriangle,
-  CheckCircle2,
-  FileText,
-  ArrowRight,
+  Download,
+  MapPin,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
-import Link from 'next/link'
 
-interface StaffRequest {
+interface CalendarEvent {
   id: string
   title: string
-  category: string
+  description: string | null
+  startDate: string
+  endDate: string
   status: string
-  priority: string
-  createdAt: string
-  dueDate?: string
-  requesterName?: string
+  type: 'appointment' | 'reservation'
+  requestId: string | null
+  location: string | null
 }
 
-const PRIORITY_COLOR: Record<string, string> = {
-  CRITICAL: 'bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/20',
-  HIGH: 'bg-orange-500/10 text-orange-700 dark:text-orange-400 border-orange-500/20',
-  MEDIUM: 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20',
-  LOW: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20',
+const TYPE_CLASS: Record<string, string> = {
+  appointment: 'bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/20',
+  reservation: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20',
 }
 
 const MONTH_NAMES = [
@@ -40,62 +36,31 @@ const MONTH_NAMES = [
   'July', 'August', 'September', 'October', 'November', 'December',
 ]
 
-function formatDate(d: string) {
-  if (!d) return '—'
-  return new Date(d).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  })
-}
-
-function isToday(date: Date | null) {
-  if (!date) return false
-  const t = new Date()
-  return (
-    date.getDate() === t.getDate() &&
-    date.getMonth() === t.getMonth() &&
-    date.getFullYear() === t.getFullYear()
-  )
-}
-
-function isSameDay(a: Date, b: Date) {
-  return (
-    a.getDate() === b.getDate() &&
-    a.getMonth() === b.getMonth() &&
-    a.getFullYear() === b.getFullYear()
-  )
-}
-
 export default function StaffCalendarPage() {
-  const [requests, setRequests] = useState<StaffRequest[]>([])
+  const [events, setEvents] = useState<CalendarEvent[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [currentDate, setCurrentDate] = useState(new Date())
-  const [selectedRequest, setSelectedRequest] = useState<StaffRequest | null>(null)
+  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null)
 
-  useEffect(() => {
-    const fetchRequests = async () => {
-      try {
-        const token = localStorage.getItem('access_token')
-        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
-        const res = await fetch(`${backendUrl}/staff/requests`, {
-          headers: { Authorization: `Bearer ${token}` },
-        })
-        if (res.ok) {
-          const data = await res.json()
-          setRequests(Array.isArray(data) ? data : [])
-        } else {
-          setRequests([])
-        }
-      } catch {
-        toast.error('Failed to load calendar data.')
-        setRequests([])
-      } finally {
-        setIsLoading(false)
-      }
+  const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
+
+  const fetchEvents = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('access_token')
+      const res = await fetch(`${backendUrl}/calendar/events`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!res.ok) throw new Error()
+      const data = await res.json()
+      setEvents(Array.isArray(data) ? data : [])
+    } catch {
+      toast.error('Failed to load calendar data.')
+    } finally {
+      setIsLoading(false)
     }
-    fetchRequests()
-  }, [])
+  }, [backendUrl])
+
+  useEffect(() => { fetchEvents() }, [fetchEvents])
 
   const year = currentDate.getFullYear()
   const month = currentDate.getMonth()
@@ -109,25 +74,44 @@ export default function StaffCalendarPage() {
   for (let i = 0; i < offset; i++) daysArray.push(null)
   for (let i = 1; i <= daysInMonth; i++) daysArray.push(new Date(year, month, i))
 
-  const getRequestsForDay = (date: Date | null) => {
+  const getEventsForDay = useCallback((date: Date | null) => {
     if (!date) return []
-    return requests.filter((r) => {
-      const due = r.dueDate ? new Date(r.dueDate) : null
-      if (due && isSameDay(due, date)) return true
-      return false
+    return events.filter((event) => {
+      const when = new Date(event.startDate)
+      return (
+        when.getDate() === date.getDate() &&
+        when.getMonth() === date.getMonth() &&
+        when.getFullYear() === date.getFullYear()
+      )
     })
-  }
+  }, [events])
 
-  // Upcoming tasks — next 14 days with a due date
-  const now = new Date()
-  const upcoming = requests
-    .filter((r) => r.dueDate && new Date(r.dueDate) >= now)
-    .sort((a, b) => new Date(a.dueDate!).getTime() - new Date(b.dueDate!).getTime())
-    .slice(0, 10)
-
-  const overdue = requests.filter(
-    (r) => r.dueDate && new Date(r.dueDate) < now && r.status?.toUpperCase() !== 'COMPLETED'
+  const upcoming = useMemo(
+    () => events
+      .filter((event) => new Date(event.startDate) >= new Date())
+      .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())
+      .slice(0, 10),
+    [events],
   )
+
+  const downloadIcs = async () => {
+    try {
+      const token = localStorage.getItem('access_token')
+      const res = await fetch(`${backendUrl}/calendar/events.ics`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!res.ok) throw new Error()
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = 'campusops-calendar.ics'
+      link.click()
+      URL.revokeObjectURL(url)
+    } catch {
+      toast.error('Failed to export ICS.')
+    }
+  }
 
   if (isLoading) {
     return (
@@ -139,50 +123,39 @@ export default function StaffCalendarPage() {
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto pb-20">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
             <CalendarIcon className="size-5 text-primary" /> Calendar
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Upcoming deadlines and assigned tasks
+            Appointments and reservations in one operational view.
           </p>
         </div>
-        <div className="flex items-center gap-2 bg-card border border-border p-1.5 rounded-lg shadow-sm">
-          <Button variant="ghost" size="sm" onClick={() => setCurrentDate(new Date())} className="text-xs font-semibold">
-            Today
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" className="gap-2" onClick={downloadIcs}>
+            <Download className="size-4" />
+            Export ICS
           </Button>
-          <div className="w-px h-4 bg-border" />
-          <Button variant="ghost" size="icon" onClick={() => setCurrentDate(new Date(year, month - 1, 1))} className="size-8">
-            <ChevronLeft className="size-4" />
-          </Button>
-          <span className="text-sm font-bold w-36 text-center">
-            {MONTH_NAMES[month]} {year}
-          </span>
-          <Button variant="ghost" size="icon" onClick={() => setCurrentDate(new Date(year, month + 1, 1))} className="size-8">
-            <ChevronRight className="size-4" />
-          </Button>
+          <div className="flex items-center gap-2 bg-card border border-border p-1.5 rounded-lg shadow-sm">
+            <Button variant="ghost" size="sm" onClick={() => setCurrentDate(new Date())} className="text-xs font-semibold">
+              Today
+            </Button>
+            <div className="w-px h-4 bg-border" />
+            <Button variant="ghost" size="icon" onClick={() => setCurrentDate(new Date(year, month - 1, 1))} className="size-8">
+              <ChevronLeft className="size-4" />
+            </Button>
+            <span className="text-sm font-bold w-36 text-center">
+              {MONTH_NAMES[month]} {year}
+            </span>
+            <Button variant="ghost" size="icon" onClick={() => setCurrentDate(new Date(year, month + 1, 1))} className="size-8">
+              <ChevronRight className="size-4" />
+            </Button>
+          </div>
         </div>
       </div>
 
-      {/* Overdue alert */}
-      {overdue.length > 0 && (
-        <div className="flex items-center gap-3 p-3 rounded-lg bg-destructive/8 border border-destructive/20">
-          <AlertTriangle className="size-4 text-destructive flex-shrink-0" />
-          <p className="text-sm text-destructive font-medium">
-            {overdue.length} overdue item{overdue.length > 1 ? 's' : ''} — past due date
-          </p>
-          <Link href="/staff/inbox" className="ml-auto">
-            <Button variant="outline" size="sm" className="text-xs border-destructive/30 text-destructive hover:bg-destructive/10 h-7">
-              View Overdue <ArrowRight className="size-3 ml-1" />
-            </Button>
-          </Link>
-        </div>
-      )}
-
       <div className="grid lg:grid-cols-4 gap-6 items-start">
-        {/* Calendar grid */}
         <div className="lg:col-span-3 bg-card border border-border rounded-xl shadow-lg overflow-hidden">
           <div className="grid grid-cols-7 bg-muted/50 border-b border-border">
             {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => (
@@ -193,7 +166,7 @@ export default function StaffCalendarPage() {
           </div>
           <div className="grid grid-cols-7 bg-border gap-px">
             {daysArray.map((date, idx) => {
-              const dayRequests = getRequestsForDay(date)
+              const dayEvents = getEventsForDay(date)
               return (
                 <div
                   key={idx}
@@ -203,31 +176,23 @@ export default function StaffCalendarPage() {
                   )}
                 >
                   {date && (
-                    <span
-                      className={cn(
-                        'text-xs font-semibold size-6 flex items-center justify-center rounded-full self-start shrink-0',
-                        isToday(date)
-                          ? 'bg-primary text-primary-foreground'
-                          : 'text-muted-foreground'
-                      )}
-                    >
+                    <span className="text-xs font-semibold size-6 flex items-center justify-center rounded-full self-start shrink-0 text-muted-foreground">
                       {date.getDate()}
                     </span>
                   )}
                   <div className="flex flex-col gap-1 overflow-hidden">
-                    {dayRequests.map((req) => (
+                    {dayEvents.map((event) => (
                       <button
-                        key={req.id}
-                        onClick={() => setSelectedRequest(req)}
+                        key={event.id}
+                        onClick={() => setSelectedEvent(event)}
                         className={cn(
                           'text-left text-[10px] px-1.5 py-1 rounded truncate border transition-all',
-                          selectedRequest?.id === req.id
+                          selectedEvent?.id === event.id
                             ? 'bg-primary text-primary-foreground border-primary'
-                            : PRIORITY_COLOR[req.priority?.toUpperCase()] ||
-                              'bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/20'
+                            : TYPE_CLASS[event.type]
                         )}
                       >
-                        {req.title}
+                        {event.title}
                       </button>
                     ))}
                   </div>
@@ -237,45 +202,43 @@ export default function StaffCalendarPage() {
           </div>
         </div>
 
-        {/* Right sidebar */}
         <div className="flex flex-col gap-6">
-          {/* Selected detail */}
           <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
             <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-4">
-              Task Details
+              Event Details
             </h2>
-            {!selectedRequest ? (
+            {!selectedEvent ? (
               <div className="flex flex-col items-center justify-center text-center gap-2 opacity-40 py-8">
                 <CalendarIcon className="size-8" />
-                <p className="text-xs">Click a task to see details</p>
+                <p className="text-xs">Click an item to see details</p>
               </div>
             ) : (
               <div className="space-y-3">
                 <h3 className="font-bold text-foreground text-sm leading-tight">
-                  {selectedRequest.title}
+                  {selectedEvent.title}
                 </h3>
                 <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                   <Clock className="size-3.5" />
-                  Due: {selectedRequest.dueDate ? formatDate(selectedRequest.dueDate) : 'No deadline'}
+                  {new Date(selectedEvent.startDate).toLocaleDateString()} · {new Date(selectedEvent.startDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </div>
-                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <FileText className="size-3.5" />
-                  {selectedRequest.category} · {selectedRequest.requesterName || 'Unknown'}
-                </div>
-                <Link href={`/staff/requests/${selectedRequest.category?.toLowerCase()}/${selectedRequest.id}`}>
-                  <Button variant="outline" className="w-full gap-2 text-xs h-8 mt-2">
-                    View Request <ArrowRight className="size-3" />
-                  </Button>
-                </Link>
+                {selectedEvent.location && (
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <MapPin className="size-3.5" />
+                    {selectedEvent.location}
+                  </div>
+                )}
+                {selectedEvent.description && (
+                  <p className="text-sm text-muted-foreground leading-relaxed">{selectedEvent.description}</p>
+                )}
+                <div className="text-xs font-medium text-primary">{selectedEvent.status}</div>
               </div>
             )}
           </div>
 
-          {/* Upcoming */}
           <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                Upcoming Deadlines
+                Upcoming
               </h2>
               <span className="bg-primary/10 text-primary px-2 py-0.5 rounded-full text-[10px] font-medium">
                 {upcoming.length}
@@ -283,21 +246,18 @@ export default function StaffCalendarPage() {
             </div>
             <div className="space-y-2 max-h-[300px] overflow-y-auto">
               {upcoming.length === 0 ? (
-                <div className="flex flex-col items-center gap-2 py-6 opacity-40">
-                  <CheckCircle2 className="size-6" />
-                  <p className="text-xs text-center">No upcoming deadlines</p>
-                </div>
+                <p className="text-xs text-muted-foreground text-center py-6">No upcoming events</p>
               ) : (
-                upcoming.map((req) => (
+                upcoming.map((event) => (
                   <button
-                    key={req.id}
-                    onClick={() => setSelectedRequest(req)}
+                    key={event.id}
+                    onClick={() => setSelectedEvent(event)}
                     className="w-full text-left p-3 rounded-lg border border-border bg-muted/20 hover:bg-muted/50 transition-colors"
                   >
-                    <p className="text-xs font-bold text-foreground truncate">{req.title}</p>
+                    <p className="text-xs font-bold text-foreground truncate">{event.title}</p>
                     <p className="text-[10px] text-muted-foreground mt-1 flex items-center gap-1">
                       <Clock className="size-3" />
-                      {formatDate(req.dueDate!)} · {req.category}
+                      {new Date(event.startDate).toLocaleDateString()} · {new Date(event.startDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </p>
                   </button>
                 ))

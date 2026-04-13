@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
-import { Calendar, Clock, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Calendar, Clock, ChevronLeft, ChevronRight, Download, Loader2, MapPin } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
@@ -10,16 +10,18 @@ import { cn } from '@/lib/utils'
 interface CalendarEvent {
   id: string
   title: string
-  date: string
-  time?: string
-  type: 'appointment' | 'reservation' | 'deadline'
+  description: string | null
+  startDate: string
+  endDate: string
   status: string
+  type: 'appointment' | 'reservation'
+  requestId: string | null
+  location: string | null
 }
 
 const TYPE_COLORS: Record<string, string> = {
   appointment: 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-800',
   reservation: 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800',
-  deadline: 'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-800',
 }
 
 function formatTime(d: string) {
@@ -47,54 +49,24 @@ export default function StudentCalendarPage() {
   const [viewMonth, setViewMonth] = useState(today.getMonth())
   const [selectedDay, setSelectedDay] = useState<number | null>(today.getDate())
 
+  const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
+
   const fetchEvents = useCallback(async () => {
     try {
       const token = localStorage.getItem('access_token')
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
-      const headers = { Authorization: `Bearer ${token}` }
+      const res = await fetch(`${backendUrl}/calendar/events`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
 
-      const [aptRes, resRes] = await Promise.all([
-        fetch(`${backendUrl}/student/appointments`, { headers }),
-        fetch(`${backendUrl}/student/reservations`, { headers }),
-      ])
-
-      const combined: CalendarEvent[] = []
-
-      if (aptRes.ok) {
-        const apts = await aptRes.json()
-        for (const a of apts) {
-          combined.push({
-            id: `apt-${a.id}`,
-            title: a.title || 'Appointment',
-            date: a.scheduledAt || a.date,
-            time: a.scheduledAt ? formatTime(a.scheduledAt) : a.time,
-            type: 'appointment',
-            status: a.status,
-          })
-        }
-      }
-
-      if (resRes.ok) {
-        const ress = await resRes.json()
-        for (const r of ress) {
-          combined.push({
-            id: `res-${r.id}`,
-            title: r.resourceName || r.title || 'Reservation',
-            date: r.startTime || r.date,
-            time: r.startTime ? formatTime(r.startTime) : r.time,
-            type: 'reservation',
-            status: r.status,
-          })
-        }
-      }
-
-      setEvents(combined)
+      if (!res.ok) throw new Error()
+      const data = await res.json()
+      setEvents(Array.isArray(data) ? data : [])
     } catch {
       toast.error('Failed to load calendar events.')
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [backendUrl])
 
   useEffect(() => { fetchEvents() }, [fetchEvents])
 
@@ -109,21 +81,42 @@ export default function StudentCalendarPage() {
     setSelectedDay(null)
   }
 
-  const eventsForDay = (day: number) => {
+  const eventsForDay = useCallback((day: number) => {
     return events.filter(e => {
-      if (!e.date) return false
-      const d = new Date(e.date)
+      const d = new Date(e.startDate)
       return d.getFullYear() === viewYear && d.getMonth() === viewMonth && d.getDate() === day
     })
-  }
+  }, [events, viewMonth, viewYear])
 
-  const selectedEvents = selectedDay ? eventsForDay(selectedDay) : []
+  const selectedEvents = useMemo(
+    () => selectedDay ? eventsForDay(selectedDay) : [],
+    [eventsForDay, selectedDay],
+  )
 
   const totalDays = daysInMonth(viewYear, viewMonth)
   const startDay = firstDayOfMonth(viewYear, viewMonth)
   const cells = Array.from({ length: startDay + totalDays }, (_, i) =>
     i < startDay ? null : i - startDay + 1
   )
+
+  const downloadIcs = async () => {
+    try {
+      const token = localStorage.getItem('access_token')
+      const res = await fetch(`${backendUrl}/calendar/events.ics`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!res.ok) throw new Error()
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = 'campusops-calendar.ics'
+      link.click()
+      URL.revokeObjectURL(url)
+    } catch {
+      toast.error('Failed to export ICS.')
+    }
+  }
 
   if (isLoading) {
     return (
@@ -137,13 +130,18 @@ export default function StudentCalendarPage() {
   }
 
   return (
-    <div className="p-6 space-y-6 max-w-4xl mx-auto">
-      <div>
-        <h1 className="text-xl font-bold text-foreground">My Calendar</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">View your appointments and reservations.</p>
+    <div className="p-6 space-y-6 max-w-5xl mx-auto">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-xl font-bold text-foreground">My Calendar</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">Appointments and reservations in one view.</p>
+        </div>
+        <Button variant="outline" size="sm" className="gap-2" onClick={downloadIcs}>
+          <Download className="size-4" />
+          Export ICS
+        </Button>
       </div>
 
-      {/* Legend */}
       <div className="flex items-center gap-4 flex-wrap">
         {[
           { label: 'Appointment', type: 'appointment' },
@@ -156,9 +154,7 @@ export default function StudentCalendarPage() {
       </div>
 
       <div className="grid lg:grid-cols-3 gap-6">
-        {/* Calendar grid */}
         <div className="lg:col-span-2 bg-card border border-border rounded-xl shadow-sm overflow-hidden">
-          {/* Month nav */}
           <div className="flex items-center justify-between px-5 py-4 border-b border-border">
             <button onClick={prevMonth} className="p-1.5 rounded-lg hover:bg-muted transition-colors">
               <ChevronLeft className="size-4 text-muted-foreground" />
@@ -169,7 +165,6 @@ export default function StudentCalendarPage() {
             </button>
           </div>
 
-          {/* Day headers */}
           <div className="grid grid-cols-7 border-b border-border">
             {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
               <div key={d} className="text-center text-[10px] font-bold text-muted-foreground py-2 uppercase tracking-wide">
@@ -178,7 +173,6 @@ export default function StudentCalendarPage() {
             ))}
           </div>
 
-          {/* Day cells */}
           <div className="grid grid-cols-7">
             {cells.map((day, idx) => {
               const dayEvents = day ? eventsForDay(day) : []
@@ -190,7 +184,7 @@ export default function StudentCalendarPage() {
                   key={idx}
                   onClick={() => day && setSelectedDay(day)}
                   className={cn(
-                    'min-h-[64px] p-1.5 border-b border-r border-border last:border-r-0 transition-colors',
+                    'min-h-[72px] p-1.5 border-b border-r border-border last:border-r-0 transition-colors',
                     day ? 'cursor-pointer hover:bg-muted/40' : 'bg-muted/10',
                     isSelected && 'bg-primary/5',
                   )}
@@ -201,7 +195,6 @@ export default function StudentCalendarPage() {
                         'size-6 rounded-full flex items-center justify-center text-xs font-medium mx-auto mb-1',
                         isToday && 'bg-primary text-primary-foreground font-bold',
                         !isToday && isSelected && 'bg-primary/20 text-primary',
-                        !isToday && !isSelected && 'text-foreground',
                       )}>
                         {day}
                       </div>
@@ -223,7 +216,6 @@ export default function StudentCalendarPage() {
           </div>
         </div>
 
-        {/* Selected day events */}
         <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
           <div className="px-4 py-4 border-b border-border">
             <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
@@ -241,17 +233,23 @@ export default function StudentCalendarPage() {
               <p className="text-xs text-muted-foreground text-center py-10">Click a day to see events.</p>
             )}
             {selectedEvents.map(ev => (
-              <div key={ev.id} className="px-4 py-3.5 space-y-1.5">
+              <div key={ev.id} className="px-4 py-3.5 space-y-2">
                 <div className="flex items-start justify-between gap-2">
                   <p className="text-sm font-medium text-foreground leading-tight">{ev.title}</p>
                   <span className={cn('text-[10px] px-2 py-0.5 rounded-full border font-semibold whitespace-nowrap', TYPE_COLORS[ev.type])}>
                     {ev.type}
                   </span>
                 </div>
-                {ev.time && (
+                <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                  <Clock className="size-3" /> {formatTime(ev.startDate)} - {formatTime(ev.endDate)}
+                </p>
+                {ev.location && (
                   <p className="text-xs text-muted-foreground flex items-center gap-1.5">
-                    <Clock className="size-3" /> {ev.time}
+                    <MapPin className="size-3" /> {ev.location}
                   </p>
+                )}
+                {ev.description && (
+                  <p className="text-xs text-muted-foreground leading-relaxed">{ev.description}</p>
                 )}
                 <Badge variant="outline" className="text-[10px] h-5">
                   {ev.status}

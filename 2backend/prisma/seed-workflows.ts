@@ -1,10 +1,21 @@
 import {
   PrismaClient,
+  Prisma,
   WorkflowActionType,
   WorkflowStepType,
 } from '@prisma/client';
+import { Pool } from 'pg';
+import { PrismaPg } from '@prisma/adapter-pg';
 
-const prisma = new PrismaClient();
+const connectionString = process.env.DATABASE_URL;
+const pool = new Pool({
+  connectionString,
+  ssl: {
+    rejectUnauthorized: false,
+  },
+});
+const adapter = new PrismaPg(pool);
+const prisma = new PrismaClient({ adapter });
 
 type StepInput = {
   stepKey: string;
@@ -21,6 +32,7 @@ type TransitionInput = {
   fromStepKey: string;
   toStepKey?: string | null;
   actionType: WorkflowActionType;
+  conditionJson?: Record<string, unknown> | null;
 };
 
 type WorkflowSeedInput = {
@@ -159,24 +171,15 @@ async function ensureTransition(params: {
   fromStepId: string;
   toStepId?: string | null;
   actionType: WorkflowActionType;
+  conditionJson?: Record<string, unknown> | null;
 }) {
   const {
     workflowDefinitionId,
     fromStepId,
     toStepId = null,
     actionType,
+    conditionJson = null,
   } = params;
-
-  const existing = await prisma.workflowTransition.findFirst({
-    where: {
-      workflowDefinitionId,
-      fromStepId,
-      toStepId,
-      actionType,
-    },
-  });
-
-  if (existing) return existing;
 
   return prisma.workflowTransition.create({
     data: {
@@ -184,6 +187,9 @@ async function ensureTransition(params: {
       fromStepId,
       toStepId,
       actionType,
+      ...(conditionJson
+        ? { conditionJson: conditionJson as Prisma.InputJsonValue }
+        : {}),
     },
   });
 }
@@ -232,6 +238,10 @@ async function seedWorkflow(
     stepMap.set(step.stepKey, createdStep.id);
   }
 
+  await prisma.workflowTransition.deleteMany({
+    where: { workflowDefinitionId: workflow.id },
+  });
+
   for (const transition of input.transitions) {
     const fromStepId = stepMap.get(transition.fromStepKey);
     if (!fromStepId) {
@@ -255,6 +265,7 @@ async function seedWorkflow(
       fromStepId,
       toStepId,
       actionType: transition.actionType,
+      conditionJson: transition.conditionJson ?? null,
     });
   }
 
@@ -643,9 +654,16 @@ const workflows: WorkflowSeedInput[] = [
         stepType: WorkflowStepType.START,
       },
       {
+        stepKey: 'MANAGER_APPROVAL',
+        stepName: 'Manager Approval',
+        stepOrder: 2,
+        stepType: WorkflowStepType.APPROVAL,
+        slaHours: 24,
+      },
+      {
         stepKey: 'TARGET_REVIEW',
         stepName: 'Target User Review',
-        stepOrder: 2,
+        stepOrder: 3,
         stepType: WorkflowStepType.REVIEW,
         assignedRoleName: 'FACULTY',
         slaHours: 48,
@@ -653,28 +671,56 @@ const workflows: WorkflowSeedInput[] = [
       {
         stepKey: 'REVISION',
         stepName: 'Revision',
-        stepOrder: 3,
+        stepOrder: 4,
         stepType: WorkflowStepType.REVISION,
         slaHours: 72,
       },
       {
         stepKey: 'APPROVED_END',
         stepName: 'Approved',
-        stepOrder: 4,
+        stepOrder: 5,
         stepType: WorkflowStepType.END,
       },
       {
         stepKey: 'REJECTED_END',
         stepName: 'Rejected',
-        stepOrder: 5,
+        stepOrder: 6,
         stepType: WorkflowStepType.END,
       },
     ],
     transitions: [
       {
         fromStepKey: 'SUBMIT',
+        toStepKey: 'MANAGER_APPROVAL',
+        actionType: WorkflowActionType.SUBMIT,
+        conditionJson: {
+          path: 'calendar.requiresManagerApproval',
+          equals: true,
+        },
+      },
+      {
+        fromStepKey: 'SUBMIT',
         toStepKey: 'TARGET_REVIEW',
         actionType: WorkflowActionType.SUBMIT,
+        conditionJson: {
+          path: 'calendar.requiresManagerApproval',
+          equals: false,
+        },
+      },
+      {
+        fromStepKey: 'MANAGER_APPROVAL',
+        toStepKey: 'TARGET_REVIEW',
+        actionType: WorkflowActionType.APPROVE,
+      },
+      {
+        fromStepKey: 'MANAGER_APPROVAL',
+        toStepKey: 'REVISION',
+        actionType: WorkflowActionType.REQUEST_REVISION,
+      },
+      {
+        fromStepKey: 'MANAGER_APPROVAL',
+        toStepKey: 'REJECTED_END',
+        actionType: WorkflowActionType.REJECT,
       },
       {
         fromStepKey: 'TARGET_REVIEW',
@@ -693,8 +739,21 @@ const workflows: WorkflowSeedInput[] = [
       },
       {
         fromStepKey: 'REVISION',
+        toStepKey: 'MANAGER_APPROVAL',
+        actionType: WorkflowActionType.SUBMIT,
+        conditionJson: {
+          path: 'calendar.requiresManagerApproval',
+          equals: true,
+        },
+      },
+      {
+        fromStepKey: 'REVISION',
         toStepKey: 'TARGET_REVIEW',
         actionType: WorkflowActionType.SUBMIT,
+        conditionJson: {
+          path: 'calendar.requiresManagerApproval',
+          equals: false,
+        },
       },
     ],
   },

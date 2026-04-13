@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 import { Pool } from 'pg';
 import { PrismaPg } from '@prisma/adapter-pg';
@@ -9,9 +9,14 @@ export class PrismaService extends PrismaClient implements OnModuleInit {
   private readonly logger = new Logger(PrismaService.name);
 
   constructor() {
-    // .env dosyasındaki URL'yi alıp yeni adaptör mimarisine bağlıyoruz
     const connectionString = process.env.DATABASE_URL;
-    const pool = new Pool({ connectionString });
+    const pool = new Pool({
+      connectionString,
+      ssl:
+        connectionString && connectionString.includes('supabase.com')
+          ? { rejectUnauthorized: false }
+          : undefined,
+    });
     const adapter = new PrismaPg(pool);
 
     super({ adapter });
@@ -19,6 +24,6 @@ export class PrismaService extends PrismaClient implements OnModuleInit {
 
   async onModuleInit() {
     await this.$connect();
-    this.logger.log('📦 Prisma Veritabanı bağlantısı başarılı (v7 Adapter).');
+    this.logger.log('Prisma database connection established.');
   }
 }

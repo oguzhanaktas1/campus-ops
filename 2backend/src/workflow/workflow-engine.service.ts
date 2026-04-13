@@ -9,6 +9,7 @@ import {
   RequestStatus,
   WorkflowActionType,
   WorkflowStepType,
+  Prisma,
 } from '@prisma/client';
 import { ProcessActionDto } from './dto/process-action.dto';
 import { SlaService } from './sla.service';
@@ -59,6 +60,89 @@ export class WorkflowEngineService {
     private slaService: SlaService,
   ) {}
 
+  private getJsonPathValue(
+    value: Prisma.JsonValue | null | undefined,
+    path: string,
+  ): unknown {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      return undefined;
+    }
+
+    let current: unknown = value;
+    for (const segment of path.split('.')) {
+      if (!current || typeof current !== 'object' || Array.isArray(current)) {
+        return undefined;
+      }
+      current = (current as Record<string, unknown>)[segment];
+    }
+
+    return current;
+  }
+
+  private matchesTransitionCondition(
+    condition: Prisma.JsonValue | null | undefined,
+    dynamicData: Prisma.JsonValue | null | undefined,
+  ): boolean {
+    if (!condition || typeof condition !== 'object' || Array.isArray(condition)) {
+      return true;
+    }
+
+    const record = condition as Record<string, unknown>;
+    const path = typeof record.path === 'string' ? record.path : null;
+    if (!path) return true;
+
+    const actual = this.getJsonPathValue(dynamicData, path);
+
+    if (Object.prototype.hasOwnProperty.call(record, 'equals')) {
+      return actual === record.equals;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(record, 'notEquals')) {
+      return actual !== record.notEquals;
+    }
+
+    if (record.exists === true) {
+      return actual !== undefined && actual !== null;
+    }
+
+    if (record.exists === false) {
+      return actual === undefined || actual === null;
+    }
+
+    return true;
+  }
+
+  private async resolveTransition(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    tx: any,
+    workflowDefinitionId: string,
+    fromStepId: string,
+    actionType: WorkflowActionType,
+    dynamicData: Prisma.JsonValue | null | undefined,
+  ) {
+    const transitions = await tx.workflowTransition.findMany({
+      where: {
+        workflowDefinitionId,
+        fromStepId,
+        actionType,
+      },
+      include: { toStep: true },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    const matched =
+      transitions.find((transition: { conditionJson?: Prisma.JsonValue | null }) =>
+        transition.conditionJson &&
+        this.matchesTransitionCondition(transition.conditionJson, dynamicData),
+      ) ??
+      transitions.find((transition: { conditionJson?: Prisma.JsonValue | null }) =>
+        !transition.conditionJson,
+      ) ??
+      null;
+
+    return matched;
+  }
+
   private mapStepTypeToStatus(
     stepType: WorkflowStepType,
     fallback: RequestStatus,
@@ -88,8 +172,10 @@ export class WorkflowEngineService {
       departmentId?: string | null;
       unitId?: string | null;
       currentAssigneeUserId?: string | null;
+      dynamicData?: Prisma.JsonValue | null;
     },
     step: {
+      stepKey?: string;
       assignedUserId?: string | null;
       assignedRoleId?: string | null;
       assignedUnitId?: string | null;
@@ -97,6 +183,24 @@ export class WorkflowEngineService {
     },
   ): Promise<string[]> {
     if (step.assignedUserId) return [step.assignedUserId];
+
+    if (step.stepKey === 'MANAGER_APPROVAL') {
+      const managerUserId = this.getJsonPathValue(
+        request.dynamicData,
+        'calendar.managerUserId',
+      );
+      return typeof managerUserId === 'string' ? [managerUserId] : [];
+    }
+
+    if (step.stepKey === 'TARGET_REVIEW') {
+      const targetUserId = this.getJsonPathValue(
+        request.dynamicData,
+        'calendar.targetUserId',
+      );
+      if (typeof targetUserId === 'string') {
+        return [targetUserId];
+      }
+    }
 
     if (
       request.currentAssigneeUserId &&
@@ -233,10 +337,12 @@ export class WorkflowEngineService {
       facultyId?: string | null;
       departmentId?: string | null;
       unitId?: string | null;
+      dynamicData?: Prisma.JsonValue | null;
     },
     workflowInstanceId: string,
     step: {
       id: string;
+      stepKey: string;
       stepName: string;
       stepType: WorkflowStepType;
       assignedUserId?: string | null;
@@ -336,6 +442,7 @@ export class WorkflowEngineService {
         departmentId: true,
         unitId: true,
         currentAssigneeUserId: true,
+        dynamicData: true,
       },
     });
 
@@ -405,14 +512,13 @@ export class WorkflowEngineService {
       },
     });
 
-    const submitTransition = await tx.workflowTransition.findFirst({
-      where: {
-        workflowDefinitionId,
-        fromStepId: firstStep.id,
-        actionType: WorkflowActionType.SUBMIT,
-      },
-      include: { toStep: true },
-    });
+    const submitTransition = await this.resolveTransition(
+      tx,
+      workflowDefinitionId,
+      firstStep.id,
+      WorkflowActionType.SUBMIT,
+      request.dynamicData,
+    );
 
     const nextStep = submitTransition?.toStep ?? null;
     if (!nextStep) {
@@ -534,6 +640,7 @@ export class WorkflowEngineService {
 
       let nextStep: {
         id: string;
+        stepKey: string;
         stepName: string;
         stepType: WorkflowStepType;
         assignedUserId: string | null;
@@ -543,14 +650,13 @@ export class WorkflowEngineService {
       } | null = null;
 
       if (workflowInstance?.currentStepId) {
-        const transition = await tx.workflowTransition.findFirst({
-          where: {
-            workflowDefinitionId: workflowInstance.workflowDefinitionId,
-            fromStepId: workflowInstance.currentStepId,
-            actionType: mapped.wfAction,
-          },
-          include: { toStep: true },
-        });
+        const transition = await this.resolveTransition(
+          tx,
+          workflowInstance.workflowDefinitionId,
+          workflowInstance.currentStepId,
+          mapped.wfAction,
+          request.dynamicData,
+        );
         nextStep = transition?.toStep ?? null;
       }
 
@@ -642,6 +748,7 @@ export class WorkflowEngineService {
               facultyId: request.facultyId,
               departmentId: request.departmentId,
               unitId: request.unitId,
+              dynamicData: request.dynamicData,
             },
             workflowInstance.id,
             nextStep,
