@@ -15,7 +15,7 @@ import jsPDF from 'jspdf'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 
-type Role = 'student' | 'faculty' | 'staff' | 'admin'
+type Role = 'student' | 'faculty' | 'staff' | 'admin' | 'organizer'
 type RoleFilter = Role | 'all'
 
 const roleConfig: Record<Role, { label: string; icon: React.ReactNode; className: string }> = {
@@ -23,6 +23,7 @@ const roleConfig: Record<Role, { label: string; icon: React.ReactNode; className
   faculty: { label: 'Faculty', icon: <Users className="size-3.5" />, className: 'text-emerald-700 bg-emerald-50 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800' },
   staff: { label: 'Staff', icon: <Briefcase className="size-3.5" />, className: 'text-amber-700 bg-amber-50 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-800' },
   admin: { label: 'Admin', icon: <ShieldCheck className="size-3.5" />, className: 'text-indigo-700 bg-indigo-50 border-indigo-200 dark:bg-indigo-950/30 dark:text-indigo-400 dark:border-indigo-800' },
+  organizer: { label: 'Organizer', icon: <Briefcase className="size-3.5" />, className: 'text-fuchsia-700 bg-fuchsia-50 border-fuchsia-200 dark:bg-fuchsia-950/30 dark:text-fuchsia-400 dark:border-fuchsia-800' },
 }
 
 // 🔥 STATÜ RENKLERİ İÇİN YARDIMCI BİLEŞEN 🔥
@@ -201,7 +202,7 @@ export default function AdminUsersPage() {
 
   const roleCounts: Record<RoleFilter, number> = {
     all: users.length, student: users.filter(u => u.role === 'student').length,
-    faculty: users.filter(u => u.role === 'faculty').length, staff: users.filter(u => u.role === 'staff').length, admin: users.filter(u => u.role === 'admin').length,
+    faculty: users.filter(u => u.role === 'faculty').length, staff: users.filter(u => u.role === 'staff').length, admin: users.filter(u => u.role === 'admin').length, organizer: users.filter(u => u.role === 'organizer').length,
   }
 
   if (isLoading) return <div className="flex h-[50vh] items-center justify-center"><Loader2 className="size-8 animate-spin text-primary" /></div>
@@ -219,7 +220,7 @@ export default function AdminUsersPage() {
       </div>
 
       <div className="flex items-center gap-1 border-b border-border pb-0 overflow-x-auto">
-        {(['all', 'student', 'faculty', 'staff', 'admin'] as RoleFilter[]).map((r) => (
+        {(['all', 'student', 'faculty', 'staff', 'organizer', 'admin'] as RoleFilter[]).map((r) => (
           <button key={r} onClick={() => setRoleFilter(r)} className={cn('px-4 py-2.5 text-sm font-medium capitalize transition-colors border-b-2 -mb-px whitespace-nowrap', roleFilter === r ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground')}>
             {r === 'all' ? 'All' : roleConfig[r as Role].label}
             <span className={cn('ml-1.5 text-xs rounded-full px-1.5 py-0.5 font-medium', roleFilter === r ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground')}>{roleCounts[r]}</span>
@@ -247,7 +248,7 @@ export default function AdminUsersPage() {
             {filtered.map((user) => {
               const roleCfg = roleConfig[user.role]
               const secondaryRoles = (user.roles ?? [])
-                .filter((item) => item.name.toLowerCase() !== user.role)
+                .filter((item) => !item.isPrimary)
                 .map((item) => item.name)
               return (
                 <tr key={user.id} className="hover:bg-muted/20 transition-colors">
@@ -279,7 +280,6 @@ export default function AdminUsersPage() {
                     </div>
                   </td>
                   <td className="px-5 py-3.5">
-                    <StatusBadge status={user.status} />
                     <StatusBadge status={user.status} />
                   </td>
                   <td className="px-5 py-3.5 text-right">

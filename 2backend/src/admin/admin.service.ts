@@ -176,12 +176,15 @@ export class AdminService {
             unit: { select: { id: true, name: true } },
           },
         },
-        primaryRoles: { include: { role: true } },
+        primaryRoles: {
+          include: { role: true },
+          orderBy: { isPrimary: 'desc' },
+        },
       },
       orderBy: { createdAt: 'desc' },
     });
 
-    return users.map((user) => ({
+      return users.map((user) => ({
       id: user.id,
       name: user.profile?.fullName || 'Unnamed User',
       email: user.email,
@@ -192,12 +195,15 @@ export class AdminService {
         user.profile?.faculty?.name ||
         user.profile?.bio ||
         'Department not specified',
-      role: user.primaryRoles[0]?.role?.name?.toLowerCase() || 'student',
-      roles: user.primaryRoles
-        .map((ur) => ({
-          id: ur.roleId,
-          name: ur.role.name,
-          isPrimary: ur.isPrimary,
+        role:
+          user.primaryRoles.find((item) => item.isPrimary)?.role?.name?.toLowerCase() ||
+          user.primaryRoles[0]?.role?.name?.toLowerCase() ||
+          'student',
+        roles: user.primaryRoles
+          .map((ur) => ({
+            id: ur.roleId,
+            name: ur.role.name,
+            isPrimary: ur.isPrimary,
         }))
         .sort((a, b) => Number(b.isPrimary) - Number(a.isPrimary)),
       lastLogin: user.updatedAt,

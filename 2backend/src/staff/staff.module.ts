@@ -8,5 +8,6 @@ import { WorkflowModule } from '../workflow/workflow.module';
   imports: [PrismaModule, WorkflowModule],
   controllers: [StaffController],
   providers: [StaffService],
+  exports: [StaffService],
 })
 export class StaffModule {}

@@ -15,6 +15,7 @@ const DOMAIN_KEYS = [
   'ACCESS_REQUEST',
   'PROCUREMENT_REQUEST',
   'EVENT_REQUEST',
+  'EVENT_CREATION_REQUEST',
 ];
 
 // Eski key → yeni key (rename listesi)
@@ -71,7 +72,7 @@ async function main() {
 
   await migrate();
 
-  console.log('\n📦 Upserting 9 domain module request types...');
+  console.log('\n📦 Upserting 10 domain module request types...');
 
   const requestTypes = [
     {
@@ -130,6 +131,12 @@ async function main() {
       category: 'CAMPUS_SERVICES',
       description: 'Campus event or student activity approval request',
     },
+    {
+      key: 'EVENT_CREATION_REQUEST',
+      name: 'Event Creation Request',
+      category: 'CAMPUS_SERVICES',
+      description: 'Organizer formal request to create and publish a campus event',
+    },
   ];
 
   for (const rt of requestTypes) {
@@ -154,7 +161,7 @@ async function main() {
     console.log(`  ✓ ${rt.key}`);
   }
 
-  console.log('\n✅ 9 domain request types seeded.');
+  console.log('\n✅ 10 domain request types seeded.');
   console.log('   All types use dedicated service forms (formSchemaJson=[])');
 }
 

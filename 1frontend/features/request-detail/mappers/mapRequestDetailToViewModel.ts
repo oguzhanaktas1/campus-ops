@@ -241,7 +241,7 @@ export function mapRequestDetailToViewModel(
       status: raw.workflow?.status ?? null,
       steps: Array.isArray(raw.workflow?.steps)
         ? raw.workflow.steps.map((step: any) => ({
-            id: String(step.id ?? fallbackId()),
+            id: Number(step.id ?? fallbackId()),
             label: String(step.label ?? step.stepName ?? 'Step'),
             status: normalizeWorkflowStepStatus(raw, step),
           }))

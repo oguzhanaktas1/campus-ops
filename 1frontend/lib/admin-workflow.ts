@@ -10,26 +10,6 @@ export function workflowAuthHeaders() {
   }
 }
 
-export type WorkflowSummary = {
-  id: string
-  key: string
-  name: string
-  description?: string | null
-  isActive: boolean
-  isDefault: boolean
-  version: number
-  steps?: Array<{ id: string; stepOrder: number }>
-  _count?: { instances: number }
-  metrics?: {
-    totalInstances: number
-    requestTypeCount: number
-    activeInstances: number
-    completedInstances: number
-    overdueInstances: number
-    lastStartedAt?: string | null
-  }
-}
-
 export type WorkflowStep = {
   id: string
   stepKey: string
@@ -46,6 +26,26 @@ export type WorkflowStep = {
     email: string
     profile?: { fullName?: string | null } | null
   } | null
+}
+
+export type WorkflowSummary = {
+  id: string
+  key: string
+  name: string
+  description?: string | null
+  isActive: boolean
+  isDefault: boolean
+  version: number
+  steps?: WorkflowStep[]
+  _count?: { instances: number }
+  metrics?: {
+    totalInstances: number
+    requestTypeCount: number
+    activeInstances: number
+    completedInstances: number
+    overdueInstances: number
+    lastStartedAt?: string | null
+  }
 }
 
 export type WorkflowTransition = {

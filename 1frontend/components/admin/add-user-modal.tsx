@@ -56,7 +56,7 @@ const EMPTY_FORM = {
   avatarUrl: '',
 }
 
-const PRIMARY_ROLE_NAMES = ['STUDENT', 'FACULTY', 'STAFF', 'ADMIN']
+const PRIMARY_ROLE_NAMES = ['STUDENT', 'FACULTY', 'STAFF', 'ADMIN', 'ORGANIZER']
 
 export function AddUserModal({
   isOpen,
@@ -150,7 +150,7 @@ export function AddUserModal({
 
       if (primaryRoleName !== 'STUDENT') next.studentNumber = ''
 
-      if (!['FACULTY', 'STAFF', 'ADMIN'].includes(primaryRoleName)) {
+      if (!['FACULTY', 'STAFF', 'ADMIN', 'ORGANIZER'].includes(primaryRoleName)) {
         next.staffNumber = ''
         next.title = ''
       }
@@ -372,7 +372,7 @@ export function AddUserModal({
                   </div>
                 ) : null}
 
-                {['FACULTY', 'STAFF', 'ADMIN'].includes(formData.primaryRoleName) ? (
+                {['FACULTY', 'STAFF', 'ADMIN', 'ORGANIZER'].includes(formData.primaryRoleName) ? (
                   <>
                     <div className="space-y-2">
                       <Label className="text-amber-600">Staff Number</Label>

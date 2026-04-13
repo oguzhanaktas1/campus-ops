@@ -14,6 +14,7 @@ export default function AdminRequestsPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [typeFilter, setTypeFilter] = useState('all')
   
   // 🔥 TOPLU SEÇİM STATE'LERİ 🔥
   const [selectedIds, setSelectedIds] = useState<string[]>([])
@@ -75,9 +76,23 @@ export default function AdminRequestsPage() {
         r.submittedByName.toLowerCase().includes(search.toLowerCase()) ||
         r.requestNo.toLowerCase().includes(search.toLowerCase())
       const matchesStatus = statusFilter === 'all' || r.status.toLowerCase() === statusFilter.toLowerCase()
-      return matchesSearch && matchesStatus
+      const matchesType =
+        typeFilter === 'all' ||
+        r.type === typeFilter ||
+        r.typeName?.toLowerCase() === typeFilter.toLowerCase()
+      return matchesSearch && matchesStatus && matchesType
     })
-  }, [requests, search, statusFilter])
+  }, [requests, search, statusFilter, typeFilter])
+
+  const requestTypes = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const request of requests) {
+      if (request.type) {
+        map.set(request.type, request.typeName ?? request.type)
+      }
+    }
+    return Array.from(map.entries()).sort((a, b) => a[1].localeCompare(b[1]))
+  }, [requests])
 
   // HEPSİNİ SEÇ / KALDIR
   const toggleSelectAll = () => {
@@ -141,7 +156,7 @@ export default function AdminRequestsPage() {
       </div>
 
       {/* SEARCH & FILTERS */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-muted/20 p-4 rounded-xl border border-border">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 bg-muted/20 p-4 rounded-xl border border-border">
         <div className="md:col-span-2 relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
           <Input 
@@ -161,6 +176,18 @@ export default function AdminRequestsPage() {
           <option value="APPROVED">Approved</option>
           <option value="REJECTED">Rejected</option>
           <option value="REVISION_REQUESTED">Revision Req.</option>
+        </select>
+        <select
+          className="bg-background border border-input rounded-md px-3 text-sm focus:ring-2 focus:ring-primary outline-none h-10"
+          value={typeFilter}
+          onChange={(e) => setTypeFilter(e.target.value)}
+        >
+          <option value="all">All Types</option>
+          {requestTypes.map(([key, label]) => (
+            <option key={key} value={key}>
+              {label}
+            </option>
+          ))}
         </select>
         <div className="flex items-center justify-center text-xs font-bold text-muted-foreground bg-background border border-border rounded-md uppercase">
           {filtered.length} visible

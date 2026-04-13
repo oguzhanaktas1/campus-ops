@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { GraduationCap, ArrowRight, Eye, EyeOff, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
-import { apiLogin, setAuth } from '@/lib/auth'
+import { apiLogin, resolvePortalPath, setAuth } from '@/lib/auth'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -31,22 +31,7 @@ export default function LoginPage() {
       setAuth(data.access_token, data.user)
       toast.success('Giriş başarılı, yönlendiriliyorsunuz...')
 
-      const role = data.user.role // 'ADMIN', 'STUDENT', 'FACULTY', 'STAFF'
-
-      switch (role.toUpperCase()) {
-        case 'ADMIN':
-          router.push('/admin/dashboard')
-          break
-        case 'FACULTY':
-          router.push('/faculty/dashboard')
-          break
-        case 'STAFF':
-          router.push('/staff/dashboard')
-          break
-        default:
-          router.push('/student/dashboard')
-          break
-      }
+      router.push(resolvePortalPath(data.user))
     } catch (err: any) {
       const errorMessage = err.message || 'Bir hata oluştu'
       setError(errorMessage) // İstersen formun üstündeki kırmızı kutuda kalsın

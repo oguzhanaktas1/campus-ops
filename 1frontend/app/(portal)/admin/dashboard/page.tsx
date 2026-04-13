@@ -9,13 +9,10 @@ import {
   Users,
   CheckSquare,
   Activity,
-  ArrowRight,
-  AlertCircle,
   CheckCircle2,
-  XCircle,
   Loader2,
-  Ticket,
-  Calendar,
+  Workflow,
+  BarChart3,
   BookMarked,
 } from 'lucide-react'
 import {
@@ -188,8 +185,8 @@ export default function AdminDashboard() {
         {[
           { label: 'Manage Users', href: '/admin/users', icon: Users },
           { label: 'All Requests', href: '/admin/requests', icon: FileText },
-          { label: 'Open Tickets', href: '/admin/tickets', icon: Ticket },
-          { label: 'Reservations', href: '/admin/reservations', icon: BookMarked },
+          { label: 'Workflows', href: '/admin/workflows', icon: Workflow },
+          { label: 'Reports', href: '/admin/reports', icon: BarChart3 },
         ].map(({ label, href, icon: Icon }) => (
           <Link key={href} href={href}>
             <div className="bg-card border border-border rounded-lg p-4 flex flex-col items-center gap-2 hover:shadow-md transition-shadow cursor-pointer text-center">

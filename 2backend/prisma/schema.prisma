@@ -229,6 +229,13 @@ model User {
   integrationsCreated Integration[] @relation("IntegrationCreatedBy")
 
   reportSnapshotsGenerated ReportSnapshot[]
+
+  eventPlansOrganized        EventPlan[]                @relation("EventPlanOrganizer")
+  eventCreationRequests      EventCreationRequest[]     @relation("EventCreationOrganizer")
+  eventsOrganized            Event[]                    @relation("EventOrganizer2")
+  eventPlanRegistrations     EventPlanRegistration[]    @relation("EventPlanRegistrant")
+  eventRegistrations         EventRegistration[]        @relation("EventRegistrant")
+  eventDecisionLogs          EventDecisionLog[]         @relation("EventDecisionMaker")
 }
 
 model UserProfile {
@@ -503,15 +510,16 @@ model Request {
 
   approvalActions       ApprovalAction[]
   
-  internshipRequest     InternshipRequest?
-  equipmentRequest      EquipmentRequest?
-  itTicket              ItTicket?
-  roomReservationRequest RoomReservationRequest?
-  eventRequest          EventRequest?
-  accessRequest         AccessRequest?
-  procurementRequest    ProcurementRequest?
-  documentRequest       DocumentRequest?
-  appointmentRequest    AppointmentRequest?
+  internshipRequest       InternshipRequest?
+  equipmentRequest        EquipmentRequest?
+  itTicket                ItTicket?
+  roomReservationRequest  RoomReservationRequest?
+  eventRequest            EventRequest?
+  accessRequest           AccessRequest?
+  procurementRequest      ProcurementRequest?
+  documentRequest         DocumentRequest?
+  appointmentRequest      AppointmentRequest?
+  eventCreationRequest    EventCreationRequest?
 
   reservations          Reservation[]
   notifications         Notification[]
@@ -799,29 +807,31 @@ model InternshipRequest {
 }
 
 model EquipmentRequest {
-  id                String      @id @default(cuid())
-  requestId         String      @unique
-  requesterUserId   String
-  labResourceId     String?
-  equipmentName     String
-  equipmentCategory String
-  quantity          Int
-  purpose           String
-  neededFrom        DateTime?
-  neededUntil       DateTime?
-  urgencyReason     String?
-  stockCheckStatus  String?
-  procurementRequired Boolean   @default(false)
-  estimatedCost     Decimal?    @db.Decimal(12, 2)
-  createdAt         DateTime    @default(now())
-  updatedAt         DateTime    @updatedAt
+  id                  String      @id @default(cuid())
+  requestId           String      @unique
+  requesterUserId     String
+  labResourceId       String?
+  eventPlanId         String?
+  equipmentName       String
+  equipmentCategory   String
+  quantity            Int
+  purpose             String
+  neededFrom          DateTime?
+  neededUntil         DateTime?
+  urgencyReason       String?
+  stockCheckStatus    String?
+  procurementRequired Boolean     @default(false)
+  estimatedCost       Decimal?    @db.Decimal(12, 2)
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
 
-  request           Request     @relation(fields: [requestId], references: [id], onDelete: Cascade)
-  requester         User        @relation("EquipmentRequester", fields: [requesterUserId], references: [id], onDelete: Restrict)
-  labResource       Resource?   @relation(fields: [labResourceId], references: [id], onDelete: SetNull)
+  request             Request     @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  requester           User        @relation("EquipmentRequester", fields: [requesterUserId], references: [id], onDelete: Restrict)
+  labResource         Resource?   @relation(fields: [labResourceId], references: [id], onDelete: SetNull)
 
   @@index([requesterUserId])
   @@index([labResourceId])
+  @@index([eventPlanId])
 }
 
 model ItTicket {
@@ -860,6 +870,7 @@ model RoomReservationRequest {
   requestId                 String            @unique
   resourceId                String
   requesterUserId           String
+  eventPlanId               String?
   eventName                 String
   reservationPurpose        String
   attendeeCount             Int
@@ -879,6 +890,7 @@ model RoomReservationRequest {
   @@index([resourceId])
   @@index([requesterUserId])
   @@index([startAt, endAt])
+  @@index([eventPlanId])
 }
 
 model EventRequest {
@@ -914,6 +926,7 @@ model AccessRequest {
   id                         String    @id @default(cuid())
   requestId                  String    @unique
   requesterUserId            String
+  eventPlanId                String?
   accessType                 String
   targetResource             String
   requestedRoleOrPermission  String?
@@ -927,12 +940,14 @@ model AccessRequest {
   requester                  User      @relation("AccessRequester", fields: [requesterUserId], references: [id], onDelete: Restrict)
 
   @@index([requesterUserId])
+  @@index([eventPlanId])
 }
 
 model ProcurementRequest {
   id                 String    @id @default(cuid())
   requestId          String    @unique
   requesterUserId    String
+  eventPlanId        String?
   itemName           String
   itemCategory       String
   quantity           Int
@@ -949,6 +964,7 @@ model ProcurementRequest {
   requester          User      @relation("ProcurementRequester", fields: [requesterUserId], references: [id], onDelete: Restrict)
 
   @@index([requesterUserId])
+  @@index([eventPlanId])
 }
 
 model DocumentRequest {
@@ -1590,4 +1606,152 @@ model CalendarEvent {
 
   @@index([userId, startDate])
   @@index([requestId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// EVENT ORGANIZER ARCHITECTURE
+// ─────────────────────────────────────────────────────────────
+
+model EventPlan {
+  id                     String    @id @default(cuid())
+  sourceEventRequestId   String?
+  organizerUserId        String
+  title                  String
+  description            String?
+  eventType              String
+  tentativeStartAt       DateTime?
+  tentativeEndAt         DateTime?
+  locationPreference     String?
+  targetAttendance       Int?
+  minimumAttendance      Int
+  registrationStartAt    DateTime?
+  registrationEndAt      DateTime?
+  status                 String    @default("DRAFT")
+  notes                  String?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  organizer              User      @relation("EventPlanOrganizer", fields: [organizerUserId], references: [id], onDelete: Restrict)
+
+  preRegistrations       EventPlanRegistration[]
+  decisionLogs           EventDecisionLog[]
+
+  @@index([sourceEventRequestId])
+  @@index([organizerUserId])
+  @@index([status])
+}
+
+model EventCreationRequest {
+  id                    String    @id @default(cuid())
+  requestId             String    @unique
+  eventPlanId           String    @unique
+  organizerUserId       String
+  title                 String
+  description           String?
+  eventType             String
+  proposedStartAt       DateTime
+  proposedEndAt         DateTime
+  locationText          String?
+  minimumAttendance     Int
+  targetAttendance      Int?
+  registrationStartAt   DateTime
+  registrationEndAt     DateTime
+  expectedBudget        Decimal?  @db.Decimal(12, 2)
+  status                String    @default("PENDING")
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  request               Request   @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  organizer             User      @relation("EventCreationOrganizer", fields: [organizerUserId], references: [id], onDelete: Restrict)
+
+  @@index([eventPlanId])
+  @@index([organizerUserId])
+}
+
+model Event {
+  id                      String    @id @default(cuid())
+  eventPlanId             String?
+  eventCreationRequestId  String?
+  organizerUserId         String
+  title                   String
+  description             String?
+  eventType               String
+  locationText            String?
+  startAt                 DateTime
+  endAt                   DateTime
+  status                  String    @default("DRAFT")
+  minimumAttendance       Int
+  targetAttendance        Int?
+  registrationStartAt     DateTime?
+  registrationEndAt       DateTime?
+  registrationCount       Int       @default(0)
+  publishedAt             DateTime?
+  confirmedAt             DateTime?
+  cancelledAt             DateTime?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  organizer               User      @relation("EventOrganizer2", fields: [organizerUserId], references: [id], onDelete: Restrict)
+
+  registrations           EventRegistration[]
+  decisionLogs            EventDecisionLog[]
+
+  @@index([eventPlanId])
+  @@index([eventCreationRequestId])
+  @@index([organizerUserId])
+  @@index([status])
+}
+
+model EventPlanRegistration {
+  id            String    @id @default(cuid())
+  eventPlanId   String
+  userId        String
+  status        String    @default("REGISTERED")
+  registeredAt  DateTime  @default(now())
+
+  eventPlan     EventPlan @relation(fields: [eventPlanId], references: [id], onDelete: Cascade)
+  user          User      @relation("EventPlanRegistrant", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([eventPlanId, userId])
+  @@index([eventPlanId])
+  @@index([userId])
+}
+
+model EventRegistration {
+  id            String    @id @default(cuid())
+  eventId       String
+  userId        String
+  status        String    @default("REGISTERED")
+  registeredAt  DateTime  @default(now())
+  cancelledAt   DateTime?
+  attendanceAt  DateTime?
+
+  event         Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user          User      @relation("EventRegistrant", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, userId])
+  @@index([eventId])
+  @@index([userId])
+}
+
+model EventDecisionLog {
+  id                    String    @id @default(cuid())
+  eventPlanId           String?
+  eventId               String?
+  decidedByUserId       String
+  decisionType          String
+  reason                String?
+  oldStartAt            DateTime?
+  newStartAt            DateTime?
+  oldRegistrationEndAt  DateTime?
+  newRegistrationEndAt  DateTime?
+  createdAt             DateTime  @default(now())
+
+  decidedBy             User      @relation("EventDecisionMaker", fields: [decidedByUserId], references: [id], onDelete: Restrict)
+  eventPlan             EventPlan? @relation(fields: [eventPlanId], references: [id], onDelete: SetNull)
+  event                 Event?     @relation(fields: [eventId], references: [id], onDelete: SetNull)
+
+  @@index([eventPlanId])
+  @@index([eventId])
+  @@index([decidedByUserId])
 }

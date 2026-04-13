@@ -897,6 +897,167 @@ const workflows: WorkflowSeedInput[] = [
   },
 
   {
+    requestTypeKey: 'EVENT_CREATION_REQUEST',
+    workflowKey: 'WF_EVENT_CREATION_REQUEST_V1',
+    workflowName: 'Event Creation Request Workflow',
+    description: 'Organizer event creation approval chain: Faculty Secretary → Department Chair → Finance Officer → Budget Approver → Event Coordinator',
+    steps: [
+      {
+        stepKey: 'SUBMIT',
+        stepName: 'Submit',
+        stepOrder: 1,
+        stepType: WorkflowStepType.START,
+      },
+      {
+        stepKey: 'FACULTY_SECRETARY_REVIEW',
+        stepName: 'Faculty Secretary Review',
+        stepOrder: 2,
+        stepType: WorkflowStepType.REVIEW,
+        assignedRoleName: 'FACULTY_SECRETARY',
+        slaHours: 48,
+      },
+      {
+        stepKey: 'DEPARTMENT_CHAIR_APPROVAL',
+        stepName: 'Department Chair Approval',
+        stepOrder: 3,
+        stepType: WorkflowStepType.APPROVAL,
+        assignedRoleName: 'DEPARTMENT_CHAIR',
+        slaHours: 48,
+      },
+      {
+        stepKey: 'FINANCE_OFFICER_REVIEW',
+        stepName: 'Finance Officer Review',
+        stepOrder: 4,
+        stepType: WorkflowStepType.APPROVAL,
+        assignedRoleName: 'FINANCE_OFFICER',
+        slaHours: 48,
+      },
+      {
+        stepKey: 'BUDGET_APPROVER_APPROVAL',
+        stepName: 'Budget Approver Approval',
+        stepOrder: 5,
+        stepType: WorkflowStepType.APPROVAL,
+        assignedRoleName: 'BUDGET_APPROVER',
+        slaHours: 48,
+      },
+      {
+        stepKey: 'EVENT_COORDINATOR_FINAL',
+        stepName: 'Event Coordinator Final Approval',
+        stepOrder: 6,
+        stepType: WorkflowStepType.APPROVAL,
+        assignedRoleName: 'EVENT_COORDINATOR',
+        slaHours: 24,
+      },
+      {
+        stepKey: 'REVISION',
+        stepName: 'Revision',
+        stepOrder: 7,
+        stepType: WorkflowStepType.REVISION,
+        slaHours: 72,
+      },
+      {
+        stepKey: 'APPROVED_END',
+        stepName: 'Approved',
+        stepOrder: 8,
+        stepType: WorkflowStepType.END,
+      },
+      {
+        stepKey: 'REJECTED_END',
+        stepName: 'Rejected',
+        stepOrder: 9,
+        stepType: WorkflowStepType.END,
+      },
+    ],
+    transitions: [
+      {
+        fromStepKey: 'SUBMIT',
+        toStepKey: 'FACULTY_SECRETARY_REVIEW',
+        actionType: WorkflowActionType.SUBMIT,
+      },
+      {
+        fromStepKey: 'FACULTY_SECRETARY_REVIEW',
+        toStepKey: 'DEPARTMENT_CHAIR_APPROVAL',
+        actionType: WorkflowActionType.APPROVE,
+      },
+      {
+        fromStepKey: 'FACULTY_SECRETARY_REVIEW',
+        toStepKey: 'REVISION',
+        actionType: WorkflowActionType.REQUEST_REVISION,
+      },
+      {
+        fromStepKey: 'FACULTY_SECRETARY_REVIEW',
+        toStepKey: 'REJECTED_END',
+        actionType: WorkflowActionType.REJECT,
+      },
+      {
+        fromStepKey: 'DEPARTMENT_CHAIR_APPROVAL',
+        toStepKey: 'FINANCE_OFFICER_REVIEW',
+        actionType: WorkflowActionType.APPROVE,
+      },
+      {
+        fromStepKey: 'DEPARTMENT_CHAIR_APPROVAL',
+        toStepKey: 'REVISION',
+        actionType: WorkflowActionType.REQUEST_REVISION,
+      },
+      {
+        fromStepKey: 'DEPARTMENT_CHAIR_APPROVAL',
+        toStepKey: 'REJECTED_END',
+        actionType: WorkflowActionType.REJECT,
+      },
+      {
+        fromStepKey: 'FINANCE_OFFICER_REVIEW',
+        toStepKey: 'BUDGET_APPROVER_APPROVAL',
+        actionType: WorkflowActionType.APPROVE,
+      },
+      {
+        fromStepKey: 'FINANCE_OFFICER_REVIEW',
+        toStepKey: 'REVISION',
+        actionType: WorkflowActionType.REQUEST_REVISION,
+      },
+      {
+        fromStepKey: 'FINANCE_OFFICER_REVIEW',
+        toStepKey: 'REJECTED_END',
+        actionType: WorkflowActionType.REJECT,
+      },
+      {
+        fromStepKey: 'BUDGET_APPROVER_APPROVAL',
+        toStepKey: 'EVENT_COORDINATOR_FINAL',
+        actionType: WorkflowActionType.APPROVE,
+      },
+      {
+        fromStepKey: 'BUDGET_APPROVER_APPROVAL',
+        toStepKey: 'REVISION',
+        actionType: WorkflowActionType.REQUEST_REVISION,
+      },
+      {
+        fromStepKey: 'BUDGET_APPROVER_APPROVAL',
+        toStepKey: 'REJECTED_END',
+        actionType: WorkflowActionType.REJECT,
+      },
+      {
+        fromStepKey: 'EVENT_COORDINATOR_FINAL',
+        toStepKey: 'APPROVED_END',
+        actionType: WorkflowActionType.APPROVE,
+      },
+      {
+        fromStepKey: 'EVENT_COORDINATOR_FINAL',
+        toStepKey: 'REVISION',
+        actionType: WorkflowActionType.REQUEST_REVISION,
+      },
+      {
+        fromStepKey: 'EVENT_COORDINATOR_FINAL',
+        toStepKey: 'REJECTED_END',
+        actionType: WorkflowActionType.REJECT,
+      },
+      {
+        fromStepKey: 'REVISION',
+        toStepKey: 'FACULTY_SECRETARY_REVIEW',
+        actionType: WorkflowActionType.SUBMIT,
+      },
+    ],
+  },
+
+  {
     requestTypeKey: 'ACCESS_REQUEST',
     workflowKey: 'WF_ACCESS_REQUEST_V2',
     workflowName: 'Access Request Workflow',

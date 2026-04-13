@@ -320,6 +320,11 @@ async function main() {
       description: 'Event coordination and operational planning role',
       scopeType: RoleScope.UNIT,
     },
+    {
+      name: 'ORGANIZER',
+      description: 'Event organizer responsible for creating and managing event plans',
+      scopeType: RoleScope.UNIT,
+    },
   ];
 
   for (const role of [...baseRoles, ...operationalRoles]) {
@@ -1288,6 +1293,27 @@ async function main() {
           unitId: eventUnit.id,
         },
       ],
+    },
+    {
+      email: 'organizer@campusops.edu.tr',
+      firstName: 'Tarık',
+      lastName: 'Organizer',
+      fullName: 'Tarık Organizer',
+      title: 'Event Organizer',
+      gender: Gender.MALE,
+      staffNumber: 'STF-2024-015',
+      facultyId: artsFaculty.id,
+      departmentId: mathDepartment.id,
+        unitId: eventUnit.id,
+        roles: [
+          {
+            roleName: 'ORGANIZER',
+            isPrimary: true,
+            facultyId: artsFaculty.id,
+            departmentId: mathDepartment.id,
+            unitId: eventUnit.id,
+          },
+        ],
     },
   ];
 

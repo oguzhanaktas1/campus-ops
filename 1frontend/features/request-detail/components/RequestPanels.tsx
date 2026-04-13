@@ -295,6 +295,30 @@ export function RequestActionPanel({
     )
   }
 
+  if (detail.portal === 'organizer') {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Actions</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {detail.status === 'REVISION_REQUESTED' ? (
+            <Button asChild className="w-full">
+              <Link
+                href={`/organizer/requests/${detail.id}/edit?type=${detail.requestType.key}`}
+              >
+                Revise Submission
+              </Link>
+            </Button>
+          ) : null}
+          <p className="text-sm text-muted-foreground">
+            Track the status of your submitted request. You can add comments or revise if requested.
+          </p>
+        </CardContent>
+      </Card>
+    )
+  }
+
   if (detail.portal === 'faculty') {
     return (
       <Card>

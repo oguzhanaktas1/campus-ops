@@ -22,10 +22,13 @@ import { InternshipsModule } from './internships/internships.module';
 import { AccessRequestsModule } from './access-requests/access-requests.module';
 import { ProcurementModule } from './procurement/procurement.module';
 import { EventsModule } from './events/events.module';
+import { EventPlansModule } from './event-plans/event-plans.module';
+import { PublicEventsModule } from './public-events/public-events.module';
 import { RedisModule } from './infrastructure/redis/redis.module';
 import { CacheModule } from './infrastructure/cache/cache.module';
 import { QueueModule } from './infrastructure/queue/queue.module';
 import { FilesModule } from './files/files.module';
+import { OrganizerModule } from './organizer/organizer.module';
 
 @Module({
   imports: [
@@ -37,6 +40,7 @@ import { FilesModule } from './files/files.module';
     PrismaModule,
     AuthModule,
     NotificationsModule,
+    OrganizerModule,
     AdminModule,
     StudentModule,
     FacultyModule,
@@ -54,6 +58,8 @@ import { FilesModule } from './files/files.module';
     AccessRequestsModule,
     ProcurementModule,
     EventsModule,
+    EventPlansModule,
+    PublicEventsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

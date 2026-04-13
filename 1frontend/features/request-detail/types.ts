@@ -1,4 +1,4 @@
-export type RequestPortal = 'student' | 'faculty' | 'staff' | 'admin'
+export type RequestPortal = 'student' | 'faculty' | 'staff' | 'admin' | 'organizer'
 
 export interface RequestActor {
   id?: string | null
@@ -35,7 +35,7 @@ export interface RequestTimelineEvent {
 }
 
 export interface RequestWorkflowStep {
-  id: string
+  id: number
   label: string
   status: 'pending' | 'active' | 'completed' | 'failed' | 'warning'
 }

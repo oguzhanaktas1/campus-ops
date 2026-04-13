@@ -24,6 +24,7 @@ import {
   type WorkflowDetail,
   type WorkflowInstance,
   type WorkflowRequestType,
+  type WorkflowStep,
   type WorkflowSummary,
 } from '@/lib/admin-workflow'
 
@@ -31,7 +32,7 @@ type WorkflowInstanceRecord = {
   workflowId: string
   workflowKey: string
   workflowName: string
-  workflowSteps: WorkflowDetail['steps']
+  workflowSteps: WorkflowStep[]
   requestTypes: WorkflowRequestType[]
   instance: WorkflowInstance
 }

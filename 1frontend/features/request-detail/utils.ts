@@ -1,4 +1,4 @@
-import type { Step } from '@/components/workflow-step-indicator'
+import type { Step, StepStatus } from '@/components/workflow-step-indicator'
 
 export function formatDate(date?: string | null, includeTime = false) {
   if (!date) return '-'
@@ -58,7 +58,7 @@ export function buildWorkflowSteps(type: string, status: string): Step[] {
   const steps = labels.map((label, idx) => ({
     id: idx + 1,
     label,
-    status: 'pending' as const,
+    status: 'pending' as StepStatus,
   }))
 
   const safeStatus = (status || 'DRAFT').toUpperCase()

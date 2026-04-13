@@ -27,6 +27,50 @@ export interface MeResponse {
   }>;
 }
 
+function uniqueRoles(values: Array<string | null | undefined>) {
+  return Array.from(
+    new Set(
+      values
+        .map((value) => String(value ?? '').toUpperCase().trim())
+        .filter(Boolean),
+    ),
+  );
+}
+
+export function extractRoles(source: any): string[] {
+  const directRoles = Array.isArray(source?.roles)
+    ? source.roles.map((role: any) =>
+        typeof role === 'string' ? role : role?.name ?? role?.role?.name,
+      )
+    : [];
+
+  const primaryRoles = Array.isArray(source?.primaryRoles)
+    ? source.primaryRoles.map((role: any) => role?.role?.name ?? role?.name)
+    : [];
+
+  return uniqueRoles([source?.role, ...directRoles, ...primaryRoles]);
+}
+
+export function resolvePortalPath(source: any): string {
+  const roles = extractRoles(source);
+
+  if (roles.includes('ADMIN')) return '/admin/dashboard';
+  if (roles.includes('ORGANIZER')) return '/organizer/dashboard';
+  if (roles.includes('FACULTY')) return '/faculty/dashboard';
+  if (roles.includes('STAFF')) return '/staff/dashboard';
+  return '/student/dashboard';
+}
+
+export function resolvePrimaryRole(source: any): string | null {
+  const roles = extractRoles(source);
+  if (roles.includes('ADMIN')) return 'ADMIN';
+  if (roles.includes('ORGANIZER')) return 'ORGANIZER';
+  if (roles.includes('FACULTY')) return 'FACULTY';
+  if (roles.includes('STAFF')) return 'STAFF';
+  if (roles.includes('STUDENT')) return 'STUDENT';
+  return roles[0] ?? null;
+}
+
 export function getToken(): string | null {
   if (typeof window === 'undefined') return null;
   return localStorage.getItem('access_token');
@@ -60,7 +104,7 @@ export function isTokenExpired(token: string): boolean {
 }
 
 export function getRoleFromToken(_token: string): string | null {
-  return getStoredUser()?.role?.toUpperCase() ?? null;
+  return resolvePrimaryRole(getStoredUser());
 }
 
 async function parseError(res: Response, fallback: string) {

@@ -4,7 +4,13 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
-import { clearAuth, fetchProfile, getStoredUser } from '@/lib/auth'
+import {
+  clearAuth,
+  extractRoles,
+  fetchProfile,
+  getStoredUser,
+  resolvePortalPath,
+} from '@/lib/auth'
 
 const CHECK_INTERVAL_MS = 60 * 1000
 
@@ -49,11 +55,10 @@ export default function AuthGuard({ children, allowedRoles }: AuthGuardProps) {
     }
 
     if (allowedRoles && allowedRoles.length > 0) {
-      const userRole = String(
-        profile?.role || profile?.primaryRoles?.[0]?.role?.name || '',
-      ).toUpperCase()
-      if (!userRole || !allowedRoles.includes(userRole)) {
-        router.replace(userRole ? `/${userRole.toLowerCase()}/dashboard` : '/login')
+      const userRoles = extractRoles(profile)
+      const hasAllowedRole = userRoles.some((role) => allowedRoles.includes(role))
+      if (!hasAllowedRole) {
+        router.replace(userRoles.length > 0 ? resolvePortalPath(profile) : '/login')
         return false
       }
     }
@@ -73,9 +78,10 @@ export default function AuthGuard({ children, allowedRoles }: AuthGuardProps) {
     }
 
     if (allowedRoles && allowedRoles.length > 0) {
-      const userRole = String(storedUser.role || '').toUpperCase()
-      if (userRole && !allowedRoles.includes(userRole)) {
-        router.replace(`/${userRole.toLowerCase()}/dashboard`)
+      const userRoles = extractRoles(storedUser)
+      const hasAllowedRole = userRoles.some((role) => allowedRoles.includes(role))
+      if (userRoles.length > 0 && !hasAllowedRole) {
+        router.replace(resolvePortalPath(storedUser))
         return
       }
     }
