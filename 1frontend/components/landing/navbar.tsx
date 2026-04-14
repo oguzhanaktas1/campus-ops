@@ -3,8 +3,9 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
+import { CampusFlowLogo } from '@/components/campusflow-logo'
 import { ThemeToggle } from '@/components/theme-toggle'
-import { GraduationCap, Menu, X } from 'lucide-react'
+import { Menu, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const navLinks = [
@@ -35,11 +36,9 @@ export function Navbar() {
     >
       <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
         {/* Logo */}
-        <Link href="/" className="flex items-center gap-2.5 shrink-0" aria-label="CampusOps home">
-          <div className="size-8 rounded-lg bg-primary flex items-center justify-center shadow-sm">
-            <GraduationCap className="size-4 text-primary-foreground" />
-          </div>
-          <span className="font-bold text-foreground text-lg tracking-tight">CampusOps</span>
+        <Link href="/" className="flex items-center gap-2.5 shrink-0" aria-label="CampusFlow home">
+          <CampusFlowLogo containerClassName="size-8" priority />
+          <span className="font-bold text-foreground text-lg tracking-tight">CampusFlow</span>
         </Link>
 
         {/* Desktop nav */}
@@ -60,9 +59,6 @@ export function Navbar() {
           <ThemeToggle />
           <Link href="/login">
             <Button variant="ghost" size="sm">Log in</Button>
-          </Link>
-          <Link href="/sign-up">
-            <Button size="sm" className="shadow-sm">Get started free</Button>
           </Link>
         </div>
 
@@ -99,9 +95,6 @@ export function Navbar() {
             <div className="pt-3 mt-2 border-t border-border flex flex-col gap-2">
               <Link href="/login" onClick={() => setMobileOpen(false)}>
                 <Button variant="outline" size="sm" className="w-full">Log in</Button>
-              </Link>
-              <Link href="/sign-up" onClick={() => setMobileOpen(false)}>
-                <Button size="sm" className="w-full">Get started free</Button>
               </Link>
             </div>
           </nav>

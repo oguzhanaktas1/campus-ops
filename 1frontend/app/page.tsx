@@ -11,9 +11,9 @@ import {
 } from 'lucide-react'
 
 export const metadata: Metadata = {
-  title: 'CampusOps – Smart Campus Operations Platform',
+  title: 'CampusFlow – Smart Campus Operations Platform',
   description:
-    'CampusOps is the all-in-one operations platform for universities. Manage student requests, faculty approvals, IT tickets, room reservations, and procurement workflows — all in one place.',
+    'CampusFlow is the all-in-one operations platform for universities. Manage student requests, faculty approvals, IT tickets, room reservations, and procurement workflows — all in one place.',
   alternates: {
     canonical: '/',
   },
@@ -184,7 +184,7 @@ export default function HomePage() {
                 From request to resolution in 3 steps
               </h2>
               <p className="text-muted-foreground mt-4 max-w-xl mx-auto text-balance">
-                No more spreadsheets, shared inboxes, or lost emails. CampusOps brings structure
+                No more spreadsheets, shared inboxes, or lost emails. CampusFlow brings structure
                 and visibility to every campus process.
               </p>
             </div>

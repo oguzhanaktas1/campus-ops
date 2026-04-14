@@ -152,7 +152,7 @@ export default function RequestTypesPage() {
         <div>
           <h1 className="text-xl font-bold text-foreground">Request Types</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Manage the types of requests available in CampusOps.
+            Manage the types of requests available in CampusFlow.
           </p>
         </div>
         <Button size="sm" className="gap-1.5" onClick={() => setIsModalOpen(true)}>

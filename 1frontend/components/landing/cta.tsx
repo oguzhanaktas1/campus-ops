@@ -36,12 +36,12 @@ export function CTA() {
             Ready to modernize your campus operations?
           </h2>
           <p className="text-primary-foreground/75 mb-10 max-w-xl mx-auto text-balance text-lg leading-relaxed">
-            Join universities using CampusOps to streamline workflows, reduce administrative load,
+            Join universities using CampusFlow to streamline workflows, reduce administrative load,
             and improve student satisfaction — from day one.
           </p>
 
           <div className="flex items-center justify-center gap-3 flex-wrap mb-8">
-            <Link href="/sign-up">
+            <Link href="/login">
               <Button
                 size="lg"
                 className="gap-2 h-12 px-6 text-base bg-white text-primary hover:bg-white/90 shadow-lg shadow-black/10"
@@ -65,10 +65,10 @@ export function CTA() {
             <Mail className="size-3.5" aria-hidden="true" />
             <span>Questions? Email us at </span>
             <a
-              href="mailto:hello@campusops.app"
+              href="mailto:hello@campusflow.app"
               className="text-primary-foreground hover:underline font-medium"
             >
-              hello@campusops.app
+              hello@campusflow.app
             </a>
           </div>
         </div>

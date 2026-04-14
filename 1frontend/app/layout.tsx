@@ -4,16 +4,16 @@ import { ThemeProvider } from '@/components/theme-provider'
 import { AuthFetchProvider } from '@/components/auth-fetch-provider'
 import './globals.css'
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://campusops.app'
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://campusflow.app'
 
 export const metadata: Metadata = {
   metadataBase: new URL(APP_URL),
   title: {
-    default: 'CampusOps – Smart Campus Operations Platform',
-    template: '%s | CampusOps',
+    default: 'CampusFlow – Smart Campus Operations Platform',
+    template: '%s | CampusFlow',
   },
   description:
-    'CampusOps is the all-in-one operations platform built for universities. Manage student requests, faculty approvals, IT tickets, room reservations, and procurement workflows — all in one place.',
+    'CampusFlow is the all-in-one operations platform built for universities. Manage student requests, faculty approvals, IT tickets, room reservations, and procurement workflows — all in one place.',
   keywords: [
     'campus operations platform',
     'university management software',
@@ -26,9 +26,9 @@ export const metadata: Metadata = {
     'room reservation system',
     'internship management',
   ],
-  authors: [{ name: 'CampusOps' }],
-  creator: 'CampusOps',
-  publisher: 'CampusOps',
+  authors: [{ name: 'CampusFlow' }],
+  creator: 'CampusFlow',
+  publisher: 'CampusFlow',
   robots: {
     index: true,
     follow: true,
@@ -44,8 +44,8 @@ export const metadata: Metadata = {
     type: 'website',
     locale: 'en_US',
     url: APP_URL,
-    siteName: 'CampusOps',
-    title: 'CampusOps – Smart Campus Operations Platform',
+    siteName: 'CampusFlow',
+    title: 'CampusFlow – Smart Campus Operations Platform',
     description:
       'All-in-one operations platform for universities. Automate approvals, manage requests, and streamline campus workflows.',
     images: [
@@ -53,23 +53,21 @@ export const metadata: Metadata = {
         url: '/og-image.png',
         width: 1200,
         height: 630,
-        alt: 'CampusOps – Smart Campus Operations Platform',
+        alt: 'CampusFlow – Smart Campus Operations Platform',
       },
     ],
   },
   twitter: {
     card: 'summary_large_image',
-    site: '@campusops',
-    creator: '@campusops',
-    title: 'CampusOps – Smart Campus Operations Platform',
+    site: '@campusflow',
+    creator: '@campusflow',
+    title: 'CampusFlow – Smart Campus Operations Platform',
     description:
       'All-in-one operations platform for universities. Automate approvals, manage requests, and streamline campus workflows.',
     images: ['/og-image.png'],
   },
   icons: {
     icon: [
-      { url: '/icon-light-32x32.png', media: '(prefers-color-scheme: light)' },
-      { url: '/icon-dark-32x32.png', media: '(prefers-color-scheme: dark)' },
       { url: '/icon.svg', type: 'image/svg+xml' },
     ],
     apple: '/apple-icon.png',
@@ -95,20 +93,20 @@ const jsonLd = {
     {
       '@type': 'Organization',
       '@id': `${APP_URL}/#organization`,
-      name: 'CampusOps',
+      name: 'CampusFlow',
       url: APP_URL,
       logo: {
         '@type': 'ImageObject',
         url: `${APP_URL}/icon.svg`,
       },
       description:
-        'CampusOps is an all-in-one campus operations platform for universities and higher education institutions.',
-      sameAs: ['https://twitter.com/campusops'],
+        'CampusFlow is an all-in-one campus operations platform for universities and higher education institutions.',
+      sameAs: ['https://twitter.com/campusflow'],
     },
     {
       '@type': 'SoftwareApplication',
       '@id': `${APP_URL}/#software`,
-      name: 'CampusOps',
+      name: 'CampusFlow',
       applicationCategory: 'BusinessApplication',
       operatingSystem: 'Web',
       url: APP_URL,
@@ -138,7 +136,7 @@ const jsonLd = {
       '@type': 'WebSite',
       '@id': `${APP_URL}/#website`,
       url: APP_URL,
-      name: 'CampusOps',
+      name: 'CampusFlow',
       publisher: {
         '@id': `${APP_URL}/#organization`,
       },

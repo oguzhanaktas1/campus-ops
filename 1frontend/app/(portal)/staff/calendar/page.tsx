@@ -105,7 +105,7 @@ export default function StaffCalendarPage() {
       const url = URL.createObjectURL(blob)
       const link = document.createElement('a')
       link.href = url
-      link.download = 'campusops-calendar.ics'
+      link.download = 'campusflow-calendar.ics'
       link.click()
       URL.revokeObjectURL(url)
     } catch {

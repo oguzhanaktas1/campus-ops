@@ -6,7 +6,8 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { GraduationCap, ArrowRight, Eye, EyeOff, Loader2 } from 'lucide-react'
+import { CampusFlowLogo } from '@/components/campusflow-logo'
+import { ArrowRight, Eye, EyeOff, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { apiLogin, resolvePortalPath, setAuth } from '@/lib/auth'
 
@@ -46,14 +47,12 @@ export default function LoginPage() {
       {/* Sol Panel (Aynı kaldı) */}
       <div className="hidden lg:flex w-1/2 bg-sidebar flex-col justify-between p-12">
         <Link href="/" className="flex items-center gap-2">
-          <div className="size-9 rounded-lg bg-sidebar-primary flex items-center justify-center">
-            <GraduationCap className="size-5 text-sidebar-primary-foreground" />
-          </div>
-          <span className="text-xl font-bold text-sidebar-foreground">CampusOps</span>
+          <CampusFlowLogo containerClassName="size-9" priority />
+          <span className="text-xl font-bold text-sidebar-foreground">CampusFlow</span>
         </Link>
         <div>
           <blockquote className="text-sidebar-foreground/90 text-lg font-medium leading-relaxed mb-6">
-            "CampusOps transformed how we handle administrative workflows. What used to take days now takes hours."
+            "CampusFlow transformed how we handle administrative workflows. What used to take days now takes hours."
           </blockquote>
           <div>
             <p className="text-sidebar-foreground font-semibold text-sm">Dr. Margaret Liu</p>
@@ -68,10 +67,8 @@ export default function LoginPage() {
         <div className="w-full max-w-sm">
           <div className="mb-8">
             <Link href="/" className="lg:hidden flex items-center gap-2 mb-6">
-              <div className="size-7 rounded bg-primary flex items-center justify-center">
-                <GraduationCap className="size-4 text-primary-foreground" />
-              </div>
-              <span className="font-bold text-foreground">CampusOps</span>
+              <CampusFlowLogo containerClassName="size-7" priority />
+              <span className="font-bold text-foreground">CampusFlow</span>
             </Link>
             <h1 className="text-2xl font-bold text-foreground">Welcome back</h1>
             <p className="text-muted-foreground text-sm mt-1">Sign in to your portal</p>

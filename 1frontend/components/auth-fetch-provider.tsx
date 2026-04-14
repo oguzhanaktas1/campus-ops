@@ -19,10 +19,10 @@ function isBackendRequest(input: RequestInfo | URL) {
 export function AuthFetchProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (typeof window === 'undefined') return
-    if ((window as any).__campusopsFetchPatched) return
+    if ((window as any).__campusflowFetchPatched) return
 
     const originalFetch = window.fetch.bind(window)
-    ;(window as any).__campusopsFetchPatched = true
+    ;(window as any).__campusflowFetchPatched = true
 
     window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
       if (!isBackendRequest(input)) {

@@ -24,7 +24,7 @@ const DashboardPreview = () => (
         </div>
         <div className="flex-1 mx-4">
           <div className="h-6 bg-background border border-border rounded-md flex items-center px-3">
-            <span className="text-[11px] text-muted-foreground font-mono">www.campusops.com.tr/student/dashboard</span>
+            <span className="text-[11px] text-muted-foreground font-mono">www.campusflow.com.tr/student/dashboard</span>
           </div>
         </div>
       </div>
@@ -138,13 +138,13 @@ export function Hero() {
 
         {/* Subheading */}
         <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto text-balance mb-10 leading-relaxed">
-          CampusOps connects students, faculty, staff, and admins in a unified workflow platform.
+          CampusFlow connects students, faculty, staff, and admins in a unified workflow platform.
           Eliminate paperwork, automate approvals, and keep your institution running at full speed.
         </p>
 
         {/* CTA buttons */}
         <div className="flex items-center justify-center gap-3 flex-wrap mb-8">
-          <Link href="/sign-up">
+          <Link href="/login">
             <Button size="lg" className="gap-2 shadow-md shadow-primary/25 h-12 px-6 text-base">
               Start free trial <ArrowRight className="size-4" />
             </Button>
