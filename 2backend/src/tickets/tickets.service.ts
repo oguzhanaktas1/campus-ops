@@ -36,6 +36,8 @@ import {
   CacheTtls,
   makeCacheHash,
 } from '../infrastructure/cache/cache-keys';
+import { RabbitmqPublisher } from '../infrastructure/rabbitmq/rabbitmq.publisher';
+import { RoutingKeys } from '../infrastructure/rabbitmq/routing-keys';
 
 const IT_REQUEST_TYPE_KEY = 'IT_SUPPORT';
 
@@ -92,6 +94,7 @@ export class TicketsService {
     private notificationsService: NotificationsService,
     private cacheService: CacheService,
     private filesService: FilesService,
+    private mq: RabbitmqPublisher,
   ) {}
 
   private hasAnyRole(roles: string[], allowed: string[]) {
@@ -1562,6 +1565,16 @@ export class TicketsService {
       actionUrl: `/staff/tickets/${requestId}`,
     });
 
+    this.mq.publish({
+      event: RoutingKeys.WORKFLOW_ASSIGNED,
+      occurredAt: new Date().toISOString(),
+      requestId,
+      requestType: 'IT_TICKET',
+      stepCode: 'it_assignment',
+      assigneeUserId: dto.assignedItUserId,
+      triggeredByUserId: userId,
+    });
+
     await this.touchTicketCaches(requestId);
     return result;
   }
@@ -1874,6 +1887,16 @@ export class TicketsService {
       title: 'IT Ticket Resolved',
       message: `${ticket.request.requestNo} has been resolved and is awaiting confirmation.`,
       actionUrl: `/faculty/tickets/${requestId}`,
+    });
+
+    this.mq.publish({
+      event: RoutingKeys.WORKFLOW_APPROVED,
+      occurredAt: new Date().toISOString(),
+      requestId,
+      requestType: 'IT_TICKET',
+      actorUserId: userId,
+      comment: dto.resolutionSummary,
+      newStatus: 'COMPLETED',
     });
 
     await this.touchTicketCaches(requestId);

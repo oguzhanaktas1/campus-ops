@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Request Submitted — CampusFlow{% endblock %}
+{% block content %}
+<h2>Your request has been submitted</h2>
+<p>Hi <strong>{{ name }}</strong>,</p>
+<p>Your request has been successfully submitted and is now under review.</p>
+<div class="meta">
+  <p><strong>Request No:</strong> {{ requestNo }}</p>
+  <p><strong>Type:</strong> {{ requestType }}</p>
+  <p><strong>Status:</strong> Submitted</p>
+</div>
+<p>You will receive updates as your request progresses through the review process.</p>
+<a class="btn" href="{{ requestUrl }}">View Request</a>
+{% endblock %}

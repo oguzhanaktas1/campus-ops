@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Action Required — CampusFlow{% endblock %}
+{% block content %}
+<h2>A request has been assigned to you</h2>
+<p>Hi <strong>{{ name }}</strong>,</p>
+<p>A new request requires your attention.</p>
+<div class="meta">
+  <p><strong>Request No:</strong> {{ requestNo }}</p>
+  <p><strong>Type:</strong> {{ requestType }}</p>
+  <p><strong>Step:</strong> {{ stepCode }}</p>
+</div>
+<p>Please review the request and take the appropriate action.</p>
+<a class="btn" href="{{ requestUrl }}">Review Request</a>
+{% endblock %}

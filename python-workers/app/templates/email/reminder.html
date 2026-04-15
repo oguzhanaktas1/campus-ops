@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Action Reminder — CampusFlow{% endblock %}
+{% block content %}
+<h2>Reminder: Action required</h2>
+<p>Hi <strong>{{ name }}</strong>,</p>
+<p>This is a reminder that the following request is awaiting your action.</p>
+<div class="meta">
+  <p><strong>Request No:</strong> {{ requestNo }}</p>
+  <p><strong>Reminder type:</strong> {{ reminderType }}</p>
+</div>
+<p>Please take action as soon as possible to avoid SLA breach.</p>
+<a class="btn" href="{{ requestUrl }}">Go to Request</a>
+{% endblock %}

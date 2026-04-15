@@ -1755,3 +1755,35 @@ model EventDecisionLog {
   @@index([eventId])
   @@index([decidedByUserId])
 }
+
+// ─── Outbox Pattern ──────────────────────────────────────────────────────────
+model OutboxEvent {
+  id          String       @id @default(cuid())
+  routingKey  String
+  payload     Json
+  status      OutboxStatus @default(PENDING)
+  retryCount  Int          @default(0)
+  lastError   String?
+  createdAt   DateTime     @default(now())
+  processedAt DateTime?
+
+  @@index([status, createdAt])
+  @@index([routingKey])
+}
+
+enum OutboxStatus {
+  PENDING
+  PROCESSED
+  FAILED
+}
+
+// Python worker'ların işlediği event'leri izler (dual-write idempotency)
+model ProcessedEvent {
+  id            String   @id @default(cuid())
+  correlationId String
+  queue         String
+  processedAt   DateTime @default(now())
+
+  @@unique([correlationId, queue])
+  @@index([processedAt])
+}

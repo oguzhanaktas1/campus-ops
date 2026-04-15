@@ -20,6 +20,9 @@ import {
   CacheTtls,
   getPortalFromRoles,
 } from '../infrastructure/cache/cache-keys';
+import { RabbitmqPublisher } from '../infrastructure/rabbitmq/rabbitmq.publisher';
+import { OutboxService } from '../infrastructure/rabbitmq/outbox.service';
+import { RoutingKeys } from '../infrastructure/rabbitmq/routing-keys';
 
 const OPEN_STATUSES: RequestStatus[] = ['SUBMITTED', 'IN_REVIEW', 'WAITING_APPROVAL'];
 const INTERNAL_ROLES = ['STAFF', 'FACULTY', 'ADMIN'];
@@ -69,6 +72,8 @@ export class RequestsService {
     private slaService: SlaService,
     private cacheService: CacheService,
     private filesService: FilesService,
+    private mq: RabbitmqPublisher,
+    private outbox: OutboxService,
   ) {}
 
   private assertRequestAccess(req: any, userId: string, roles: string[]) {
@@ -165,6 +170,18 @@ export class RequestsService {
           });
         }
       }
+
+      // ── Outbox: request.created — transaction ile atomik ─────────────────
+      await this.outbox.enqueue({
+        event: RoutingKeys.REQUEST_CREATED,
+        occurredAt: new Date().toISOString(),
+        requestId: req.id,
+        requestNo: req.requestNo,
+        requestType: (req.requestType as any).key ?? '',
+        requesterUserId: userId,
+        priority: req.priority,
+        workflowInstanceId: null,
+      }, tx as any);
 
       return req;
     });
@@ -487,6 +504,26 @@ export class RequestsService {
       this.cacheService.bumpVersion(CacheKeys.version('faculty:approvals:list')),
       this.cacheService.bumpVersion(CacheKeys.version('staff:tickets:list')),
     ]);
+
+    // ── Outbox: workflow action event — fire-and-forget (transaction dışı) ──
+    const actionToEvent: Record<string, string> = {
+      approve:  RoutingKeys.WORKFLOW_APPROVED,
+      reject:   RoutingKeys.WORKFLOW_REJECTED,
+      revision: RoutingKeys.WORKFLOW_REVISION_REQUESTED,
+    };
+    const eventKey = actionToEvent[dto.action];
+    if (eventKey) {
+      // processAction transaction'ı zaten commit edildi; outbox direkt yaz
+      void this.outbox.enqueue({
+        event: eventKey as any,
+        occurredAt: new Date().toISOString(),
+        requestId,
+        requestType: (result as any).requestType?.key ?? '',
+        actorUserId: userId,
+        comment: dto.comment ?? null,
+        newStatus: (result as any).status ?? '',
+      });
+    }
 
     return result;
   }

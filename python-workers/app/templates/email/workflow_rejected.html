@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Request Rejected — CampusFlow{% endblock %}
+{% block content %}
+<h2>Your request has been rejected</h2>
+<p>Hi <strong>{{ name }}</strong>,</p>
+<p>Unfortunately, your request could not be approved at this time.</p>
+<div class="meta">
+  <p><strong>Request No:</strong> {{ requestNo }}</p>
+  <p><strong>Reason:</strong> {{ reason }}</p>
+</div>
+<p>If you have questions, please contact the relevant office or submit a new request.</p>
+<a class="btn" href="{{ requestUrl }}">View Request</a>
+{% endblock %}

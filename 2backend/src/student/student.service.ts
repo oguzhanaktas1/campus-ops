@@ -30,6 +30,8 @@ import {
   buildStorageObjectKey,
 } from '../files/file-security';
 import { FilesService } from '../files/files.service';
+import { RabbitmqPublisher } from '../infrastructure/rabbitmq/rabbitmq.publisher';
+import { RoutingKeys } from '../infrastructure/rabbitmq/routing-keys';
 @Injectable()
 export class StudentService {
   private readonly logger = new Logger(StudentService.name);
@@ -40,6 +42,7 @@ export class StudentService {
     private prisma: PrismaService,
     private workflowEngine: WorkflowEngineService,
     private filesService: FilesService,
+    private mq: RabbitmqPublisher,
   ) {
     const supabaseUrl = process.env.SUPABASE_URL;
     const supabaseKey = process.env.SUPABASE_KEY;
@@ -945,6 +948,16 @@ export class StudentService {
             requestId: req.id,
           },
         });
+
+        // ── RabbitMQ: attachment.process ────────────────────────────────────
+        this.mq.publish({
+          event: RoutingKeys.ATTACHMENT_PROCESS,
+          occurredAt: new Date().toISOString(),
+          attachmentId: savedFile.id,
+          requestId: req.id,
+          storageKey: meta.objectPath,
+          mimeType: meta.mimeType,
+        } as any);
       }
 
       if (!reqType.workflowDefinitionId && assignedUserId) {

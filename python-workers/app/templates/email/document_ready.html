@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Document Ready — CampusFlow{% endblock %}
+{% block content %}
+<h2>Your document is ready</h2>
+<p>Hi <strong>{{ name }}</strong>,</p>
+<p>The official approval document for your request has been generated and is now available for download.</p>
+<div class="meta">
+  <p><strong>Request No:</strong> {{ requestNo }}</p>
+  <p><strong>Document:</strong> Approval Summary (PDF)</p>
+</div>
+<p>Click the button below to view and download your document.</p>
+<a class="btn" href="{{ requestUrl }}">Download Document</a>
+{% endblock %}

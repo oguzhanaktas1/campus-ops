@@ -13,6 +13,8 @@ import {
 } from '@prisma/client';
 import { ProcessActionDto } from './dto/process-action.dto';
 import { SlaService } from './sla.service';
+import { RabbitmqPublisher } from '../infrastructure/rabbitmq/rabbitmq.publisher';
+import { RoutingKeys } from '../infrastructure/rabbitmq/routing-keys';
 
 const TERMINAL_STATUSES: RequestStatus[] = [
   'APPROVED',
@@ -58,6 +60,7 @@ export class WorkflowEngineService {
   constructor(
     private prisma: PrismaService,
     private slaService: SlaService,
+    private mq: RabbitmqPublisher,
   ) {}
 
   private getJsonPathValue(
@@ -634,7 +637,11 @@ export class WorkflowEngineService {
       throw new BadRequestException('Request is already in a terminal state.');
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    // workflow.assigned için transaction dışında publish edilecek veri
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const assignedPublishRef: { data: any } = { data: null };
+
+    const txResult = await this.prisma.$transaction(async (tx) => {
       const workflowInstance = request.workflowInstance;
       const pendingStep = workflowInstance?.instanceSteps?.[0] ?? null;
 
@@ -738,6 +745,17 @@ export class WorkflowEngineService {
             data: { currentStepId: nextStep.id, status: 'ACTIVE' },
           });
 
+          const resolvedIds = await this.resolveAssignedUserIds(
+            tx,
+            {
+              facultyId:    request.facultyId,
+              departmentId: request.departmentId,
+              unitId:       request.unitId,
+              dynamicData:  request.dynamicData,
+            },
+            nextStep,
+          );
+
           await this.activateStep(
             tx,
             {
@@ -755,6 +773,14 @@ export class WorkflowEngineService {
             userId,
             `Workflow moved to "${nextStep.stepName}".`,
           );
+
+          // Transaction dışında publish için ref'e yaz
+          assignedPublishRef.data = {
+            assigneeUserIds: resolvedIds,
+            stepCode: nextStep.stepKey,
+            workflowInstanceId: workflowInstance.id,
+            requestType: (request as any).requestType?.key ?? '',
+          };
         } else {
           await this.slaService.markResolution(tx, requestId, nextStatus);
 
@@ -783,5 +809,29 @@ export class WorkflowEngineService {
         nextStep: shouldContinue ? nextStep?.stepName ?? null : null,
       };
     });
+
+    // ── workflow.assigned event — transaction dışında publish ──────────────
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    const apd = assignedPublishRef.data;
+    if (apd) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      for (const assigneeUserId of apd.assigneeUserIds as string[]) {
+        this.mq.publish({
+          event:              RoutingKeys.WORKFLOW_ASSIGNED,
+          occurredAt:         new Date().toISOString(),
+          requestId,
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+          requestType:        apd.requestType,
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+          workflowInstanceId: apd.workflowInstanceId,
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+          stepCode:           apd.stepCode,
+          assigneeUserId,
+          triggeredByUserId:  userId,
+        });
+      }
+    }
+
+    return txResult;
   }
 }

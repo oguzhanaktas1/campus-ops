@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Request Approved — CampusFlow{% endblock %}
+{% block content %}
+<h2>Your request has been approved ✓</h2>
+<p>Hi <strong>{{ name }}</strong>,</p>
+<p>Great news! Your request has been approved.</p>
+<div class="meta">
+  <p><strong>Request No:</strong> {{ requestNo }}</p>
+  {% if comment %}<p><strong>Note:</strong> {{ comment }}</p>{% endif %}
+</div>
+<a class="btn" href="{{ requestUrl }}">View Request</a>
+{% endblock %}

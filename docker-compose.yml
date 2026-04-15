@@ -32,6 +32,24 @@ services:
       timeout: 5s
       retries: 10
 
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: campusops-rabbitmq
+    restart: unless-stopped
+    ports:
+      - "5672:5672"    # AMQP
+      - "15672:15672"  # Management UI → http://localhost:15672  (campusops/campusops_mq)
+    environment:
+      RABBITMQ_DEFAULT_USER: campusops
+      RABBITMQ_DEFAULT_PASS: campusops_mq
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+
   backend:
     build:
       context: ./2backend
@@ -45,6 +63,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     environment:
       NODE_ENV: production
       RUN_MIGRATIONS: "false"
@@ -57,8 +77,44 @@ services:
       REDIS_DB: 0
       REDIS_TLS: "false"
       JWT_SECRET: super-gizli-kampus-anahtari
+      RABBITMQ_URL: amqp://campusops:campusops_mq@rabbitmq:5672
+      RABBITMQ_MGMT_URL: http://rabbitmq:15672
+      RABBITMQ_MGMT_USER: campusops
+      RABBITMQ_MGMT_PASS: campusops_mq
+      WORKERS_INTERNAL_URL: http://python-workers:8001
+      METRICS_INTERNAL_URL: http://python-workers:8000
+      PROMETHEUS_URL: http://python-workers:8000
     ports:
       - "5000:5000"
+
+  python-workers:
+    build:
+      context: ./python-workers
+      dockerfile: Dockerfile
+    container_name: campusops-workers
+    restart: unless-stopped
+    env_file:
+      - ./python-workers/.env
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      RABBITMQ_URL: amqp://campusops:campusops_mq@rabbitmq:5672
+      REDIS_URL: redis://redis:6379/0
+      ENV: production
+      LOG_LEVEL: INFO
+    ports:
+      - "8000:8000"   # Prometheus metrics
+      - "8001:8001"   # Health check
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
 
   frontend:
     build:
@@ -84,3 +140,4 @@ services:
 volumes:
   postgres_data:
   redis_data:
+  rabbitmq_data:

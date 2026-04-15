@@ -1,0 +1,135 @@
+import { Controller, Get, UseGuards } from '@nestjs/common';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
+import { RabbitmqMonitorService } from '../infrastructure/rabbitmq/rabbitmq-monitor.service';
+import { OutboxProcessorService } from '../infrastructure/rabbitmq/outbox-processor.service';
+import { PrismaService } from '../core/prisma/prisma.service';
+import { RabbitmqPublisher } from '../infrastructure/rabbitmq/rabbitmq.publisher';
+
+/**
+ * System Monitoring — admin yetkisiyle erişilir.
+ *
+ * Local:  http://localhost:5000/admin/system/...
+ * Prod:   https://yourdomain.com/admin/system/...
+ *
+ * Python worker URL'leri (iç ağ / env'den okunur):
+ *   WORKERS_INTERNAL_URL  varsayılan: http://localhost:8001
+ *   METRICS_INTERNAL_URL  varsayılan: http://localhost:8000
+ */
+@Controller('admin/system')
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles('ADMIN')
+export class SystemMonitorController {
+  private readonly workersUrl: string;
+  private readonly metricsUrl: string;
+
+  constructor(
+    private readonly mqMonitor: RabbitmqMonitorService,
+    private readonly outboxProcessor: OutboxProcessorService,
+    private readonly prisma: PrismaService,
+    private readonly mqPublisher: RabbitmqPublisher,
+  ) {
+    this.workersUrl = process.env.WORKERS_INTERNAL_URL ?? 'http://localhost:8001';
+    this.metricsUrl = process.env.METRICS_INTERNAL_URL ?? 'http://localhost:8000';
+  }
+
+  // ── NestJS health ────────────────────────────────────────────────────────
+
+  @Get('backend/health')
+  backendHealth() {
+    return { status: 'ok', service: 'backend', timestamp: new Date().toISOString() };
+  }
+
+  @Get('backend/ready')
+  async backendReady() {
+    const checks: Record<string, boolean> = {};
+    try {
+      await this.prisma.$queryRaw`SELECT 1`;
+      checks.database = true;
+    } catch { checks.database = false; }
+    checks.rabbitmq = (this.mqPublisher as any).channel !== null;
+    const allReady = Object.values(checks).every(Boolean);
+    return { status: allReady ? 'ready' : 'not_ready', checks, service: 'backend', timestamp: new Date().toISOString() };
+  }
+
+  // ── Python workers proxy ─────────────────────────────────────────────────
+
+  @Get('workers/health')
+  async workersHealth() {
+    return this._proxy(`${this.workersUrl}/health`, 'workers');
+  }
+
+  @Get('workers/ready')
+  async workersReady() {
+    return this._proxy(`${this.workersUrl}/ready`, 'workers');
+  }
+
+  @Get('workers/metrics/raw')
+  async workersMetricsRaw() {
+    return this._proxyText(`${this.metricsUrl}/metrics`);
+  }
+
+  // ── Queue & outbox ───────────────────────────────────────────────────────
+
+  @Get('rabbitmq/queues')
+  getRabbitmqQueues() { return this.mqMonitor.getQueueStats(); }
+
+  @Get('rabbitmq/dlq')
+  getRabbitmqDlq() { return this.mqMonitor.getDlqStats(); }
+
+  @Get('outbox/stats')
+  getOutboxStats() { return this.mqMonitor.getOutboxStats(); }
+
+  // ── Full snapshot ────────────────────────────────────────────────────────
+
+  /** Tek çağrıda tüm monitoring verisi */
+  @Get('snapshot')
+  async getSnapshot() {
+    const [backend, workers, rabbitmq, outbox] = await Promise.allSettled([
+      this.backendReady(),
+      this._proxy(`${this.workersUrl}/ready`, 'workers'),
+      this.mqMonitor.getFullStatus(),
+      this.mqMonitor.getOutboxStats(),
+    ]);
+
+    return {
+      timestamp: new Date().toISOString(),
+      backend:   backend.status  === 'fulfilled' ? backend.value  : { status: 'error', error: (backend  as any).reason?.message },
+      workers:   workers.status  === 'fulfilled' ? workers.value  : { status: 'error', error: (workers  as any).reason?.message },
+      rabbitmq:  rabbitmq.status === 'fulfilled' ? rabbitmq.value : { status: 'error', error: (rabbitmq as any).reason?.message },
+      outbox:    outbox.status   === 'fulfilled' ? outbox.value   : { status: 'error', error: (outbox   as any).reason?.message },
+      urls: {
+        backendHealth:  `${process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000'}/health`,
+        backendReady:   `${process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000'}/ready`,
+        workersHealth:  `${process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000'}/admin/system/workers/health`,
+        workersReady:   `${process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000'}/admin/system/workers/ready`,
+        metrics:        `${process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000'}/admin/system/workers/metrics/raw`,
+        rabbitmqMgmt:   process.env.RABBITMQ_MGMT_URL ?? 'http://localhost:15672',
+        prometheus:     process.env.PROMETHEUS_URL ?? 'http://localhost:8000',
+      },
+    };
+  }
+
+  // ── Yardımcılar ──────────────────────────────────────────────────────────
+
+  private async _proxy(url: string, service: string): Promise<any> {
+    try {
+      const res = await fetch(url, { signal: AbortSignal.timeout(4000) });
+      const json = await res.json();
+      return { ...json, service };
+    } catch (err: any) {
+      return { status: 'unreachable', service, error: err?.message ?? 'timeout' };
+    }
+  }
+
+  private async _proxyText(url: string): Promise<{ content: string }> {
+    try {
+      const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
+      const text = await res.text();
+      return { content: text };
+    } catch {
+      return { content: '# metrics endpoint unreachable' };
+    }
+  }
+}

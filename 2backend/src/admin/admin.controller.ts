@@ -21,12 +21,18 @@ import { extractUserId } from '../core/auth/extract-user-id';
 import { AssignRoleDto } from './dto/assign-role.dto';
 import { AdminUpdateProfileDto } from './dto/admin-update-profile.dto';
 import { UpdateRequestTypeDto } from '../requests/dto/update-request-type.dto';
+import { OutboxProcessorService } from '../infrastructure/rabbitmq/outbox-processor.service';
+import { RabbitmqMonitorService } from '../infrastructure/rabbitmq/rabbitmq-monitor.service';
 
 @Controller('admin')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles('ADMIN')
 export class AdminController {
-  constructor(private readonly adminService: AdminService) {}
+  constructor(
+    private readonly adminService: AdminService,
+    private readonly outboxProcessor: OutboxProcessorService,
+    private readonly mqMonitor: RabbitmqMonitorService,
+  ) {}
 
   @Get('users')
   getAllUsers(
@@ -506,6 +512,56 @@ export class AdminController {
   @Delete('workflows-admin/:id')
   deleteWorkflow(@Request() req: any, @Param('id') id: string) {
     return this.adminService.deleteWorkflow(extractUserId(req), id);
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // OUTBOX MANAGEMENT
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /** Birikmiş pending outbox event'lerini hemen işle */
+  @Post('outbox/flush')
+  flushOutbox() {
+    return this.outboxProcessor.flush().then(() => ({ flushed: true }));
+  }
+
+  /** FAILED event'leri PENDING'e çevir ve yeniden dene */
+  @Post('outbox/retry-failed')
+  retryFailedOutbox() {
+    return this.outboxProcessor.retryFailed().then((count) => ({ retriedCount: count }));
+  }
+
+  /** 7 günden eski PROCESSED event'leri temizle */
+  @Post('outbox/purge')
+  purgeOutbox() {
+    return this.outboxProcessor.purgeProcessed().then((count) => ({ purgedCount: count }));
+  }
+
+  /** Outbox istatistikleri */
+  @Get('outbox/stats')
+  getOutboxStats() {
+    return this.mqMonitor.getOutboxStats();
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // RABBITMQ MONITORING
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /** Tüm RabbitMQ queue + DLQ + outbox özet durumu */
+  @Get('rabbitmq/status')
+  getRabbitmqStatus() {
+    return this.mqMonitor.getFullStatus();
+  }
+
+  /** Dead letter queue mesajları */
+  @Get('rabbitmq/dlq')
+  getDlqMessages() {
+    return this.mqMonitor.getDlqStats();
+  }
+
+  /** Queue listesi ve mesaj sayıları */
+  @Get('rabbitmq/queues')
+  getRabbitmqQueues() {
+    return this.mqMonitor.getQueueStats();
   }
 
   // ─────────────────────────────────────────────────────────────────────────

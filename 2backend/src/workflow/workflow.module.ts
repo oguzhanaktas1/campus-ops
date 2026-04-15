@@ -5,9 +5,10 @@ import { SlaService } from './sla.service';
 import { SlaSchedulerService } from './sla-scheduler.service';
 import { WorkflowController } from './workflow.controller';
 import { PrismaModule } from '../core/prisma/prisma.module';
+import { RabbitmqModule } from '../infrastructure/rabbitmq/rabbitmq.module';
 
 @Module({
-  imports: [PrismaModule],
+  imports: [PrismaModule, RabbitmqModule],
   controllers: [WorkflowController],
   providers: [
     WorkflowService,
