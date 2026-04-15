@@ -50,6 +50,7 @@ export default function AdminWorkflowsPage() {
   const [isCreateStepOpen, setIsCreateStepOpen] = useState(false)
   const [isCreateTransitionOpen, setIsCreateTransitionOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isMetaLoading, setIsMetaLoading] = useState(false)
 
   const [workflowForm, setWorkflowForm] = useState({
     key: '',
@@ -90,6 +91,10 @@ export default function AdminWorkflowsPage() {
   }, [])
 
   const fetchMeta = useCallback(async () => {
+    if (isMetaLoading) return
+    if (roles.length && users.length && units.length) return
+
+    setIsMetaLoading(true)
     try {
       const [rolesRes, usersRes, unitsRes] = await Promise.all([
         fetch(`${BACKEND}/admin/roles`, { headers: authHeaders() }),
@@ -121,8 +126,10 @@ export default function AdminWorkflowsPage() {
       }
     } catch {
       // silent meta fallback
+    } finally {
+      setIsMetaLoading(false)
     }
-  }, [])
+  }, [isMetaLoading, roles.length, units.length, users.length])
 
   const fetchWorkflowDetail = useCallback(async (id: string) => {
     setIsDetailLoading(true)
@@ -142,8 +149,13 @@ export default function AdminWorkflowsPage() {
   }, [])
 
   useEffect(() => {
-    void Promise.all([fetchWorkflows(), fetchMeta()])
-  }, [fetchMeta, fetchWorkflows])
+    void fetchWorkflows()
+  }, [fetchWorkflows])
+
+  useEffect(() => {
+    if (!isCreateStepOpen) return
+    void fetchMeta()
+  }, [fetchMeta, isCreateStepOpen])
 
   useEffect(() => {
     if (!selectedId) {

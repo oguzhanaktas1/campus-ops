@@ -1,12 +1,14 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { Plus, Pencil, Trash2, Loader2, ShieldCheck, Clock } from 'lucide-react'
+import { Plus, Pencil, Trash2, Loader2, ShieldCheck, Clock, ChevronLeft, ChevronRight, Zap } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { getToken } from '@/lib/auth'
+
+// ─── Types ───────────────────────────────────────────────────────────────────
 
 interface RequestType { id: string; name: string; key: string }
 
@@ -22,42 +24,53 @@ interface SLAPolicy {
   isActive: boolean
 }
 
-interface SlaOverview {
-  metrics: {
-    activePolicies: number
-    firstResponseBreaches: number
-    resolutionBreaches: number
-    escalations: number
-    stepOverdues: number
-  }
-  recentEvents: Array<{
-    id: string
-    eventType: string
-    occurredAt: string
-    resolvedAt?: string | null
-    request?: {
-      id: string
-      requestNo: string
-      title: string
-      status: string
-    } | null
-    policy?: {
-      id: string
-      name: string
-      priority?: string | null
-      requestType?: { key: string; name: string } | null
-    } | null
-  }>
+interface SlaEvent {
+  id: string
+  eventType: string
+  occurredAt: string
+  resolvedAt?: string | null
+  request?: { id: string; requestNo: string; title: string; status: string } | null
+  policy?: { id: string; name: string; priority?: string | null; requestType?: { key: string; name: string } | null } | null
 }
 
+interface SlaMetrics {
+  activePolicies: number
+  firstResponseBreaches: number
+  resolutionBreaches: number
+  escalations: number
+  stepOverdues: number
+}
+
+interface PagedResult<T> { data: T[]; total: number; page: number; totalPages: number }
+
+// ─── Constants ───────────────────────────────────────────────────────────────
+
+const PAGE_SIZE = 20
+const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000'
+
 const PRIORITY_BADGE: Record<string, string> = {
-  LOW: 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800/30 dark:text-slate-400 dark:border-slate-700',
+  LOW:    'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800/30 dark:text-slate-400 dark:border-slate-700',
   MEDIUM: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-800',
-  HIGH: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-800',
+  HIGH:   'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-800',
   URGENT: 'bg-red-50 text-red-700 border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-800',
 }
 
-const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000'
+const EVENT_TYPE_BADGE: Record<string, string> = {
+  FIRST_RESPONSE_BREACHED: 'bg-red-50 text-red-700 border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-800',
+  RESOLUTION_BREACHED:     'bg-red-50 text-red-700 border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-800',
+  ESCALATION_TRIGGERED:    'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-800',
+  STEP_OVERDUE:            'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/30 dark:text-orange-400 dark:border-orange-800',
+  FIRST_RESPONSE_STARTED:  'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-800',
+  RESOLUTION_STARTED:      'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800',
+}
+
+const EMPTY_FORM = {
+  name: '', requestTypeId: '', priority: '',
+  firstResponseMinutes: '', resolutionMinutes: '', escalationMinutes: '',
+  isActive: true,
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function minutesToHuman(mins?: number | null): string {
   if (!mins && mins !== 0) return '—'
@@ -68,45 +81,136 @@ function minutesToHuman(mins?: number | null): string {
   return `${h}h ${m}m`
 }
 
-const EMPTY_FORM = {
-  name: '',
-  requestTypeId: '',
-  priority: '',
-  firstResponseMinutes: '',
-  resolutionMinutes: '',
-  escalationMinutes: '',
-  isActive: true,
+function Pagination({ page, totalPages, isLoading, onChange }: {
+  page: number; totalPages: number; isLoading: boolean; onChange: (p: number) => void
+}) {
+  if (totalPages <= 1) return null
+  const pages = Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
+    const pg = totalPages <= 7 ? i + 1
+      : page <= 4 ? i + 1
+      : page >= totalPages - 3 ? totalPages - 6 + i
+      : page - 3 + i
+    return pg < 1 || pg > totalPages ? null : pg
+  })
+  return (
+    <div className="flex items-center justify-between text-sm pt-2">
+      <p className="text-muted-foreground">Page {page} of {totalPages}</p>
+      <div className="flex items-center gap-1">
+        <Button variant="outline" size="sm" className="gap-1" disabled={page <= 1 || isLoading} onClick={() => onChange(page - 1)}>
+          <ChevronLeft className="size-4" /> Prev
+        </Button>
+        {pages.map((pg, i) => pg === null ? null : (
+          <Button key={`${pg}-${i}`} variant={pg === page ? 'default' : 'outline'} size="sm" className="w-9" disabled={isLoading} onClick={() => onChange(pg)}>
+            {pg}
+          </Button>
+        ))}
+        <Button variant="outline" size="sm" className="gap-1" disabled={page >= totalPages || isLoading} onClick={() => onChange(page + 1)}>
+          Next <ChevronRight className="size-4" />
+        </Button>
+      </div>
+    </div>
+  )
 }
 
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
 export default function AdminSLAPage() {
-  const [policies, setPolicies] = useState<SLAPolicy[]>([])
+  const [activeTab, setActiveTab] = useState<'policies' | 'events'>('policies')
+
+  // Metrics
+  const [metrics, setMetrics] = useState<SlaMetrics | null>(null)
+  const [metricsLoading, setMetricsLoading] = useState(true)
+
+  // Policies tab
+  const [policiesResult, setPoliciesResult] = useState<PagedResult<SLAPolicy>>({ data: [], total: 0, page: 1, totalPages: 1 })
+  const [policiesPage, setPoliciesPage] = useState(1)
+  const [policiesLoading, setPoliciesLoading] = useState(true)
+
+  // Events tab
+  const [eventsResult, setEventsResult] = useState<PagedResult<SlaEvent>>({ data: [], total: 0, page: 1, totalPages: 1 })
+  const [eventsPage, setEventsPage] = useState(1)
+  const [eventsLoading, setEventsLoading] = useState(false)
+  const [eventsFetched, setEventsFetched] = useState(false)
+
+  // Request types (for form)
   const [requestTypes, setRequestTypes] = useState<RequestType[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [overview, setOverview] = useState<SlaOverview | null>(null)
+
+  // Dialog
   const [showDialog, setShowDialog] = useState(false)
   const [editTarget, setEditTarget] = useState<SLAPolicy | null>(null)
   const [form, setForm] = useState({ ...EMPTY_FORM })
   const [isSaving, setIsSaving] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
-  const fetchPolicies = useCallback(async () => {
+  // ── Fetchers ─────────────────────────────────────────────────────────────
+
+  const fetchMetrics = useCallback(async () => {
+    setMetricsLoading(true)
     try {
-      const [polRes, rtRes, overviewRes] = await Promise.all([
-        fetch(`${BACKEND}/admin/sla`, { headers: { Authorization: `Bearer ${getToken()}` } }),
+      const res = await fetch(`${BACKEND}/admin/sla/overview`, { headers: { Authorization: `Bearer ${getToken()}` } })
+      if (res.ok) {
+        const json = await res.json()
+        setMetrics(json.metrics)
+      }
+    } catch { /* silent */ }
+    finally { setMetricsLoading(false) }
+  }, [])
+
+  const fetchPolicies = useCallback(async (pg: number) => {
+    setPoliciesLoading(true)
+    try {
+      const params = new URLSearchParams({ page: String(pg), limit: String(PAGE_SIZE) })
+      const [polRes, rtRes] = await Promise.all([
+        fetch(`${BACKEND}/admin/sla?${params}`, { headers: { Authorization: `Bearer ${getToken()}` } }),
         fetch(`${BACKEND}/admin/request-types`, { headers: { Authorization: `Bearer ${getToken()}` } }),
-        fetch(`${BACKEND}/admin/sla/overview`, { headers: { Authorization: `Bearer ${getToken()}` } }),
       ])
-      if (polRes.ok) setPolicies(await polRes.json())
+      if (polRes.ok) setPoliciesResult(await polRes.json())
       if (rtRes.ok) setRequestTypes(await rtRes.json())
-      if (overviewRes.ok) setOverview(await overviewRes.json())
     } catch {
       toast.error('Failed to load SLA policies.')
     } finally {
-      setIsLoading(false)
+      setPoliciesLoading(false)
     }
   }, [])
 
-  useEffect(() => { fetchPolicies() }, [fetchPolicies])
+  const fetchEvents = useCallback(async (pg: number) => {
+    setEventsLoading(true)
+    try {
+      const params = new URLSearchParams({ page: String(pg), limit: String(PAGE_SIZE) })
+      const res = await fetch(`${BACKEND}/admin/sla/events?${params}`, { headers: { Authorization: `Bearer ${getToken()}` } })
+      if (res.ok) setEventsResult(await res.json())
+    } catch {
+      toast.error('Failed to load SLA events.')
+    } finally {
+      setEventsLoading(false)
+      setEventsFetched(true)
+    }
+  }, [])
+
+  // Initial load
+  useEffect(() => {
+    fetchMetrics()
+    fetchPolicies(1)
+  }, [fetchMetrics, fetchPolicies])
+
+  // Fetch events when tab first activated
+  useEffect(() => {
+    if (activeTab === 'events' && !eventsFetched) {
+      fetchEvents(1)
+    }
+  }, [activeTab, eventsFetched, fetchEvents])
+
+  // ── Handlers ─────────────────────────────────────────────────────────────
+
+  const handlePoliciesPage = (pg: number) => {
+    setPoliciesPage(pg)
+    fetchPolicies(pg)
+  }
+
+  const handleEventsPage = (pg: number) => {
+    setEventsPage(pg)
+    fetchEvents(pg)
+  }
 
   function openAdd() {
     setEditTarget(null)
@@ -141,7 +245,7 @@ export default function AdminSLAPage() {
         escalationMinutes: form.escalationMinutes ? parseInt(form.escalationMinutes) : null,
         isActive: form.isActive,
       }
-      const url = editTarget ? `${BACKEND}/admin/sla/${editTarget.id}` : `${BACKEND}/admin/sla`
+      const url    = editTarget ? `${BACKEND}/admin/sla/${editTarget.id}` : `${BACKEND}/admin/sla`
       const method = editTarget ? 'PATCH' : 'POST'
       const res = await fetch(url, {
         method,
@@ -151,7 +255,8 @@ export default function AdminSLAPage() {
       if (!res.ok) throw new Error()
       toast.success(editTarget ? 'SLA policy updated.' : 'SLA policy created.')
       setShowDialog(false)
-      fetchPolicies()
+      fetchPolicies(policiesPage)
+      fetchMetrics()
     } catch {
       toast.error('Failed to save SLA policy.')
     } finally {
@@ -168,7 +273,8 @@ export default function AdminSLAPage() {
       })
       if (!res.ok) throw new Error()
       toast.success('SLA policy deleted.')
-      setPolicies((prev) => prev.filter((p) => p.id !== id))
+      fetchPolicies(policiesPage)
+      fetchMetrics()
     } catch {
       toast.error('Failed to delete SLA policy.')
     } finally {
@@ -176,17 +282,19 @@ export default function AdminSLAPage() {
     }
   }
 
-  if (isLoading) {
-    return (
-      <div className="flex h-[60vh] items-center justify-center">
-        <Loader2 className="size-8 animate-spin text-primary" />
-      </div>
-    )
-  }
+  // ── Render ────────────────────────────────────────────────────────────────
+
+  const { data: policies, total: policiesTotal, totalPages: policiesTotalPages } = policiesResult
+  const { data: events, total: eventsTotal, totalPages: eventsTotalPages } = eventsResult
+  const policiesStart = (policiesPage - 1) * PAGE_SIZE + 1
+  const policiesEnd   = Math.min(policiesPage * PAGE_SIZE, policiesTotal)
+  const eventsStart   = (eventsPage - 1) * PAGE_SIZE + 1
+  const eventsEnd     = Math.min(eventsPage * PAGE_SIZE, eventsTotal)
 
   return (
     <div className="p-6 space-y-6 max-w-5xl mx-auto pb-20">
-      {/* Dialog */}
+
+      {/* Add/Edit Dialog */}
       {showDialog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
           <div className="bg-background border border-border rounded-xl p-6 max-w-md w-full shadow-2xl space-y-4">
@@ -196,32 +304,20 @@ export default function AdminSLAPage() {
             <div className="space-y-3">
               <div>
                 <label className="text-xs font-semibold text-muted-foreground mb-1 block">Policy Name *</label>
-                <Input
-                  value={form.name}
-                  onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                  placeholder="e.g. Critical Response SLA"
-                />
+                <Input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="e.g. Critical Response SLA" />
               </div>
               <div>
                 <label className="text-xs font-semibold text-muted-foreground mb-1 block">Request Type</label>
-                <select
-                  value={form.requestTypeId}
-                  onChange={(e) => setForm((f) => ({ ...f, requestTypeId: e.target.value }))}
-                  className="w-full bg-background border border-input rounded-md px-3 h-10 text-sm focus:ring-2 focus:ring-primary outline-none"
-                >
+                <select value={form.requestTypeId} onChange={(e) => setForm((f) => ({ ...f, requestTypeId: e.target.value }))}
+                  className="w-full bg-background border border-input rounded-md px-3 h-10 text-sm focus:ring-2 focus:ring-primary outline-none">
                   <option value="">Any request type</option>
-                  {requestTypes.map((rt) => (
-                    <option key={rt.id} value={rt.id}>{rt.name}</option>
-                  ))}
+                  {requestTypes.map((rt) => <option key={rt.id} value={rt.id}>{rt.name}</option>)}
                 </select>
               </div>
               <div>
                 <label className="text-xs font-semibold text-muted-foreground mb-1 block">Priority</label>
-                <select
-                  value={form.priority}
-                  onChange={(e) => setForm((f) => ({ ...f, priority: e.target.value }))}
-                  className="w-full bg-background border border-input rounded-md px-3 h-10 text-sm focus:ring-2 focus:ring-primary outline-none"
-                >
+                <select value={form.priority} onChange={(e) => setForm((f) => ({ ...f, priority: e.target.value }))}
+                  className="w-full bg-background border border-input rounded-md px-3 h-10 text-sm focus:ring-2 focus:ring-primary outline-none">
                   <option value="">Any priority</option>
                   <option value="LOW">Low</option>
                   <option value="MEDIUM">Medium</option>
@@ -230,62 +326,33 @@ export default function AdminSLAPage() {
                 </select>
               </div>
               <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className="text-xs font-semibold text-muted-foreground mb-1 block">First Response (min)</label>
-                  <Input
-                    type="number" min="1"
-                    value={form.firstResponseMinutes}
-                    onChange={(e) => setForm((f) => ({ ...f, firstResponseMinutes: e.target.value }))}
-                    placeholder="e.g. 60"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-semibold text-muted-foreground mb-1 block">Resolution (min)</label>
-                  <Input
-                    type="number" min="1"
-                    value={form.resolutionMinutes}
-                    onChange={(e) => setForm((f) => ({ ...f, resolutionMinutes: e.target.value }))}
-                    placeholder="e.g. 480"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-semibold text-muted-foreground mb-1 block">Escalation (min)</label>
-                  <Input
-                    type="number" min="1"
-                    value={form.escalationMinutes}
-                    onChange={(e) => setForm((f) => ({ ...f, escalationMinutes: e.target.value }))}
-                    placeholder="e.g. 1440"
-                  />
-                </div>
+                {[
+                  { label: 'First Response (min)', key: 'firstResponseMinutes' as const },
+                  { label: 'Resolution (min)',     key: 'resolutionMinutes' as const },
+                  { label: 'Escalation (min)',     key: 'escalationMinutes' as const },
+                ].map(({ label, key }) => (
+                  <div key={key}>
+                    <label className="text-xs font-semibold text-muted-foreground mb-1 block">{label}</label>
+                    <Input type="number" min="1" value={form[key]}
+                      onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
+                      placeholder="e.g. 60" />
+                  </div>
+                ))}
               </div>
               {(form.firstResponseMinutes || form.resolutionMinutes || form.escalationMinutes) && (
                 <div className="bg-muted/40 rounded-lg px-3 py-2 text-xs text-muted-foreground space-y-1">
-                  {form.firstResponseMinutes && (
-                    <p>First response: <span className="font-semibold text-foreground">{minutesToHuman(parseInt(form.firstResponseMinutes))}</span></p>
-                  )}
-                  {form.resolutionMinutes && (
-                    <p>Resolution: <span className="font-semibold text-foreground">{minutesToHuman(parseInt(form.resolutionMinutes))}</span></p>
-                  )}
-                  {form.escalationMinutes && (
-                    <p>Escalation: <span className="font-semibold text-foreground">{minutesToHuman(parseInt(form.escalationMinutes))}</span></p>
-                  )}
+                  {form.firstResponseMinutes && <p>First response: <span className="font-semibold text-foreground">{minutesToHuman(parseInt(form.firstResponseMinutes))}</span></p>}
+                  {form.resolutionMinutes    && <p>Resolution: <span className="font-semibold text-foreground">{minutesToHuman(parseInt(form.resolutionMinutes))}</span></p>}
+                  {form.escalationMinutes    && <p>Escalation: <span className="font-semibold text-foreground">{minutesToHuman(parseInt(form.escalationMinutes))}</span></p>}
                 </div>
               )}
               <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="isActive"
-                  checked={form.isActive}
-                  onChange={(e) => setForm((f) => ({ ...f, isActive: e.target.checked }))}
-                  className="rounded"
-                />
+                <input type="checkbox" id="isActive" checked={form.isActive} onChange={(e) => setForm((f) => ({ ...f, isActive: e.target.checked }))} className="rounded" />
                 <label htmlFor="isActive" className="text-sm text-foreground">Active</label>
               </div>
             </div>
             <div className="flex gap-3 pt-2">
-              <Button variant="outline" className="flex-1" onClick={() => setShowDialog(false)} disabled={isSaving}>
-                Cancel
-              </Button>
+              <Button variant="outline" className="flex-1" onClick={() => setShowDialog(false)} disabled={isSaving}>Cancel</Button>
               <Button className="flex-1" onClick={handleSave} disabled={isSaving}>
                 {isSaving ? <Loader2 className="size-4 animate-spin" /> : editTarget ? 'Update' : 'Create Policy'}
               </Button>
@@ -294,160 +361,238 @@ export default function AdminSLAPage() {
         </div>
       )}
 
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold text-foreground">SLA Policies</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Define response and resolution time targets.</p>
+          <h1 className="text-xl font-bold text-foreground">SLA Management</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">Define response targets and monitor SLA events.</p>
         </div>
-        <Button onClick={openAdd} className="gap-2 self-start">
-          <Plus className="size-4" /> Add Policy
-        </Button>
+        {activeTab === 'policies' && (
+          <Button onClick={openAdd} className="gap-2 self-start">
+            <Plus className="size-4" /> Add Policy
+          </Button>
+        )}
       </div>
 
-      {overview && (
+      {/* Metrics */}
+      {metricsLoading ? (
         <div className="grid gap-4 md:grid-cols-5">
-          {[
-            ['Active Policies', overview.metrics.activePolicies],
-            ['First Response Breaches', overview.metrics.firstResponseBreaches],
-            ['Resolution Breaches', overview.metrics.resolutionBreaches],
-            ['Escalations', overview.metrics.escalations],
-            ['Step Overdues', overview.metrics.stepOverdues],
-          ].map(([label, value]) => (
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="rounded-xl border border-border bg-card p-4 shadow-sm animate-pulse h-20" />
+          ))}
+        </div>
+      ) : metrics && (
+        <div className="grid gap-4 md:grid-cols-5">
+          {([
+            ['Active Policies',          metrics.activePolicies,          ''],
+            ['First Response Breaches',  metrics.firstResponseBreaches,   metrics.firstResponseBreaches > 0 ? 'text-red-600' : ''],
+            ['Resolution Breaches',      metrics.resolutionBreaches,      metrics.resolutionBreaches > 0 ? 'text-red-600' : ''],
+            ['Escalations',              metrics.escalations,             metrics.escalations > 0 ? 'text-amber-600' : ''],
+            ['Step Overdues',            metrics.stepOverdues,            metrics.stepOverdues > 0 ? 'text-orange-600' : ''],
+          ] as [string, number, string][]).map(([label, value, valClass]) => (
             <div key={label} className="rounded-xl border border-border bg-card p-4 shadow-sm">
               <p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
-              <p className="mt-2 text-2xl font-semibold text-foreground">{value}</p>
+              <p className={cn('mt-2 text-2xl font-semibold', valClass || 'text-foreground')}>{value}</p>
             </div>
           ))}
         </div>
       )}
 
-      {/* Table */}
-      <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border bg-muted/40">
-                <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Policy Name</th>
-                <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden sm:table-cell">Request Type</th>
-                <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Priority</th>
-                <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden md:table-cell">First Response</th>
-                <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden md:table-cell">Resolution</th>
-                <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden lg:table-cell">Escalation</th>
-                <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden lg:table-cell">Status</th>
-                <th className="px-5 py-3 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {policies.map((p) => (
-                <tr key={p.id} className="hover:bg-muted/20 transition-colors">
-                  <td className="px-5 py-3.5">
-                    <div className="flex items-center gap-2">
-                      <ShieldCheck className="size-4 text-primary shrink-0" />
-                      <span className="font-medium text-foreground">{p.name}</span>
-                    </div>
-                  </td>
-                  <td className="px-5 py-3.5 hidden sm:table-cell text-xs text-muted-foreground">
-                    {p.requestType?.name ?? '—'}
-                  </td>
-                  <td className="px-5 py-3.5">
-                    {p.priority ? (
-                      <span className={cn('text-xs font-semibold px-2.5 py-1 rounded-full border', PRIORITY_BADGE[p.priority] ?? PRIORITY_BADGE.LOW)}>
-                        {p.priority}
-                      </span>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">Any</span>
-                    )}
-                  </td>
-                  <td className="px-5 py-3.5 hidden md:table-cell">
-                    <span className="flex items-center gap-1.5 text-sm font-medium text-foreground">
-                      <Clock className="size-3.5 text-muted-foreground" />
-                      {minutesToHuman(p.firstResponseMinutes)}
-                    </span>
-                  </td>
-                  <td className="px-5 py-3.5 hidden md:table-cell">
-                    <span className="flex items-center gap-1.5 text-sm font-medium text-foreground">
-                      <Clock className="size-3.5 text-muted-foreground" />
-                      {minutesToHuman(p.resolutionMinutes)}
-                    </span>
-                  </td>
-                  <td className="px-5 py-3.5 hidden lg:table-cell">
-                    <span className="flex items-center gap-1.5 text-sm font-medium text-foreground">
-                      <Clock className="size-3.5 text-muted-foreground" />
-                      {minutesToHuman(p.escalationMinutes)}
-                    </span>
-                  </td>
-                  <td className="px-5 py-3.5 hidden lg:table-cell">
-                    <span className={cn(
-                      'text-xs font-semibold px-2 py-0.5 rounded-full border',
-                      p.isActive
-                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800'
-                        : 'bg-slate-50 text-slate-600 border-slate-200 dark:bg-slate-800/30 dark:text-slate-400 dark:border-slate-700'
-                    )}>
-                      {p.isActive ? 'Active' : 'Inactive'}
-                    </span>
-                  </td>
-                  <td className="px-5 py-3.5 text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <Button variant="ghost" size="icon" className="size-8" onClick={() => openEdit(p)}>
-                        <Pencil className="size-3.5" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="size-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                        onClick={() => handleDelete(p.id)}
-                        disabled={deletingId === p.id}
-                      >
-                        {deletingId === p.id ? <Loader2 className="size-3.5 animate-spin" /> : <Trash2 className="size-3.5" />}
-                      </Button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {policies.length === 0 && (
-            <div className="text-center py-16">
-              <ShieldCheck className="size-10 text-muted-foreground/30 mx-auto mb-3" />
-              <p className="text-sm font-medium text-foreground">No SLA policies defined.</p>
-              <p className="text-xs text-muted-foreground mt-1">Add a policy to set response time targets.</p>
-            </div>
-          )}
-        </div>
+      {/* Tabs */}
+      <div className="flex items-center gap-1 border-b border-border">
+        {([
+          { key: 'policies', label: 'SLA Policies',    icon: <ShieldCheck className="size-3.5" />, count: policiesTotal },
+          { key: 'events',   label: 'Recent SLA Events', icon: <Zap className="size-3.5" />,        count: eventsTotal },
+        ] as const).map((tab) => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveTab(tab.key)}
+            className={cn(
+              'flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px whitespace-nowrap',
+              activeTab === tab.key ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'
+            )}
+          >
+            {tab.icon}
+            {tab.label}
+            {(tab.key === 'policies' ? !policiesLoading : eventsFetched) && tab.count > 0 && (
+              <span className={cn('ml-1 text-xs rounded-full px-1.5 py-0.5 font-medium',
+                activeTab === tab.key ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground')}>
+                {tab.count}
+              </span>
+            )}
+          </button>
+        ))}
       </div>
 
-      {overview && (
-        <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
-          <div className="border-b border-border px-5 py-4">
-            <h2 className="text-sm font-semibold text-foreground">Recent SLA Events</h2>
-          </div>
-          <div className="divide-y divide-border">
-            {overview.recentEvents.length === 0 ? (
-              <div className="px-5 py-10 text-sm text-muted-foreground">No SLA event recorded yet.</div>
-            ) : (
-              overview.recentEvents.map((event) => (
-                <div key={event.id} className="px-5 py-4 space-y-1.5">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="rounded-full border border-border bg-muted px-2.5 py-0.5 text-xs font-medium text-foreground">
-                      {event.eventType}
-                    </span>
-                    {event.policy?.priority && (
-                      <span className={cn('text-xs font-semibold px-2.5 py-1 rounded-full border', PRIORITY_BADGE[event.policy.priority] ?? PRIORITY_BADGE.LOW)}>
-                        {event.policy.priority}
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-sm text-foreground">
-                    {event.request?.requestNo ?? 'Request'} {event.request?.title ? `· ${event.request.title}` : ''}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Policy: {event.policy?.name ?? 'N/A'} · Occurred: {new Date(event.occurredAt).toLocaleString('tr-TR')}
-                    {event.resolvedAt ? ` · Resolved: ${new Date(event.resolvedAt).toLocaleString('tr-TR')}` : ''}
-                  </p>
-                </div>
-              ))
+      {/* ── POLICIES TAB ── */}
+      {activeTab === 'policies' && (
+        <div className="space-y-4">
+          {policiesTotal > 0 && (
+            <p className="text-sm text-muted-foreground">
+              Showing {policiesStart}–{policiesEnd} of {policiesTotal} policies
+            </p>
+          )}
+          <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
+            {policiesLoading && (
+              <div className="flex items-center justify-center py-4 border-b border-border">
+                <Loader2 className="size-5 animate-spin text-primary" />
+              </div>
             )}
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border bg-muted/40">
+                    <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Policy Name</th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden sm:table-cell">Request Type</th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Priority</th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden md:table-cell">First Response</th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden md:table-cell">Resolution</th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden lg:table-cell">Escalation</th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden lg:table-cell">Status</th>
+                    <th className="px-5 py-3 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {policies.map((p) => (
+                    <tr key={p.id} className="hover:bg-muted/20 transition-colors">
+                      <td className="px-5 py-3.5">
+                        <div className="flex items-center gap-2">
+                          <ShieldCheck className="size-4 text-primary shrink-0" />
+                          <span className="font-medium text-foreground">{p.name}</span>
+                        </div>
+                      </td>
+                      <td className="px-5 py-3.5 hidden sm:table-cell text-xs text-muted-foreground">{p.requestType?.name ?? '—'}</td>
+                      <td className="px-5 py-3.5">
+                        {p.priority ? (
+                          <span className={cn('text-xs font-semibold px-2.5 py-1 rounded-full border', PRIORITY_BADGE[p.priority] ?? PRIORITY_BADGE.LOW)}>{p.priority}</span>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">Any</span>
+                        )}
+                      </td>
+                      <td className="px-5 py-3.5 hidden md:table-cell">
+                        <span className="flex items-center gap-1.5 text-sm font-medium text-foreground">
+                          <Clock className="size-3.5 text-muted-foreground" />{minutesToHuman(p.firstResponseMinutes)}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3.5 hidden md:table-cell">
+                        <span className="flex items-center gap-1.5 text-sm font-medium text-foreground">
+                          <Clock className="size-3.5 text-muted-foreground" />{minutesToHuman(p.resolutionMinutes)}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3.5 hidden lg:table-cell">
+                        <span className="flex items-center gap-1.5 text-sm font-medium text-foreground">
+                          <Clock className="size-3.5 text-muted-foreground" />{minutesToHuman(p.escalationMinutes)}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3.5 hidden lg:table-cell">
+                        <span className={cn('text-xs font-semibold px-2 py-0.5 rounded-full border',
+                          p.isActive
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800'
+                            : 'bg-slate-50 text-slate-600 border-slate-200 dark:bg-slate-800/30 dark:text-slate-400 dark:border-slate-700')}>
+                          {p.isActive ? 'Active' : 'Inactive'}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3.5 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <Button variant="ghost" size="icon" className="size-8" onClick={() => openEdit(p)}>
+                            <Pencil className="size-3.5" />
+                          </Button>
+                          <Button variant="ghost" size="icon"
+                            className="size-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                            onClick={() => handleDelete(p.id)} disabled={deletingId === p.id}>
+                            {deletingId === p.id ? <Loader2 className="size-3.5 animate-spin" /> : <Trash2 className="size-3.5" />}
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {!policiesLoading && policies.length === 0 && (
+                <div className="text-center py-16">
+                  <ShieldCheck className="size-10 text-muted-foreground/30 mx-auto mb-3" />
+                  <p className="text-sm font-medium text-foreground">No SLA policies defined.</p>
+                  <p className="text-xs text-muted-foreground mt-1">Add a policy to set response time targets.</p>
+                </div>
+              )}
+            </div>
           </div>
+          <Pagination page={policiesPage} totalPages={policiesTotalPages} isLoading={policiesLoading} onChange={handlePoliciesPage} />
+        </div>
+      )}
+
+      {/* ── EVENTS TAB ── */}
+      {activeTab === 'events' && (
+        <div className="space-y-4">
+          {eventsTotal > 0 && (
+            <p className="text-sm text-muted-foreground">
+              Showing {eventsStart}–{eventsEnd} of {eventsTotal} events
+            </p>
+          )}
+          <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
+            {eventsLoading && (
+              <div className="flex items-center justify-center py-4 border-b border-border">
+                <Loader2 className="size-5 animate-spin text-primary" />
+              </div>
+            )}
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border bg-muted/40">
+                    <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Event</th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden sm:table-cell">Request</th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden md:table-cell">Policy</th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden lg:table-cell">Priority</th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Occurred</th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden lg:table-cell">Resolved</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {events.map((event) => (
+                    <tr key={event.id} className="hover:bg-muted/20 transition-colors">
+                      <td className="px-5 py-3.5">
+                        <span className={cn('text-xs font-semibold px-2.5 py-1 rounded-full border',
+                          EVENT_TYPE_BADGE[event.eventType] ?? 'bg-muted text-muted-foreground border-border')}>
+                          {event.eventType.replace(/_/g, ' ')}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3.5 hidden sm:table-cell">
+                        {event.request ? (
+                          <div>
+                            <p className="text-xs font-mono text-muted-foreground">{event.request.requestNo}</p>
+                            <p className="text-sm text-foreground truncate max-w-[180px]">{event.request.title}</p>
+                          </div>
+                        ) : <span className="text-xs text-muted-foreground">—</span>}
+                      </td>
+                      <td className="px-5 py-3.5 hidden md:table-cell text-sm text-muted-foreground">
+                        {event.policy?.name ?? '—'}
+                      </td>
+                      <td className="px-5 py-3.5 hidden lg:table-cell">
+                        {event.policy?.priority ? (
+                          <span className={cn('text-xs font-semibold px-2.5 py-1 rounded-full border', PRIORITY_BADGE[event.policy.priority] ?? PRIORITY_BADGE.LOW)}>
+                            {event.policy.priority}
+                          </span>
+                        ) : <span className="text-xs text-muted-foreground">—</span>}
+                      </td>
+                      <td className="px-5 py-3.5 text-xs text-muted-foreground whitespace-nowrap">
+                        {new Date(event.occurredAt).toLocaleString('tr-TR')}
+                      </td>
+                      <td className="px-5 py-3.5 hidden lg:table-cell text-xs text-muted-foreground whitespace-nowrap">
+                        {event.resolvedAt ? new Date(event.resolvedAt).toLocaleString('tr-TR') : '—'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {!eventsLoading && eventsFetched && events.length === 0 && (
+                <div className="text-center py-16">
+                  <Zap className="size-10 text-muted-foreground/30 mx-auto mb-3" />
+                  <p className="text-sm font-medium text-foreground">No SLA events recorded yet.</p>
+                </div>
+              )}
+            </div>
+          </div>
+          <Pagination page={eventsPage} totalPages={eventsTotalPages} isLoading={eventsLoading} onChange={handleEventsPage} />
         </div>
       )}
     </div>

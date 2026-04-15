@@ -5,6 +5,7 @@ import { PortalLayout, type NavItem } from "@/components/portal-layout";
 import { NotificationBell } from "@/components/notification-bell";
 import { ProfileDropdown } from "@/components/profile-dropdown";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { LanguageSwitcher } from "@/components/language-switcher";
 import {
   LayoutDashboard,
   Users,
@@ -45,12 +46,19 @@ const navItems: NavItem[] = [
     ],
   },
   {
-    label: "Requests & Workflows",
+    label: "Requests",
     href: "#",
     icon: FileText,
     children: [
       { label: "All Requests", href: "/admin/requests" },
       { label: "Request Types", href: "/admin/request-types" },
+    ],
+  },
+  {
+    label: "Workflows",
+    href: "#",
+    icon: ClipboardList,
+    children: [
       { label: "Workflows", href: "/admin/workflows" },
       { label: "Workflow Instances", href: "/admin/workflow-instances" },
     ],
@@ -58,25 +66,16 @@ const navItems: NavItem[] = [
   {
     label: "Operations",
     href: "#",
-    icon: ClipboardList,
+    icon: Activity,
     children: [
       { label: "Resources", href: "/admin/resources" },
       { label: "SLA Policies", href: "/admin/sla" },
     ],
   },
   {
-    label: "Analytics & Reports",
-    href: "#",
-    icon: BarChart3,
-    children: [
-      { label: "Analytics", href: "/admin/analytics" },
-      { label: "Reports", href: "/admin/reports" },
-    ],
-  },
-  {
     label: "System",
     href: "#",
-    icon: Activity,
+    icon: ClipboardList,
     children: [
       { label: "Integrations", href: "/admin/integrations" },
       { label: "Webhook Logs", href: "/admin/webhook-logs" },
@@ -84,6 +83,8 @@ const navItems: NavItem[] = [
       { label: "Audit Logs", href: "/admin/audit-logs" },
     ],
   },
+  { label: "Analytics", href: "/admin/analytics", icon: BarChart3 },
+  { label: "Reports", href: "/admin/reports", icon: BarChart3 },
   { label: "Notifications", href: "/admin/notifications", icon: Bell },
   { label: "Settings", href: "/admin/settings", icon: Settings },
 ];
@@ -140,6 +141,7 @@ export default function AdminLayout({
       </div>
       <div className="flex items-center gap-1 ml-auto">
         <ThemeToggle />
+        <LanguageSwitcher />
         <NotificationBell role="admin" />
         <ProfileDropdown user={user} settingsHref="/admin/settings" />
       </div>

@@ -25,7 +25,6 @@ import {
   type WorkflowInstance,
   type WorkflowRequestType,
   type WorkflowStep,
-  type WorkflowSummary,
 } from '@/lib/admin-workflow'
 
 type WorkflowInstanceRecord = {
@@ -78,27 +77,13 @@ export default function AdminWorkflowInstancesPage() {
     const load = async () => {
       setIsLoading(true)
       try {
-        const summaryRes = await fetch(`${BACKEND}/admin/workflows`, {
+        const summaryRes = await fetch(`${BACKEND}/admin/workflows/instances/overview`, {
           headers: authHeaders(),
         })
         if (!summaryRes.ok) throw new Error('Failed to load workflows.')
 
-        const summaries = (await summaryRes.json()) as WorkflowSummary[]
-        const details = await Promise.all(
-          summaries.map(async (workflow) => {
-            const detailRes = await fetch(`${BACKEND}/admin/workflows/${workflow.id}`, {
-              headers: authHeaders(),
-            })
-
-            if (!detailRes.ok) {
-              throw new Error(`Failed to load instances for ${workflow.name}.`)
-            }
-
-            return (await detailRes.json()) as WorkflowDetail
-          }),
-        )
-
-        setWorkflowDetails(details)
+        const details = (await summaryRes.json()) as WorkflowDetail[]
+        setWorkflowDetails(Array.isArray(details) ? details : [])
       } catch (error) {
         setWorkflowDetails([])
         toast.error(

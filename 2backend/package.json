@@ -8,6 +8,9 @@
   "scripts": {
     "build": "nest build",
     "seed": "ts-node --transpile-only prisma/seed.ts",
+    "seed:users": "ts-node --transpile-only prisma/users_seed.ts",
+    "seed:resources": "ts-node --transpile-only prisma/resources_seed.ts",
+    "seed:organizers": "ts-node --transpile-only prisma/organizers_seed.ts",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
     "start:dev": "nest start --watch",

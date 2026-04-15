@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { CampusFlowLogo } from '@/components/campusflow-logo'
+import { NT } from '@/components/no-translate'
 
 const footerLinks = {
   Product: [
@@ -39,7 +40,7 @@ export function Footer() {
           <div className="col-span-2 sm:col-span-3 lg:col-span-1">
             <Link href="/" className="flex items-center gap-2.5 mb-4" aria-label="CampusFlow home">
               <CampusFlowLogo containerClassName="size-8" />
-              <span className="font-bold text-foreground text-lg">CampusFlow</span>
+              <NT className="font-bold text-foreground text-lg">CampusFlow</NT>
             </Link>
             <p className="text-sm text-muted-foreground leading-relaxed max-w-[200px]">
               Smart campus operations platform built for modern universities.
@@ -106,7 +107,7 @@ export function Footer() {
         {/* Bottom bar */}
         <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-8 border-t border-border">
           <p className="text-xs text-muted-foreground">
-            © {new Date().getFullYear()} CampusFlow. All rights reserved.
+            © {new Date().getFullYear()} <NT>CampusFlow</NT>. All rights reserved.
           </p>
           <div className="flex items-center gap-4">
             <Link href="/privacy" className="text-xs text-muted-foreground hover:text-foreground transition-colors">

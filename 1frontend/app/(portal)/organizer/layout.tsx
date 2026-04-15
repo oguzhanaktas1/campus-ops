@@ -6,6 +6,7 @@ import { PortalLayout, type NavItem } from "@/components/portal-layout";
 import { NotificationBell } from "@/components/notification-bell";
 import { ProfileDropdown } from "@/components/profile-dropdown";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { LanguageSwitcher } from "@/components/language-switcher";
 import {
   LayoutDashboard,
   ClipboardList,
@@ -84,6 +85,7 @@ export default function OrganizerLayout({
       </div>
       <div className="flex items-center gap-1 ml-auto">
         <ThemeToggle />
+        <LanguageSwitcher />
         <NotificationBell role="organizer" />
         <ProfileDropdown user={user} settingsHref="/organizer/settings" />
       </div>

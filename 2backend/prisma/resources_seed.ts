@@ -12,10 +12,1206 @@ async function main() {
     process.exit(1);
   }
 
-  const facultyEng = await prisma.faculty.findUnique({ where: { code: 'ENG' } });
-  const facultyArts = await prisma.faculty.findUnique({ where: { code: 'ARTS' } });
+  const facultyEng = await prisma.faculty.findUnique({
+    where: { code: 'ENG' },
+  });
+  const facultyArts = await prisma.faculty.findUnique({
+    where: { code: 'ARTS' },
+  });
   const deptCS = await prisma.department.findUnique({ where: { code: 'CS' } });
   const unitIT = await prisma.unit.findUnique({ where: { code: 'IT-DEPT' } });
+
+  const additionalRooms = Array.from({ length: 15 }, (_, index) => {
+    const number = index + 1;
+    const floor = Math.floor(index / 5) + 1;
+    const code = `ROOM-S${String(number).padStart(2, '0')}`;
+    return {
+      code,
+      name: `Smart Classroom S-${String(number).padStart(2, '0')}`,
+      resourceType: ResourceType.ROOM,
+      campusId: campus.id,
+      facultyId:
+        number % 3 === 0 ? (facultyArts?.id ?? null) : (facultyEng?.id ?? null),
+      locationText: `South Academic Block, Floor ${floor}`,
+      capacity: 24 + (index % 5) * 8,
+      description:
+        'Flexible classroom with lecture capture support and wireless presentation.',
+      metadataJson: {
+        hasProjector: true,
+        hasWhiteboard: true,
+        hasLectureCapture: true,
+        seating: index % 2 === 0 ? 'movable' : 'fixed',
+      },
+    };
+  });
+
+  const additionalLabs = Array.from({ length: 10 }, (_, index) => {
+    const number = index + 1;
+    const code = `LAB-X${String(number).padStart(2, '0')}`;
+    return {
+      code,
+      name: `Innovation Lab X-${String(number).padStart(2, '0')}`,
+      resourceType: ResourceType.LAB,
+      campusId: campus.id,
+      facultyId: facultyEng?.id ?? null,
+      departmentId: number <= 6 ? (deptCS?.id ?? null) : null,
+      locationText: `Research Annex, Floor ${Math.floor(index / 3) + 1}`,
+      capacity: 16 + (index % 4) * 4,
+      description:
+        'Specialized lab space for practical sessions, workshops and supervised study.',
+      metadataJson: {
+        computers: 16 + (index % 4) * 4,
+        accessMode: number % 2 === 0 ? 'reservation' : 'staff-supervised',
+        specialty:
+          number <= 3
+            ? 'software'
+            : number <= 6
+              ? 'ai-ml'
+              : number <= 8
+                ? 'robotics'
+                : 'media-production',
+      },
+    };
+  });
+
+  const additionalEquipment = Array.from({ length: 20 }, (_, index) => {
+    const number = index + 1;
+    const code = `EQ-KIT-${String(number).padStart(2, '0')}`;
+    const equipmentType =
+      number <= 5
+        ? 'Presentation Kit'
+        : number <= 10
+          ? 'Laptop Bundle'
+          : number <= 15
+            ? 'Recording Kit'
+            : 'Workshop Kit';
+
+    return {
+      code,
+      name: `${equipmentType} #${number}`,
+      resourceType: ResourceType.EQUIPMENT,
+      campusId: campus.id,
+      facultyId: number >= 16 ? (facultyArts?.id ?? null) : null,
+      unitId: unitIT?.id ?? null,
+      locationText:
+        number <= 10
+          ? 'IT Equipment Depot'
+          : number <= 15
+            ? 'Media Center Storage'
+            : 'Makerspace Cabinet',
+      capacity: 1,
+      description: 'Portable equipment set available for short-term checkout.',
+      metadataJson: {
+        category:
+          number <= 5
+            ? 'presentation'
+            : number <= 10
+              ? 'computing'
+              : number <= 15
+                ? 'recording'
+                : 'maker',
+        checkoutDays: number <= 10 ? 3 : 5,
+        bundled: true,
+      },
+    };
+  });
+
+  const additionalVehicles = Array.from({ length: 5 }, (_, index) => {
+    const number = index + 1;
+    const code = `VEH-SVC-${String(number).padStart(2, '0')}`;
+    return {
+      code,
+      name: `Service Vehicle #${number}`,
+      resourceType: ResourceType.VEHICLE,
+      campusId: campus.id,
+      locationText: 'Campus Garage',
+      capacity: number <= 2 ? 5 : number === 3 ? 8 : 2,
+      description:
+        number <= 2
+          ? 'Passenger vehicle for administrative visits and campus transfers.'
+          : number === 3
+            ? 'Utility van for logistics and event transport.'
+            : 'Maintenance cart for on-campus operational support.',
+      metadataJson: {
+        vehicleClass:
+          number <= 2 ? 'sedan' : number === 3 ? 'van' : 'utility-cart',
+        fuelType: number <= 3 ? 'Diesel' : 'Electric',
+        reservationRequired: true,
+      },
+    };
+  });
+
+  // ─────────────────────────────────────────────────────────────
+  // EK 50 KAYNAK
+  // ─────────────────────────────────────────────────────────────
+  const extraResources = [
+    // ── ROOMS (15 adet) ──────────────────────────────────────────
+    {
+      code: 'ROOM-STUDY-01',
+      name: 'Group Study Room 1',
+      resourceType: ResourceType.ROOM,
+      campusId: campus.id,
+      locationText: 'Library Building, Floor 1',
+      capacity: 8,
+      description: 'Quiet group study room with whiteboard and display screen.',
+      metadataJson: { hasWhiteboard: true, hasDisplay: true, hasAC: true },
+    },
+    {
+      code: 'ROOM-STUDY-02',
+      name: 'Group Study Room 2',
+      resourceType: ResourceType.ROOM,
+      campusId: campus.id,
+      locationText: 'Library Building, Floor 1',
+      capacity: 8,
+      description: 'Quiet group study room with whiteboard and display screen.',
+      metadataJson: { hasWhiteboard: true, hasDisplay: true, hasAC: true },
+    },
+    {
+      code: 'ROOM-STUDY-03',
+      name: 'Group Study Room 3',
+      resourceType: ResourceType.ROOM,
+      campusId: campus.id,
+      locationText: 'Library Building, Floor 2',
+      capacity: 6,
+      description: 'Small group study room with smart TV.',
+      metadataJson: { hasSmartTV: true, hasAC: true },
+    },
+    {
+      code: 'ROOM-MEET-01',
+      name: 'Board Meeting Room',
+      resourceType: ResourceType.ROOM,
+      campusId: campus.id,
+      locationText: 'Administration Building, Floor 3',
+      capacity: 18,
+      description: 'Formal board room with video conferencing and projector.',
+      metadataJson: { hasProjector: true, hasVideoConference: true, hasMicrophone: true },
+    },
+    {
+      code: 'ROOM-MEET-02',
+      name: 'Faculty Meeting Room',
+      resourceType: ResourceType.ROOM,
+      campusId: campus.id,
+      facultyId: facultyEng?.id ?? null,
+      locationText: 'Engineering Building, Floor 4',
+      capacity: 14,
+      description: 'Faculty-level meeting room with projector and AC.',
+      metadataJson: { hasProjector: true, hasAC: true },
+    },
+    {
+      code: 'ROOM-DEBRIEF',
+      name: 'Debriefing Room',
+      resourceType: ResourceType.ROOM,
+      campusId: campus.id,
+      locationText: 'Student Affairs Building, Floor 2',
+      capacity: 10,
+      description: 'Confidential meeting room for student affairs and HR use.',
+      metadataJson: { soundproof: true, hasWhiteboard: true },
+    },
+    {
+      code: 'ROOM-EXAM-01',
+      name: 'Exam Hall E-1',
+      resourceType: ResourceType.ROOM,
+      campusId: campus.id,
+      locationText: 'Main Building, Block F, Floor 1',
+      capacity: 60,
+      description: 'Dedicated exam hall with individual desks and CCTV.',
+      metadataJson: { hasCCTV: true, hasAC: true, seating: 'individual' },
+    },
+    {
+      code: 'ROOM-EXAM-02',
+      name: 'Exam Hall E-2',
+      resourceType: ResourceType.ROOM,
+      campusId: campus.id,
+      locationText: 'Main Building, Block F, Floor 2',
+      capacity: 60,
+      description: 'Dedicated exam hall with individual desks and CCTV.',
+      metadataJson: { hasCCTV: true, hasAC: true, seating: 'individual' },
+    },
+    {
+      code: 'ROOM-DESIGN',
+      name: 'Design Studio',
+      resourceType: ResourceType.ROOM,
+      campusId: campus.id,
+      facultyId: facultyArts?.id ?? null,
+      locationText: 'Arts Building, Block C, Floor 2',
+      capacity: 22,
+      description: 'Open-plan design studio for graphic and industrial design courses.',
+      metadataJson: { hasDrawingTables: true, hasProjector: true, hasPrinter: true },
+    },
+    {
+      code: 'ROOM-COLLAB-01',
+      name: 'Innovation Hub',
+      resourceType: ResourceType.ROOM,
+      campusId: campus.id,
+      locationText: 'Student Center, Floor 2',
+      capacity: 40,
+      description: 'Collaborative open space with modular furniture, TVs and writable walls.',
+      metadataJson: { hasWritableWalls: true, hasMultipleTV: true, modularFurniture: true },
+    },
+    {
+      code: 'ROOM-PODCAST',
+      name: 'Podcast & Recording Room',
+      resourceType: ResourceType.ROOM,
+      campusId: campus.id,
+      locationText: 'Media Center, Floor 1',
+      capacity: 4,
+      description: 'Soundproofed room with professional microphones and recording software.',
+      metadataJson: { soundproof: true, hasMixer: true, hasRecordingPC: true },
+    },
+    {
+      code: 'ROOM-COUNSEL',
+      name: 'Counseling Room 1',
+      resourceType: ResourceType.ROOM,
+      campusId: campus.id,
+      locationText: 'Student Health Center, Floor 1',
+      capacity: 3,
+      description: 'Private counseling room for student psychological support sessions.',
+      metadataJson: { soundproof: true, private: true },
+    },
+    {
+      code: 'ROOM-PRAYER',
+      name: 'Prayer & Meditation Room',
+      resourceType: ResourceType.ROOM,
+      campusId: campus.id,
+      locationText: 'Student Center, Ground Floor',
+      capacity: 20,
+      description: 'Multi-faith prayer and meditation room.',
+      metadataJson: { multiFaith: true, hasAC: true },
+    },
+    {
+      code: 'ROOM-PRESS',
+      name: 'Press Conference Room',
+      resourceType: ResourceType.ROOM,
+      campusId: campus.id,
+      locationText: 'Administration Building, Floor 1',
+      capacity: 30,
+      description: 'Room for press conferences with podium, microphones and backdrop.',
+      metadataJson: { hasPodium: true, hasMicrophone: true, hasBackdrop: true, hasProjector: true },
+    },
+    {
+      code: 'ROOM-MAKER',
+      name: 'Makerspace Workshop',
+      resourceType: ResourceType.ROOM,
+      campusId: campus.id,
+      locationText: 'Engineering Building, Basement',
+      capacity: 25,
+      description: 'Hands-on makerspace with workbenches, tools and 3D printers.',
+      metadataJson: { has3DPrinters: true, hasWorkbenches: true, hasPowerTools: true },
+    },
+
+    // ── LABS (10 adet) ───────────────────────────────────────────
+    {
+      code: 'LAB-PHYS-01',
+      name: 'Physics Lab PH-1',
+      resourceType: ResourceType.LAB,
+      campusId: campus.id,
+      facultyId: facultyEng?.id ?? null,
+      locationText: 'Engineering Building, Block G, Floor 1',
+      capacity: 24,
+      description: 'General physics laboratory for undergraduate experiments.',
+      metadataJson: { equipment: ['Spectrometer', 'Oscilloscope', 'Power Supply'], hasVentilation: true },
+    },
+    {
+      code: 'LAB-CHEM-01',
+      name: 'Chemistry Lab CH-1',
+      resourceType: ResourceType.LAB,
+      campusId: campus.id,
+      facultyId: facultyEng?.id ?? null,
+      locationText: 'Engineering Building, Block G, Floor 2',
+      capacity: 20,
+      description: 'General chemistry lab with fume hoods and safety equipment.',
+      metadataJson: { fumeHoods: 4, hasSafetyShower: true, hasFirstAid: true },
+    },
+    {
+      code: 'LAB-BIO-01',
+      name: 'Biology Lab BIO-1',
+      resourceType: ResourceType.LAB,
+      campusId: campus.id,
+      facultyId: facultyEng?.id ?? null,
+      locationText: 'Science Building, Floor 1',
+      capacity: 20,
+      description: 'Biology laboratory with microscopes and specimen collection.',
+      metadataJson: { microscopes: 20, hasCentrifuge: true, hasRefrigerator: true },
+    },
+    {
+      code: 'LAB-NET-01',
+      name: 'Network Engineering Lab',
+      resourceType: ResourceType.LAB,
+      campusId: campus.id,
+      facultyId: facultyEng?.id ?? null,
+      departmentId: deptCS?.id ?? null,
+      locationText: 'Engineering Building, Block D, Floor 3',
+      capacity: 20,
+      description: 'Networking lab with Cisco switches, routers and patch panels.',
+      metadataJson: { ciscoDevices: true, rackUnits: 4, computers: 20 },
+    },
+    {
+      code: 'LAB-CYBER-01',
+      name: 'Cybersecurity Lab',
+      resourceType: ResourceType.LAB,
+      campusId: campus.id,
+      facultyId: facultyEng?.id ?? null,
+      departmentId: deptCS?.id ?? null,
+      locationText: 'Engineering Building, Block D, Floor 4',
+      capacity: 16,
+      description: 'Isolated lab environment for cybersecurity training and CTF exercises.',
+      metadataJson: { isolated: true, computers: 16, hasFirewall: true },
+    },
+    {
+      code: 'LAB-DATA-01',
+      name: 'Data Science Lab',
+      resourceType: ResourceType.LAB,
+      campusId: campus.id,
+      facultyId: facultyEng?.id ?? null,
+      departmentId: deptCS?.id ?? null,
+      locationText: 'Engineering Building, Block D, Floor 2',
+      capacity: 24,
+      description: 'GPU-equipped lab for data science and machine learning workloads.',
+      metadataJson: { computers: 24, gpuNodes: 6, software: ['Jupyter', 'PyTorch', 'TensorFlow'] },
+    },
+    {
+      code: 'LAB-PHOTO-01',
+      name: 'Photography Lab',
+      resourceType: ResourceType.LAB,
+      campusId: campus.id,
+      facultyId: facultyArts?.id ?? null,
+      locationText: 'Arts Building, Block C, Floor 1',
+      capacity: 12,
+      description: 'Professional photography lab with studio lighting and darkroom.',
+      metadataJson: { hasDarkroom: true, hasStudioLights: true, hasBackdrops: true },
+    },
+    {
+      code: 'LAB-ANIM-01',
+      name: 'Animation & Motion Lab',
+      resourceType: ResourceType.LAB,
+      campusId: campus.id,
+      facultyId: facultyArts?.id ?? null,
+      locationText: 'Arts Building, Block C, Floor 3',
+      capacity: 18,
+      description: 'High-end workstations for 3D animation, VFX and motion graphics.',
+      metadataJson: { computers: 18, software: ['Maya', 'Blender', 'After Effects'], hasDrawingTablets: true },
+    },
+    {
+      code: 'LAB-EMBED-01',
+      name: 'Embedded Systems Lab',
+      resourceType: ResourceType.LAB,
+      campusId: campus.id,
+      facultyId: facultyEng?.id ?? null,
+      locationText: 'Engineering Building, Block E, Floor 2',
+      capacity: 18,
+      description: 'Lab for embedded systems design with Arduino, Raspberry Pi and FPGA boards.',
+      metadataJson: { arduinoKits: 18, raspberryPiKits: 18, fpgaBoards: 6 },
+    },
+    {
+      code: 'LAB-LANG-01',
+      name: 'Language Learning Lab',
+      resourceType: ResourceType.LAB,
+      campusId: campus.id,
+      locationText: 'Main Building, Block B, Floor 2',
+      capacity: 30,
+      description: 'Language lab with headsets, audio booths and pronunciation software.',
+      metadataJson: { computers: 30, headsets: 30, software: ['Rosetta Stone', 'Sanako'], boothCount: 30 },
+    },
+
+    // ── EQUIPMENT (20 adet) ──────────────────────────────────────
+    {
+      code: 'EQ-VR-01',
+      name: 'VR Headset Kit #1',
+      resourceType: ResourceType.EQUIPMENT,
+      campusId: campus.id,
+      unitId: unitIT?.id ?? null,
+      locationText: 'IT Department Storage',
+      capacity: 1,
+      description: 'Meta Quest 3 VR headset with controllers for educational simulations.',
+      metadataJson: { brand: 'Meta', model: 'Quest 3', includes: ['Headset', '2 Controllers', 'Charging Dock'] },
+    },
+    {
+      code: 'EQ-VR-02',
+      name: 'VR Headset Kit #2',
+      resourceType: ResourceType.EQUIPMENT,
+      campusId: campus.id,
+      unitId: unitIT?.id ?? null,
+      locationText: 'IT Department Storage',
+      capacity: 1,
+      description: 'Meta Quest 3 VR headset with controllers for educational simulations.',
+      metadataJson: { brand: 'Meta', model: 'Quest 3', includes: ['Headset', '2 Controllers', 'Charging Dock'] },
+    },
+    {
+      code: 'EQ-3DPRINT-01',
+      name: '3D Printer #1',
+      resourceType: ResourceType.EQUIPMENT,
+      campusId: campus.id,
+      locationText: 'Makerspace Workshop',
+      capacity: 1,
+      description: 'FDM 3D printer for prototyping and design projects.',
+      metadataJson: { brand: 'Prusa', model: 'MK4', printVolume: '250x210x220mm', materials: ['PLA', 'PETG', 'ASA'] },
+    },
+    {
+      code: 'EQ-3DPRINT-02',
+      name: '3D Printer #2',
+      resourceType: ResourceType.EQUIPMENT,
+      campusId: campus.id,
+      locationText: 'Makerspace Workshop',
+      capacity: 1,
+      description: 'Resin 3D printer for detailed prototypes.',
+      metadataJson: { brand: 'Elegoo', model: 'Saturn 3 Ultra', printVolume: '218x123x260mm', type: 'resin' },
+    },
+    {
+      code: 'EQ-DRONE-01',
+      name: 'Drone Kit #1',
+      resourceType: ResourceType.EQUIPMENT,
+      campusId: campus.id,
+      locationText: 'Media Center',
+      capacity: 1,
+      description: 'DJI Mavic 3 drone for aerial photography and event coverage.',
+      metadataJson: { brand: 'DJI', model: 'Mavic 3', includes: ['Drone', '3 Batteries', 'Remote', 'Case'], licenseRequired: true },
+    },
+    {
+      code: 'EQ-DRONE-02',
+      name: 'Drone Kit #2',
+      resourceType: ResourceType.EQUIPMENT,
+      campusId: campus.id,
+      locationText: 'Media Center',
+      capacity: 1,
+      description: 'DJI Mini 4 Pro drone for lightweight aerial recording.',
+      metadataJson: { brand: 'DJI', model: 'Mini 4 Pro', includes: ['Drone', '2 Batteries', 'Remote'], licenseRequired: true },
+    },
+    {
+      code: 'EQ-LIGHT-01',
+      name: 'Studio Lighting Kit #1',
+      resourceType: ResourceType.EQUIPMENT,
+      campusId: campus.id,
+      locationText: 'Media Center',
+      capacity: 1,
+      description: 'Professional studio lighting set with softboxes and LED panels.',
+      metadataJson: { includes: ['2x LED Panel', '2x Softbox', 'Light Stand x4', 'Diffuser'], brand: 'Godox' },
+    },
+    {
+      code: 'EQ-LIGHT-02',
+      name: 'Studio Lighting Kit #2',
+      resourceType: ResourceType.EQUIPMENT,
+      campusId: campus.id,
+      locationText: 'Media Center',
+      capacity: 1,
+      description: 'Portable ring light and LED bar set for video productions.',
+      metadataJson: { includes: ['Ring Light 18"', '2x LED Bar', 'Tripod'], brand: 'Neewer' },
+    },
+    {
+      code: 'EQ-MIC-01',
+      name: 'Condenser Microphone Set',
+      resourceType: ResourceType.EQUIPMENT,
+      campusId: campus.id,
+      locationText: 'Media Center',
+      capacity: 1,
+      description: 'Professional condenser microphone set for studio recording.',
+      metadataJson: { brand: 'Shure', model: 'SM7B', includes: ['Mic', 'Boom Arm', 'XLR Cable', 'Pop Filter'] },
+    },
+    {
+      code: 'EQ-GIMBAL-01',
+      name: 'Camera Gimbal',
+      resourceType: ResourceType.EQUIPMENT,
+      campusId: campus.id,
+      locationText: 'Media Center',
+      capacity: 1,
+      description: '3-axis camera gimbal stabilizer for smooth video recording.',
+      metadataJson: { brand: 'DJI', model: 'RS 3 Pro', maxPayload: '4.5kg' },
+    },
+    {
+      code: 'EQ-SCANNER-01',
+      name: 'Document Scanner',
+      resourceType: ResourceType.EQUIPMENT,
+      campusId: campus.id,
+      locationText: 'Student Affairs Office',
+      capacity: 1,
+      description: 'High-speed document scanner for digitizing records.',
+      metadataJson: { brand: 'Fujitsu', model: 'ScanSnap iX1600', dpi: 600, pagesPerMinute: 40 },
+    },
+    {
+      code: 'EQ-TABLET-02',
+      name: 'iPad Pro Kit',
+      resourceType: ResourceType.EQUIPMENT,
+      campusId: campus.id,
+      unitId: unitIT?.id ?? null,
+      locationText: 'IT Department',
+      capacity: 1,
+      description: 'iPad Pro 12.9" with Apple Pencil for presentations and digital annotation.',
+      metadataJson: { brand: 'Apple', model: 'iPad Pro 12.9" M2', includes: ['Apple Pencil', 'Magic Keyboard', 'Case'] },
+    },
+    {
+      code: 'EQ-TABLET-03',
+      name: 'iPad Pro Kit #2',
+      resourceType: ResourceType.EQUIPMENT,
+      campusId: campus.id,
+      unitId: unitIT?.id ?? null,
+      locationText: 'IT Department',
+      capacity: 1,
+      description: 'iPad Pro 12.9" with Apple Pencil for presentations and digital annotation.',
+      metadataJson: { brand: 'Apple', model: 'iPad Pro 12.9" M2', includes: ['Apple Pencil', 'Magic Keyboard', 'Case'] },
+    },
+    {
+      code: 'EQ-CLICKER-01',
+      name: 'Presentation Clicker Set',
+      resourceType: ResourceType.EQUIPMENT,
+      campusId: campus.id,
+      unitId: unitIT?.id ?? null,
+      locationText: 'IT Department Storage',
+      capacity: 5,
+      description: 'Wireless presentation clickers (quantity: 5) with laser pointer.',
+      metadataJson: { brand: 'Logitech', model: 'R500s', quantity: 5 },
+    },
+    {
+      code: 'EQ-HOTSPOT-01',
+      name: 'Mobile Hotspot Device',
+      resourceType: ResourceType.EQUIPMENT,
+      campusId: campus.id,
+      unitId: unitIT?.id ?? null,
+      locationText: 'IT Department',
+      capacity: 1,
+      description: 'Portable 4G/5G hotspot device for events and off-campus use.',
+      metadataJson: { brand: 'Huawei', model: 'E5788', networkType: '4G/5G', simIncluded: true },
+    },
+    {
+      code: 'EQ-EXTCAM-01',
+      name: 'Action Camera Kit',
+      resourceType: ResourceType.EQUIPMENT,
+      campusId: campus.id,
+      locationText: 'Student Activities Office',
+      capacity: 1,
+      description: 'GoPro Hero 12 action camera for outdoor events and sports coverage.',
+      metadataJson: { brand: 'GoPro', model: 'Hero 12 Black', includes: ['Camera', '2 Batteries', 'Mounts', 'Waterproof Case'] },
+    },
+    {
+      code: 'EQ-MEASURE-01',
+      name: 'Scientific Measurement Kit',
+      resourceType: ResourceType.EQUIPMENT,
+      campusId: campus.id,
+      facultyId: facultyEng?.id ?? null,
+      locationText: 'Engineering Building Storage',
+      capacity: 1,
+      description: 'Portable measurement toolkit including digital caliper, laser distance meter.',
+      metadataJson: { includes: ['Digital Caliper', 'Laser Distance Meter', 'Multimeter', 'Thermometer'] },
+    },
+    {
+      code: 'EQ-WEBCAST-01',
+      name: 'Webcasting Kit',
+      resourceType: ResourceType.EQUIPMENT,
+      campusId: campus.id,
+      unitId: unitIT?.id ?? null,
+      locationText: 'IT Department Storage',
+      capacity: 1,
+      description: 'Complete webcasting setup for live streaming lectures and events.',
+      metadataJson: { includes: ['Capture Card', 'Stream Deck', 'USB Mic', 'Webcam 4K'], software: 'OBS Studio' },
+    },
+    {
+      code: 'EQ-EXTDISPLAY-01',
+      name: 'Portable Display 4K',
+      resourceType: ResourceType.EQUIPMENT,
+      campusId: campus.id,
+      unitId: unitIT?.id ?? null,
+      locationText: 'IT Department',
+      capacity: 1,
+      description: '15.6" portable 4K USB-C display for presentations and dual-screen setups.',
+      metadataJson: { brand: 'ASUS', model: 'ZenScreen Pro', resolution: '4K', connection: 'USB-C' },
+    },
+    {
+      code: 'EQ-ARDUINO-KIT',
+      name: 'Arduino Education Kit',
+      resourceType: ResourceType.EQUIPMENT,
+      campusId: campus.id,
+      facultyId: facultyEng?.id ?? null,
+      locationText: 'Engineering Building Storage',
+      capacity: 10,
+      description: 'Arduino Uno starter kit bundle for electronics and IoT courses (10 units).',
+      metadataJson: { brand: 'Arduino', model: 'Uno R3', quantity: 10, includes: ['Board', 'Breadboard', 'Sensors', 'Cables'] },
+    },
+
+    // ── VEHICLES (5 adet) ─────────────────────────────────────────
+    {
+      code: 'VEH-BUS-01',
+      name: 'Field Trip Bus #1',
+      resourceType: ResourceType.VEHICLE,
+      campusId: campus.id,
+      locationText: 'Campus Garage',
+      capacity: 45,
+      description: 'Large bus for field trips and inter-campus transport.',
+      metadataJson: { seats: 45, fuelType: 'Diesel', licenseRequired: 'D', hasAC: true },
+    },
+    {
+      code: 'VEH-ELECTRIC-01',
+      name: 'Electric Campus Shuttle',
+      resourceType: ResourceType.VEHICLE,
+      campusId: campus.id,
+      locationText: 'Campus Garage',
+      capacity: 12,
+      description: 'Electric shuttle for eco-friendly campus mobility.',
+      metadataJson: { seats: 12, fuelType: 'Electric', range: '150km', chargingTime: '2h' },
+    },
+    {
+      code: 'VEH-AMBULANCE',
+      name: 'Campus Ambulance',
+      resourceType: ResourceType.VEHICLE,
+      campusId: campus.id,
+      locationText: 'Health Center Parking',
+      capacity: 2,
+      description: 'Medical emergency response vehicle for campus health center.',
+      metadataJson: { vehicleClass: 'ambulance', equipmentIncluded: true, availabilty: '24/7' },
+    },
+    {
+      code: 'VEH-PICKUP-01',
+      name: 'Pickup Truck #1',
+      resourceType: ResourceType.VEHICLE,
+      campusId: campus.id,
+      locationText: 'Campus Garage',
+      capacity: 2,
+      description: 'Pickup truck for heavy equipment transport and facilities management.',
+      metadataJson: { vehicleClass: 'pickup', fuelType: 'Diesel', payload: '1000kg' },
+    },
+    {
+      code: 'VEH-GOLF-01',
+      name: 'Campus Golf Cart #1',
+      resourceType: ResourceType.VEHICLE,
+      campusId: campus.id,
+      locationText: 'Main Entrance Depot',
+      capacity: 4,
+      description: 'Electric golf cart for VIP and mobility-impaired campus transport.',
+      metadataJson: { vehicleClass: 'golf-cart', fuelType: 'Electric', maxSpeed: '25km/h' },
+    },
+  ];
+
+  // ─────────────────────────────────────────────────────────────
+  // EK 50 DAHA FAZLA KAYNAK
+  // ─────────────────────────────────────────────────────────────
+  const moreResources = [
+    // ── ROOMS (15 adet) ──────────────────────────────────────────
+    {
+      code: 'ROOM-THEATER',
+      name: 'Campus Theater & Auditorium',
+      resourceType: ResourceType.ROOM,
+      campusId: campus.id,
+      locationText: 'Student Center, Ground Floor',
+      capacity: 500,
+      description: 'Full-scale campus theater with stage, lighting grid, and sound system.',
+      metadataJson: { hasStage: true, hasLightingGrid: true, hasSoundSystem: true, hasBalcony: true, hasDressingRooms: true },
+    },
+    {
+      code: 'ROOM-GALLERY-01',
+      name: 'Art Gallery Room',
+      resourceType: ResourceType.ROOM,
+      campusId: campus.id,
+      facultyId: facultyArts?.id ?? null,
+      locationText: 'Arts Building, Block C, Ground Floor',
+      capacity: 60,
+      description: 'Exhibition gallery for student and faculty artwork displays.',
+      metadataJson: { hasTrackLighting: true, hasHangingSystem: true, climate: 'controlled' },
+    },
+    {
+      code: 'ROOM-CLUB-01',
+      name: 'Student Club Room 1',
+      resourceType: ResourceType.ROOM,
+      campusId: campus.id,
+      locationText: 'Student Center, Floor 1',
+      capacity: 15,
+      description: 'Dedicated room for student club activities and meetings.',
+      metadataJson: { hasWhiteboard: true, hasTV: true, hasLocker: true },
+    },
+    {
+      code: 'ROOM-CLUB-02',
+      name: 'Student Club Room 2',
+      resourceType: ResourceType.ROOM,
+      campusId: campus.id,
+      locationText: 'Student Center, Floor 1',
+      capacity: 15,
+      description: 'Dedicated room for student club activities and meetings.',
+      metadataJson: { hasWhiteboard: true, hasTV: true, hasLocker: true },
+    },
+    {
+      code: 'ROOM-CLUB-03',
+      name: 'Student Club Room 3',
+      resourceType: ResourceType.ROOM,
+      campusId: campus.id,
+      locationText: 'Student Center, Floor 2',
+      capacity: 20,
+      description: 'Larger club room for music, drama or cultural societies.',
+      metadataJson: { hasWhiteboard: true, hasSpeakers: true, hasStage: false, instrument_storage: true },
+    },
+    {
+      code: 'ROOM-SIMULATION',
+      name: 'Business Simulation Room',
+      resourceType: ResourceType.ROOM,
+      campusId: campus.id,
+      locationText: 'Main Building, Block B, Floor 3',
+      capacity: 24,
+      description: 'Mock trading floor and business simulation environment.',
+      metadataJson: { hasMultipleScreens: true, hasBloombergTerminals: 6, hasProjector: true },
+    },
+    {
+      code: 'ROOM-LOUNGE-01',
+      name: 'Faculty Lounge',
+      resourceType: ResourceType.ROOM,
+      campusId: campus.id,
+      locationText: 'Administration Building, Floor 2',
+      capacity: 25,
+      description: 'Comfortable lounge for faculty rest and informal meetings.',
+      metadataJson: { hasKitchenette: true, hasTV: true, hasSofas: true },
+    },
+    {
+      code: 'ROOM-TRAINING-01',
+      name: 'Staff Training Room',
+      resourceType: ResourceType.ROOM,
+      campusId: campus.id,
+      locationText: 'Administration Building, Floor 3',
+      capacity: 30,
+      description: 'Dedicated training room with computers and projector for staff development.',
+      metadataJson: { hasProjector: true, computers: 15, hasWhiteboard: true },
+    },
+    {
+      code: 'ROOM-BREAKOUT-01',
+      name: 'Breakout Room A',
+      resourceType: ResourceType.ROOM,
+      campusId: campus.id,
+      locationText: 'Main Building, Block B, Floor 2',
+      capacity: 8,
+      description: 'Small breakout room for team discussions adjacent to conference rooms.',
+      metadataJson: { hasWhiteboard: true, hasTV: true },
+    },
+    {
+      code: 'ROOM-BREAKOUT-02',
+      name: 'Breakout Room B',
+      resourceType: ResourceType.ROOM,
+      campusId: campus.id,
+      locationText: 'Main Building, Block B, Floor 2',
+      capacity: 8,
+      description: 'Small breakout room for team discussions adjacent to conference rooms.',
+      metadataJson: { hasWhiteboard: true, hasTV: true },
+    },
+    {
+      code: 'ROOM-AMPHITHEATER',
+      name: 'Outdoor Amphitheater',
+      resourceType: ResourceType.ROOM,
+      campusId: campus.id,
+      locationText: 'Campus Central Garden',
+      capacity: 200,
+      description: 'Open-air amphitheater for outdoor events, performances and ceremonies.',
+      metadataJson: { outdoor: true, hasPASystem: true, hasStage: true, lightingAvailable: true },
+    },
+    {
+      code: 'ROOM-SPORTS-CONF',
+      name: 'Sports Department Office',
+      resourceType: ResourceType.ROOM,
+      campusId: campus.id,
+      locationText: 'Sports Complex, Floor 1',
+      capacity: 12,
+      description: 'Sports department meeting room with video analysis display.',
+      metadataJson: { hasVideoAnalysis: true, hasProjector: true },
+    },
+    {
+      code: 'ROOM-PILATES',
+      name: 'Yoga & Pilates Studio',
+      resourceType: ResourceType.ROOM,
+      campusId: campus.id,
+      locationText: 'Sports Complex, Floor 2',
+      capacity: 20,
+      description: 'Dedicated studio for yoga, pilates and relaxation sessions.',
+      metadataJson: { hasMirrors: true, hasAC: true, hasSpeakers: true, flooringType: 'rubberized' },
+    },
+    {
+      code: 'ROOM-READING-ROOM',
+      name: 'Silent Reading Room',
+      resourceType: ResourceType.ROOM,
+      campusId: campus.id,
+      locationText: 'Library Building, Floor 3',
+      capacity: 50,
+      description: 'Quiet reading room with individual study carrels and natural light.',
+      metadataJson: { silentZone: true, hasIndividualLamps: true, hasLockers: true },
+    },
+    {
+      code: 'ROOM-INCUBATOR',
+      name: 'Startup Incubator Space',
+      resourceType: ResourceType.ROOM,
+      campusId: campus.id,
+      locationText: 'Technology Transfer Office, Floor 1',
+      capacity: 20,
+      description: 'Co-working space for student and faculty startups with hot desks and meeting pods.',
+      metadataJson: { hasHotDesks: 16, hasMeetingPods: 2, hasPrinter: true, hasHighSpeedInternet: true },
+    },
+
+    // ── LABS (10 adet) ───────────────────────────────────────────
+    {
+      code: 'LAB-MECH-01',
+      name: 'Mechanical Engineering Lab',
+      resourceType: ResourceType.LAB,
+      campusId: campus.id,
+      facultyId: facultyEng?.id ?? null,
+      locationText: 'Engineering Building, Block H, Floor 1',
+      capacity: 22,
+      description: 'Mechanical engineering lab with CNC machines, lathes and milling tools.',
+      metadataJson: { hasCNC: true, hasLathe: 4, hasMilling: 2, hasVentilation: true, PPERequired: true },
+    },
+    {
+      code: 'LAB-CIVIL-01',
+      name: 'Civil Engineering Testing Lab',
+      resourceType: ResourceType.LAB,
+      campusId: campus.id,
+      facultyId: facultyEng?.id ?? null,
+      locationText: 'Engineering Building, Block H, Floor 2',
+      capacity: 18,
+      description: 'Structural and materials testing lab for civil engineering courses.',
+      metadataJson: { hasUTM: true, hasConcreteTestingEquipment: true, hasVibrationTable: true },
+    },
+    {
+      code: 'LAB-MATERIALS',
+      name: 'Materials Science Lab',
+      resourceType: ResourceType.LAB,
+      campusId: campus.id,
+      facultyId: facultyEng?.id ?? null,
+      locationText: 'Engineering Building, Block G, Floor 3',
+      capacity: 16,
+      description: 'Lab for characterizing and testing engineering materials.',
+      metadataJson: { hasSEM: true, hasXRD: true, hasHardnessTester: true, cleanroomClass: 1000 },
+    },
+    {
+      code: 'LAB-ROBOTICS-02',
+      name: 'Advanced Robotics Lab',
+      resourceType: ResourceType.LAB,
+      campusId: campus.id,
+      facultyId: facultyEng?.id ?? null,
+      departmentId: deptCS?.id ?? null,
+      locationText: 'Engineering Building, Block E, Floor 3',
+      capacity: 14,
+      description: 'Advanced robotics platform with industrial robot arms and ROS workstations.',
+      metadataJson: { robotArms: 3, ROSWorkstations: 14, hasArenaFloor: true, hasVisionSystem: true },
+    },
+    {
+      code: 'LAB-GIS-01',
+      name: 'GIS & Mapping Lab',
+      resourceType: ResourceType.LAB,
+      campusId: campus.id,
+      facultyId: facultyEng?.id ?? null,
+      locationText: 'Engineering Building, Block D, Floor 1',
+      capacity: 20,
+      description: 'Geographic information systems lab with ArcGIS and satellite imagery tools.',
+      metadataJson: { computers: 20, software: ['ArcGIS', 'QGIS', 'AutoCAD'], hasLargePlotter: true },
+    },
+    {
+      code: 'LAB-MUSIC-01',
+      name: 'Music Production Lab',
+      resourceType: ResourceType.LAB,
+      campusId: campus.id,
+      facultyId: facultyArts?.id ?? null,
+      locationText: 'Arts Building, Block C, Floor 2',
+      capacity: 12,
+      description: 'Music production studio with DAW workstations, MIDI keyboards and acoustic panels.',
+      metadataJson: { workstations: 12, midiKeyboards: 12, software: ['Ableton', 'Logic Pro', 'Pro Tools'], soundproofed: true },
+    },
+    {
+      code: 'LAB-ARCH-01',
+      name: 'Architecture Studio',
+      resourceType: ResourceType.LAB,
+      campusId: campus.id,
+      facultyId: facultyEng?.id ?? null,
+      locationText: 'Engineering Building, Block A, Floor 3',
+      capacity: 20,
+      description: 'Architecture studio with drafting tables, model-making tools and CAD workstations.',
+      metadataJson: { draftingTables: 20, computers: 20, software: ['AutoCAD', 'Revit', 'SketchUp'], hasModelWorkbench: true },
+    },
+    {
+      code: 'LAB-GAME-01',
+      name: 'Game Development Lab',
+      resourceType: ResourceType.LAB,
+      campusId: campus.id,
+      facultyId: facultyEng?.id ?? null,
+      departmentId: deptCS?.id ?? null,
+      locationText: 'Engineering Building, Block D, Floor 5',
+      capacity: 20,
+      description: 'High-performance workstations for game development with Unity and Unreal Engine.',
+      metadataJson: { computers: 20, software: ['Unity', 'Unreal Engine', 'Godot'], hasGameControllers: true, hasVRStations: 4 },
+    },
+    {
+      code: 'LAB-SPEECH-01',
+      name: 'Speech & Communication Lab',
+      resourceType: ResourceType.LAB,
+      campusId: campus.id,
+      locationText: 'Main Building, Block B, Floor 3',
+      capacity: 24,
+      description: 'Lab for speech, debate, and presentation training with recording booths.',
+      metadataJson: { recordingBooths: 4, computers: 24, software: ['Praat', 'Audacity'], hasTeleprompter: true },
+    },
+    {
+      code: 'LAB-ENVIRON-01',
+      name: 'Environmental Science Lab',
+      resourceType: ResourceType.LAB,
+      campusId: campus.id,
+      facultyId: facultyEng?.id ?? null,
+      locationText: 'Science Building, Floor 2',
+      capacity: 18,
+      description: 'Lab for environmental sampling, water quality testing and air analysis.',
+      metadataJson: { hasAirQualityAnalyzer: true, hasWaterTestingKit: true, hasFumeHood: 2, hasIncubator: true },
+    },
+
+    // ── EQUIPMENT (20 adet) ──────────────────────────────────────
+    {
+      code: 'EQ-SCREEN-01',
+      name: 'Portable Projector Screen #1',
+      resourceType: ResourceType.EQUIPMENT,
+      campusId: campus.id,
+      unitId: unitIT?.id ?? null,
+      locationText: 'IT Department Storage',
+      capacity: 1,
+      description: '120" portable tripod projector screen for indoor events.',
+      metadataJson: { size: '120"', type: 'tripod', aspectRatio: '16:9' },
+    },
+    {
+      code: 'EQ-IWHITEBOARD-01',
+      name: 'Interactive Smart Whiteboard',
+      resourceType: ResourceType.EQUIPMENT,
+      campusId: campus.id,
+      unitId: unitIT?.id ?? null,
+      locationText: 'IT Department Storage',
+      capacity: 1,
+      description: '75" interactive smart whiteboard with built-in Android OS and wireless screen mirroring.',
+      metadataJson: { brand: 'Samsung', model: 'Flip Pro 75"', connection: ['WiFi', 'HDMI', 'USB-C'], hasBuiltinCamera: true },
+    },
+    {
+      code: 'EQ-CAMCORDER-01',
+      name: 'Professional Camcorder',
+      resourceType: ResourceType.EQUIPMENT,
+      campusId: campus.id,
+      locationText: 'Media Center',
+      capacity: 1,
+      description: 'Sony professional camcorder for events and documentary projects.',
+      metadataJson: { brand: 'Sony', model: 'FX3', includes: ['Camera', 'Lens', 'ND Filters', 'Case'], resolution: '4K' },
+    },
+    {
+      code: 'EQ-SOUNDBOARD-01',
+      name: 'Audio Mixer / Soundboard',
+      resourceType: ResourceType.EQUIPMENT,
+      campusId: campus.id,
+      locationText: 'Media Center',
+      capacity: 1,
+      description: '24-channel digital audio mixer for live events and studio recording.',
+      metadataJson: { brand: 'Behringer', model: 'X32', channels: 24, hasUSBAudio: true },
+    },
+    {
+      code: 'EQ-TELESCOPE-01',
+      name: 'Telescope Kit',
+      resourceType: ResourceType.EQUIPMENT,
+      campusId: campus.id,
+      facultyId: facultyEng?.id ?? null,
+      locationText: 'Science Building Rooftop Storage',
+      capacity: 1,
+      description: 'Computerized reflecting telescope for astronomy courses and public events.',
+      metadataJson: { brand: 'Celestron', model: 'NexStar 8SE', aperture: '203mm', mountType: 'alt-az computerized' },
+    },
+    {
+      code: 'EQ-MICROSCOPE-PORT-01',
+      name: 'Portable Digital Microscope',
+      resourceType: ResourceType.EQUIPMENT,
+      campusId: campus.id,
+      locationText: 'Science Building Storage',
+      capacity: 1,
+      description: 'USB digital microscope for field samples and classroom demonstrations.',
+      metadataJson: { brand: 'Dino-Lite', magnification: '20x-220x', connection: 'USB', hasLEDIllumination: true },
+    },
+    {
+      code: 'EQ-POWERSTATION-01',
+      name: 'Portable Power Station',
+      resourceType: ResourceType.EQUIPMENT,
+      campusId: campus.id,
+      locationText: 'Student Activities Office',
+      capacity: 1,
+      description: '2000W portable power station for outdoor events and fieldwork.',
+      metadataJson: { brand: 'EcoFlow', model: 'Delta Pro', capacity: '3600Wh', outlets: ['AC x4', 'USB-A x4', 'USB-C x2'] },
+    },
+    {
+      code: 'EQ-WALKIE-01',
+      name: 'Walkie Talkie Set (10 units)',
+      resourceType: ResourceType.EQUIPMENT,
+      campusId: campus.id,
+      locationText: 'Student Activities Office',
+      capacity: 10,
+      description: '10x long-range walkie talkies for event coordination and campus security support.',
+      metadataJson: { brand: 'Motorola', model: 'T600', range: '10km', quantity: 10, includesCharger: true },
+    },
+    {
+      code: 'EQ-MEGAPHONE-01',
+      name: 'Megaphone / Bullhorn',
+      resourceType: ResourceType.EQUIPMENT,
+      campusId: campus.id,
+      locationText: 'Student Activities Office',
+      capacity: 1,
+      description: 'High-power megaphone for outdoor events and campus announcements.',
+      metadataJson: { brand: 'Pyle', watts: 50, hasRecording: true, hasSiren: true },
+    },
+    {
+      code: 'EQ-LAVALIER-01',
+      name: 'Lavalier Microphone Set',
+      resourceType: ResourceType.EQUIPMENT,
+      campusId: campus.id,
+      locationText: 'Media Center',
+      capacity: 1,
+      description: 'Wireless lavalier mic set with 4 transmitters for conferences and panels.',
+      metadataJson: { brand: 'Rode', model: 'Wireless GO II', transmitters: 4, hasBodypack: true },
+    },
+    {
+      code: 'EQ-GREENSCREEN-01',
+      name: 'Green Screen Kit',
+      resourceType: ResourceType.EQUIPMENT,
+      campusId: campus.id,
+      locationText: 'Media Center',
+      capacity: 1,
+      description: 'Large collapsible green screen with stand for video production.',
+      metadataJson: { size: '3x2m', includes: ['Green Screen', 'Stand x2', 'Sandbag x2', 'Carry Bag'] },
+    },
+    {
+      code: 'EQ-BEAMER-01',
+      name: 'Ultra Short Throw Projector',
+      resourceType: ResourceType.EQUIPMENT,
+      campusId: campus.id,
+      unitId: unitIT?.id ?? null,
+      locationText: 'IT Department Storage',
+      capacity: 1,
+      description: '4K ultra short throw laser projector for small meeting rooms.',
+      metadataJson: { brand: 'Epson', model: 'LS300W', lumens: 3600, resolution: '4K', throwDistance: '20cm' },
+    },
+    {
+      code: 'EQ-WORKSTATION-01',
+      name: 'High-End Design Workstation',
+      resourceType: ResourceType.EQUIPMENT,
+      campusId: campus.id,
+      facultyId: facultyArts?.id ?? null,
+      locationText: 'Arts Department Storage',
+      capacity: 1,
+      description: 'Portable high-performance workstation for rendering, VFX and design.',
+      metadataJson: { brand: 'Apple', model: 'Mac Pro M2 Ultra', ram: '192GB', storage: '4TB SSD', gpu: 'M2 Ultra 76-core' },
+    },
+    {
+      code: 'EQ-SCANNER-3D-01',
+      name: '3D Scanner',
+      resourceType: ResourceType.EQUIPMENT,
+      campusId: campus.id,
+      facultyId: facultyEng?.id ?? null,
+      locationText: 'Engineering Building Storage',
+      capacity: 1,
+      description: 'Handheld 3D scanner for reverse engineering and object digitization.',
+      metadataJson: { brand: 'Revopoint', model: 'RANGE 3', accuracy: '0.1mm', includes: ['Scanner', 'Turntable', 'Case'] },
+    },
+    {
+      code: 'EQ-THERMAL-01',
+      name: 'Thermal Imaging Camera',
+      resourceType: ResourceType.EQUIPMENT,
+      campusId: campus.id,
+      facultyId: facultyEng?.id ?? null,
+      locationText: 'Engineering Building Storage',
+      capacity: 1,
+      description: 'Handheld thermal camera for building inspections and engineering diagnostics.',
+      metadataJson: { brand: 'FLIR', model: 'E6-XT', resolution: '240x180', temperatureRange: '-20 to 550°C' },
+    },
+    {
+      code: 'EQ-OSCILLOSCOPE-01',
+      name: 'Digital Oscilloscope',
+      resourceType: ResourceType.EQUIPMENT,
+      campusId: campus.id,
+      facultyId: facultyEng?.id ?? null,
+      locationText: 'Engineering Building Storage',
+      capacity: 2,
+      description: 'Portable 4-channel digital oscilloscope for electronics experiments.',
+      metadataJson: { brand: 'Rigol', model: 'DS1054Z', channels: 4, bandwidth: '50MHz', quantity: 2 },
+    },
+    {
+      code: 'EQ-HDMI-KIT-01',
+      name: 'HDMI Distribution Kit',
+      resourceType: ResourceType.EQUIPMENT,
+      campusId: campus.id,
+      unitId: unitIT?.id ?? null,
+      locationText: 'IT Department Storage',
+      capacity: 1,
+      description: 'HDMI splitter/switcher kit for simultaneous multi-display event setups.',
+      metadataJson: { includes: ['1x8 HDMI Splitter', '4-Port HDMI Switch', 'HDMI Cables x10'], brand: 'Club3D' },
+    },
+    {
+      code: 'EQ-FIRST-AID-01',
+      name: 'Portable First Aid Kit (Large)',
+      resourceType: ResourceType.EQUIPMENT,
+      campusId: campus.id,
+      locationText: 'Student Activities Office',
+      capacity: 1,
+      description: 'Comprehensive first aid kit for events with 200+ participants.',
+      metadataJson: { items: 200, includes: ['Bandages', 'AED', 'Splint', 'CPR Mask', 'Gloves'], AEDIncluded: true },
+    },
+    {
+      code: 'EQ-LABEL-PRINT-01',
+      name: 'Label Printer',
+      resourceType: ResourceType.EQUIPMENT,
+      campusId: campus.id,
+      unitId: unitIT?.id ?? null,
+      locationText: 'IT Department',
+      capacity: 1,
+      description: 'Industrial label printer for asset tagging and inventory management.',
+      metadataJson: { brand: 'Brother', model: 'QL-1110NWB', printWidth: '62mm', connectivity: ['WiFi', 'USB', 'Ethernet'] },
+    },
+    {
+      code: 'EQ-ELECTRIC-PUMP-01',
+      name: 'Electric Air Pump',
+      resourceType: ResourceType.EQUIPMENT,
+      campusId: campus.id,
+      locationText: 'Student Activities Office',
+      capacity: 1,
+      description: 'High-speed electric air pump for inflatable decorations, balloons and sports equipment.',
+      metadataJson: { brand: 'Intex', model: 'Quick Fill', power: '120W', hasMultipleNozzles: true },
+    },
+
+    // ── VEHICLES (5 adet) ─────────────────────────────────────────
+    {
+      code: 'VEH-BIKE-01',
+      name: 'Campus Bicycle #1',
+      resourceType: ResourceType.VEHICLE,
+      campusId: campus.id,
+      locationText: 'Main Entrance Bike Rack',
+      capacity: 1,
+      description: 'Campus bicycle available for short inter-building trips.',
+      metadataJson: { vehicleClass: 'bicycle', type: 'hybrid', hasLock: true, hasHelmet: true },
+    },
+    {
+      code: 'VEH-BIKE-02',
+      name: 'Campus Bicycle #2',
+      resourceType: ResourceType.VEHICLE,
+      campusId: campus.id,
+      locationText: 'Main Entrance Bike Rack',
+      capacity: 1,
+      description: 'Campus bicycle available for short inter-building trips.',
+      metadataJson: { vehicleClass: 'bicycle', type: 'hybrid', hasLock: true, hasHelmet: true },
+    },
+    {
+      code: 'VEH-ESCOOTER-01',
+      name: 'Electric Scooter #1',
+      resourceType: ResourceType.VEHICLE,
+      campusId: campus.id,
+      locationText: 'Campus Mobility Station A',
+      capacity: 1,
+      description: 'Electric scooter for eco-friendly campus mobility.',
+      metadataJson: { vehicleClass: 'e-scooter', maxSpeed: '25km/h', range: '40km', chargeTime: '4h' },
+    },
+    {
+      code: 'VEH-MINIVAN-01',
+      name: 'Faculty Minivan',
+      resourceType: ResourceType.VEHICLE,
+      campusId: campus.id,
+      locationText: 'Campus Garage',
+      capacity: 7,
+      description: 'Minivan for faculty travel, delegation visits and department field trips.',
+      metadataJson: { vehicleClass: 'minivan', seats: 7, fuelType: 'Petrol', hasAC: true, licenseRequired: 'B' },
+    },
+    {
+      code: 'VEH-LUGGAGE-01',
+      name: 'Electric Luggage Cart',
+      resourceType: ResourceType.VEHICLE,
+      campusId: campus.id,
+      locationText: 'Campus Garage',
+      capacity: 2,
+      description: 'Electric luggage/cargo cart for transporting equipment between buildings.',
+      metadataJson: { vehicleClass: 'cargo-cart', fuelType: 'Electric', maxPayload: '500kg', indoorUse: true },
+    },
+  ];
 
   const resources = [
     // ─────────────────────────────────────────────────────────────
@@ -30,7 +1226,11 @@ async function main() {
       locationText: 'Engineering Building, Block A, Floor 1',
       capacity: 120,
       description: 'Large lecture hall with projector and sound system.',
-      metadataJson: { hasProjector: true, hasWhiteboard: true, hasMicrophone: true },
+      metadataJson: {
+        hasProjector: true,
+        hasWhiteboard: true,
+        hasMicrophone: true,
+      },
     },
     {
       code: 'ROOM-A201',
@@ -71,7 +1271,8 @@ async function main() {
       campusId: campus.id,
       locationText: 'Student Center, Ground Floor',
       capacity: 300,
-      description: 'Large multipurpose hall for events, conferences and ceremonies.',
+      description:
+        'Large multipurpose hall for events, conferences and ceremonies.',
       metadataJson: { hasStage: true, hasAV: true, hasMicrophone: true },
     },
 
@@ -88,7 +1289,11 @@ async function main() {
       locationText: 'Engineering Building, Block D, Floor 1',
       capacity: 30,
       description: 'Computer lab with 30 workstations, dual monitors.',
-      metadataJson: { computers: 30, os: 'Windows 11', software: ['MATLAB', 'Visual Studio', 'Python'] },
+      metadataJson: {
+        computers: 30,
+        os: 'Windows 11',
+        software: ['MATLAB', 'Visual Studio', 'Python'],
+      },
     },
     {
       code: 'LAB-CS2',
@@ -100,7 +1305,11 @@ async function main() {
       locationText: 'Engineering Building, Block D, Floor 2',
       capacity: 25,
       description: 'Programming lab for software engineering courses.',
-      metadataJson: { computers: 25, os: 'Ubuntu 22.04', software: ['GCC', 'Docker', 'VS Code'] },
+      metadataJson: {
+        computers: 25,
+        os: 'Ubuntu 22.04',
+        software: ['GCC', 'Docker', 'VS Code'],
+      },
     },
     {
       code: 'LAB-EE1',
@@ -110,8 +1319,11 @@ async function main() {
       facultyId: facultyEng?.id ?? null,
       locationText: 'Engineering Building, Block E, Floor 1',
       capacity: 20,
-      description: 'Electronics laboratory with oscilloscopes and soldering stations.',
-      metadataJson: { equipment: ['Oscilloscope', 'Multimeter', 'Soldering Station'] },
+      description:
+        'Electronics laboratory with oscilloscopes and soldering stations.',
+      metadataJson: {
+        equipment: ['Oscilloscope', 'Multimeter', 'Soldering Station'],
+      },
     },
 
     // ─────────────────────────────────────────────────────────────
@@ -125,8 +1337,14 @@ async function main() {
       unitId: unitIT?.id ?? null,
       locationText: 'IT Department Storage',
       capacity: 1,
-      description: 'Portable HDMI projector, 3000 lumens. Suitable for presentations.',
-      metadataJson: { brand: 'Epson', model: 'EB-X41', lumens: 3000, connections: ['HDMI', 'VGA', 'USB'] },
+      description:
+        'Portable HDMI projector, 3000 lumens. Suitable for presentations.',
+      metadataJson: {
+        brand: 'Epson',
+        model: 'EB-X41',
+        lumens: 3000,
+        connections: ['HDMI', 'VGA', 'USB'],
+      },
     },
     {
       code: 'EQ-PROJ-02',
@@ -137,7 +1355,12 @@ async function main() {
       locationText: 'IT Department Storage',
       capacity: 1,
       description: 'Portable HDMI projector, 4000 lumens.',
-      metadataJson: { brand: 'BenQ', model: 'MX550', lumens: 4000, connections: ['HDMI', 'VGA'] },
+      metadataJson: {
+        brand: 'BenQ',
+        model: 'MX550',
+        lumens: 4000,
+        connections: ['HDMI', 'VGA'],
+      },
     },
     {
       code: 'EQ-LAPTOP-01',
@@ -148,7 +1371,13 @@ async function main() {
       locationText: 'IT Department',
       capacity: 1,
       description: 'Dell Latitude laptop for short-term loan. Windows 11.',
-      metadataJson: { brand: 'Dell', model: 'Latitude 5540', os: 'Windows 11', ram: '16GB', storage: '512GB SSD' },
+      metadataJson: {
+        brand: 'Dell',
+        model: 'Latitude 5540',
+        os: 'Windows 11',
+        ram: '16GB',
+        storage: '512GB SSD',
+      },
     },
     {
       code: 'EQ-LAPTOP-02',
@@ -159,7 +1388,13 @@ async function main() {
       locationText: 'IT Department',
       capacity: 1,
       description: 'Dell Latitude laptop for short-term loan. Windows 11.',
-      metadataJson: { brand: 'Dell', model: 'Latitude 5540', os: 'Windows 11', ram: '16GB', storage: '512GB SSD' },
+      metadataJson: {
+        brand: 'Dell',
+        model: 'Latitude 5540',
+        os: 'Windows 11',
+        ram: '16GB',
+        storage: '512GB SSD',
+      },
     },
     {
       code: 'EQ-CAMERA-01',
@@ -169,7 +1404,11 @@ async function main() {
       locationText: 'Media Center',
       capacity: 1,
       description: 'Canon DSLR camera kit for student projects and events.',
-      metadataJson: { brand: 'Canon', model: 'EOS 850D', includes: ['24-55mm lens', 'Tripod', 'Memory card'] },
+      metadataJson: {
+        brand: 'Canon',
+        model: 'EOS 850D',
+        includes: ['24-55mm lens', 'Tripod', 'Memory card'],
+      },
     },
     {
       code: 'EQ-TABLET-01',
@@ -200,7 +1439,11 @@ async function main() {
       locationText: 'Student Activities Office',
       capacity: 1,
       description: 'Bluetooth portable speaker set for events.',
-      metadataJson: { brand: 'JBL', model: 'EON615', includes: ['2 speakers', 'Mic', 'Cables'] },
+      metadataJson: {
+        brand: 'JBL',
+        model: 'EON615',
+        includes: ['2 speakers', 'Mic', 'Cables'],
+      },
     },
 
     // ─────────────────────────────────────────────────────────────
@@ -216,27 +1459,51 @@ async function main() {
       description: 'University minibus for field trips and campus transport.',
       metadataJson: { seats: 15, fuelType: 'Diesel', licenseRequired: 'D' },
     },
+
+    ...additionalRooms,
+    ...additionalLabs,
+    ...additionalEquipment,
+    ...additionalVehicles,
+    ...extraResources,
+    ...moreResources,
   ];
 
   let created = 0;
   let skipped = 0;
 
   for (const r of resources) {
-    const existing = await prisma.resource.findUnique({ where: { code: r.code } });
+    const existing = await prisma.resource.findUnique({
+      where: { code: r.code },
+    });
     if (existing) {
-      await prisma.resource.update({ where: { code: r.code }, data: { ...r, isActive: true } });
+      await prisma.resource.update({
+        where: { code: r.code },
+        data: { ...r, isActive: true },
+      });
       skipped++;
     } else {
       await prisma.resource.create({ data: { ...r, isActive: true } });
       created++;
     }
-    console.log(`  ${existing ? '↺' : '✓'} [${r.resourceType}] ${r.code} — ${r.name}`);
+    console.log(
+      `  ${existing ? '↺' : '✓'} [${r.resourceType}] ${r.code} — ${r.name}`,
+    );
   }
 
+  const totals = resources.reduce<Record<string, number>>((acc, resource) => {
+    acc[resource.resourceType] = (acc[resource.resourceType] ?? 0) + 1;
+    return acc;
+  }, {});
+
   console.log(`\n✅ Resources seeded: ${created} created, ${skipped} updated.`);
-  console.log(`   ROOM: 5  |  LAB: 3  |  EQUIPMENT: 8  |  VEHICLE: 1`);
+  console.log(
+    `   ROOM: ${totals.ROOM ?? 0}  |  LAB: ${totals.LAB ?? 0}  |  EQUIPMENT: ${totals.EQUIPMENT ?? 0}  |  VEHICLE: ${totals.VEHICLE ?? 0}`,
+  );
 }
 
 main()
-  .catch((e) => { console.error('❌ ERROR:', e); process.exit(1); })
+  .catch((e) => {
+    console.error('❌ ERROR:', e);
+    process.exit(1);
+  })
   .finally(() => prisma.$disconnect());

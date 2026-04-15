@@ -319,7 +319,8 @@ export class SlaService {
   async runSlaSweep() {
     const now = new Date();
 
-    await this.prisma.$transaction(async (tx) => {
+    await this.prisma.$transaction(
+      async (tx) => {
       const overdueSteps = await tx.workflowInstanceStep.findMany({
         where: {
           status: 'PENDING',
@@ -472,7 +473,52 @@ export class SlaService {
           });
         }
       }
-    });
+      },
+      {
+        // Sweep işlemi çok sayıda request içerebilir; timeout artırıldı
+        timeout: 60_000,
+      },
+    );
+  }
+
+  async getSLAEvents(opts: { page?: number; limit?: number } = {}) {
+    const page = Math.max(1, opts.page ?? 1);
+    const limit = Math.min(100, Math.max(1, opts.limit ?? 20));
+    const skip = (page - 1) * limit;
+
+    const [events, total] = await Promise.all([
+      this.prisma.slaEvent.findMany({
+        include: {
+          request: { select: { id: true, requestNo: true, title: true, status: true } },
+          slaPolicy: {
+            select: {
+              id: true,
+              name: true,
+              requestType: { select: { key: true, name: true } },
+              priority: true,
+            },
+          },
+        },
+        orderBy: { occurredAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.slaEvent.count(),
+    ]);
+
+    return {
+      data: events.map((event) => ({
+        id: event.id,
+        eventType: event.eventType,
+        occurredAt: event.occurredAt,
+        resolvedAt: event.resolvedAt,
+        request: event.request,
+        policy: event.slaPolicy,
+      })),
+      total,
+      page,
+      totalPages: Math.ceil(total / limit),
+    };
   }
 
   async getAdminOverview() {

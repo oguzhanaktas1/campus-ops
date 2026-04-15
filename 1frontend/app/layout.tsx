@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next'
 import { Analytics } from '@vercel/analytics/next'
 import { ThemeProvider } from '@/components/theme-provider'
 import { AuthFetchProvider } from '@/components/auth-fetch-provider'
+import { LanguageProvider } from '@/contexts/language-context'
 import './globals.css'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://campusflow.app'
@@ -150,8 +151,32 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="tr" suppressHydrationWarning>
       <head>
+        {/* 1) Flash önleyici — tema cookie'den okunur (dil artık hep EN başlar) */}
+        <script dangerouslySetInnerHTML={{ __html: `(function(){
+  try{
+    var tc=document.cookie.match(/cf_theme=([^;]+)/);
+    var th=tc?tc[1]:null;
+    if(!th){try{th=localStorage.getItem('theme');}catch(e){}}
+    if(!th){th=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}
+    if(th==='dark'){document.documentElement.classList.add('dark');}
+  }catch(e){}
+})();` }} />
+
+        {/* 2) Google Translate — init fonksiyonu script yüklenmeden önce tanımlanmalı */}
+        <script dangerouslySetInnerHTML={{ __html: `
+function googleTranslateElementInit(){
+  new google.translate.TranslateElement({
+    pageLanguage:'en',
+    includedLanguages:'tr,en',
+    autoDisplay:false,
+    layout:google.translate.TranslateElement.InlineLayout.SIMPLE
+  },'google_translate_element');
+}` }} />
+        {/* eslint-disable-next-line @next/next/no-sync-scripts */}
+        <script src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit" />
+
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
@@ -161,13 +186,18 @@ export default function RootLayout({
         className="font-sans antialiased"
         suppressHydrationWarning
       >
+        {/* Google Translate gizli container — widget burada başlatılır */}
+        <div id="google_translate_element" style={{ display: 'none' }} />
+
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
           enableSystem
           disableTransitionOnChange
         >
-          <AuthFetchProvider>{children}</AuthFetchProvider>
+          <LanguageProvider>
+            <AuthFetchProvider>{children}</AuthFetchProvider>
+          </LanguageProvider>
           <Analytics />
         </ThemeProvider>
       </body>

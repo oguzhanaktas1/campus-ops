@@ -166,25 +166,53 @@ export class AdminService {
     }
   }
 
-  async getAllUsers() {
-    const users = await this.prisma.user.findMany({
-      include: {
-        profile: {
-          include: {
-            faculty: { select: { id: true, name: true } },
-            department: { select: { id: true, name: true } },
-            unit: { select: { id: true, name: true } },
+  async getAllUsers(opts: { page?: number; limit?: number; search?: string; role?: string } = {}) {
+    const page = Math.max(1, opts.page ?? 1);
+    const limit = Math.min(100, Math.max(1, opts.limit ?? 20));
+    const skip = (page - 1) * limit;
+
+    const where: any = {};
+
+    if (opts.role && opts.role !== 'all') {
+      where.primaryRoles = {
+        some: {
+          isPrimary: true,
+          role: { name: { equals: opts.role.toUpperCase(), mode: 'insensitive' } },
+        },
+      };
+    }
+
+    if (opts.search) {
+      where.OR = [
+        { email: { contains: opts.search, mode: 'insensitive' } },
+        { profile: { fullName: { contains: opts.search, mode: 'insensitive' } } },
+      ];
+    }
+
+    const [users, total] = await Promise.all([
+      this.prisma.user.findMany({
+        where,
+        include: {
+          profile: {
+            include: {
+              faculty: { select: { id: true, name: true } },
+              department: { select: { id: true, name: true } },
+              unit: { select: { id: true, name: true } },
+            },
+          },
+          primaryRoles: {
+            include: { role: true },
+            orderBy: { isPrimary: 'desc' },
           },
         },
-        primaryRoles: {
-          include: { role: true },
-          orderBy: { isPrimary: 'desc' },
-        },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.user.count({ where }),
+    ]);
 
-      return users.map((user) => ({
+    const data = users.map((user) => ({
       id: user.id,
       name: user.profile?.fullName || 'Unnamed User',
       email: user.email,
@@ -195,15 +223,15 @@ export class AdminService {
         user.profile?.faculty?.name ||
         user.profile?.bio ||
         'Department not specified',
-        role:
-          user.primaryRoles.find((item) => item.isPrimary)?.role?.name?.toLowerCase() ||
-          user.primaryRoles[0]?.role?.name?.toLowerCase() ||
-          'student',
-        roles: user.primaryRoles
-          .map((ur) => ({
-            id: ur.roleId,
-            name: ur.role.name,
-            isPrimary: ur.isPrimary,
+      role:
+        user.primaryRoles.find((item) => item.isPrimary)?.role?.name?.toLowerCase() ||
+        user.primaryRoles[0]?.role?.name?.toLowerCase() ||
+        'student',
+      roles: user.primaryRoles
+        .map((ur) => ({
+          id: ur.roleId,
+          name: ur.role.name,
+          isPrimary: ur.isPrimary,
         }))
         .sort((a, b) => Number(b.isPrimary) - Number(a.isPrimary)),
       lastLogin: user.updatedAt,
@@ -212,13 +240,13 @@ export class AdminService {
       staffNumber: user.profile?.staffNumber || '',
       studentNumber: user.profile?.studentNumber || '',
       gender: user.profile?.gender || 'MALE',
-      birthDate: user.profile?.birthDate
-        ? user.profile.birthDate.toISOString()
-        : null,
+      birthDate: user.profile?.birthDate ? user.profile.birthDate.toISOString() : null,
       address: user.profile?.address || '',
       bio: user.profile?.bio || '',
       createdAt: user.createdAt,
     }));
+
+    return { data, total, page, totalPages: Math.ceil(total / limit) };
   }
 
   async getRoles() {
@@ -1390,16 +1418,41 @@ export class AdminService {
   // RESOURCES CRUD
   // ─────────────────────────────────────────────────────────────────────────
 
-  async getResources() {
-    return this.prisma.resource.findMany({
-      include: {
-        campus: { select: { id: true, name: true } },
-        faculty: { select: { id: true, name: true } },
-        department: { select: { id: true, name: true } },
-        unit: { select: { id: true, name: true } },
-      },
-      orderBy: { name: 'asc' },
-    });
+  async getResources(opts: { page?: number; limit?: number; search?: string; type?: string } = {}) {
+    const page = Math.max(1, opts.page ?? 1);
+    const limit = Math.min(100, Math.max(1, opts.limit ?? 20));
+    const skip = (page - 1) * limit;
+
+    const where: any = {};
+
+    if (opts.type && opts.type !== 'all') {
+      where.resourceType = opts.type.toUpperCase();
+    }
+
+    if (opts.search) {
+      where.OR = [
+        { name: { contains: opts.search, mode: 'insensitive' } },
+        { code: { contains: opts.search, mode: 'insensitive' } },
+      ];
+    }
+
+    const [data, total] = await Promise.all([
+      this.prisma.resource.findMany({
+        where,
+        include: {
+          campus: { select: { id: true, name: true } },
+          faculty: { select: { id: true, name: true } },
+          department: { select: { id: true, name: true } },
+          unit: { select: { id: true, name: true } },
+        },
+        orderBy: { name: 'asc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.resource.count({ where }),
+    ]);
+
+    return { data, total, page, totalPages: Math.ceil(total / limit) };
   }
 
   async createResource(adminId: string, data: any) {
@@ -1559,17 +1612,40 @@ export class AdminService {
     });
   }
 
-  async getSLAPolicies() {
+  async getSLAPolicies(opts: { page?: number; limit?: number } = {}) {
+    const page = Math.max(1, opts.page ?? 1);
+    const limit = Math.min(100, Math.max(1, opts.limit ?? 20));
+    const skip = (page - 1) * limit;
+
     await this.slaService.runSlaSweep();
 
-    return this.prisma.slaPolicy.findMany({
-      include: { requestType: { select: { id: true, name: true, key: true } } },
-      orderBy: { createdAt: 'desc' },
-    });
+    const [data, total] = await Promise.all([
+      this.prisma.slaPolicy.findMany({
+        include: { requestType: { select: { id: true, name: true, key: true } } },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.slaPolicy.count(),
+    ]);
+
+    return { data, total, page, totalPages: Math.ceil(total / limit) };
+  }
+
+  async getSLAEvents(opts: { page?: number; limit?: number } = {}) {
+    return this.slaService.getSLAEvents(opts);
   }
 
   async getSLAOverview() {
-    return this.slaService.getAdminOverview();
+    const [requestVersion, slaVersion] = await Promise.all([
+      this.cacheService.getVersion(CacheKeys.version('admin:requests:list')),
+      this.cacheService.getVersion(CacheKeys.version('admin:sla:overview')),
+    ]);
+    const key = CacheKeys.adminSlaOverview(requestVersion, slaVersion);
+
+    return this.cacheService.getOrSet(key, CacheTtls.sla, async () =>
+      this.slaService.getAdminOverview(),
+    );
   }
 
   async createSLAPolicy(adminId: string, data: any) {
@@ -1592,6 +1668,10 @@ export class AdminService {
         entityId: policy.id,
       },
     });
+    await Promise.all([
+      this.cacheService.bumpVersion(CacheKeys.version('admin:sla:policies')),
+      this.cacheService.bumpVersion(CacheKeys.version('admin:sla:overview')),
+    ]);
     return policy;
   }
 
@@ -1623,6 +1703,10 @@ export class AdminService {
     await this.prisma.auditLog.create({
       data: { userId: adminId, actionType: AuditActionType.UPDATE, entityType: 'SlaPolicy', entityId: id },
     });
+    await Promise.all([
+      this.cacheService.bumpVersion(CacheKeys.version('admin:sla:policies')),
+      this.cacheService.bumpVersion(CacheKeys.version('admin:sla:overview')),
+    ]);
     return policy;
   }
 
@@ -1638,6 +1722,10 @@ export class AdminService {
         entityId: id,
       },
     });
+    await Promise.all([
+      this.cacheService.bumpVersion(CacheKeys.version('admin:sla:policies')),
+      this.cacheService.bumpVersion(CacheKeys.version('admin:sla:overview')),
+    ]);
     return { message: 'SLA Policy deleted successfully.' };
   }
 

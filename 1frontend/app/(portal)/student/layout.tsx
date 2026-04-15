@@ -6,6 +6,7 @@ import { PortalLayout, type NavItem } from "@/components/portal-layout";
 import { NotificationBell } from "@/components/notification-bell";
 import { ProfileDropdown } from "@/components/profile-dropdown";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { LanguageSwitcher } from "@/components/language-switcher";
 import {
   LayoutDashboard,
   FileText,
@@ -122,6 +123,7 @@ export default function StudentLayout({
       </div>
       <div className="flex items-center gap-1 ml-auto">
         <ThemeToggle />
+        <LanguageSwitcher />
         <NotificationBell role="student" />
         <ProfileDropdown user={user} settingsHref="/student/settings" />
       </div>

@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
-import { Plus, Pencil, Trash2, Loader2, Box, Search, ChevronRight } from 'lucide-react'
+import { useEffect, useState, useCallback, useRef } from 'react'
+import { Plus, Pencil, Trash2, Loader2, Box, Search, ChevronRight, ChevronLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
@@ -19,14 +19,22 @@ interface Resource {
   isActive: boolean
 }
 
+interface PagedResult {
+  data: Resource[]
+  total: number
+  page: number
+  totalPages: number
+}
+
+const PAGE_SIZE = 20
 const RESOURCE_TYPES = ['ROOM', 'LAB', 'EQUIPMENT', 'VEHICLE', 'OTHER'] as const
 
 const TYPE_BADGE: Record<string, string> = {
-  ROOM: 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-800',
-  LAB: 'bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-950/40 dark:text-purple-400 dark:border-purple-800',
+  ROOM:      'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-800',
+  LAB:       'bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-950/40 dark:text-purple-400 dark:border-purple-800',
   EQUIPMENT: 'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-800',
-  VEHICLE: 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800',
-  OTHER: 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800/40 dark:text-slate-400 dark:border-slate-700',
+  VEHICLE:   'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800',
+  OTHER:     'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800/40 dark:text-slate-400 dark:border-slate-700',
 }
 
 const EMPTY_FORM = {
@@ -39,33 +47,61 @@ const EMPTY_FORM = {
 }
 
 export default function AdminResourcesPage() {
-  const [resources, setResources] = useState<Resource[]>([])
+  const [result, setResult] = useState<PagedResult>({ data: [], total: 0, page: 1, totalPages: 1 })
   const [isLoading, setIsLoading] = useState(true)
+  const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
   const [typeFilter, setTypeFilter] = useState('all')
+
   const [showDialog, setShowDialog] = useState(false)
   const [editTarget, setEditTarget] = useState<Resource | null>(null)
   const [form, setForm] = useState({ ...EMPTY_FORM })
   const [isSaving, setIsSaving] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
-  const fetchResources = useCallback(async () => {
+  const searchTimer = useRef<ReturnType<typeof setTimeout>>()
+  const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
+
+  const load = useCallback(async (pg: number, q: string, type: string) => {
+    setIsLoading(true)
     try {
       const token = getToken()
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
-      const res = await fetch(`${backendUrl}/admin/resources`, {
+      const params = new URLSearchParams({ page: String(pg), limit: String(PAGE_SIZE) })
+      if (q)            params.set('search', q)
+      if (type !== 'all') params.set('type', type)
+      const res = await fetch(`${backendUrl}/admin/resources?${params}`, {
         headers: { Authorization: `Bearer ${token}` },
       })
       if (!res.ok) throw new Error()
-      setResources(await res.json())
+      setResult(await res.json())
     } catch {
       toast.error('Failed to load resources.')
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [backendUrl])
 
-  useEffect(() => { fetchResources() }, [fetchResources])
+  useEffect(() => { load(1, '', 'all') }, [load])
+
+  const handleSearch = (val: string) => {
+    setSearch(val)
+    clearTimeout(searchTimer.current)
+    searchTimer.current = setTimeout(() => {
+      setPage(1)
+      load(1, val, typeFilter)
+    }, 400)
+  }
+
+  const handleTypeFilter = (type: string) => {
+    setTypeFilter(type)
+    setPage(1)
+    load(1, search, type)
+  }
+
+  const handlePageChange = (pg: number) => {
+    setPage(pg)
+    load(pg, search, typeFilter)
+  }
 
   const openAdd = () => {
     setEditTarget(null)
@@ -94,14 +130,8 @@ export default function AdminResourcesPage() {
     setIsSaving(true)
     try {
       const token = getToken()
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
-      const payload = {
-        ...form,
-        capacity: form.capacity ? parseInt(form.capacity) : undefined,
-      }
-      const url = editTarget
-        ? `${backendUrl}/admin/resources/${editTarget.id}`
-        : `${backendUrl}/admin/resources`
+      const payload = { ...form, capacity: form.capacity ? parseInt(form.capacity) : undefined }
+      const url    = editTarget ? `${backendUrl}/admin/resources/${editTarget.id}` : `${backendUrl}/admin/resources`
       const method = editTarget ? 'PUT' : 'POST'
       const res = await fetch(url, {
         method,
@@ -111,7 +141,7 @@ export default function AdminResourcesPage() {
       if (!res.ok) throw new Error()
       toast.success(editTarget ? 'Resource updated.' : 'Resource created.')
       setShowDialog(false)
-      fetchResources()
+      load(page, search, typeFilter)
     } catch {
       toast.error('Failed to save resource.')
     } finally {
@@ -123,14 +153,18 @@ export default function AdminResourcesPage() {
     setDeletingId(id)
     try {
       const token = getToken()
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
       const res = await fetch(`${backendUrl}/admin/resources/${id}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` },
       })
       if (!res.ok) throw new Error()
       toast.success('Resource deleted.')
-      setResources(prev => prev.filter(r => r.id !== id))
+      // mevcut sayfada başka kayıt kalmadıysa önceki sayfaya dön
+      const newTotal = result.total - 1
+      const newTotalPages = Math.ceil(newTotal / PAGE_SIZE)
+      const targetPage = page > newTotalPages && newTotalPages > 0 ? newTotalPages : page
+      if (targetPage !== page) setPage(targetPage)
+      load(targetPage, search, typeFilter)
     } catch {
       toast.error('Failed to delete resource.')
     } finally {
@@ -138,16 +172,11 @@ export default function AdminResourcesPage() {
     }
   }
 
-  const filtered = resources.filter(r => {
-    const matchSearch =
-      search === '' ||
-      r.name.toLowerCase().includes(search.toLowerCase()) ||
-      r.code.toLowerCase().includes(search.toLowerCase())
-    const matchType = typeFilter === 'all' || r.resourceType === typeFilter
-    return matchSearch && matchType
-  })
+  const { data: resources, total, totalPages } = result
+  const start = (page - 1) * PAGE_SIZE + 1
+  const end   = Math.min(page * PAGE_SIZE, total)
 
-  if (isLoading) {
+  if (isLoading && resources.length === 0) {
     return (
       <div className="flex h-[60vh] items-center justify-center">
         <div className="flex flex-col items-center gap-3">
@@ -170,66 +199,37 @@ export default function AdminResourcesPage() {
             <div className="space-y-3">
               <div>
                 <label className="text-xs font-semibold text-muted-foreground mb-1 block">Name *</label>
-                <Input
-                  value={form.name}
-                  onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-                  placeholder="e.g. Computer Lab A"
-                />
+                <Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Computer Lab A" />
               </div>
               <div>
                 <label className="text-xs font-semibold text-muted-foreground mb-1 block">Code *</label>
-                <Input
-                  value={form.code}
-                  onChange={e => setForm(f => ({ ...f, code: e.target.value }))}
-                  placeholder="e.g. CL-A"
-                />
+                <Input value={form.code} onChange={e => setForm(f => ({ ...f, code: e.target.value }))} placeholder="e.g. CL-A" />
               </div>
               <div>
                 <label className="text-xs font-semibold text-muted-foreground mb-1 block">Type</label>
                 <select
                   value={form.resourceType}
-                  onChange={e =>
-                    setForm(f => ({ ...f, resourceType: e.target.value as Resource['resourceType'] }))
-                  }
+                  onChange={e => setForm(f => ({ ...f, resourceType: e.target.value as Resource['resourceType'] }))}
                   className="w-full bg-background border border-input rounded-md px-3 h-10 text-sm focus:ring-2 focus:ring-primary outline-none"
                 >
-                  {RESOURCE_TYPES.map(t => (
-                    <option key={t} value={t}>{t}</option>
-                  ))}
+                  {RESOURCE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                 </select>
               </div>
               <div>
                 <label className="text-xs font-semibold text-muted-foreground mb-1 block">Capacity</label>
-                <Input
-                  type="number"
-                  value={form.capacity}
-                  onChange={e => setForm(f => ({ ...f, capacity: e.target.value }))}
-                  placeholder="e.g. 30"
-                />
+                <Input type="number" value={form.capacity} onChange={e => setForm(f => ({ ...f, capacity: e.target.value }))} placeholder="e.g. 30" />
               </div>
               <div>
                 <label className="text-xs font-semibold text-muted-foreground mb-1 block">Description</label>
-                <Input
-                  value={form.description}
-                  onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
-                  placeholder="Optional description"
-                />
+                <Input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Optional description" />
               </div>
               <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="isActive"
-                  checked={form.isActive}
-                  onChange={e => setForm(f => ({ ...f, isActive: e.target.checked }))}
-                  className="rounded"
-                />
+                <input type="checkbox" id="isActive" checked={form.isActive} onChange={e => setForm(f => ({ ...f, isActive: e.target.checked }))} className="rounded" />
                 <label htmlFor="isActive" className="text-sm text-foreground">Active</label>
               </div>
             </div>
             <div className="flex gap-3 pt-2">
-              <Button variant="outline" className="flex-1" onClick={() => setShowDialog(false)} disabled={isSaving}>
-                Cancel
-              </Button>
+              <Button variant="outline" className="flex-1" onClick={() => setShowDialog(false)} disabled={isSaving}>Cancel</Button>
               <Button className="flex-1" onClick={handleSave} disabled={isSaving}>
                 {isSaving ? <Loader2 className="size-4 animate-spin" /> : editTarget ? 'Update' : 'Create'}
               </Button>
@@ -241,7 +241,9 @@ export default function AdminResourcesPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl font-bold text-foreground">Resources</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Manage rooms, labs, equipment and more.</p>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            {total > 0 ? `Showing ${start}–${end} of ${total} resources` : 'No resources found.'}
+          </p>
         </div>
         <Button onClick={openAdd} className="gap-2 self-start">
           <Plus className="size-4" /> Add Resource
@@ -256,12 +258,12 @@ export default function AdminResourcesPage() {
             placeholder="Search by name or code..."
             className="pl-9"
             value={search}
-            onChange={e => setSearch(e.target.value)}
+            onChange={e => handleSearch(e.target.value)}
           />
         </div>
         <select
           value={typeFilter}
-          onChange={e => setTypeFilter(e.target.value)}
+          onChange={e => handleTypeFilter(e.target.value)}
           className="bg-background border border-input rounded-md px-3 h-10 text-sm focus:ring-2 focus:ring-primary outline-none"
         >
           <option value="all">All Types</option>
@@ -271,6 +273,11 @@ export default function AdminResourcesPage() {
 
       {/* Table */}
       <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
+        {isLoading && (
+          <div className="flex items-center justify-center py-4 border-b border-border">
+            <Loader2 className="size-5 animate-spin text-primary" />
+          </div>
+        )}
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -284,16 +291,14 @@ export default function AdminResourcesPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {filtered.map(r => (
+              {resources.map(r => (
                 <tr key={r.id} className="hover:bg-muted/20 transition-colors">
                   <td className="px-5 py-3.5">
                     <div className="flex items-center gap-2">
                       <Box className="size-4 text-muted-foreground shrink-0" />
                       <div>
                         <p className="font-medium text-foreground">{r.name}</p>
-                        {r.description && (
-                          <p className="text-xs text-muted-foreground truncate max-w-[200px]">{r.description}</p>
-                        )}
+                        {r.description && <p className="text-xs text-muted-foreground truncate max-w-[200px]">{r.description}</p>}
                       </div>
                     </div>
                   </td>
@@ -305,9 +310,7 @@ export default function AdminResourcesPage() {
                       {r.resourceType}
                     </span>
                   </td>
-                  <td className="px-5 py-3.5 hidden md:table-cell text-sm text-muted-foreground">
-                    {r.capacity ?? '—'}
-                  </td>
+                  <td className="px-5 py-3.5 hidden md:table-cell text-sm text-muted-foreground">{r.capacity ?? '—'}</td>
                   <td className="px-5 py-3.5 hidden lg:table-cell">
                     <span className={cn(
                       'text-xs font-semibold px-2.5 py-1 rounded-full border',
@@ -321,23 +324,18 @@ export default function AdminResourcesPage() {
                   <td className="px-5 py-3.5 text-right">
                     <div className="flex items-center justify-end gap-2">
                       <Link href={`/admin/resources/${r.id}`}>
-                        <Button variant="ghost" size="icon" className="size-8">
-                          <ChevronRight className="size-3.5" />
-                        </Button>
+                        <Button variant="ghost" size="icon" className="size-8"><ChevronRight className="size-3.5" /></Button>
                       </Link>
                       <Button variant="ghost" size="icon" className="size-8" onClick={() => openEdit(r)}>
                         <Pencil className="size-3.5" />
                       </Button>
                       <Button
-                        variant="ghost"
-                        size="icon"
+                        variant="ghost" size="icon"
                         className="size-8 text-destructive hover:text-destructive hover:bg-destructive/10"
                         onClick={() => handleDelete(r.id)}
                         disabled={deletingId === r.id}
                       >
-                        {deletingId === r.id
-                          ? <Loader2 className="size-3.5 animate-spin" />
-                          : <Trash2 className="size-3.5" />}
+                        {deletingId === r.id ? <Loader2 className="size-3.5 animate-spin" /> : <Trash2 className="size-3.5" />}
                       </Button>
                     </div>
                   </td>
@@ -345,7 +343,7 @@ export default function AdminResourcesPage() {
               ))}
             </tbody>
           </table>
-          {filtered.length === 0 && (
+          {!isLoading && resources.length === 0 && (
             <div className="text-center py-16">
               <Box className="size-10 text-muted-foreground/30 mx-auto mb-3" />
               <p className="text-sm font-medium text-foreground">No resources found.</p>
@@ -354,6 +352,50 @@ export default function AdminResourcesPage() {
           )}
         </div>
       </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between text-sm">
+          <p className="text-muted-foreground">Page {page} of {totalPages}</p>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="outline" size="sm" className="gap-1"
+              disabled={page <= 1 || isLoading}
+              onClick={() => handlePageChange(page - 1)}
+            >
+              <ChevronLeft className="size-4" /> Prev
+            </Button>
+            {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
+              const pg = totalPages <= 7
+                ? i + 1
+                : page <= 4
+                  ? i + 1
+                  : page >= totalPages - 3
+                    ? totalPages - 6 + i
+                    : page - 3 + i
+              if (pg < 1 || pg > totalPages) return null
+              return (
+                <Button
+                  key={pg}
+                  variant={pg === page ? 'default' : 'outline'}
+                  size="sm" className="w-9"
+                  disabled={isLoading}
+                  onClick={() => handlePageChange(pg)}
+                >
+                  {pg}
+                </Button>
+              )
+            })}
+            <Button
+              variant="outline" size="sm" className="gap-1"
+              disabled={page >= totalPages || isLoading}
+              onClick={() => handlePageChange(page + 1)}
+            >
+              Next <ChevronRight className="size-4" />
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

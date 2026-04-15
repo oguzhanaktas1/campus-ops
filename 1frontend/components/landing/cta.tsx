@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { ArrowRight, Mail, PhoneCall } from 'lucide-react'
+import { NT } from '@/components/no-translate'
 
 export function CTA() {
   return (
@@ -36,7 +37,7 @@ export function CTA() {
             Ready to modernize your campus operations?
           </h2>
           <p className="text-primary-foreground/75 mb-10 max-w-xl mx-auto text-balance text-lg leading-relaxed">
-            Join universities using CampusFlow to streamline workflows, reduce administrative load,
+            Join universities using <NT>CampusFlow</NT> to streamline workflows, reduce administrative load,
             and improve student satisfaction — from day one.
           </p>
 
@@ -64,12 +65,14 @@ export function CTA() {
           <div className="flex items-center justify-center gap-1.5 text-sm text-primary-foreground/70">
             <Mail className="size-3.5" aria-hidden="true" />
             <span>Questions? Email us at </span>
-            <a
-              href="mailto:hello@campusflow.app"
-              className="text-primary-foreground hover:underline font-medium"
-            >
-              hello@campusflow.app
-            </a>
+            <NT>
+              <a
+                href="mailto:info@campusflow.com.tr"
+                className="text-primary-foreground hover:underline font-medium"
+              >
+                info@campusflow.com.tr
+              </a>
+            </NT>
           </div>
         </div>
       </div>

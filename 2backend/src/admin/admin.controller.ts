@@ -29,8 +29,18 @@ export class AdminController {
   constructor(private readonly adminService: AdminService) {}
 
   @Get('users')
-  getAllUsers() {
-    return this.adminService.getAllUsers();
+  getAllUsers(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('search') search?: string,
+    @Query('role') role?: string,
+  ) {
+    return this.adminService.getAllUsers({
+      page: page ? parseInt(page) : undefined,
+      limit: limit ? parseInt(limit) : undefined,
+      search: search || undefined,
+      role: role || undefined,
+    });
   }
 
   @Get('users/:id')
@@ -330,8 +340,18 @@ export class AdminController {
   // ─────────────────────────────────────────────────────────────────────────
 
   @Get('resources')
-  getResources() {
-    return this.adminService.getResources();
+  getResources(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('search') search?: string,
+    @Query('type') type?: string,
+  ) {
+    return this.adminService.getResources({
+      page: page ? parseInt(page) : undefined,
+      limit: limit ? parseInt(limit) : undefined,
+      search: search || undefined,
+      type: type || undefined,
+    });
   }
 
   @Post('resources')
@@ -388,13 +408,30 @@ export class AdminController {
   }
 
   @Get('sla')
-  getSLAPolicies() {
-    return this.adminService.getSLAPolicies();
+  getSLAPolicies(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.adminService.getSLAPolicies({
+      page: page ? parseInt(page) : undefined,
+      limit: limit ? parseInt(limit) : undefined,
+    });
   }
 
   @Get('sla/overview')
   getSLAOverview() {
     return this.adminService.getSLAOverview();
+  }
+
+  @Get('sla/events')
+  getSLAEvents(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.adminService.getSLAEvents({
+      page: page ? parseInt(page) : undefined,
+      limit: limit ? parseInt(limit) : undefined,
+    });
   }
 
   @Post('sla')

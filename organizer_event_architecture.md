@@ -465,15 +465,7 @@ Kullanıcı bilgileri sistemden çekilir.
 ## Sayfa: `/requests/[id]`
 Student’ın açtığı `EventRequest` detay sayfası burada kalır.
 
-### Gösterilecekler
-- request no
-- event name
-- description
-- event type
-- created at
-- request status
-- comments
-- workflow / approval history
+mevcut sayfa
 
 ---
 

@@ -91,6 +91,20 @@ export const CacheKeys = {
   version: (scope: string) => scope,
   adminDashboardSummary: (version: number) =>
     `${cacheKeys.admin.dashboard()}:v${version}`,
+  adminWorkflowsList: (requestVersion: number, workflowVersion: number) =>
+    `admin:workflows:list:reqv${requestVersion}:wfv${workflowVersion}`,
+  adminWorkflowDetail: (
+    workflowId: string,
+    requestVersion: number,
+    workflowVersion: number,
+  ) => `admin:workflow:detail:${workflowId}:reqv${requestVersion}:wfv${workflowVersion}`,
+  adminWorkflowInstancesOverview: (
+    requestVersion: number,
+    workflowVersion: number,
+  ) => `admin:workflow-instances:overview:reqv${requestVersion}:wfv${workflowVersion}`,
+  adminSlaPolicies: (version: number) => `admin:sla:policies:v${version}`,
+  adminSlaOverview: (requestVersion: number, slaVersion: number) =>
+    `admin:sla:overview:reqv${requestVersion}:slav${slaVersion}`,
   adminRequestsList: (filterHash: string, version: number) =>
     `admin:requests:list:${filterHash}:v${version}`,
   facultyApprovalsList: (userId: string, filterHash: string, version: number) =>
@@ -117,4 +131,6 @@ export const CacheTtls = {
   long: 60 * 15,
   reference: 60 * 5,
   notifications: 60,
+  workflowOverview: 20,
+  sla: 30,
 };

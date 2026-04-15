@@ -5,6 +5,7 @@ import {
   Delete,
   Body,
   Param,
+  Query,
   UseGuards,
   Request,
 } from '@nestjs/common';
@@ -28,9 +29,14 @@ export class WorkflowController {
     return this.workflowService.getAll();
   }
 
+  @Get('instances/overview')
+  getInstancesOverview() {
+    return this.workflowService.getInstancesOverview();
+  }
+
   @Get(':id')
-  getById(@Param('id') id: string) {
-    return this.workflowService.getById(id);
+  getById(@Param('id') id: string, @Query('view') view?: string) {
+    return this.workflowService.getById(id, view);
   }
 
   @Post()

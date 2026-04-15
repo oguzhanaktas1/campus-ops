@@ -1,3 +1,4 @@
+import { NT } from '@/components/no-translate'
 import { StatusBadge } from '@/components/status-badge'
 import { WorkflowStepIndicator } from '@/components/workflow-step-indicator'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -12,7 +13,7 @@ import {
 function KeyValueList({
   items,
 }: {
-  items: Array<{ label: string; value: string | null }>
+  items: Array<{ label: string; value: string | null; noTranslate?: boolean }>
 }) {
   return (
     <div className="grid gap-3 sm:grid-cols-2">
@@ -22,7 +23,11 @@ function KeyValueList({
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               {item.label}
             </p>
-            <p className="text-sm text-foreground">{item.value}</p>
+            {item.noTranslate ? (
+              <NT as="p" className="text-sm text-foreground">{item.value}</NT>
+            ) : (
+              <p className="text-sm text-foreground">{item.value}</p>
+            )}
           </div>
         ) : null,
       )}
@@ -99,22 +104,14 @@ export function RequestQuickFactsCard({
       <CardContent>
         <KeyValueList
           items={[
-            { label: 'Requester', value: detail.requester?.fullName ?? null },
-            {
-              label: 'Current Assignee',
-              value: detail.currentAssignee?.fullName ?? null,
-            },
+            { label: 'Requester',        value: detail.requester?.fullName ?? null,        noTranslate: true },
+            { label: 'Current Assignee', value: detail.currentAssignee?.fullName ?? null,  noTranslate: true },
             {
               label: 'Assigned People',
-              value:
-                detail.assignedPeople.length > 0
-                  ? detail.assignedPeople.join(', ')
-                  : null,
+              value: detail.assignedPeople.length > 0 ? detail.assignedPeople.join(', ') : null,
+              noTranslate: true,
             },
-            {
-              label: 'Activity Count',
-              value: String(detail.timeline.length),
-            },
+            { label: 'Activity Count',   value: String(detail.timeline.length) },
           ]}
         />
       </CardContent>
@@ -142,34 +139,24 @@ export function RelatedEntitiesCard({
       <CardContent className="space-y-4">
         <KeyValueList
           items={[
-            { label: 'Full Name', value: requester?.fullName ?? null },
-            { label: 'Email', value: requester?.email ?? null },
-            { label: 'Role', value: requesterRole },
-            { label: 'Department', value: requester?.department ?? null },
-            { label: 'Faculty', value: requester?.faculty ?? null },
-            { label: 'Academic Title', value: requester?.title ?? null },
+            { label: 'Full Name',        value: requester?.fullName ?? null,   noTranslate: true },
+            { label: 'Email',            value: requester?.email ?? null,      noTranslate: true },
+            { label: 'Role',             value: requesterRole },
+            { label: 'Department',       value: requester?.department ?? null },
+            { label: 'Faculty',          value: requester?.faculty ?? null },
+            { label: 'Academic Title',   value: requester?.title ?? null },
             {
-              label:
-                requester?.role?.toUpperCase().includes('STUDENT')
-                  ? 'Student Number'
-                  : 'Staff Number',
+              label: requester?.role?.toUpperCase().includes('STUDENT') ? 'Student Number' : 'Staff Number',
               value: requesterNumber ?? null,
+              noTranslate: true,
             },
-            {
-              label: 'Current Assignee',
-              value: detail.currentAssignee?.fullName ?? null,
-            },
+            { label: 'Current Assignee', value: detail.currentAssignee?.fullName ?? null, noTranslate: true },
             {
               label: 'Assigned People',
-              value:
-                detail.assignedPeople.length > 0
-                  ? detail.assignedPeople.join(', ')
-                  : null,
+              value: detail.assignedPeople.length > 0 ? detail.assignedPeople.join(', ') : null,
+              noTranslate: true,
             },
-            {
-              label: 'Domain Key',
-              value: humanize(detail.requestType.key),
-            },
+            { label: 'Domain Key',       value: humanize(detail.requestType.key) },
           ]}
         />
         <div className="flex items-center justify-between gap-4 border-t pt-4 text-sm">
