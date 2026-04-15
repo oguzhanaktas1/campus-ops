@@ -18,6 +18,7 @@ import {
   Building2,
   Activity,
   ClipboardList,
+  MonitorDot,
 } from "lucide-react";
 import AuthGuard from "@/components/AuthGuard/auth-guard";
 import { fetchProfile, getStoredUser } from "@/lib/auth";
@@ -77,6 +78,7 @@ const navItems: NavItem[] = [
     href: "#",
     icon: ClipboardList,
     children: [
+      { label: "Monitoring", href: "/admin/monitoring" },
       { label: "Integrations", href: "/admin/integrations" },
       { label: "Webhook Logs", href: "/admin/webhook-logs" },
       { label: "System Events", href: "/admin/system-events" },

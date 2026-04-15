@@ -11,11 +11,13 @@ import { RabbitmqPublisher } from '../infrastructure/rabbitmq/rabbitmq.publisher
  * System Monitoring — admin yetkisiyle erişilir.
  *
  * Local:  http://localhost:5000/admin/system/...
- * Prod:   https://yourdomain.com/admin/system/...
+ * Prod:   https://yourdomain.com/api/admin/system/...   (nginx → backend:5000)
  *
- * Python worker URL'leri (iç ağ / env'den okunur):
- *   WORKERS_INTERNAL_URL  varsayılan: http://localhost:8001
- *   METRICS_INTERNAL_URL  varsayılan: http://localhost:8000
+ * Env değişkenleri:
+ *   PUBLIC_API_URL        public backend URL'i  (ör: https://api.yourdomain.com)
+ *   RABBITMQ_MGMT_PUBLIC  tarayıcıdan erişilecek RabbitMQ UI (ör: https://mq.yourdomain.com)
+ *   WORKERS_INTERNAL_URL  iç ağ worker URL       varsayılan: http://localhost:8001
+ *   METRICS_INTERNAL_URL  iç ağ metrics URL      varsayılan: http://localhost:8000
  */
 @Controller('admin/system')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -24,14 +26,19 @@ export class SystemMonitorController {
   private readonly workersUrl: string;
   private readonly metricsUrl: string;
 
+  private readonly publicApiUrl: string;
+  private readonly rabbitmqMgmtPublic: string;
+
   constructor(
     private readonly mqMonitor: RabbitmqMonitorService,
     private readonly outboxProcessor: OutboxProcessorService,
     private readonly prisma: PrismaService,
     private readonly mqPublisher: RabbitmqPublisher,
   ) {
-    this.workersUrl = process.env.WORKERS_INTERNAL_URL ?? 'http://localhost:8001';
-    this.metricsUrl = process.env.METRICS_INTERNAL_URL ?? 'http://localhost:8000';
+    this.workersUrl      = process.env.WORKERS_INTERNAL_URL ?? 'http://localhost:8001';
+    this.metricsUrl      = process.env.METRICS_INTERNAL_URL ?? 'http://localhost:8000';
+    this.publicApiUrl    = process.env.PUBLIC_API_URL        ?? 'http://localhost:5000';
+    this.rabbitmqMgmtPublic = process.env.RABBITMQ_MGMT_PUBLIC ?? process.env.RABBITMQ_MGMT_URL ?? 'http://localhost:15672';
   }
 
   // ── NestJS health ────────────────────────────────────────────────────────
@@ -100,13 +107,13 @@ export class SystemMonitorController {
       rabbitmq:  rabbitmq.status === 'fulfilled' ? rabbitmq.value : { status: 'error', error: (rabbitmq as any).reason?.message },
       outbox:    outbox.status   === 'fulfilled' ? outbox.value   : { status: 'error', error: (outbox   as any).reason?.message },
       urls: {
-        backendHealth:  `${process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000'}/health`,
-        backendReady:   `${process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000'}/ready`,
-        workersHealth:  `${process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000'}/admin/system/workers/health`,
-        workersReady:   `${process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000'}/admin/system/workers/ready`,
-        metrics:        `${process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000'}/admin/system/workers/metrics/raw`,
-        rabbitmqMgmt:   process.env.RABBITMQ_MGMT_URL ?? 'http://localhost:15672',
-        prometheus:     process.env.PROMETHEUS_URL ?? 'http://localhost:8000',
+        backendHealth:  `${this.publicApiUrl}/health`,
+        backendReady:   `${this.publicApiUrl}/ready`,
+        workersHealth:  `${this.publicApiUrl}/admin/system/workers/health`,
+        workersReady:   `${this.publicApiUrl}/admin/system/workers/ready`,
+        metrics:        `${this.publicApiUrl}/admin/system/workers/metrics/raw`,
+        rabbitmqMgmt:   this.rabbitmqMgmtPublic,
+        prometheus:     `${this.publicApiUrl}/admin/system/workers/metrics/raw`,
       },
     };
   }

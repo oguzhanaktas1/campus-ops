@@ -84,6 +84,11 @@ services:
       WORKERS_INTERNAL_URL: http://python-workers:8001
       METRICS_INTERNAL_URL: http://python-workers:8000
       PROMETHEUS_URL: http://python-workers:8000
+      # Public URL — tarayıcıdan erişilen backend adresi
+      # Local: http://localhost:5000  |  Prod: https://api.yourdomain.com
+      PUBLIC_API_URL: http://localhost:5000
+      # Prod'da RabbitMQ Management UI public URL'i (ör: https://mq.yourdomain.com)
+      RABBITMQ_MGMT_PUBLIC: http://localhost:15672
     ports:
       - "5000:5000"
 

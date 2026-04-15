@@ -1,0 +1,27 @@
+# Prod override — domain bazlı ayarlar
+# Kullanım: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# Değiştirmen gereken değerler:
+#   yourdomain.com  →  gerçek domain adın
+#   api.yourdomain.com  →  backend subdomain (veya yourdomain.com/api nginx proxy ile)
+#   mq.yourdomain.com  →  opsiyonel RabbitMQ UI subdomain (güvenli ağda bırakabilirsin)
+
+services:
+  backend:
+    environment:
+      NODE_ENV: production
+      FRONTEND_URL: https://campusflow.com.tr
+      PUBLIC_API_URL: https://api.campusflow.com.tr
+      RABBITMQ_MGMT_PUBLIC: https://mq.campusflow.com.tr
+
+  frontend:
+    build:
+      context: ./1frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_BACKEND_URL: https://api.campusflow.com.tr
+        NEXT_PUBLIC_APP_URL: https://campusflow.com.tr
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_BACKEND_URL: https://api.campusflow.com.tr
+      NEXT_PUBLIC_APP_URL: https://campusflow.com.tr
