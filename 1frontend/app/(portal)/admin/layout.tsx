@@ -21,6 +21,7 @@ import {
   MonitorDot,
 } from "lucide-react";
 import AuthGuard from "@/components/AuthGuard/auth-guard";
+import { PortalAssistant } from "@/components/ai/portal-assistant";
 import { fetchProfile, getStoredUser } from "@/lib/auth";
 
 const navItems: NavItem[] = [
@@ -159,6 +160,16 @@ export default function AdminLayout({
         topbar={topbar}
       >
         {children}
+        <PortalAssistant
+          portal="admin"
+          title="Admin AI Assistant"
+          description="Analytics narration, admin navigation help, and workflow or log guidance for authorized admin areas."
+          prompts={[
+            "Analytics ekranına gitmek istiyorum.",
+            "Webhook hatalarını nereden takip ederim?",
+            "Workflow ve request type ekranları arasındaki fark nedir?",
+          ]}
+        />
       </PortalLayout>
     </AuthGuard>
   );

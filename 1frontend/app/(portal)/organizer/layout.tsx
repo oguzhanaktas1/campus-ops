@@ -20,6 +20,7 @@ import {
   Package,
 } from "lucide-react";
 import AuthGuard from "@/components/AuthGuard/auth-guard";
+import { PortalAssistant } from "@/components/ai/portal-assistant";
 import { fetchProfile, getStoredUser, getToken } from "@/lib/auth";
 
 const navItems: NavItem[] = [
@@ -101,6 +102,16 @@ export default function OrganizerLayout({
         topbar={topbar}
       >
         {children}
+        <PortalAssistant
+          portal="organizer"
+          title="Organizer AI Assistant"
+          description="Event, reservation, equipment, and access-request guidance within organizer routes."
+          prompts={[
+            "Yeni etkinlik planını nereden oluştururum?",
+            "Rezervasyon sürecini açıklar mısın?",
+            "Ekipman talebi için hangi sayfaya gitmeliyim?",
+          ]}
+        />
       </PortalLayout>
     </AuthGuard>
   );

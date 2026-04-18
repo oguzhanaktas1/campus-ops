@@ -62,8 +62,25 @@ export default function AdminDashboard() {
   const [metrics, setMetrics]   = useState<any>(null)
   const [recent,  setRecent]    = useState<any[]>([])
   const [reports, setReports]   = useState<any>(null)
+  const [aiNarration, setAiNarration] = useState<any>(null)
+  const [aiLoading, setAiLoading] = useState(false)
   const [loading, setLoading]   = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+
+  const fetchAiNarration = async (base: string, headers: Record<string, string>) => {
+    setAiLoading(true)
+    try {
+      const aiRes = await fetch(`${base}/ai/analytics/admin-overview`, { headers })
+      if (!aiRes.ok) {
+        return
+      }
+      setAiNarration(await aiRes.json())
+    } catch (e) {
+      console.error('Admin AI summary fetch error:', e)
+    } finally {
+      setAiLoading(false)
+    }
+  }
 
   const fetchAll = async (silent = false) => {
     if (silent) setRefreshing(true)
@@ -89,6 +106,8 @@ export default function AdminDashboard() {
       setLoading(false)
       setRefreshing(false)
     }
+
+    void fetchAiNarration(base, headers)
   }
 
   useEffect(() => { void fetchAll() }, [])
@@ -136,6 +155,34 @@ export default function AdminDashboard() {
       </div>
 
       {/* ── Today banner ───────────────────────────────────────────────────── */}
+      {(aiLoading || aiNarration?.summary) && (
+        <div className="rounded-xl border border-primary/15 bg-gradient-to-r from-primary/5 via-background to-emerald-500/5 p-4 shadow-sm">
+          <div className="flex items-center gap-2">
+            <BarChart3 className="size-4 text-primary" />
+            <h2 className="text-sm font-semibold text-foreground">AI Executive Summary</h2>
+          </div>
+          {aiNarration?.summary ? (
+            <>
+              <p className="mt-2 text-sm text-foreground">{aiNarration.summary}</p>
+              {Array.isArray(aiNarration.highlights) && aiNarration.highlights.length > 0 && (
+                <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                  {aiNarration.highlights.slice(0, 3).map((highlight: string) => (
+                    <div key={highlight} className="rounded-lg border border-border/70 bg-background/80 px-3 py-2 text-xs text-muted-foreground">
+                      {highlight}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="size-4 animate-spin" />
+              AI summary is loading in the background.
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
           { label: "Today's Requests",     value: m.todayRequests     ?? 0, icon: FileText,     cls: 'text-primary' },

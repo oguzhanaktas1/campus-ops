@@ -8,6 +8,7 @@ import {
   Inbox,
   Loader2,
   RotateCcw,
+  Sparkles,
   XCircle,
 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -64,6 +65,14 @@ export default function FacultyApprovalsPage() {
   const [isProcessing, setIsProcessing] = useState(false)
   const [selectedId, setSelectedId] = useState<string | null>(initialSelectedId)
   const [comment, setComment] = useState('')
+  const [aiEnabled, setAiEnabled] = useState(false)
+  const [aiSummary, setAiSummary] = useState<{
+    summary: string
+    risks: string[]
+    recommendations: string[]
+    fallbackUsed?: boolean
+  } | null>(null)
+  const [isAiLoading, setIsAiLoading] = useState(false)
 
   const { detail, isLoading, setDetail } = useRequestDetail(
     selectedId ?? '',
@@ -113,6 +122,26 @@ export default function FacultyApprovalsPage() {
   }, [initialSelectedId])
 
   useEffect(() => {
+    const checkAi = async () => {
+      try {
+        const token = getToken()
+        const backendUrl =
+          process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
+        const res = await fetch(`${backendUrl}/ai/health`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        if (!res.ok) return
+        const data = await res.json()
+        setAiEnabled(data.enabled === true && data.status !== 'unavailable' && data.status !== 'disabled')
+      } catch {
+        setAiEnabled(false)
+      }
+    }
+
+    void checkAi()
+  }, [])
+
+  useEffect(() => {
     if (!selectedId) {
       router.replace('/faculty/approvals')
       return
@@ -120,6 +149,53 @@ export default function FacultyApprovalsPage() {
 
     router.replace(`/faculty/approvals?id=${selectedId}`)
   }, [router, selectedId])
+
+  useEffect(() => {
+    const run = async () => {
+      if (!detail || !aiEnabled || !selectedId) {
+        setAiSummary(null)
+        return
+      }
+
+      setIsAiLoading(true)
+      try {
+        const token = getToken()
+        const backendUrl =
+          process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
+        const res = await fetch(`${backendUrl}/ai/summary/approval`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            requestTitle: detail.title,
+            requestDescription: detail.description,
+            domainData: detail.domainData ?? {},
+            currentWorkflowStep: detail.workflow.currentStep ?? null,
+            previousActions: detail.timeline.map((item) => `${item.status}: ${item.note ?? ''}`),
+            commentsSummary: detail.comments
+              .slice(-5)
+              .map((item) => `${item.author}: ${item.content}`)
+              .join('\n'),
+            attachedDocuments: detail.attachments.map((item) => item.name),
+          }),
+        })
+
+        if (!res.ok) {
+          throw new Error('AI summary unavailable')
+        }
+
+        setAiSummary(await res.json())
+      } catch {
+        setAiSummary(null)
+      } finally {
+        setIsAiLoading(false)
+      }
+    }
+
+    void run()
+  }, [aiEnabled, detail, selectedId])
 
   const selectedSummary = useMemo(
     () => pending.find((item) => item.id === selectedId) ?? null,
@@ -276,6 +352,11 @@ export default function FacultyApprovalsPage() {
                     onCommentChange={setComment}
                     onAction={handleAction}
                   />
+                  <ApprovalAiSummaryCard
+                    aiEnabled={aiEnabled}
+                    summary={aiSummary}
+                    isLoading={isAiLoading}
+                  />
                   <WorkflowCurrentStepCard detail={detail} />
                   <RequestQuickFactsCard detail={detail} />
                   <RelatedEntitiesCard detail={detail} />
@@ -286,6 +367,83 @@ export default function FacultyApprovalsPage() {
         </main>
       </div>
     </div>
+  )
+}
+
+function ApprovalAiSummaryCard({
+  aiEnabled,
+  summary,
+  isLoading,
+}: {
+  aiEnabled: boolean
+  summary: {
+    summary: string
+    risks: string[]
+    recommendations: string[]
+    fallbackUsed?: boolean
+  } | null
+  isLoading: boolean
+}) {
+  if (!aiEnabled) return null
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Sparkles className="size-4 text-primary" />
+          AI Review Summary
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {isLoading ? (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="size-4 animate-spin" />
+            Preparing summary
+          </div>
+        ) : !summary ? (
+          <p className="text-sm text-muted-foreground">
+            AI summary is unavailable. Review flow continues normally without it.
+          </p>
+        ) : (
+          <>
+            <div className="rounded-lg border bg-muted/30 p-3 text-sm text-foreground">
+              {summary.summary}
+            </div>
+            {summary.risks.length > 0 && (
+              <div>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Risks
+                </p>
+                <div className="space-y-2">
+                  {summary.risks.map((item) => (
+                    <div key={item} className="rounded-md border border-amber-300/40 bg-amber-50/60 px-3 py-2 text-sm text-amber-900">
+                      {item}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {summary.recommendations.length > 0 && (
+              <div>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Recommendations
+                </p>
+                <div className="space-y-2">
+                  {summary.recommendations.map((item) => (
+                    <div key={item} className="rounded-md border border-emerald-300/40 bg-emerald-50/60 px-3 py-2 text-sm text-emerald-900">
+                      {item}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            <p className="text-xs text-muted-foreground">
+              Advisory only. Final decision always belongs to the reviewer.
+            </p>
+          </>
+        )}
+      </CardContent>
+    </Card>
   )
 }
 

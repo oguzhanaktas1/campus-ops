@@ -11,6 +11,7 @@ import { Upload, Loader2, FileText, X, Server } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import Link from 'next/link'
+import { getToken } from '@/lib/auth'
 import {
   getRevisionFieldMode,
   type RevisionPolicy,
@@ -74,6 +75,9 @@ export function RequestForm({
 }: RequestFormProps) {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
+  const [isAiAvailable, setIsAiAvailable] = useState(false)
+  const [isAiParsing, setIsAiParsing] = useState(false)
+  const [aiParseNote, setAiParseNote] = useState('')
   const [error, setError] = useState('')
 
   const [requestTypes, setRequestTypes] = useState<RequestTypeOption[]>([])
@@ -158,6 +162,25 @@ export function RequestForm({
       }
     }
     fetchData()
+  }, [])
+
+  useEffect(() => {
+    const checkAi = async () => {
+      try {
+        const token = getToken()
+        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
+        if (!token) return
+        const res = await fetch(`${backendUrl}/ai/health`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        if (!res.ok) return
+        const data = await res.json()
+        setIsAiAvailable(data.enabled === true && data.status !== 'unavailable' && data.status !== 'disabled')
+      } catch {
+        setIsAiAvailable(false)
+      }
+    }
+    void checkAi()
   }, [])
 
   // 🔥 KATEGORİ BAZLI DİNAMİK YÖNLENDİRME MANTIĞI 🔥
@@ -363,11 +386,154 @@ export function RequestForm({
     }
   }
 
+  const handleAiParse = async () => {
+    const token = getToken()
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
+    const sourceText = [formData.title, formData.description].filter(Boolean).join('\n\n')
+
+    if (!token || !sourceText.trim()) {
+      setAiParseNote('Add a title or description first.')
+      return
+    }
+
+    setIsAiParsing(true)
+    setAiParseNote('')
+
+    try {
+      const res = await fetch(`${backendUrl}/ai/parse/request`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          text: sourceText,
+          portal: 'student',
+          requestTypeCandidates: requestTypes.map((item) => item.key),
+        }),
+      })
+
+      if (!res.ok) {
+        throw new Error('Parser unavailable')
+      }
+
+      const data = await res.json()
+      const extractedFields = data.extractedFields && typeof data.extractedFields === 'object'
+        ? data.extractedFields
+        : {}
+
+      setFormData((prev) => {
+        const next = { ...prev }
+        if (!prev.typeKey && typeof data.requestType === 'string') {
+          next.typeKey = data.requestType
+        }
+        if ((!prev.title || String(prev.title).trim() === '') && typeof data.title === 'string') {
+          next.title = data.title
+        }
+        if ((!prev.description || String(prev.description).trim() === '') && typeof data.summary === 'string') {
+          next.description = data.summary
+        }
+
+        for (const [key, value] of Object.entries(extractedFields)) {
+          if (next[key] === undefined || next[key] === '') {
+            next[key] = value
+          }
+        }
+        return next
+      })
+
+      setItState((prev) => ({
+        category:
+          !prev.category && typeof extractedFields.category === 'string'
+            ? extractedFields.category
+            : prev.category,
+        subcategory:
+          !prev.subcategory && typeof extractedFields.subcategory === 'string'
+            ? extractedFields.subcategory
+            : prev.subcategory,
+        affectedSystem:
+          !prev.affectedSystem && typeof extractedFields.affectedSystem === 'string'
+            ? extractedFields.affectedSystem
+            : prev.affectedSystem,
+        locationText:
+          !prev.locationText && typeof extractedFields.locationText === 'string'
+            ? extractedFields.locationText
+            : prev.locationText,
+      }))
+
+      setEquipState((prev) => ({
+        equipmentName:
+          !prev.equipmentName && typeof extractedFields.equipmentName === 'string'
+            ? extractedFields.equipmentName
+            : prev.equipmentName,
+        equipmentCategory:
+          !prev.equipmentCategory && typeof extractedFields.equipmentCategory === 'string'
+            ? extractedFields.equipmentCategory
+            : prev.equipmentCategory,
+        quantity:
+          prev.quantity === '1' && typeof extractedFields.quantity !== 'undefined'
+            ? String(extractedFields.quantity)
+            : prev.quantity,
+        purpose:
+          !prev.purpose && typeof extractedFields.purpose === 'string'
+            ? extractedFields.purpose
+            : prev.purpose,
+        neededFrom:
+          !prev.neededFrom && typeof extractedFields.neededFrom === 'string'
+            ? extractedFields.neededFrom
+            : prev.neededFrom,
+        neededUntil:
+          !prev.neededUntil && typeof extractedFields.neededUntil === 'string'
+            ? extractedFields.neededUntil
+            : prev.neededUntil,
+        urgencyReason:
+          !prev.urgencyReason && typeof extractedFields.urgencyReason === 'string'
+            ? extractedFields.urgencyReason
+            : prev.urgencyReason,
+      }))
+
+      setAiParseNote(
+        Array.isArray(data.missingFields) && data.missingFields.length > 0
+          ? `AI parsed a draft. Missing fields: ${data.missingFields.join(', ')}`
+          : 'AI parsed a draft and prefilled available fields.',
+      )
+    } catch {
+      setAiParseNote('AI parser is unavailable. You can continue filling the form normally.')
+    } finally {
+      setIsAiParsing(false)
+    }
+  }
+
   return (
     <div className="bg-card border border-border rounded-lg shadow-sm p-6">
       {error && <p className="text-sm text-destructive bg-destructive/10 border border-destructive/20 p-3 rounded-md mb-5 font-medium">{error}</p>}
       
       <form onSubmit={handleSubmit} className="space-y-5">
+        {isAiAvailable && !isEditMode && (
+          <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-semibold text-primary">AI Form Helper</p>
+                <p className="text-xs text-muted-foreground">
+                  Optional helper only. It can prefill draft fields from your title and description, but you make the final edits and final submission.
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                className="gap-2"
+                onClick={() => void handleAiParse()}
+                disabled={isAiParsing}
+              >
+                {isAiParsing && <Loader2 className="size-4 animate-spin" />}
+                Parse with AI
+              </Button>
+            </div>
+            {aiParseNote && (
+              <p className="mt-3 text-xs text-muted-foreground">{aiParseNote}</p>
+            )}
+          </div>
+        )}
         
         <div className="space-y-1.5">
           <Label>Request Type <span className="text-destructive">*</span></Label>

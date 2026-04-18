@@ -38,6 +38,7 @@ import {
 } from '../infrastructure/cache/cache-keys';
 import { RabbitmqPublisher } from '../infrastructure/rabbitmq/rabbitmq.publisher';
 import { RoutingKeys } from '../infrastructure/rabbitmq/routing-keys';
+import { AiClientService } from '../modules/ai/ai-client.service';
 
 const IT_REQUEST_TYPE_KEY = 'IT_SUPPORT';
 
@@ -95,6 +96,7 @@ export class TicketsService {
     private cacheService: CacheService,
     private filesService: FilesService,
     private mq: RabbitmqPublisher,
+    private aiClientService: AiClientService,
   ) {}
 
   private hasAnyRole(roles: string[], allowed: string[]) {
@@ -904,7 +906,40 @@ export class TicketsService {
       requestNo = makeRequestNo();
     }
 
-    const priority = dto.priority ?? PriorityLevel.MEDIUM;
+    const aiTriage = await this.aiClientService.post(
+      '/triage/ticket',
+      {
+        title: dto.title,
+        description: dto.description ?? dto.title,
+        requester_faculty: dto.facultyId ?? null,
+        requester_department: dto.departmentId ?? null,
+        source_channel: 'portal',
+        similar_resolutions: [],
+      },
+      {
+        requestType: 'IT_TICKET',
+        category: dto.category,
+        priority: dto.priority ?? 'MEDIUM',
+        suggestedUnit: 'IT',
+        summary: dto.title,
+        missingFields: [],
+        confidence: 0.25,
+        fallbackUsed: true,
+      },
+    );
+
+    const category =
+      ['general', 'other', 'unspecified'].includes(dto.category.toLowerCase()) &&
+      typeof aiTriage.category === 'string'
+        ? aiTriage.category
+        : dto.category;
+
+    const priority =
+      dto.priority ??
+      (typeof aiTriage.priority === 'string' &&
+      Object.values(PriorityLevel).includes(aiTriage.priority as PriorityLevel)
+        ? (aiTriage.priority as PriorityLevel)
+        : PriorityLevel.MEDIUM);
 
     const created = await this.prisma.$transaction(async (tx) => {
       const req = await tx.request.create({
@@ -920,6 +955,9 @@ export class TicketsService {
           facultyId: dto.facultyId ?? null,
           departmentId: dto.departmentId ?? null,
           unitId: dto.unitId ?? null,
+          dynamicData: {
+            aiTriage,
+          },
         },
       });
 
@@ -939,7 +977,7 @@ export class TicketsService {
         data: {
           requestId: req.id,
           reportedByUserId: userId,
-          category: dto.category,
+          category,
           subcategory: dto.subcategory ?? null,
           affectedSystem: dto.affectedSystem ?? null,
           assetId: dto.assetId ?? null,
@@ -962,7 +1000,12 @@ export class TicketsService {
 
       await this.slaService.startRequestSla(tx, req.id);
 
-      return { requestId: req.id, ticketId: ticket.id, requestNo: req.requestNo };
+      return {
+        requestId: req.id,
+        ticketId: ticket.id,
+        requestNo: req.requestNo,
+        aiTriage,
+      };
     });
 
     await this.touchTicketCaches(created.requestId);

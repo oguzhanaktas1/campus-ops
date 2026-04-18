@@ -30,6 +30,7 @@ import { QueueModule } from './infrastructure/queue/queue.module';
 import { RabbitmqModule } from './infrastructure/rabbitmq/rabbitmq.module';
 import { FilesModule } from './files/files.module';
 import { OrganizerModule } from './organizer/organizer.module';
+import { AiModule } from './modules/ai/ai.module';
 
 @Module({
   imports: [
@@ -39,6 +40,7 @@ import { OrganizerModule } from './organizer/organizer.module';
     QueueModule,
     RabbitmqModule,
     FilesModule,
+    AiModule,
     PrismaModule,
     AuthModule,
     NotificationsModule,

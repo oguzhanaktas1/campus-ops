@@ -24,6 +24,7 @@ import {
   ShoppingCart,
 } from "lucide-react";
 import AuthGuard from "@/components/AuthGuard/auth-guard";
+import { PortalAssistant } from "@/components/ai/portal-assistant";
 import { fetchProfile, getStoredUser, getToken } from "@/lib/auth";
 
 const baseNavItems: NavItem[] = [
@@ -121,6 +122,16 @@ export default function FacultyLayout({ children }: { children: React.ReactNode 
         topbar={topbar}
       >
         {children}
+        <PortalAssistant
+          portal="faculty"
+          title="Faculty AI Assistant"
+          description="Approval routing, internship flow help, and role-aware guidance for faculty workflows."
+          prompts={[
+            "Bekleyen onaylarımı nereden görebilirim?",
+            "Staj onayı süreci nasıl işliyor?",
+            "Randevu taleplerimi hangi sayfadan yönetirim?",
+          ]}
+        />
       </PortalLayout>
     </AuthGuard>
   );

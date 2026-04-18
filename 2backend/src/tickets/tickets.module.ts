@@ -4,9 +4,10 @@ import { TicketsController } from './tickets.controller';
 import { PrismaModule } from '../core/prisma/prisma.module';
 import { WorkflowModule } from '../workflow/workflow.module';
 import { RabbitmqModule } from '../infrastructure/rabbitmq/rabbitmq.module';
+import { AiModule } from '../modules/ai/ai.module';
 
 @Module({
-  imports: [PrismaModule, WorkflowModule, RabbitmqModule],
+  imports: [PrismaModule, WorkflowModule, RabbitmqModule, AiModule],
   controllers: [TicketsController],
   providers: [TicketsService],
   exports: [TicketsService],

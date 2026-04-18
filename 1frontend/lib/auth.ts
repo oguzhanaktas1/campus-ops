@@ -97,6 +97,9 @@ export function clearAuth(): void {
   if (typeof window === 'undefined') return;
   localStorage.removeItem('access_token');
   localStorage.removeItem('user');
+  Object.keys(sessionStorage)
+    .filter((key) => key.startsWith('campusops-ai-session:'))
+    .forEach((key) => sessionStorage.removeItem(key));
 }
 
 export function isTokenExpired(token: string): boolean {

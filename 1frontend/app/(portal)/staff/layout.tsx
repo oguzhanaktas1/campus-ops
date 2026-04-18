@@ -25,6 +25,7 @@ import {
   CalendarDays,
 } from "lucide-react";
 import AuthGuard from "@/components/AuthGuard/auth-guard";
+import { PortalAssistant } from "@/components/ai/portal-assistant";
 import { fetchProfile, getStoredUser } from "@/lib/auth";
 
 const navItems: NavItem[] = [
@@ -110,6 +111,16 @@ export default function StaffLayout({
         topbar={topbar}
       >
         {children}
+        <PortalAssistant
+          portal="staff"
+          title="Staff AI Assistant"
+          description="Queue navigation, ticket guidance, and role-aware help for staff operations."
+          prompts={[
+            "Açık ticketları nereden görebilirim?",
+            "Onay kuyruğuma nasıl giderim?",
+            "Doküman işlemleri için hangi sayfa uygun?",
+          ]}
+        />
       </PortalLayout>
     </AuthGuard>
   );

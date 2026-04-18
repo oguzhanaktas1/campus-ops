@@ -50,6 +50,7 @@ interface Snapshot {
   timestamp: string
   backend: ServiceStatus
   workers: ServiceStatus
+  ai: ServiceStatus
   rabbitmq: any
   outbox: OutboxStats
   urls: {
@@ -57,6 +58,7 @@ interface Snapshot {
     backendReady: string
     workersHealth: string
     workersReady: string
+    aiHealth: string
     metrics: string
     rabbitmqMgmt: string
     prometheus: string
@@ -269,6 +271,20 @@ export default function MonitoringPage() {
               <div className="flex gap-3 flex-wrap">
                 <ExternalUrl label="/health" href={snapshot.urls.workersHealth} />
                 <ExternalUrl label="/ready" href={snapshot.urls.workersReady} />
+              </div>
+            )
+          }
+        />
+
+        <ServiceCard
+          icon={<Server className="size-4" />}
+          title="AI Service"
+          subtitle="FastAPI · port 8010"
+          status={snapshot?.ai}
+          extraLinks={
+            snapshot?.urls && (
+              <div className="flex gap-3 flex-wrap">
+                <ExternalUrl label="/ai/health" href={snapshot.urls.aiHealth} />
               </div>
             )
           }

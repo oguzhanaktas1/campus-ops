@@ -44,6 +44,8 @@ function formatDate(d: string) {
 
 export default function StaffDashboard() {
   const [user, setUser] = useState<any>(null)
+  const [aiNarration, setAiNarration] = useState<any>(null)
+  const [aiLoading, setAiLoading] = useState(false)
   const [metrics, setMetrics] = useState({
     assignedCount: 0,
     overdueCount: 0,
@@ -57,11 +59,34 @@ export default function StaffDashboard() {
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
+    const fetchAiNarration = async (
+      backendUrl: string,
+      headers: Record<string, string>,
+    ) => {
+      setAiLoading(true)
+      try {
+        const resAi = await fetch(`${backendUrl}/ai/analytics/it-overview`, {
+          headers,
+        })
+
+        if (!resAi.ok) {
+          return
+        }
+
+        setAiNarration(await resAi.json())
+      } catch (error) {
+        console.error('Staff AI summary fetch failed:', error)
+      } finally {
+        setAiLoading(false)
+      }
+    }
+
     const fetchDashboardData = async () => {
       try {
         const token = localStorage.getItem('access_token')
         const storedUser = getStoredUser()
         const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
+        const headers = { Authorization: `Bearer ${token}` }
 
         if (storedUser) {
           try {
@@ -70,7 +95,7 @@ export default function StaffDashboard() {
         }
 
         const resMetrics = await fetch(`${backendUrl}/staff/metrics`, {
-          headers: { Authorization: `Bearer ${token}` },
+          headers,
         })
 
         if (resMetrics.ok) {
@@ -85,7 +110,7 @@ export default function StaffDashboard() {
         }
 
         const resRequests = await fetch(`${backendUrl}/staff/requests?filter=active`, {
-          headers: { Authorization: `Bearer ${token}` },
+          headers,
         })
 
         if (resRequests.ok) {
@@ -105,6 +130,8 @@ export default function StaffDashboard() {
           setUrgent(parsedRequests.filter((r: any) => r.priority === 'URGENT' || r.priority === 'HIGH'))
           setOverdue([])
         }
+
+        void fetchAiNarration(backendUrl, headers)
       } catch (error) {
         console.error('Dashboard data fetch failed:', error)
       } finally {
@@ -129,6 +156,34 @@ export default function StaffDashboard() {
           Here&apos;s your operations queue and SLA status.
         </p>
       </div>
+
+      {(aiLoading || aiNarration?.summary) && (
+        <div className="rounded-xl border border-amber-500/20 bg-gradient-to-r from-amber-500/8 via-background to-background p-4 shadow-sm">
+          <div className="flex items-center gap-2">
+            <Activity className="size-4 text-amber-600" />
+            <h2 className="text-sm font-semibold text-foreground">AI IT Summary</h2>
+          </div>
+          {aiNarration?.summary ? (
+            <>
+              <p className="mt-2 text-sm text-foreground">{aiNarration.summary}</p>
+              {Array.isArray(aiNarration.highlights) && aiNarration.highlights.length > 0 && (
+                <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                  {aiNarration.highlights.slice(0, 3).map((highlight: string) => (
+                    <div key={highlight} className="rounded-lg border border-border/70 bg-background/80 px-3 py-2 text-xs text-muted-foreground">
+                      {highlight}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="size-4 animate-spin" />
+              AI summary is loading in the background.
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         <MetricCard title="Assigned Tickets" value={metrics.assignedCount} description="In your queue" icon={<Ticket className="size-4" />} />

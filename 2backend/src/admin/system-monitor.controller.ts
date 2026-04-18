@@ -6,6 +6,7 @@ import { RabbitmqMonitorService } from '../infrastructure/rabbitmq/rabbitmq-moni
 import { OutboxProcessorService } from '../infrastructure/rabbitmq/outbox-processor.service';
 import { PrismaService } from '../core/prisma/prisma.service';
 import { RabbitmqPublisher } from '../infrastructure/rabbitmq/rabbitmq.publisher';
+import { AiClientService } from '../modules/ai/ai-client.service';
 
 /**
  * System Monitoring — admin yetkisiyle erişilir.
@@ -34,6 +35,7 @@ export class SystemMonitorController {
     private readonly outboxProcessor: OutboxProcessorService,
     private readonly prisma: PrismaService,
     private readonly mqPublisher: RabbitmqPublisher,
+    private readonly aiClientService: AiClientService,
   ) {
     this.workersUrl      = process.env.WORKERS_INTERNAL_URL ?? 'http://localhost:8001';
     this.metricsUrl      = process.env.METRICS_INTERNAL_URL ?? 'http://localhost:8000';
@@ -77,6 +79,16 @@ export class SystemMonitorController {
     return this._proxyText(`${this.metricsUrl}/metrics`);
   }
 
+  @Get('ai/health')
+  async aiHealth() {
+    const payload = await this.aiClientService.getHealth();
+    return {
+      ...payload,
+      service: 'ai-service',
+      timestamp: new Date().toISOString(),
+    };
+  }
+
   // ── Queue & outbox ───────────────────────────────────────────────────────
 
   @Get('rabbitmq/queues')
@@ -93,9 +105,10 @@ export class SystemMonitorController {
   /** Tek çağrıda tüm monitoring verisi */
   @Get('snapshot')
   async getSnapshot() {
-    const [backend, workers, rabbitmq, outbox] = await Promise.allSettled([
+    const [backend, workers, ai, rabbitmq, outbox] = await Promise.allSettled([
       this.backendReady(),
       this._proxy(`${this.workersUrl}/ready`, 'workers'),
+      this.aiHealth(),
       this.mqMonitor.getFullStatus(),
       this.mqMonitor.getOutboxStats(),
     ]);
@@ -104,6 +117,7 @@ export class SystemMonitorController {
       timestamp: new Date().toISOString(),
       backend:   backend.status  === 'fulfilled' ? backend.value  : { status: 'error', error: (backend  as any).reason?.message },
       workers:   workers.status  === 'fulfilled' ? workers.value  : { status: 'error', error: (workers  as any).reason?.message },
+      ai:        ai.status       === 'fulfilled' ? ai.value       : { status: 'error', error: (ai as any).reason?.message },
       rabbitmq:  rabbitmq.status === 'fulfilled' ? rabbitmq.value : { status: 'error', error: (rabbitmq as any).reason?.message },
       outbox:    outbox.status   === 'fulfilled' ? outbox.value   : { status: 'error', error: (outbox   as any).reason?.message },
       urls: {
@@ -111,6 +125,7 @@ export class SystemMonitorController {
         backendReady:   `${this.publicApiUrl}/ready`,
         workersHealth:  `${this.publicApiUrl}/admin/system/workers/health`,
         workersReady:   `${this.publicApiUrl}/admin/system/workers/ready`,
+        aiHealth:       `${this.publicApiUrl}/admin/system/ai/health`,
         metrics:        `${this.publicApiUrl}/admin/system/workers/metrics/raw`,
         rabbitmqMgmt:   this.rabbitmqMgmtPublic,
         prometheus:     `${this.publicApiUrl}/admin/system/workers/metrics/raw`,

@@ -25,6 +25,7 @@ import {
   PartyPopper,
 } from "lucide-react";
 import AuthGuard from "@/components/AuthGuard/auth-guard";
+import { PortalAssistant } from "@/components/ai/portal-assistant";
 import { fetchProfile, getStoredUser, getToken } from "@/lib/auth";
 
 const navItems: NavItem[] = [
@@ -139,6 +140,16 @@ export default function StudentLayout({
         topbar={topbar}
       >
         {children}
+        <PortalAssistant
+          portal="student"
+          title="Student AI Assistant"
+          description="Route guidance, request status explanations, and next-step help within your own student scope."
+          prompts={[
+            "Staj başvurusu nasıl yapılır?",
+            "Açık taleplerimi nasıl takip ederim?",
+            "Rezervasyon için hangi sayfaya gitmeliyim?",
+          ]}
+        />
       </PortalLayout>
     </AuthGuard>
   );
