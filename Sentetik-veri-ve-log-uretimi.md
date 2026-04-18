@@ -1,14 +1,12 @@
-Seed verileri
-100 kullanıcı
-20 akademisyen
-10 admin / personel
-250 öğrenci
-500 request
-150 ticket
-80 randevu
-60 staj kaydı
+her requestten 20 30ar tane hepsi farklı statuslerde her biri farklı faculty staff atanmış veya beklemede 
 200 notification
-5000 audit log
+500 audit log
+500 system evnt
+500 integration
+500 webhook log
+reservation appointment requestlerin bazılarının takbimlere eklenmesi
+her portaldan ai servislerinin hepsi ile konuşma , asistan ai sumarry etc
+
 Sentetik log üretimi
 
 Cron ya da script ile:
@@ -22,17 +20,6 @@ dashboard’u doldur
 
 Bunu seed.ts + synthetic-simulator.ts gibi yapabilirsin.
 
-
-300 öğrenci
-40 akademisyen
-25 personel
-5 admin
-10 departman
-1000 request
-250 ticket
-180 reservation
-5000 audit log
-3000 notification
 Python simulator
 random workflow transitions
 fake delay generation

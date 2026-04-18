@@ -19,6 +19,8 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recha
 import { cn } from '@/lib/utils'
 import { fetchProfile, getStoredUser } from '@/lib/auth'
 
+const STAFF_AI_SUMMARY_CACHE_KEY = 'campusops-ai-summary:staff-dashboard'
+
 const requestTypeLabels: Record<string, string> = {
   it_support: 'IT Support',
   maintenance: 'Maintenance',
@@ -59,10 +61,36 @@ export default function StaffDashboard() {
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
+    const readCachedAiNarration = () => {
+      const raw = sessionStorage.getItem(STAFF_AI_SUMMARY_CACHE_KEY)
+      if (!raw) return null
+
+      try {
+        return JSON.parse(raw)
+      } catch {
+        sessionStorage.removeItem(STAFF_AI_SUMMARY_CACHE_KEY)
+        return null
+      }
+    }
+
+    const writeCachedAiNarration = (value: unknown) => {
+      sessionStorage.setItem(STAFF_AI_SUMMARY_CACHE_KEY, JSON.stringify(value))
+    }
+
     const fetchAiNarration = async (
       backendUrl: string,
       headers: Record<string, string>,
+      force = false,
     ) => {
+      if (!force) {
+        const cached = readCachedAiNarration()
+        if (cached) {
+          setAiNarration(cached)
+          setAiLoading(false)
+          return
+        }
+      }
+
       setAiLoading(true)
       try {
         const resAi = await fetch(`${backendUrl}/ai/analytics/it-overview`, {
@@ -73,7 +101,9 @@ export default function StaffDashboard() {
           return
         }
 
-        setAiNarration(await resAi.json())
+        const next = await resAi.json()
+        setAiNarration(next)
+        writeCachedAiNarration(next)
       } catch (error) {
         console.error('Staff AI summary fetch failed:', error)
       } finally {

@@ -16,6 +16,8 @@ import { getToken } from '@/lib/auth'
 import { MetricCard } from '@/components/metric-card'
 import { Button } from '@/components/ui/button'
 
+const ADMIN_AI_SUMMARY_CACHE_KEY = 'campusops-ai-summary:admin-dashboard'
+
 const STATUS_COLORS: Record<string, string> = {
   SUBMITTED:          '#6366f1',
   IN_REVIEW:          '#f59e0b',
@@ -67,14 +69,47 @@ export default function AdminDashboard() {
   const [loading, setLoading]   = useState(true)
   const [refreshing, setRefreshing] = useState(false)
 
-  const fetchAiNarration = async (base: string, headers: Record<string, string>) => {
+  const readCachedAiNarration = () => {
+    if (typeof window === 'undefined') return null
+    const raw = sessionStorage.getItem(ADMIN_AI_SUMMARY_CACHE_KEY)
+    if (!raw) return null
+
+    try {
+      return JSON.parse(raw)
+    } catch {
+      sessionStorage.removeItem(ADMIN_AI_SUMMARY_CACHE_KEY)
+      return null
+    }
+  }
+
+  const writeCachedAiNarration = (value: unknown) => {
+    if (typeof window === 'undefined') return
+    sessionStorage.setItem(ADMIN_AI_SUMMARY_CACHE_KEY, JSON.stringify(value))
+  }
+
+  const fetchAiNarration = async (
+    base: string,
+    headers: Record<string, string>,
+    force = false,
+  ) => {
+    if (!force) {
+      const cached = readCachedAiNarration()
+      if (cached) {
+        setAiNarration(cached)
+        setAiLoading(false)
+        return
+      }
+    }
+
     setAiLoading(true)
     try {
       const aiRes = await fetch(`${base}/ai/analytics/admin-overview`, { headers })
       if (!aiRes.ok) {
         return
       }
-      setAiNarration(await aiRes.json())
+      const next = await aiRes.json()
+      setAiNarration(next)
+      writeCachedAiNarration(next)
     } catch (e) {
       console.error('Admin AI summary fetch error:', e)
     } finally {
@@ -107,7 +142,7 @@ export default function AdminDashboard() {
       setRefreshing(false)
     }
 
-    void fetchAiNarration(base, headers)
+    void fetchAiNarration(base, headers, silent)
   }
 
   useEffect(() => { void fetchAll() }, [])

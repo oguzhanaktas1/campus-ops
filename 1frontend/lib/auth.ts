@@ -98,7 +98,7 @@ export function clearAuth(): void {
   localStorage.removeItem('access_token');
   localStorage.removeItem('user');
   Object.keys(sessionStorage)
-    .filter((key) => key.startsWith('campusops-ai-session:'))
+    .filter((key) => key.startsWith('campusops-ai-session:') || key.startsWith('campusops-ai-summary:'))
     .forEach((key) => sessionStorage.removeItem(key));
 }
 
