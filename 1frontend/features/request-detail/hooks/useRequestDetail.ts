@@ -21,14 +21,6 @@ async function fetchJson(url: string, token: string) {
   return response.json()
 }
 
-function resolveSupplementalKey(raw: any) {
-  const key = String(raw.requestType?.key ?? raw.type ?? '').toUpperCase()
-  if (key.includes('EQUIPMENT')) return 'equipment'
-  if (key.includes('TICKET') || key.includes('IT_SUPPORT')) return 'ticket'
-  if (key.includes('INTERNSHIP')) return 'internship'
-  return null
-}
-
 export function useRequestDetail(requestId: string, portal: RequestPortal) {
   const [detail, setDetail] = useState<RequestDetailViewModel | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -47,33 +39,16 @@ export function useRequestDetail(requestId: string, portal: RequestPortal) {
       }
 
       try {
+        // Single fetch — backend now includes domain data (equipment/ticket/internship) inline.
+        // No supplemental round-trip needed.
         const base = await fetchJson(
           `${backendUrl}/${portal}/requests/${requestId}`,
           token,
         )
 
-        let domainData: Record<string, unknown> | null = null
-        const supplementalKey = resolveSupplementalKey(base)
-
-        if (supplementalKey === 'equipment') {
-          const equipment = await fetchJson(
-            `${backendUrl}/equipment-requests/${requestId}`,
-            token,
-          )
-          domainData = equipment.equipment ?? null
-        } else if (supplementalKey === 'ticket') {
-          const ticket = await fetchJson(
-            `${backendUrl}/it-tickets/${requestId}`,
-            token,
-          )
-          domainData = ticket.ticket ?? null
-        } else if (supplementalKey === 'internship') {
-          const internship = await fetchJson(
-            `${backendUrl}/internships/${requestId}`,
-            token,
-          )
-          domainData = internship.internshipRequest ?? null
-        }
+        // domainData is provided inline by the backend as { type, data }
+        const inlineDomain = base.domainData ?? null
+        const domainData: Record<string, unknown> | null = inlineDomain?.data ?? null
 
         if (!isCancelled) {
           setDetail(mapRequestDetailToViewModel(portal, base, domainData))

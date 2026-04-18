@@ -1,19 +1,20 @@
 """
-Email gönderim servisi — aiosmtplib + Jinja2 şablonları.
+Email gönderim servisi — Resend API + Jinja2 şablonları.
 """
-import asyncio
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
+from __future__ import annotations
+from datetime import datetime
 from pathlib import Path
-import aiosmtplib
+
+import httpx
 import structlog
 from jinja2 import Environment, FileSystemLoader, select_autoescape
+
 from app.config.settings import settings
 
 logger = structlog.get_logger(__name__)
 
-# Şablon dizini
 TEMPLATE_DIR = Path(__file__).parent.parent / "templates" / "email"
+RESEND_URL   = "https://api.resend.com/emails"
 
 _jinja_env: Environment | None = None
 
@@ -28,21 +29,18 @@ def _get_jinja_env() -> Environment:
     return _jinja_env
 
 
-def _render_template(template_name: str, context: dict) -> tuple[str, str]:
+def _render(template_name: str, context: dict) -> tuple[str, str]:
     """(subject, html_body) döndürür."""
-    from datetime import datetime
     env = _get_jinja_env()
     ctx = {"year": datetime.now().year, **context}
     try:
-        tmpl = env.get_template(f"{template_name}.html")
-        html = tmpl.render(**ctx)
-        # Konu başlığı şablondan veya context'ten alınır
+        tmpl  = env.get_template(f"{template_name}.html")
+        html  = tmpl.render(**ctx)
         subject = context.get("subject", "CampusFlow Notification")
         return subject, html
     except Exception:
-        # Şablon yoksa basit fallback
         subject = context.get("subject", "CampusFlow Notification")
-        html = f"<p>{context.get('message', '')}</p>"
+        html    = f"<p>{context.get('message', '')}</p>"
         return subject, html
 
 
@@ -52,33 +50,64 @@ async def send_email(
     context: dict,
 ) -> bool:
     """
-    Email gönder. Başarılıysa True, hata varsa False döner.
-    SMTP ayarları eksikse log yazar ve True döner (geliştirme ortamında kayıp verme).
+    Resend API üzerinden email gönder.
+    API key yoksa geliştirme ortamında loglayıp True döner.
     """
-    if not settings.smtp_user or not settings.smtp_password:
-        logger.warning("smtp_not_configured", to=to_email, template=template)
-        return True  # Geliştirme: loglayıp geç
+    if not settings.resend_api_key:
+        logger.warning("resend_not_configured", to=to_email, template=template)
+        return True
 
-    subject, html_body = _render_template(template, context)
-
-    msg = MIMEMultipart("alternative")
-    msg["From"]    = settings.smtp_from
-    msg["To"]      = to_email
-    msg["Subject"] = subject
-    msg.attach(MIMEText(html_body, "html", "utf-8"))
+    subject, html_body = _render(template, context)
 
     try:
-        await aiosmtplib.send(
-            msg,
-            hostname=settings.smtp_host,
-            port=settings.smtp_port,
-            username=settings.smtp_user,
-            password=settings.smtp_password,
-            start_tls=True,
-            timeout=15,
-        )
-        logger.info("email_sent", to=to_email, template=template, subject=subject)
-        return True
+        async with httpx.AsyncClient(timeout=15) as client:
+            resp = await client.post(
+                RESEND_URL,
+                headers={
+                    "Authorization": f"Bearer {settings.resend_api_key}",
+                    "Content-Type":  "application/json",
+                },
+                json={
+                    "from":    settings.resend_from,
+                    "to":      [to_email],
+                    "subject": subject,
+                    "html":    html_body,
+                },
+            )
+
+        if resp.status_code in (200, 201):
+            data = resp.json()
+            email_id = data.get("id", "unknown")
+            print(f"[RESEND ✓] to={to_email} | template={template} | subject={subject!r} | id={email_id} | status={resp.status_code}")
+            logger.info("email_sent", to=to_email, template=template,
+                        subject=subject, resend_id=email_id, http_status=resp.status_code)
+            return True
+        else:
+            print(f"[RESEND ✗] to={to_email} | template={template} | status={resp.status_code} | body={resp.text[:300]}")
+            logger.error("email_send_failed", to=to_email, template=template,
+                         http_status=resp.status_code, body=resp.text[:300])
+            return False
+
     except Exception as e:
+        print(f"[RESEND ✗] to={to_email} | template={template} | error={e}")
         logger.error("email_send_failed", to=to_email, template=template, error=str(e))
         return False
+
+
+async def send_email_bulk(
+    recipients: list[dict],  # [{"email": str, "name": str, ...context}]
+    template: str,
+    base_context: dict,
+) -> int:
+    """
+    Toplu email gönderimi — event.published gibi durumlarda kullanılır.
+    Başarılı gönderim sayısını döner.
+    """
+    sent = 0
+    for r in recipients:
+        ctx = {**base_context, "name": r.get("name") or r["email"]}
+        ok  = await send_email(r["email"], template, ctx)
+        if ok:
+            sent += 1
+    logger.info("bulk_email_done", template=template, total=len(recipients), sent=sent)
+    return sent

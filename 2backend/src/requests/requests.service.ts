@@ -264,7 +264,7 @@ export class RequestsService {
     );
     const cacheKey = CacheKeys.requestDetail(portal, requestId, userId, version);
 
-    return this.cacheService.getOrSet(cacheKey, CacheTtls.medium, async () => {
+    return this.cacheService.getOrSet(cacheKey, CacheTtls.long, async () => {
       const canSeeInternal = roles.some((r) => INTERNAL_ROLES.includes(r));
 
       const req: any = await this.prisma.request.findUnique({
@@ -340,6 +340,17 @@ export class RequestsService {
               },
             },
           },
+          // Domain-specific tables — included inline to avoid extra round-trips
+          equipmentRequest: {
+            include: { labResource: { select: { id: true, name: true, resourceType: true } } },
+          },
+          itTicket: true,
+          internshipRequest: {
+            include: {
+              advisor: { select: { id: true, email: true, profile: { select: { fullName: true } } } },
+              term: { select: { id: true, name: true, startDate: true, endDate: true } },
+            },
+          },
           _count: { select: { comments: true } },
         },
       });
@@ -351,6 +362,15 @@ export class RequestsService {
       const attachments = await Promise.all(
         req.fileLinks.map((fl: any) => this.filesService.buildAttachmentResponse(fl.file)),
       );
+
+      // Build inline domain data to avoid extra frontend round-trips
+      const domainData = req.equipmentRequest
+        ? { type: 'equipment', data: req.equipmentRequest }
+        : req.itTicket
+          ? { type: 'ticket', data: req.itTicket }
+          : req.internshipRequest
+            ? { type: 'internship', data: req.internshipRequest }
+            : null;
 
       return {
       request: {
@@ -474,6 +494,7 @@ export class RequestsService {
           }
         : null,
       attachments,
+      domainData,
       };
     });
   }
@@ -486,6 +507,13 @@ export class RequestsService {
     requestId: string,
     dto: import('../workflow/dto/process-action.dto').ProcessActionDto,
   ) {
+    // Mevcut statüyü al — status_changed event'i için gerekli
+    const prevReq = await this.prisma.request.findUnique({
+      where: { id: requestId },
+      select: { status: true },
+    });
+    const oldStatus = prevReq?.status ?? '';
+
     const result = await this.workflowEngine.processAction(
       userId,
       roles,
@@ -512,16 +540,33 @@ export class RequestsService {
       revision: RoutingKeys.WORKFLOW_REVISION_REQUESTED,
     };
     const eventKey = actionToEvent[dto.action];
+    const newStatus = (result as any).status ?? '';
+    const reqType   = (result as any).requestType?.key ?? '';
+
     if (eventKey) {
       // processAction transaction'ı zaten commit edildi; outbox direkt yaz
       void this.outbox.enqueue({
         event: eventKey as any,
         occurredAt: new Date().toISOString(),
         requestId,
-        requestType: (result as any).requestType?.key ?? '',
+        requestType: reqType,
         actorUserId: userId,
         comment: dto.comment ?? null,
-        newStatus: (result as any).status ?? '',
+        newStatus,
+      });
+    }
+
+    // ── request.status_changed — her status değişiminde requester'a email ──
+    if (newStatus && newStatus !== oldStatus) {
+      void this.outbox.enqueue({
+        event: RoutingKeys.REQUEST_STATUS_CHANGED as any,
+        occurredAt: new Date().toISOString(),
+        requestId,
+        requestType: reqType,
+        oldStatus,
+        newStatus,
+        actorUserId: userId,
+        note: dto.comment ?? null,
       });
     }
 

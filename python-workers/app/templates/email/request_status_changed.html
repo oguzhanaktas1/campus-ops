@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Request Status Updated — CampusFlow{% endblock %}
+{% block content %}
+<h2>Your request status has been updated</h2>
+<p>Hi <strong>{{ name }}</strong>,</p>
+<p>The status of your request has changed.</p>
+<div class="meta">
+  <p><strong>Request No:</strong> {{ requestNo }}</p>
+  <p><strong>Type:</strong> {{ requestType }}</p>
+  <p><strong>Previous Status:</strong> {{ oldStatus }}</p>
+  <p><strong>New Status:</strong> <span style="color:#4f46e5;font-weight:700;">{{ newStatus }}</span></p>
+  {% if note %}<p><strong>Note:</strong> {{ note }}</p>{% endif %}
+</div>
+<p>You can track the progress of your request using the button below.</p>
+<a class="btn" href="{{ requestUrl }}">View Request</a>
+{% endblock %}

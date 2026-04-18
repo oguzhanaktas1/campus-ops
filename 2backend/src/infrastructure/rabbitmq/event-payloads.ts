@@ -76,6 +76,27 @@ export interface WorkflowRevisionRequestedPayload extends BaseEventPayload {
   newStatus: string;
 }
 
+export interface RequestStatusChangedPayload extends BaseEventPayload {
+  event: 'request.status_changed';
+  requestId: string;
+  requestType: string;
+  oldStatus: string;
+  newStatus: string;
+  actorUserId?: string | null;
+  note?: string | null;
+}
+
+export interface EventPublishedPayload extends BaseEventPayload {
+  event: 'event.published';
+  eventId: string;
+  eventTitle: string;
+  eventDescription?: string | null;
+  eventDate?: string | null;
+  location?: string | null;
+  organizerName?: string | null;
+  targetAudience?: string | null; // "ALL" | "FACULTY:<id>" | "DEPT:<id>"
+}
+
 // ── Notification / email ────────────────────────────────────────────────────
 
 export interface NotificationCreatePayload extends BaseEventPayload {
@@ -129,10 +150,12 @@ export type AnyEventPayload =
   | RequestCreatedPayload
   | RequestUpdatedPayload
   | RequestCancelledPayload
+  | RequestStatusChangedPayload
   | WorkflowAssignedPayload
   | WorkflowApprovedPayload
   | WorkflowRejectedPayload
   | WorkflowRevisionRequestedPayload
+  | EventPublishedPayload
   | NotificationCreatePayload
   | EmailSendPayload
   | ReminderSchedulePayload

@@ -2,7 +2,7 @@ aio-pika==9.4.3
 asyncpg==0.30.0
 redis==5.2.1
 python-dotenv==1.0.1
-aiosmtplib==3.0.2
+# resend via httpx (httpx already included below)
 jinja2==3.1.4
 pydantic==2.10.6
 pydantic-settings==2.7.0

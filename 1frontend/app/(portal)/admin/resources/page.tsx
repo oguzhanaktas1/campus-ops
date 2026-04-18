@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback, useRef } from 'react'
-import { Plus, Pencil, Trash2, Loader2, Box, Search, ChevronRight, ChevronLeft } from 'lucide-react'
+import { Plus, Pencil, Trash2, Loader2, Box, Search, ChevronRight, ChevronLeft, DoorOpen, FlaskConical, Wrench, Car, LayoutGrid } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
@@ -37,6 +37,15 @@ const TYPE_BADGE: Record<string, string> = {
   OTHER:     'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800/40 dark:text-slate-400 dark:border-slate-700',
 }
 
+
+const TYPE_ICON: Record<string, React.ElementType> = {
+  ROOM:      DoorOpen,
+  LAB:       FlaskConical,
+  EQUIPMENT: Wrench,
+  VEHICLE:   Car,
+  OTHER:     Box,
+}
+
 const EMPTY_FORM = {
   name: '',
   code: '',
@@ -52,6 +61,8 @@ export default function AdminResourcesPage() {
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
   const [typeFilter, setTypeFilter] = useState('all')
+  const [typeCounts, setTypeCounts] = useState<Record<string, number>>({})
+  const [statsLoading, setStatsLoading] = useState(true)
 
   const [showDialog, setShowDialog] = useState(false)
   const [editTarget, setEditTarget] = useState<Resource | null>(null)
@@ -61,6 +72,30 @@ export default function AdminResourcesPage() {
 
   const searchTimer = useRef<ReturnType<typeof setTimeout>>()
   const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
+
+  const loadStats = useCallback(async () => {
+    setStatsLoading(true)
+    try {
+      const token = getToken()
+      const allKeys = ['all', ...RESOURCE_TYPES]
+      const results = await Promise.all(
+        allKeys.map(type => {
+          const params = new URLSearchParams({ page: '1', limit: '1' })
+          if (type !== 'all') params.set('type', type)
+          return fetch(`${backendUrl}/admin/resources?${params}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }).then(r => r.json())
+        })
+      )
+      const counts: Record<string, number> = {}
+      allKeys.forEach((key, i) => { counts[key] = results[i].total ?? 0 })
+      setTypeCounts(counts)
+    } catch {
+      // stats are non-critical
+    } finally {
+      setStatsLoading(false)
+    }
+  }, [backendUrl])
 
   const load = useCallback(async (pg: number, q: string, type: string) => {
     setIsLoading(true)
@@ -81,7 +116,10 @@ export default function AdminResourcesPage() {
     }
   }, [backendUrl])
 
-  useEffect(() => { load(1, '', 'all') }, [load])
+  useEffect(() => {
+    load(1, '', 'all')
+    loadStats()
+  }, [load, loadStats])
 
   const handleSearch = (val: string) => {
     setSearch(val)
@@ -142,6 +180,7 @@ export default function AdminResourcesPage() {
       toast.success(editTarget ? 'Resource updated.' : 'Resource created.')
       setShowDialog(false)
       load(page, search, typeFilter)
+      loadStats()
     } catch {
       toast.error('Failed to save resource.')
     } finally {
@@ -165,6 +204,7 @@ export default function AdminResourcesPage() {
       const targetPage = page > newTotalPages && newTotalPages > 0 ? newTotalPages : page
       if (targetPage !== page) setPage(targetPage)
       load(targetPage, search, typeFilter)
+      loadStats()
     } catch {
       toast.error('Failed to delete resource.')
     } finally {
@@ -238,37 +278,155 @@ export default function AdminResourcesPage() {
         </div>
       )}
 
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
         <div>
           <h1 className="text-xl font-bold text-foreground">Resources</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            {total > 0 ? `Showing ${start}–${end} of ${total} resources` : 'No resources found.'}
-          </p>
+          <p className="text-sm text-muted-foreground mt-0.5">Campus facilities, labs, equipment and vehicles</p>
         </div>
-        <Button onClick={openAdd} className="gap-2 self-start">
+        <Button onClick={openAdd} className="gap-2 self-start shrink-0">
           <Plus className="size-4" /> Add Resource
         </Button>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-          <Input
-            placeholder="Search by name or code..."
-            className="pl-9"
-            value={search}
-            onChange={e => handleSearch(e.target.value)}
-          />
+      {/* Stats — total + per-type counts */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        {/* Total card */}
+        <div className="col-span-2 sm:col-span-3 lg:col-span-1 bg-card border border-border rounded-xl px-4 py-3 flex items-center gap-3 shadow-sm">
+          <div className="size-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+            <LayoutGrid className="size-4 text-primary" />
+          </div>
+          <div>
+            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">Total</p>
+            <p className="text-2xl font-bold text-foreground leading-none mt-0.5">
+              {statsLoading ? <span className="inline-block w-8 h-6 bg-muted animate-pulse rounded" /> : (typeCounts['all'] ?? 0)}
+            </p>
+          </div>
         </div>
-        <select
-          value={typeFilter}
-          onChange={e => handleTypeFilter(e.target.value)}
-          className="bg-background border border-input rounded-md px-3 h-10 text-sm focus:ring-2 focus:ring-primary outline-none"
-        >
-          <option value="all">All Types</option>
-          {RESOURCE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-        </select>
+        {/* Per-type cards */}
+        {RESOURCE_TYPES.map(type => {
+          const Icon = TYPE_ICON[type]
+          const count = typeCounts[type] ?? 0
+          const isActive = typeFilter === type
+          return (
+            <button
+              key={type}
+              onClick={() => handleTypeFilter(isActive ? 'all' : type)}
+              className={cn(
+                'bg-card border rounded-xl px-3 py-3 flex items-center gap-2.5 shadow-sm transition-all text-left',
+                isActive
+                  ? 'border-primary ring-2 ring-primary/20'
+                  : 'border-border hover:border-primary/40 hover:shadow-md'
+              )}
+            >
+              <div className={cn('size-8 rounded-lg flex items-center justify-center shrink-0', TYPE_BADGE[type])}>
+                <Icon className="size-3.5" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide truncate">{type}</p>
+                <p className="text-xl font-bold text-foreground leading-none mt-0.5">
+                  {statsLoading ? <span className="inline-block w-6 h-5 bg-muted animate-pulse rounded" /> : count}
+                </p>
+              </div>
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Filters */}
+      <div className="space-y-2.5">
+        <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
+          <div className="relative flex-1 max-w-sm">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+            <Input
+              placeholder="Search by name or code..."
+              className="pl-9"
+              value={search}
+              onChange={e => handleSearch(e.target.value)}
+            />
+          </div>
+          {/* Result count badge */}
+          <div className={cn(
+            'flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm font-medium transition-colors',
+            typeFilter !== 'all' || search
+              ? 'bg-primary/10 border-primary/30 text-primary'
+              : 'bg-muted/50 border-border text-muted-foreground'
+          )}>
+            {isLoading
+              ? <Loader2 className="size-3.5 animate-spin" />
+              : <span className="font-bold text-base leading-none">{total}</span>
+            }
+            <span className="text-xs">
+              {typeFilter !== 'all' ? `${typeFilter.charAt(0) + typeFilter.slice(1).toLowerCase()} resources` : search ? 'results' : 'resources total'}
+            </span>
+            {(typeFilter !== 'all' || search) && (
+              <button
+                onClick={() => {
+                  setSearch('')
+                  setTypeFilter('all')
+                  setPage(1)
+                  load(1, '', 'all')
+                }}
+                className="ml-1 text-muted-foreground hover:text-foreground text-xs font-normal"
+              >
+                ✕ clear
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Type filter chips */}
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => handleTypeFilter('all')}
+            className={cn(
+              'flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-semibold transition-all',
+              typeFilter === 'all'
+                ? 'bg-foreground text-background border-foreground'
+                : 'bg-background text-muted-foreground border-border hover:border-foreground/40 hover:text-foreground'
+            )}
+          >
+            <LayoutGrid className="size-3" />
+            All
+            {!statsLoading && <span className="ml-0.5 opacity-70">({typeCounts['all'] ?? 0})</span>}
+          </button>
+          {RESOURCE_TYPES.map(type => {
+            const Icon = TYPE_ICON[type]
+            const isActive = typeFilter === type
+            const chipActive: Record<string, string> = {
+              ROOM:      'bg-blue-600 text-white border-blue-600',
+              LAB:       'bg-purple-600 text-white border-purple-600',
+              EQUIPMENT: 'bg-amber-500 text-white border-amber-500',
+              VEHICLE:   'bg-emerald-600 text-white border-emerald-600',
+              OTHER:     'bg-slate-600 text-white border-slate-600',
+            }
+            const chipIdle: Record<string, string> = {
+              ROOM:      'hover:border-blue-400 hover:text-blue-600',
+              LAB:       'hover:border-purple-400 hover:text-purple-600',
+              EQUIPMENT: 'hover:border-amber-400 hover:text-amber-600',
+              VEHICLE:   'hover:border-emerald-400 hover:text-emerald-600',
+              OTHER:     'hover:border-slate-400 hover:text-slate-600',
+            }
+            return (
+              <button
+                key={type}
+                onClick={() => handleTypeFilter(isActive ? 'all' : type)}
+                className={cn(
+                  'flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-semibold transition-all',
+                  isActive
+                    ? chipActive[type]
+                    : cn('bg-background text-muted-foreground border-border', chipIdle[type])
+                )}
+              >
+                <Icon className="size-3" />
+                {type.charAt(0) + type.slice(1).toLowerCase()}
+                {!statsLoading && (
+                  <span className="ml-0.5 opacity-70">({typeCounts[type] ?? 0})</span>
+                )}
+              </button>
+            )
+          })}
+        </div>
       </div>
 
       {/* Table */}

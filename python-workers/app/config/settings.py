@@ -17,12 +17,9 @@ class Settings(BaseSettings):
     # Redis
     redis_url: str = "redis://localhost:6379/0"
 
-    # SMTP
-    smtp_host: str = "smtp.gmail.com"
-    smtp_port: int = 587
-    smtp_user: str = ""
-    smtp_password: str = ""
-    smtp_from: str = "CampusFlow <noreply@campusflow.com.tr>"
+    # Resend
+    resend_api_key: str = ""
+    resend_from: str = "CampusFlow <noreply@campusflow.com.tr>"
 
     # Supabase storage
     supabase_url: str = ""

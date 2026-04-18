@@ -2,6 +2,8 @@ import { Injectable, NotFoundException, ForbiddenException, BadRequestException 
 import { PrismaService } from '../core/prisma/prisma.service';
 import { RequestStatus, PriorityLevel } from '@prisma/client';
 import { WorkflowEngineService } from '../workflow/workflow-engine.service';
+import { OutboxService } from '../infrastructure/rabbitmq/outbox.service';
+import { RoutingKeys } from '../infrastructure/rabbitmq/routing-keys';
 
 const TYPE_KEY = 'EVENT_REQUEST';
 
@@ -23,6 +25,7 @@ export class EventsService {
   constructor(
     private prisma: PrismaService,
     private workflowEngine: WorkflowEngineService,
+    private outbox: OutboxService,
   ) {}
 
   private async getOrCreateRequestType() {
@@ -192,6 +195,30 @@ export class EventsService {
     void this.prisma.auditLog.create({
       data: { userId, actionType: 'UPDATE', entityType: 'EventRequest', entityId: id, newValuesJson: { status, note } },
     });
+
+    // Event onaylandığında öğrencilere duyuru emaili gönder
+    if (status === RequestStatus.APPROVED) {
+      const full = await this.prisma.request.findUnique({
+        where: { id },
+        include: {
+          eventRequest: true,
+          requester: { include: { profile: { select: { fullName: true } } } },
+        },
+      });
+      if (full?.eventRequest) {
+        void this.outbox.enqueue({
+          event: RoutingKeys.EVENT_PUBLISHED as any,
+          occurredAt: new Date().toISOString(),
+          eventId: id,
+          eventTitle: full.eventRequest.eventName,
+          eventDescription: full.eventRequest.description ?? null,
+          eventDate: full.eventRequest.startAt?.toISOString() ?? null,
+          location: full.eventRequest.locationPreference ?? null,
+          organizerName: full.requester.profile?.fullName ?? full.requester.email,
+          targetAudience: 'ALL',
+        });
+      }
+    }
 
     return updated;
   }

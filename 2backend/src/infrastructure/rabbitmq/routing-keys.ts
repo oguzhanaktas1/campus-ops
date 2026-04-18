@@ -4,9 +4,13 @@ export const EXCHANGE = 'campusops.events';
 /** Routing key sabitleri */
 export const RoutingKeys = {
   // ── Request lifecycle ────────────────────────────────────────────────────
-  REQUEST_CREATED:  'request.created',
-  REQUEST_UPDATED:  'request.updated',
-  REQUEST_CANCELLED:'request.cancelled',
+  REQUEST_CREATED:        'request.created',
+  REQUEST_UPDATED:        'request.updated',
+  REQUEST_CANCELLED:      'request.cancelled',
+  REQUEST_STATUS_CHANGED: 'request.status_changed',
+
+  // ── Campus events ─────────────────────────────────────────────────────────
+  EVENT_PUBLISHED: 'event.published',
 
   // ── Workflow actions ─────────────────────────────────────────────────────
   WORKFLOW_ASSIGNED:            'workflow.assigned',
@@ -60,6 +64,9 @@ export const QUEUE_BINDINGS: Record<string, string[]> = {
     'email.send',
     'workflow.*',
     'reminder.schedule',
+    'request.created',
+    'request.status_changed',
+    'event.published',
   ],
   [Queues.WORKFLOW]: [
     'request.created',

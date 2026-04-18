@@ -20,6 +20,8 @@ from app.schemas.payloads import (
     WorkflowRevisionRequestedPayload,
     ReminderSchedulePayload,
     RequestCreatedPayload,
+    RequestStatusChangedPayload,
+    EventPublishedPayload,
 )
 from app.services import db_service, mail_service
 
@@ -36,6 +38,8 @@ async def handle(payload: BasePayload) -> None:
             await _handle_direct(payload)  # type: ignore[arg-type]
         case "request.created":
             await _handle_request_created(payload)  # type: ignore[arg-type]
+        case "request.status_changed":
+            await _handle_status_changed(payload)  # type: ignore[arg-type]
         case "workflow.assigned":
             await _handle_workflow_assigned(payload)  # type: ignore[arg-type]
         case "workflow.approved":
@@ -46,6 +50,8 @@ async def handle(payload: BasePayload) -> None:
             await _handle_workflow_revision(payload)  # type: ignore[arg-type]
         case "reminder.schedule":
             await _handle_reminder(payload)  # type: ignore[arg-type]
+        case "event.published":
+            await _handle_event_published(payload)  # type: ignore[arg-type]
         case _:
             logger.debug("email_handler_skip", event=payload.event)
 
@@ -191,6 +197,76 @@ async def _handle_workflow_revision(p: WorkflowRevisionRequestedPayload) -> None
         request_id=p.requestId,
         template_key="workflow_revision",
     )
+
+
+async def _handle_status_changed(p: RequestStatusChangedPayload) -> None:
+    """Her status değişiminde request sahibine mail."""
+    request = await db_service.fetch_request_by_id(p.requestId)
+    if not request:
+        return
+    user = await db_service.fetch_user_by_id(request["requesterUserId"])
+    if not user:
+        return
+
+    await _send(
+        to_email=user["email"],
+        template="request_status_changed",
+        context={
+            "subject":     f"Request {request['requestNo']} — status updated",
+            "name":        user.get("fullName") or user["email"],
+            "requestNo":   request["requestNo"],
+            "requestType": p.requestType,
+            "oldStatus":   p.oldStatus,
+            "newStatus":   p.newStatus,
+            "note":        p.note or "",
+            "requestUrl":  f"{FRONTEND_URL}/student/requests/{p.requestId}",
+        },
+        user_id=user["id"],
+        request_id=p.requestId,
+        template_key="request_status_changed",
+    )
+
+
+async def _handle_event_published(p: EventPublishedPayload) -> None:
+    """Event yayınlandığında öğrencilere toplu mail."""
+    # targetAudience: "ALL" | "FACULTY:<id>" | "DEPT:<id>"
+    faculty_id    = None
+    department_id = None
+    audience = (p.targetAudience or "ALL").upper()
+    if audience.startswith("FACULTY:"):
+        faculty_id = audience.split(":", 1)[1]
+    elif audience.startswith("DEPT:"):
+        department_id = audience.split(":", 1)[1]
+
+    students = await db_service.fetch_active_students(
+        faculty_id=faculty_id,
+        department_id=department_id,
+    )
+    if not students:
+        logger.warning("event_published_no_students", event_id=p.eventId)
+        return
+
+    base_ctx = {
+        "subject":          f"New Event: {p.eventTitle}",
+        "eventTitle":       p.eventTitle,
+        "eventDescription": p.eventDescription or "",
+        "eventDate":        p.eventDate or "",
+        "location":         p.location or "",
+        "organizerName":    p.organizerName or "CampusFlow",
+        "eventUrl":         f"{FRONTEND_URL}/events/{p.eventId}",
+    }
+
+    sent = await mail_service.send_email_bulk(students, "event_published", base_ctx)
+    logger.info("event_published_emails_sent", event_id=p.eventId, sent=sent, total=len(students))
+
+    # Her öğrenciye email log yaz (toplu)
+    for s in students[:sent]:
+        await db_service.create_email_log(
+            to_email=s["email"],
+            subject=base_ctx["subject"],
+            template_key="event_published",
+            user_id=s["id"],
+        )
 
 
 async def _handle_reminder(p: ReminderSchedulePayload) -> None:

@@ -251,6 +251,46 @@ async def create_reminder_record(
         logger.warning("create_reminder_failed", error=str(e))
 
 
+async def fetch_active_students(
+    faculty_id: str | None = None,
+    department_id: str | None = None,
+) -> list[dict]:
+    """Aktif öğrencileri çek — event.published bildirimleri için."""
+    pool = await get_pool()
+    if faculty_id:
+        rows = await pool.fetch(
+            """
+            SELECT u.id, u.email, p."fullName"
+            FROM "User" u
+            LEFT JOIN "UserProfile" p ON p."userId" = u.id
+            WHERE u.role = 'STUDENT' AND u."isActive" = true
+              AND p."facultyId" = $1
+            """,
+            faculty_id,
+        )
+    elif department_id:
+        rows = await pool.fetch(
+            """
+            SELECT u.id, u.email, p."fullName"
+            FROM "User" u
+            LEFT JOIN "UserProfile" p ON p."userId" = u.id
+            WHERE u.role = 'STUDENT' AND u."isActive" = true
+              AND p."departmentId" = $1
+            """,
+            department_id,
+        )
+    else:
+        rows = await pool.fetch(
+            """
+            SELECT u.id, u.email, p."fullName"
+            FROM "User" u
+            LEFT JOIN "UserProfile" p ON p."userId" = u.id
+            WHERE u.role = 'STUDENT' AND u."isActive" = true
+            """,
+        )
+    return [dict(r) for r in rows]
+
+
 async def create_email_log(
     to_email: str,
     subject: str,

@@ -117,6 +117,27 @@ class SlaCheckPayload(BasePayload):
     checkType: str
 
 
+class RequestStatusChangedPayload(BasePayload):
+    event: Literal["request.status_changed"]
+    requestId: str
+    requestType: str
+    oldStatus: str
+    newStatus: str
+    actorUserId: Optional[str] = None
+    note: Optional[str] = None
+
+
+class EventPublishedPayload(BasePayload):
+    event: Literal["event.published"]
+    eventId: str
+    eventTitle: str
+    eventDescription: Optional[str] = None
+    eventDate: Optional[str] = None
+    location: Optional[str] = None
+    organizerName: Optional[str] = None
+    targetAudience: Optional[str] = None  # "ALL" | "FACULTY:<id>" | "DEPT:<id>"
+
+
 class AuditAppendPayload(BasePayload):
     event: Literal["audit.append"]
     entityType: str
@@ -157,17 +178,19 @@ PAYLOAD_MAP: dict[str, type[BasePayload]] = {
     "attachment.process":  AttachmentProcessPayload,
     "document.generate":   DocumentGeneratePayload,
     "report.generate":     ReportGeneratePayload,
-    "request.created":            RequestCreatedPayload,
-    "request.updated":            RequestUpdatedPayload,
-    "request.cancelled":          RequestCancelledPayload,
-    "workflow.assigned":          WorkflowAssignedPayload,
-    "workflow.approved":          WorkflowApprovedPayload,
-    "workflow.rejected":          WorkflowRejectedPayload,
-    "workflow.revision_requested":WorkflowRevisionRequestedPayload,
-    "notification.create":        NotificationCreatePayload,
-    "email.send":                 EmailSendPayload,
-    "reminder.schedule":          ReminderSchedulePayload,
-    "sla.check":                  SlaCheckPayload,
+    "request.created":              RequestCreatedPayload,
+    "request.updated":              RequestUpdatedPayload,
+    "request.cancelled":            RequestCancelledPayload,
+    "request.status_changed":       RequestStatusChangedPayload,
+    "workflow.assigned":            WorkflowAssignedPayload,
+    "workflow.approved":            WorkflowApprovedPayload,
+    "workflow.rejected":            WorkflowRejectedPayload,
+    "workflow.revision_requested":  WorkflowRevisionRequestedPayload,
+    "event.published":              EventPublishedPayload,
+    "notification.create":          NotificationCreatePayload,
+    "email.send":                   EmailSendPayload,
+    "reminder.schedule":            ReminderSchedulePayload,
+    "sla.check":                    SlaCheckPayload,
 }
 
 

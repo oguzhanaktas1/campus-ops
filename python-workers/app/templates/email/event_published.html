@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}New Event — CampusFlow{% endblock %}
+{% block content %}
+<h2>📅 {{ eventTitle }}</h2>
+<p>Hi <strong>{{ name }}</strong>,</p>
+<p>A new campus event has been announced. Don't miss it!</p>
+<div class="meta">
+  {% if eventDate %}<p><strong>Date:</strong> {{ eventDate }}</p>{% endif %}
+  {% if location %}<p><strong>Location:</strong> {{ location }}</p>{% endif %}
+  {% if organizerName %}<p><strong>Organizer:</strong> {{ organizerName }}</p>{% endif %}
+  {% if eventDescription %}<p><strong>About:</strong> {{ eventDescription }}</p>{% endif %}
+</div>
+<a class="btn" href="{{ eventUrl }}">View Event Details</a>
+{% endblock %}

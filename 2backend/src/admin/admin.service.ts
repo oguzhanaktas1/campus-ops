@@ -506,6 +506,12 @@ export class AdminService {
   }
 
   async getRequestById(requestId: string) {
+    const version = await this.cacheService.getVersion(
+      CacheKeys.version(`request:detail:${requestId}`),
+    );
+    const cacheKey = `admin:request:detail:${requestId}:v${version}`;
+
+    return this.cacheService.getOrSet(cacheKey, CacheTtls.long, async () => {
     const request = await this.prisma.request.findUnique({
       where: { id: requestId },
       include: {
@@ -753,6 +759,7 @@ export class AdminService {
         };
       })(),
     };
+    }); // end cacheService.getOrSet
   }
 
   async deleteRequest(requestId: string) {
@@ -760,7 +767,13 @@ export class AdminService {
       where: { id: requestId },
     });
     if (!request) throw new NotFoundException('Request not found');
-    return this.prisma.request.delete({ where: { id: requestId } });
+    const result = await this.prisma.request.delete({ where: { id: requestId } });
+    await Promise.all([
+      this.cacheService.bumpVersion(CacheKeys.version(`request:detail:${requestId}`)),
+      this.cacheService.bumpVersion(CacheKeys.version('admin:requests:list')),
+      this.cacheService.bumpVersion(CacheKeys.version('admin:dashboard:summary')),
+    ]);
+    return result;
   }
 
   // 🔥 BİLDİRİM (NOTIFICATION) OPERASYONLARI 🔥
