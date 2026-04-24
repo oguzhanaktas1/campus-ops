@@ -139,13 +139,21 @@ export function AddUserModal({
   const handlePrimaryRoleChange = (roleId: string) => {
     const role = roles.find((item) => item.id === roleId)
     const primaryRoleName = role?.name.toUpperCase() || ''
+    const primaryRoleIds = roles
+      .filter((item) => PRIMARY_ROLE_NAMES.includes(item.name.toUpperCase()))
+      .map((item) => item.id)
 
     setFormData((prev) => {
       const next = {
         ...prev,
         primaryRoleId: roleId,
         primaryRoleName,
-        roleIds: Array.from(new Set([roleId, ...prev.roleIds.filter((id) => id !== roleId)])),
+        roleIds: Array.from(
+          new Set([
+            roleId,
+            ...prev.roleIds.filter((id) => id === roleId || !primaryRoleIds.includes(id)),
+          ]),
+        ),
       }
 
       if (primaryRoleName !== 'STUDENT') next.studentNumber = ''

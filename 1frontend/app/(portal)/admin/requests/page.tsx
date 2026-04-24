@@ -9,6 +9,24 @@ import { Search, FileText, Trash2, Loader2, AlertTriangle, ArrowRight, CheckSqua
 import { toast } from 'sonner'
 import Link from 'next/link'
 
+const requestTypeLabels: Record<string, string> = {
+  ACCESS_REQUEST: 'Access / Permission Request',
+  APPOINTMENT: 'Appointment Request',
+  DOCUMENT_REQUEST: 'Document Request',
+  EQUIPMENT: 'Equipment Request',
+  EVENT_CREATION_REQUEST: 'Event Creation Request',
+  EVENT_REQUEST: 'Event / Activity Request',
+  INTERNSHIP_REQUEST: 'Internship Application',
+  IT_TICKET: 'IT Support Ticket',
+  PROCUREMENT_REQUEST: 'Procurement Request',
+  ROOM_RESERVATION: 'Room / Resource Reservation',
+}
+
+function getRequestTypeLabel(request: { type?: string; typeName?: string }) {
+  if (request.type && requestTypeLabels[request.type]) return requestTypeLabels[request.type]
+  return request.typeName ?? request.type ?? 'Unknown'
+}
+
 export default function AdminRequestsPage() {
   const [requests, setRequests] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -88,7 +106,7 @@ export default function AdminRequestsPage() {
     const map = new Map<string, string>()
     for (const request of requests) {
       if (request.type) {
-        map.set(request.type, request.typeName ?? request.type)
+        map.set(request.type, getRequestTypeLabel(request))
       }
     }
     return Array.from(map.entries()).sort((a, b) => a[1].localeCompare(b[1]))
@@ -242,8 +260,8 @@ export default function AdminRequestsPage() {
                     <p className="text-[10px] font-mono text-muted-foreground mt-1.5">{req.requestNo}</p>
                   </td>
                   <td className="px-5 py-4">
-                    <span className="px-2 py-0.5 rounded bg-secondary text-[10px] font-bold text-secondary-foreground uppercase">
-                      {req.typeName}
+                    <span className="px-2 py-0.5 rounded bg-secondary text-[10px] font-bold text-secondary-foreground">
+                      {getRequestTypeLabel(req)}
                     </span>
                   </td>
                   <td className="px-5 py-4">

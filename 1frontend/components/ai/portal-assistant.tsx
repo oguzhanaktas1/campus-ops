@@ -13,6 +13,7 @@ type AssistantMessage = {
   role: 'user' | 'assistant'
   content: string
   links?: Array<{ label: string; href: string }>
+  cards?: Array<{ type: string; label: string; value: string | number; description?: string | null }>
 }
 
 type PortalAssistantProps = {
@@ -124,6 +125,7 @@ export function PortalAssistant({
           role: 'assistant',
           content: data.answer || 'AI assistant is currently unavailable.',
           links: Array.isArray(data.links) ? data.links : [],
+          cards: Array.isArray(data.cards) ? data.cards : [],
         },
       ])
     } catch {
@@ -244,6 +246,28 @@ export function PortalAssistant({
                           >
                             {link.label}
                           </Link>
+                        ))}
+                      </div>
+                    )}
+                    {!!message.cards?.length && (
+                      <div className="mt-2 grid gap-2">
+                        {message.cards.map((card, cardIndex) => (
+                          <div
+                            key={`${card.label}-${cardIndex}`}
+                            className="rounded-xl border border-border/70 bg-muted/30 px-3 py-2"
+                          >
+                            <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                              {card.label}
+                            </div>
+                            <div className="text-sm font-semibold text-foreground">
+                              {card.value}
+                            </div>
+                            {card.description ? (
+                              <div className="text-[11px] text-muted-foreground">
+                                {card.description}
+                              </div>
+                            ) : null}
+                          </div>
                         ))}
                       </div>
                     )}

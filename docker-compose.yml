@@ -118,7 +118,7 @@ services:
       ENABLE_DOCS: "false"
       AI_ENABLED: "true"
       AI_RUNTIME_PROVIDER: ollama
-      AI_DEFAULT_MODEL: gemma4:latest
+      AI_DEFAULT_MODEL: gemma4:e2b
       AI_RUNTIME_BASE_URL: http://192.168.25.197:11434
       AI_REQUEST_TIMEOUT_SECONDS: 20
       AI_INTERNAL_API_KEY: campusops-ai-internal-dev-key

@@ -6,7 +6,7 @@ her requestten 20 30ar tane hepsi farklı statuslerde her biri farklı faculty s
 500 webhook log
 reservation appointment requestlerin bazılarının takbimlere eklenmesi
 her portaldan ai servislerinin hepsi ile konuşma , asistan ai sumarry etc
-
+organizer event olustursun 10 15 tane bir kaçına katılımcı sağklansın bir kaçına sağlanmasın bir kaç event yayınlansın başlasın tüm varyasyonlar
 Sentetik log üretimi
 
 Cron ya da script ile:

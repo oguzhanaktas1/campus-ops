@@ -26,12 +26,22 @@ import { FilesService } from '../files/files.service';
 
 @Injectable()
 export class AdminService {
+  private readonly primaryRoleNames = ['ADMIN', 'STUDENT', 'FACULTY', 'STAFF', 'ORGANIZER'];
+
   constructor(
     private prisma: PrismaService,
     private slaService: SlaService,
     private cacheService: CacheService,
     private filesService: FilesService,
   ) {}
+
+  private async getPrimaryRoleIds() {
+    const roles = await this.prisma.role.findMany({
+      where: { name: { in: this.primaryRoleNames } },
+      select: { id: true },
+    });
+    return new Set(roles.map((role) => role.id));
+  }
 
   private buildRequestDomainData(request: any) {
     switch (request.requestType?.key) {
@@ -171,7 +181,31 @@ export class AdminService {
     const limit = Math.min(100, Math.max(1, opts.limit ?? 20));
     const skip = (page - 1) * limit;
 
-    const where: any = {};
+    const searchWhere: any = {};
+
+    if (opts.search) {
+      const roleSearch = opts.search.trim().replace(/[\s-]+/g, '_');
+      const roleNameFilters = [
+        { name: { contains: opts.search, mode: 'insensitive' } },
+        ...(roleSearch !== opts.search
+          ? [{ name: { contains: roleSearch, mode: 'insensitive' } }]
+          : []),
+      ];
+
+      searchWhere.OR = [
+        { email: { contains: opts.search, mode: 'insensitive' } },
+        { profile: { fullName: { contains: opts.search, mode: 'insensitive' } } },
+        {
+          primaryRoles: {
+            some: {
+              role: { OR: roleNameFilters },
+            },
+          },
+        },
+      ];
+    }
+
+    const where: any = { ...searchWhere };
 
     if (opts.role && opts.role !== 'all') {
       where.primaryRoles = {
@@ -182,14 +216,7 @@ export class AdminService {
       };
     }
 
-    if (opts.search) {
-      where.OR = [
-        { email: { contains: opts.search, mode: 'insensitive' } },
-        { profile: { fullName: { contains: opts.search, mode: 'insensitive' } } },
-      ];
-    }
-
-    const [users, total] = await Promise.all([
+    const [users, total, allCount, roleCountRows, roles] = await Promise.all([
       this.prisma.user.findMany({
         where,
         include: {
@@ -210,7 +237,24 @@ export class AdminService {
         take: limit,
       }),
       this.prisma.user.count({ where }),
+      this.prisma.user.count({ where: searchWhere }),
+      this.prisma.userRole.groupBy({
+        by: ['roleId'],
+        where: {
+          isPrimary: true,
+          user: searchWhere,
+        },
+        _count: { userId: true },
+      }),
+      this.prisma.role.findMany({ select: { id: true, name: true } }),
     ]);
+
+    const roleNameById = new Map(roles.map((role) => [role.id, role.name.toLowerCase()]));
+    const roleCounts = roleCountRows.reduce<Record<string, number>>((acc, row) => {
+      const roleName = roleNameById.get(row.roleId);
+      if (roleName) acc[roleName] = row._count.userId;
+      return acc;
+    }, { all: allCount });
 
     const data = users.map((user) => ({
       id: user.id,
@@ -246,7 +290,7 @@ export class AdminService {
       createdAt: user.createdAt,
     }));
 
-    return { data, total, page, totalPages: Math.ceil(total / limit) };
+    return { data, total, page, totalPages: Math.ceil(total / limit), roleCounts };
   }
 
   async getRoles() {
@@ -273,9 +317,15 @@ export class AdminService {
     const fullName = `${data.firstName} ${data.lastName}`.trim();
     const primaryRoleId = data.primaryRoleId || data.roleId;
     const submittedRoleIds = Array.isArray(data.roleIds) ? data.roleIds : [];
+    const primaryRoleIds = await this.getPrimaryRoleIds();
     const roleIds = Array.from(
       new Set(
-        [primaryRoleId, ...submittedRoleIds].filter(
+        [
+          primaryRoleId,
+          ...submittedRoleIds.filter(
+            (roleId) => roleId === primaryRoleId || !primaryRoleIds.has(roleId),
+          ),
+        ].filter(
           (value): value is string => typeof value === 'string' && value.length > 0,
         ),
       ),
@@ -352,9 +402,15 @@ export class AdminService {
     const fullName = `${data.firstName} ${data.lastName}`.trim();
     const primaryRoleId = data.primaryRoleId || data.roleId;
     const submittedRoleIds = Array.isArray(data.roleIds) ? data.roleIds : [];
+    const primaryRoleIds = await this.getPrimaryRoleIds();
     const roleIds = Array.from(
       new Set(
-        [primaryRoleId, ...submittedRoleIds].filter(
+        [
+          primaryRoleId,
+          ...submittedRoleIds.filter(
+            (roleId) => roleId === primaryRoleId || !primaryRoleIds.has(roleId),
+          ),
+        ].filter(
           (value): value is string => typeof value === 'string' && value.length > 0,
         ),
       ),

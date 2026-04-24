@@ -594,6 +594,7 @@ export class AiService {
     );
     const conversation = await this.getOrCreateConversation(user, dto, portal);
     const openRequests = await this.resolveVisibleRequests(user, portal);
+    const liveDataContext = await this.resolveAssistantLiveDataContext(user, portal);
 
     await this.persistMessage(conversation.id, user.userId, 'user', dto.message, {
       portal,
@@ -633,6 +634,7 @@ export class AiService {
             })) ?? [],
         },
         openRequests,
+        liveDataContext,
         requestTypeHelpMapping: Object.fromEntries(
           authorizedRouteDetails.map((route) => [route.label, route.href]),
         ),
@@ -640,6 +642,7 @@ export class AiService {
       {
         answer: 'AI assistant is currently unavailable.',
         links: [],
+        cards: [],
         confidence: 0.25,
         fallbackUsed: true,
       },
@@ -659,6 +662,9 @@ export class AiService {
       String(response.answer ?? ''),
       {
         links: Array.isArray(response.links) ? response.links : [],
+        cards: Array.isArray((response as Record<string, unknown>).cards)
+          ? ((response as Record<string, unknown>).cards as unknown[])
+          : [],
         confidence: response.confidence ?? null,
         fallbackUsed: response.fallbackUsed ?? false,
       },
@@ -766,6 +772,397 @@ export class AiService {
     }
 
     return REQUEST_TYPE_MAP[portal] ?? [];
+  }
+
+  private async resolveAssistantLiveDataContext(
+    user: JwtUser,
+    portal: string,
+  ): Promise<JsonRecord> {
+    const now = new Date();
+
+    if (portal === 'admin') {
+      const [
+        totalUsers,
+        activeUsers,
+        totalRoles,
+        totalPermissions,
+        totalRequests,
+        openRequestsCount,
+        totalRequestTypes,
+        totalWorkflows,
+        totalResources,
+        totalIntegrations,
+        recentUsers,
+        recentRequests,
+        recentAuditLogs,
+        recentWebhookLogs,
+      ] = await Promise.all([
+        this.prisma.user.count({ where: { deletedAt: null } }),
+        this.prisma.user.count({ where: { deletedAt: null, status: 'ACTIVE' } }),
+        this.prisma.role.count(),
+        this.prisma.permission.count(),
+        this.prisma.request.count({ where: { deletedAt: null } }),
+        this.prisma.request.count({
+          where: {
+            deletedAt: null,
+            status: {
+              notIn: ['COMPLETED', 'APPROVED', 'REJECTED', 'CANCELLED', 'CLOSED', 'EXPIRED'],
+            },
+          },
+        }),
+        this.prisma.requestType.count(),
+        this.prisma.workflowDefinition.count({ where: { isActive: true } }),
+        this.prisma.resource.count({ where: { isActive: true } }),
+        this.prisma.integration.count(),
+        this.prisma.user.findMany({
+          where: { deletedAt: null },
+          orderBy: { createdAt: 'desc' },
+          take: 5,
+          select: {
+            id: true,
+            email: true,
+            status: true,
+            createdAt: true,
+            profile: { select: { fullName: true } },
+          },
+        }),
+        this.prisma.request.findMany({
+          where: { deletedAt: null },
+          orderBy: { updatedAt: 'desc' },
+          take: 8,
+          select: {
+            id: true,
+            requestNo: true,
+            title: true,
+            status: true,
+            updatedAt: true,
+            requestType: { select: { key: true, name: true } },
+          },
+        }),
+        this.prisma.auditLog.findMany({
+          orderBy: { createdAt: 'desc' },
+          take: 6,
+          select: {
+            actionType: true,
+            entityType: true,
+            entityId: true,
+            createdAt: true,
+          },
+        }),
+        this.prisma.webhookLog.findMany({
+          orderBy: { createdAt: 'desc' },
+          take: 6,
+          select: {
+            status: true,
+            direction: true,
+            responseStatusCode: true,
+            createdAt: true,
+            integration: { select: { name: true, provider: true } },
+          },
+        }),
+      ]);
+
+      return {
+        generatedAt: now.toISOString(),
+        portal,
+        summary: {
+          totalUsers,
+          activeUsers,
+          totalRoles,
+          totalPermissions,
+          totalRequests,
+          openRequests: openRequestsCount,
+          totalRequestTypes,
+          activeWorkflows: totalWorkflows,
+          activeResources: totalResources,
+          totalIntegrations,
+        },
+        recentUsers: recentUsers.map((item) => ({
+          id: item.id,
+          fullName: item.profile?.fullName ?? null,
+          email: item.email,
+          status: item.status,
+          createdAt: item.createdAt,
+        })),
+        recentRequests: recentRequests.map((item) => ({
+          id: item.id,
+          requestNo: item.requestNo,
+          title: item.title,
+          status: item.status,
+          requestType: item.requestType?.name ?? item.requestType?.key ?? null,
+          updatedAt: item.updatedAt,
+        })),
+        recentAuditLogs,
+        recentWebhookLogs: recentWebhookLogs.map((item) => ({
+          status: item.status,
+          direction: item.direction,
+          responseStatusCode: item.responseStatusCode,
+          createdAt: item.createdAt,
+          integrationName: item.integration?.name ?? null,
+          integrationProvider: item.integration?.provider ?? null,
+        })),
+      };
+    }
+
+    if (portal === 'student') {
+      const [myRequests, upcomingAppointments, upcomingReservations, unreadNotifications] =
+        await Promise.all([
+          this.prisma.request.findMany({
+            where: { requesterUserId: user.userId, deletedAt: null },
+            orderBy: { updatedAt: 'desc' },
+            take: 8,
+            select: {
+              requestNo: true,
+              title: true,
+              status: true,
+              updatedAt: true,
+              requestType: { select: { key: true, name: true } },
+            },
+          }),
+          this.prisma.appointment.findMany({
+            where: {
+              OR: [{ requesterUserId: user.userId }, { hostUserId: user.userId }],
+              startAt: { gte: now },
+            },
+            orderBy: { startAt: 'asc' },
+            take: 5,
+            select: {
+              title: true,
+              status: true,
+              startAt: true,
+              endAt: true,
+              locationText: true,
+            },
+          }),
+          this.prisma.reservation.findMany({
+            where: { reservedByUserId: user.userId, startAt: { gte: now } },
+            orderBy: { startAt: 'asc' },
+            take: 5,
+            select: {
+              title: true,
+              status: true,
+              startAt: true,
+              endAt: true,
+            },
+          }),
+          this.prisma.notification.count({
+            where: { userId: user.userId, isRead: false },
+          }),
+        ]);
+
+      return {
+        generatedAt: now.toISOString(),
+        portal,
+        summary: {
+          totalRequests: myRequests.length,
+          openRequests: myRequests.filter((item) =>
+            !['COMPLETED', 'APPROVED', 'REJECTED', 'CANCELLED', 'CLOSED', 'EXPIRED'].includes(item.status),
+          ).length,
+          unreadNotifications,
+        },
+        recentRequests: myRequests.map((item) => ({
+          requestNo: item.requestNo,
+          title: item.title,
+          status: item.status,
+          requestType: item.requestType?.name ?? item.requestType?.key ?? null,
+          updatedAt: item.updatedAt,
+        })),
+        upcomingAppointments,
+        upcomingReservations,
+      };
+    }
+
+    if (portal === 'faculty') {
+      const visibleRequests = await this.prisma.request.findMany({
+        where: {
+          OR: [
+            { currentAssigneeUserId: user.userId },
+            { requesterUserId: user.userId },
+            {
+              workflowInstance: {
+                instanceSteps: {
+                  some: {
+                    assignedToUserId: user.userId,
+                  },
+                },
+              },
+            },
+          ],
+          deletedAt: null,
+        },
+        orderBy: { updatedAt: 'desc' },
+        take: 10,
+        select: {
+          requestNo: true,
+          title: true,
+          status: true,
+          updatedAt: true,
+          requestType: { select: { key: true, name: true } },
+        },
+      });
+
+      return {
+        generatedAt: now.toISOString(),
+        portal,
+        summary: {
+          visibleRequests: visibleRequests.length,
+          pendingApprovals: visibleRequests.filter((item) =>
+            ['WAITING_APPROVAL', 'IN_REVIEW', 'SUBMITTED'].includes(item.status),
+          ).length,
+        },
+        recentRequests: visibleRequests.map((item) => ({
+          requestNo: item.requestNo,
+          title: item.title,
+          status: item.status,
+          requestType: item.requestType?.name ?? item.requestType?.key ?? null,
+          updatedAt: item.updatedAt,
+        })),
+      };
+    }
+
+    if (portal === 'staff') {
+      const scopeUserIds = await this.resolveItScopeUserIds(user);
+      const ticketWhere = scopeUserIds
+        ? {
+            OR: [
+              { assignedItUserId: { in: scopeUserIds } },
+              { reportedByUserId: user.userId },
+            ],
+          }
+        : { reportedByUserId: user.userId };
+
+      const [recentTickets, recentRequests] = await Promise.all([
+        this.prisma.itTicket.findMany({
+          where: ticketWhere,
+          orderBy: { updatedAt: 'desc' },
+          take: 8,
+          select: {
+            category: true,
+            ticketStatus: true,
+            updatedAt: true,
+            request: { select: { requestNo: true, title: true, status: true } },
+          },
+        }),
+        this.prisma.request.findMany({
+          where: {
+            OR: [
+              { currentAssigneeUserId: user.userId },
+              { requesterUserId: user.userId },
+            ],
+            deletedAt: null,
+          },
+          orderBy: { updatedAt: 'desc' },
+          take: 8,
+          select: {
+            requestNo: true,
+            title: true,
+            status: true,
+            updatedAt: true,
+            requestType: { select: { key: true, name: true } },
+          },
+        }),
+      ]);
+
+      return {
+        generatedAt: now.toISOString(),
+        portal,
+        summary: {
+          visibleTickets: recentTickets.length,
+          visibleRequests: recentRequests.length,
+          openTickets: recentTickets.filter((item) =>
+            ['OPEN', 'TRIAGED', 'IN_PROGRESS', 'WAITING_USER', 'REOPENED'].includes(item.ticketStatus),
+          ).length,
+        },
+        recentTickets: recentTickets.map((item) => ({
+          category: item.category,
+          ticketStatus: item.ticketStatus,
+          updatedAt: item.updatedAt,
+          requestNo: item.request.requestNo,
+          title: item.request.title,
+          requestStatus: item.request.status,
+        })),
+        recentRequests: recentRequests.map((item) => ({
+          requestNo: item.requestNo,
+          title: item.title,
+          status: item.status,
+          requestType: item.requestType?.name ?? item.requestType?.key ?? null,
+          updatedAt: item.updatedAt,
+        })),
+      };
+    }
+
+    if (portal === 'organizer') {
+      const [recentEventRequests, upcomingEvents, recentProcurement] = await Promise.all([
+        this.prisma.eventRequest.findMany({
+          where: { organizerUserId: user.userId },
+          orderBy: { updatedAt: 'desc' },
+          take: 8,
+          select: {
+            eventName: true,
+            eventType: true,
+            startAt: true,
+            endAt: true,
+            request: { select: { requestNo: true, status: true, title: true } },
+          },
+        }),
+        this.prisma.event.findMany({
+          where: { organizerUserId: user.userId, startAt: { gte: now } },
+          orderBy: { startAt: 'asc' },
+          take: 5,
+          select: {
+            title: true,
+            startAt: true,
+            endAt: true,
+            status: true,
+            locationText: true,
+          },
+        }),
+        this.prisma.procurementRequest.findMany({
+          where: { requesterUserId: user.userId },
+          orderBy: { updatedAt: 'desc' },
+          take: 5,
+          select: {
+            itemName: true,
+            procurementStatus: true,
+            updatedAt: true,
+            request: { select: { requestNo: true, status: true } },
+          },
+        }),
+      ]);
+
+      return {
+        generatedAt: now.toISOString(),
+        portal,
+        summary: {
+          eventRequests: recentEventRequests.length,
+          upcomingEvents: upcomingEvents.length,
+          procurementItems: recentProcurement.length,
+        },
+        recentEventRequests: recentEventRequests.map((item) => ({
+          eventName: item.eventName,
+          eventType: item.eventType,
+          startAt: item.startAt,
+          endAt: item.endAt,
+          requestNo: item.request.requestNo,
+          requestStatus: item.request.status,
+          title: item.request.title,
+        })),
+        upcomingEvents,
+        recentProcurement: recentProcurement.map((item) => ({
+          itemName: item.itemName,
+          procurementStatus: item.procurementStatus,
+          updatedAt: item.updatedAt,
+          requestNo: item.request.requestNo,
+          requestStatus: item.request.status,
+        })),
+      };
+    }
+
+    return {
+      generatedAt: now.toISOString(),
+      portal,
+      summary: {},
+    };
   }
 
   private async getOrCreateConversation(

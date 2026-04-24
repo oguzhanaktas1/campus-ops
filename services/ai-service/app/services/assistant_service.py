@@ -4,121 +4,61 @@ import httpx
 
 from app.core.config import get_settings
 from app.models.assistant import AssistantAskRequest, AssistantAskResponse
+from app.services.assistant_intent_router import AssistantIntentRouter
+from app.services.assistant_tools import AssistantToolLayer
 from app.services.ollama_client import OllamaClient
 from app.services.prompt_service import PromptService
 from app.utils.validation import clamp_confidence
-
-
-ROUTE_HINTS: dict[str, dict[str, str]] = {
-    "student": {
-        "internship": "/student/internships/new",
-        "reservation": "/student/reservations/new",
-        "appointment": "/student/appointments/new",
-        "document": "/student/documents/new",
-        "access": "/student/access-requests/new",
-        "event": "/student/events/new",
-    },
-    "faculty": {
-        "approval": "/faculty/approvals",
-        "internship": "/faculty/internships",
-        "appointment": "/faculty/appointments",
-        "request": "/faculty/requests",
-    },
-    "staff": {
-        "ticket": "/staff/tickets",
-        "document": "/staff/documents",
-        "reservation": "/staff/reservations",
-        "approval": "/staff/approvals",
-        "access": "/staff/access-requests",
-        "procurement": "/staff/procurement",
-    },
-    "admin": {
-        "user": "/admin/users",
-        "users": "/admin/users",
-        "analytics": "/admin/analytics",
-        "webhook": "/admin/webhook-logs",
-        "workflow": "/admin/workflows",
-        "request": "/admin/requests",
-        "role": "/admin/roles",
-        "permission": "/admin/permissions",
-        "sla": "/admin/sla",
-    },
-    "organizer": {
-        "event": "/organizer/events",
-        "reservation": "/organizer/reservations",
-        "equipment": "/organizer/equipment",
-        "access": "/organizer/access-requests",
-        "procurement": "/organizer/procurement",
-    },
-}
-
-GENERIC_KEYWORD_MAP: dict[str, list[str]] = {
-    "users": ["user", "users", "kullanıcı", "kullanıcılar", "edit user", "manage users"],
-    "roles": ["role", "roles", "rol", "roller"],
-    "permissions": ["permission", "permissions", "yetki", "izinler"],
-    "analytics": ["analytics", "analitik", "istatistik", "report", "reports", "rapor"],
-    "workflows": ["workflow", "workflows", "iş akışı", "onay akışı"],
-    "requests": ["request", "requests", "talep", "talepler"],
-    "documents": ["document", "documents", "belge"],
-    "tickets": ["ticket", "tickets", "it", "support"],
-    "reservations": ["reservation", "reservations", "rezervasyon"],
-    "appointments": ["appointment", "appointments", "randevu", "meeting"],
-    "events": ["event", "events", "etkinlik"],
-    "access": ["access", "permission request", "erişim", "izin"],
-    "procurement": ["procurement", "purchase", "satın alma"],
-}
-
-GREETING_KEYWORDS = {
-    "merhaba",
-    "selam",
-    "selamlar",
-    "hello",
-    "hi",
-    "hey",
-    "günaydın",
-    "iyi akşamlar",
-    "iyi günler",
-}
-
-CAPABILITY_KEYWORDS = {
-    "ne yapabilirsin",
-    "yardım",
-    "yardımcı ol",
-    "neler yapabilirsin",
-    "hangi konularda",
-    "help",
-    "what can you do",
-}
 
 
 class AssistantService:
     def __init__(self) -> None:
         self.settings = get_settings()
         self.client = OllamaClient()
+        self.intent_router = AssistantIntentRouter()
+        self.tool_layer = AssistantToolLayer()
 
     async def answer(self, payload: AssistantAskRequest) -> AssistantAskResponse:
-        fallback = self._fallback(payload)
+        intent = self.intent_router.route(payload.message)
+        tool_result = self.tool_layer.execute(intent.name, payload, intent.entities)
+        fallback = self._fallback(payload, intent.name, tool_result)
+
+        if tool_result.handled:
+            return AssistantAskResponse(
+                answer=tool_result.answer,
+                links=tool_result.links,
+                cards=tool_result.cards,
+                confidence=0.94,
+                fallbackUsed=False,
+            )
+
         if not self.settings.ai_enabled:
             return fallback
 
         prompt = PromptService.render(
             "assistant/portal.md",
             payload=json.dumps(payload.model_dump(), ensure_ascii=False, indent=2),
+            intent=intent.name,
+            intent_entities=json.dumps(intent.entities, ensure_ascii=False, indent=2),
+            tool_context=json.dumps(tool_result.context, ensure_ascii=False, indent=2),
         )
 
         try:
             result = await self.client.generate_json(prompt)
-            links = result.get("links", fallback.links)
+            links = result.get("links", [])
             safe_links = [
                 link
                 for link in links
                 if isinstance(link, dict)
                 and link.get("href") in payload.authorized_routes
             ]
+            cards = result.get("cards", [])
+            safe_cards = [card for card in cards if isinstance(card, dict)]
             return AssistantAskResponse.model_validate(
                 {
                     "answer": result.get("answer", fallback.answer),
                     "links": safe_links,
+                    "cards": safe_cards,
                     "confidence": clamp_confidence(result.get("confidence"), 0.85),
                     "fallbackUsed": False,
                 }
@@ -126,112 +66,62 @@ class AssistantService:
         except (httpx.HTTPError, ValueError, KeyError):
             return fallback
 
-    def _fallback(self, payload: AssistantAskRequest) -> AssistantAskResponse:
-        portal_key = payload.portal.lower()
-        message = payload.message.lower()
-        if self._is_greeting(message):
-            return AssistantAskResponse(
-                answer=(
-                    f"Merhaba. {payload.portal_context or 'CampusOps içinde'} "
-                    "rolünüze uygun sayfalar, işlemler ve iş akışları konusunda yardımcı olabilirim."
-                ),
-                links=[],
-                confidence=self.settings.fallback_confidence,
-                fallbackUsed=True,
-            )
+    def _fallback(
+        self,
+        payload: AssistantAskRequest,
+        intent_name: str,
+        tool_result,
+    ) -> AssistantAskResponse:
+        summary = payload.live_data_context.get("summary", {})
+        recent_requests = payload.live_data_context.get("recentRequests", [])
+        cards = tool_result.cards if getattr(tool_result, "cards", None) else []
 
-        if self._is_capability_question(message):
-            return AssistantAskResponse(
-                answer=(
-                    f"{payload.portal_context or 'CampusOps portalınız'} "
-                    "kapsamındaki işlemler, uygun sayfalar, onay akışları ve size açık modüller hakkında yardımcı olabilirim."
-                ),
-                links=[],
-                confidence=self.settings.fallback_confidence,
-                fallbackUsed=True,
-            )
-
-        route_candidates = ROUTE_HINTS.get(portal_key, {})
-        matched_route = self._match_route_detail(payload, message)
-        matched_href = ""
-        matched_label = "Open Page"
-
-        if matched_route:
-            matched_href = str(matched_route.get("href", ""))
-            matched_label = str(matched_route.get("label", "Open Page"))
-
-        for keyword, href in route_candidates.items():
-            if matched_href:
-                break
-            if keyword in message and href in payload.authorized_routes:
-                matched_href = href
-                break
-
-        links = []
         answer = (
-            "Bu konuda yalnızca CampusOps içindeki, rolünüze açık sayfa ve işlevler hakkında yardımcı olabilirim."
+            "Bu soruyu su an netlestiremedim. CampusOps icinde hangi modul, kayit veya islemden soz ettiginizi biraz daha acik yazabilirsiniz."
         )
-        if matched_href:
-            links = [{"label": matched_label, "href": matched_href}]
-            answer = f"İlgili işlem için {matched_label} sayfasını açabilirsiniz."
+
+        metric_intents = {
+            "analytics_summary",
+            "ticket_queue_summary",
+            "my_open_requests_count",
+            "my_today_summary",
+        }
+
+        if intent_name in metric_intents and isinstance(summary, dict):
+            parts: list[str] = []
+            for key, label in (
+                ("totalUsers", "Toplam kullanici"),
+                ("activeUsers", "Aktif kullanici"),
+                ("openRequests", "Acik request"),
+                ("openTickets", "Acik ticket"),
+                ("unreadNotifications", "Okunmamis bildirim"),
+            ):
+                if key in summary:
+                    parts.append(f"{label} {summary[key]}")
+            if parts:
+                answer = ". ".join(parts) + "."
+            elif isinstance(recent_requests, list) and recent_requests:
+                first = recent_requests[0]
+                if isinstance(first, dict):
+                    request_no = first.get("requestNo") or "Kayit"
+                    status = first.get("status") or "UNKNOWN"
+                    answer = f"En guncel gorunen kayit {request_no}; durumu {status}."
+        elif intent_name == "help_navigation":
+            answer = (
+                "CampusOps icinde ilgili sayfayi bulmaya calistim ama su an net eslestiremedim. Islemi veya modul adini biraz daha spesifik yazabilirsiniz."
+            )
+        elif intent_name in {"request_summary", "request_status_explanation"}:
+            if isinstance(recent_requests, list) and recent_requests:
+                first = recent_requests[0]
+                if isinstance(first, dict):
+                    request_no = first.get("requestNo") or "Kayit"
+                    status = first.get("status") or "UNKNOWN"
+                    answer = f"Ilgili kaydi dogrudan cozemedim. Gorunen en guncel kayit {request_no}; durumu {status}."
 
         return AssistantAskResponse(
             answer=answer,
-            links=links,
-            confidence=self.settings.fallback_confidence,
+            links=[],
+            cards=cards,
+            confidence=max(self.settings.fallback_confidence, 0.2),
             fallbackUsed=True,
         )
-
-    def _match_route_detail(
-        self, payload: AssistantAskRequest, message: str
-    ) -> dict[str, object] | None:
-        best_route: dict[str, object] | None = None
-        best_score = 0
-
-        for route in payload.authorized_route_details:
-            href = route.get("href")
-            if not isinstance(href, str) or href not in payload.authorized_routes:
-                continue
-
-            score = 0
-            label = str(route.get("label", "")).lower()
-            description = str(route.get("description", "")).lower()
-
-            for text in (label, description):
-                if not text:
-                    continue
-                if text in message:
-                    score += 4
-                for token in text.replace("/", " ").replace("-", " ").split():
-                    if len(token) > 2 and token in message:
-                        score += 2
-
-            keywords = route.get("keywords", [])
-            if isinstance(keywords, list):
-                for keyword in keywords:
-                    if isinstance(keyword, str) and keyword.lower() in message:
-                        score += 5
-
-            for keyword_group, aliases in GENERIC_KEYWORD_MAP.items():
-                if any(alias in message for alias in aliases):
-                    if keyword_group in label or keyword_group in description:
-                        score += 4
-
-            if score > best_score:
-                best_score = score
-                best_route = route
-
-        if best_score <= 0:
-            return None
-
-        return best_route
-
-    def _is_greeting(self, message: str) -> bool:
-        normalized = message.strip().lower()
-        return normalized in GREETING_KEYWORDS or any(
-            normalized.startswith(keyword) for keyword in GREETING_KEYWORDS
-        )
-
-    def _is_capability_question(self, message: str) -> bool:
-        normalized = message.strip().lower()
-        return any(keyword in normalized for keyword in CAPABILITY_KEYWORDS)

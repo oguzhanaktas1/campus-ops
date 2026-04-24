@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from pydantic import Field
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -11,9 +11,15 @@ class Settings(BaseSettings):
     enable_docs: bool = Field(default=True, alias="ENABLE_DOCS")
     ai_enabled: bool = Field(default=True, alias="AI_ENABLED")
     runtime_provider: str = Field(default="ollama", alias="AI_RUNTIME_PROVIDER")
-    default_model: str = Field(default="gemma3:4b", alias="AI_DEFAULT_MODEL")
-    runtime_base_url: str = Field(default="http://localhost:11434", alias="AI_RUNTIME_BASE_URL")
-    request_timeout_seconds: float = Field(default=20.0, alias="AI_REQUEST_TIMEOUT_SECONDS")
+    default_model: str = Field(
+        default="gemma4:e2b",
+        validation_alias=AliasChoices("AI_DEFAULT_MODEL", "OLLAMA_MODEL"),
+    )
+    runtime_base_url: str = Field(
+        default="http://localhost:11434",
+        validation_alias=AliasChoices("AI_RUNTIME_BASE_URL", "OLLAMA_BASE_URL"),
+    )
+    request_timeout_seconds: float = Field(default=30.0, alias="AI_REQUEST_TIMEOUT_SECONDS")
     internal_api_key: str = Field(default="campusops-ai-internal-dev-key", alias="AI_INTERNAL_API_KEY")
     fallback_confidence: float = Field(default=0.25, alias="AI_FALLBACK_CONFIDENCE")
 

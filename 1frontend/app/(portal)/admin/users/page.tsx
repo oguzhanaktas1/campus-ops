@@ -59,10 +59,11 @@ interface PagedResult {
   total: number
   page: number
   totalPages: number
+  roleCounts?: Partial<Record<RoleFilter, number>>
 }
 
 export default function AdminUsersPage() {
-  const [result, setResult] = useState<PagedResult>({ data: [], total: 0, page: 1, totalPages: 1 })
+  const [result, setResult] = useState<PagedResult>({ data: [], total: 0, page: 1, totalPages: 1, roleCounts: {} })
   const [isLoading, setIsLoading] = useState(true)
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
@@ -209,7 +210,7 @@ export default function AdminUsersPage() {
     }
   }
 
-  const { data: users, total, totalPages } = result
+  const { data: users, total, totalPages, roleCounts = {} } = result
   const start = (page - 1) * PAGE_SIZE + 1
   const end   = Math.min(page * PAGE_SIZE, total)
 
@@ -242,7 +243,15 @@ export default function AdminUsersPage() {
               roleFilter === r ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'
             )}
           >
-            {r === 'all' ? 'All' : roleConfig[r as Role].label}
+            <span>{r === 'all' ? 'All' : roleConfig[r as Role].label}</span>
+            <span
+              className={cn(
+                'ml-2 rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums',
+                roleFilter === r ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
+              )}
+            >
+              {roleCounts[r] ?? (r === 'all' ? total : 0)}
+            </span>
           </button>
         ))}
       </div>
@@ -251,7 +260,7 @@ export default function AdminUsersPage() {
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
         <Input
-          placeholder="Search users by name or email..."
+          placeholder="Search users by name, email, role, or secondary role..."
           className="pl-9"
           value={search}
           onChange={(e) => handleSearch(e.target.value)}

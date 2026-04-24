@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -24,6 +24,7 @@ import { toast } from 'sonner'
 type ScopeType = 'GLOBAL' | 'CAMPUS' | 'FACULTY' | 'DEPARTMENT' | 'UNIT'
 
 const SCOPE_TYPES: ScopeType[] = ['GLOBAL', 'CAMPUS', 'FACULTY', 'DEPARTMENT', 'UNIT']
+const MAIN_ROLE_NAMES = ['ADMIN', 'STUDENT', 'FACULTY', 'STAFF', 'ORGANIZER']
 
 const scopeColors: Record<ScopeType, string> = {
   GLOBAL: 'text-indigo-700 bg-indigo-50 border-indigo-200 dark:bg-indigo-950/30 dark:text-indigo-400 dark:border-indigo-800',
@@ -150,6 +151,70 @@ export default function RolesPage() {
       r.scopeType.toLowerCase().includes(search.toLowerCase()),
   )
 
+  const groupedRoles = useMemo(() => {
+    const mainRoles = filtered
+      .filter((role) => MAIN_ROLE_NAMES.includes(role.name.toUpperCase()))
+      .sort((a, b) => MAIN_ROLE_NAMES.indexOf(a.name.toUpperCase()) - MAIN_ROLE_NAMES.indexOf(b.name.toUpperCase()))
+    const secondaryRoles = filtered.filter((role) => !MAIN_ROLE_NAMES.includes(role.name.toUpperCase()))
+    return { mainRoles, secondaryRoles }
+  }, [filtered])
+
+  const renderRoleRow = (role: Role) => (
+    <tr key={role.id} className="hover:bg-muted/20 transition-colors">
+      <td className="px-5 py-3.5">
+        <div className="flex items-center gap-3">
+          <div className="size-8 rounded-md bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center text-violet-700 dark:text-violet-400 flex-shrink-0">
+            <Shield className="size-4" />
+          </div>
+          <div className="min-w-0">
+            <p className="font-medium text-foreground">{role.name}</p>
+            {role.description && (
+              <p className="text-xs text-muted-foreground truncate max-w-xs">{role.description}</p>
+            )}
+          </div>
+        </div>
+      </td>
+      <td className="px-5 py-3.5 hidden md:table-cell">
+        <span className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-medium border ${scopeColors[role.scopeType]}`}>
+          {role.scopeType}
+        </span>
+      </td>
+      <td className="px-5 py-3.5 hidden lg:table-cell">
+        <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-muted text-foreground border border-border">
+          {role.permissionsCount ?? 0} permissions
+        </span>
+      </td>
+      <td className="px-5 py-3.5">
+        {role.isSystem ? (
+          <span className="flex items-center gap-1 px-2 py-1 rounded-md bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700 text-[10px] font-bold tracking-wider w-fit">
+            <Lock className="size-2.5" /> SYSTEM
+          </span>
+        ) : (
+          <span className="px-2 py-1 rounded-md bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 text-[10px] font-bold tracking-wider">
+            CUSTOM
+          </span>
+        )}
+      </td>
+      <td className="px-5 py-3.5 text-right">
+        <div className="flex items-center justify-end gap-1">
+          <Button variant="ghost" size="icon" className="size-7" onClick={() => openEdit(role)}>
+            <Pencil className="size-3.5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-7 text-destructive hover:text-destructive hover:bg-destructive/10 disabled:opacity-40"
+            onClick={() => handleDelete(role)}
+            disabled={role.isSystem}
+            title={role.isSystem ? 'System roles cannot be deleted' : 'Delete role'}
+          >
+            <Trash2 className="size-3.5" />
+          </Button>
+        </div>
+      </td>
+    </tr>
+  )
+
   if (isLoading)
     return (
       <div className="flex h-[50vh] items-center justify-center">
@@ -207,61 +272,22 @@ export default function RolesPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
-            {filtered.map((role) => (
-              <tr key={role.id} className="hover:bg-muted/20 transition-colors">
-                <td className="px-5 py-3.5">
-                  <div className="flex items-center gap-3">
-                    <div className="size-8 rounded-md bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center text-violet-700 dark:text-violet-400 flex-shrink-0">
-                      <Shield className="size-4" />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="font-medium text-foreground">{role.name}</p>
-                      {role.description && (
-                        <p className="text-xs text-muted-foreground truncate max-w-xs">{role.description}</p>
-                      )}
-                    </div>
-                  </div>
-                </td>
-                <td className="px-5 py-3.5 hidden md:table-cell">
-                  <span className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-medium border ${scopeColors[role.scopeType]}`}>
-                    {role.scopeType}
-                  </span>
-                </td>
-                <td className="px-5 py-3.5 hidden lg:table-cell">
-                  <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-muted text-foreground border border-border">
-                    {role.permissionsCount ?? 0} permissions
-                  </span>
-                </td>
-                <td className="px-5 py-3.5">
-                  {role.isSystem ? (
-                    <span className="flex items-center gap-1 px-2 py-1 rounded-md bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700 text-[10px] font-bold tracking-wider w-fit">
-                      <Lock className="size-2.5" /> SYSTEM
-                    </span>
-                  ) : (
-                    <span className="px-2 py-1 rounded-md bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 text-[10px] font-bold tracking-wider">
-                      CUSTOM
-                    </span>
-                  )}
-                </td>
-                <td className="px-5 py-3.5 text-right">
-                  <div className="flex items-center justify-end gap-1">
-                    <Button variant="ghost" size="icon" className="size-7" onClick={() => openEdit(role)}>
-                      <Pencil className="size-3.5" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="size-7 text-destructive hover:text-destructive hover:bg-destructive/10 disabled:opacity-40"
-                      onClick={() => handleDelete(role)}
-                      disabled={role.isSystem}
-                      title={role.isSystem ? 'System roles cannot be deleted' : 'Delete role'}
-                    >
-                      <Trash2 className="size-3.5" />
-                    </Button>
-                  </div>
+            {groupedRoles.mainRoles.length > 0 && (
+              <tr className="bg-muted/25">
+                <td colSpan={5} className="px-5 py-2 text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
+                  Main Roles
                 </td>
               </tr>
-            ))}
+            )}
+            {groupedRoles.mainRoles.map(renderRoleRow)}
+            {groupedRoles.secondaryRoles.length > 0 && (
+              <tr className="bg-muted/25">
+                <td colSpan={5} className="px-5 py-2 text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
+                  Secondary Roles
+                </td>
+              </tr>
+            )}
+            {groupedRoles.secondaryRoles.map(renderRoleRow)}
           </tbody>
         </table>
         {filtered.length === 0 && (
