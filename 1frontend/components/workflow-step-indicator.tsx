@@ -7,9 +7,40 @@ import { CheckCircle2, Circle, Clock, XCircle, RotateCcw } from 'lucide-react'
 export type StepStatus = 'completed' | 'active' | 'pending' | 'failed' | 'warning'
 
 export interface Step {
-  id: number
+  id: number | string
   label: string
   status: StepStatus
+  key?: string | null
+  stepKey?: string | null
+  name?: string | null
+  type?: string | null
+  isCurrent?: boolean | null
+  assignedRole?: string | null
+  role?: string | null
+  assignedUnit?: { id?: string | null; name?: string | null } | null
+  unitName?: string | null
+  assignedTo?: {
+    id?: string | null
+    fullName?: string | null
+    email?: string | null
+    role?: string | null
+  } | null
+  assignedToName?: string | null
+  actionBy?: {
+    id?: string | null
+    fullName?: string | null
+    email?: string | null
+    role?: string | null
+  } | null
+  actionByName?: string | null
+  actionTaken?: string | null
+  actionNote?: string | null
+  startedAt?: string | null
+  completedAt?: string | null
+  actedAt?: string | null
+  dueAt?: string | null
+  slaHours?: number | null
+  isOverdue?: boolean | null
 }
 
 interface WorkflowStepIndicatorProps {

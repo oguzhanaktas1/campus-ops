@@ -9,6 +9,8 @@ const statusConfig: Record<string, { label: string; className: string }> = {
   pending: { label: 'Pending', className: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-800' },
   submitted: { label: 'Submitted', className: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-800' },
   in_review: { label: 'In Review', className: 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/30 dark:text-indigo-400 dark:border-indigo-800' },
+  advisor_review: { label: 'Advisor Review', className: 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/30 dark:text-indigo-400 dark:border-indigo-800' },
+  coordinator_review: { label: 'Internship Coordinator Review', className: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-800' },
   under_review: { label: 'Under Review', className: 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/30 dark:text-indigo-400 dark:border-indigo-800' },
   waiting_approval: { label: 'Waiting Approval', className: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-800' },
   approved: { label: 'Approved', className: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800' },
@@ -19,6 +21,9 @@ const statusConfig: Record<string, { label: string; className: string }> = {
   cancelled: { label: 'Cancelled', className: 'bg-muted text-muted-foreground border-border' },
   closed: { label: 'Closed', className: 'bg-muted text-muted-foreground border-border' },
   expired: { label: 'Expired', className: 'bg-red-50 text-red-700 border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-800' },
+  scheduled: { label: 'Scheduled', className: 'bg-teal-50 text-teal-700 border-teal-200 dark:bg-teal-950/30 dark:text-teal-400 dark:border-teal-800' },
+  resolved: { label: 'Resolved', className: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800' },
+  returned_for_revision: { label: 'Returned for Revision', className: 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/30 dark:text-orange-400 dark:border-orange-800' },
 }
 
 const priorityConfig: Record<string, { label: string; className: string }> = {

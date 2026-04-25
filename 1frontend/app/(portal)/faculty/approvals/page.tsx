@@ -326,6 +326,7 @@ export default function FacultyApprovalsPage() {
 
               <div className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_340px]">
                 <div className="space-y-6">
+                  <WorkflowCurrentStepCard detail={detail} />
                   <RequestMetaCard detail={detail} />
                   <DomainDetailPanel detail={detail} />
                   <RequestAttachmentsPanel detail={detail} />
@@ -357,7 +358,6 @@ export default function FacultyApprovalsPage() {
                     summary={aiSummary}
                     isLoading={isAiLoading}
                   />
-                  <WorkflowCurrentStepCard detail={detail} />
                   <RequestQuickFactsCard detail={detail} />
                   <RelatedEntitiesCard detail={detail} />
                 </div>

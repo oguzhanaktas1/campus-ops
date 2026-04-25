@@ -118,6 +118,16 @@ export class AppointmentsService {
       return false;
     }
 
+    const anySlot = await this.prisma.userAvailabilitySlot.findFirst({
+      where: { userId, isActive: true },
+      select: { id: true },
+    });
+
+    // If the host hasn't configured any availability, skip validation.
+    if (!anySlot) {
+      return false;
+    }
+
     const dayOfWeek = startAt.getUTCDay();
     const slotStart = `${String(startAt.getUTCHours()).padStart(2, '0')}:${String(
       startAt.getUTCMinutes(),

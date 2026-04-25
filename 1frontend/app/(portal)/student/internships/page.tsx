@@ -94,7 +94,7 @@ export default function StudentInternshipsPage() {
                     )}
                   </div>
                 </div>
-                <StatusBadge status={item.status} />
+                <StatusBadge status={item.displayStatus ?? item.status} />
               </div>
             </Link>
           ))}

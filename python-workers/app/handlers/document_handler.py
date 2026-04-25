@@ -37,7 +37,7 @@ async def handle(payload: BasePayload) -> None:
             if p.requestType.lower() in DOCUMENT_REQUEST_TYPES:
                 await _generate_for_request(p.requestId, actor_user_id=p.actorUserId)
         case _:
-            logger.debug("document_handler_skip", event=payload.event)
+            logger.debug("document_handler_skip", event_name=payload.event)
 
 
 async def _generate_for_request(

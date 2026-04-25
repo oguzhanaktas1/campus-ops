@@ -295,7 +295,8 @@ export default function NewInternshipPage() {
         <div className="rounded-lg border border-border bg-card p-5">
           <p className="text-sm text-muted-foreground">
             After submission, the application is routed automatically to users
-            with the `INTERNSHIP_COORDINATOR` role.
+            with the `ADVISOR` role first. After advisor approval, it moves to
+            users with the `INTERNSHIP_COORDINATOR` role.
           </p>
         </div>
 

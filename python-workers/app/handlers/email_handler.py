@@ -53,7 +53,7 @@ async def handle(payload: BasePayload) -> None:
         case "event.published":
             await _handle_event_published(payload)  # type: ignore[arg-type]
         case _:
-            logger.debug("email_handler_skip", event=payload.event)
+            logger.debug("email_handler_skip", event_name=payload.event)
 
 
 # ─── Handler'lar ──────────────────────────────────────────────────────────────

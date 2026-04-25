@@ -72,6 +72,8 @@ export default function AdminUsersPage() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [userToEdit, setUserToEdit] = useState<DbUser | null>(null)
   const [userToDelete, setUserToDelete] = useState<DbUser | null>(null)
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
 
   const searchTimer = useRef<ReturnType<typeof setTimeout>>()
@@ -124,6 +126,18 @@ export default function AdminUsersPage() {
   const openAddModal  = () => { setUserToEdit(null); setIsModalOpen(true) }
   const openEditModal = (user: DbUser) => { setUserToEdit(user); setIsModalOpen(true) }
 
+  const toggleSelectAll = () => {
+    setSelectedIds((prev) =>
+      users.length > 0 && prev.length === users.length ? [] : users.map((user) => user.id),
+    )
+  }
+
+  const toggleSelectUser = (id: string) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
+    )
+  }
+
   const handleDeleteConfirm = async () => {
     if (!userToDelete) return
     setIsDeleting(true)
@@ -134,12 +148,39 @@ export default function AdminUsersPage() {
         headers: { Authorization: `Bearer ${token}` },
       })
       toast.success('User deleted successfully!')
+      setSelectedIds((prev) => prev.filter((id) => id !== userToDelete.id))
       load(page, search, roleFilter)
     } catch {
       toast.error('Failed to delete user.')
     } finally {
       setIsDeleting(false)
       setUserToDelete(null)
+    }
+  }
+
+  const handleBulkDeleteConfirm = async () => {
+    if (selectedIds.length === 0) return
+    setIsDeleting(true)
+    try {
+      const token = localStorage.getItem('access_token')
+      await Promise.all(
+        selectedIds.map((id) =>
+          fetch(`${backendUrl}/admin/users/${id}`, {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${token}` },
+          }).then((res) => {
+            if (!res.ok) throw new Error(`Failed to delete user ${id}`)
+          }),
+        ),
+      )
+      toast.success(`${selectedIds.length} users deleted successfully!`)
+      setSelectedIds([])
+      setIsBulkDeleteOpen(false)
+      load(page, search, roleFilter)
+    } catch {
+      toast.error('Failed to delete selected users.')
+    } finally {
+      setIsDeleting(false)
     }
   }
 
@@ -232,6 +273,22 @@ export default function AdminUsersPage() {
         </Button>
       </div>
 
+      {selectedIds.length > 0 && (
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-destructive/20 bg-destructive/5 px-4 py-3">
+          <p className="text-sm font-medium text-foreground">
+            {selectedIds.length} user{selectedIds.length === 1 ? '' : 's'} selected
+          </p>
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="sm" onClick={() => setSelectedIds([])} disabled={isDeleting}>
+              Clear
+            </Button>
+            <Button variant="destructive" size="sm" className="gap-1.5" onClick={() => setIsBulkDeleteOpen(true)} disabled={isDeleting}>
+              <Trash2 className="size-3.5" /> Delete Selected
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Role tabs */}
       <div className="flex items-center gap-1 border-b border-border pb-0 overflow-x-auto">
         {(['all', 'student', 'faculty', 'staff', 'organizer', 'admin'] as RoleFilter[]).map((r) => (
@@ -277,6 +334,15 @@ export default function AdminUsersPage() {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border bg-muted/40">
+              <th className="px-5 py-3 text-left w-12">
+                <input
+                  type="checkbox"
+                  className="size-4 rounded border-border cursor-pointer"
+                  checked={users.length > 0 && selectedIds.length === users.length}
+                  onChange={toggleSelectAll}
+                  aria-label="Select all users on this page"
+                />
+              </th>
               <th className="px-5 py-3 text-left font-semibold text-muted-foreground">User</th>
               <th className="px-5 py-3 text-left font-semibold text-muted-foreground hidden md:table-cell">Department</th>
               <th className="px-5 py-3 text-left font-semibold text-muted-foreground">Role</th>
@@ -290,6 +356,15 @@ export default function AdminUsersPage() {
               const secondaryRoles = (user.roles ?? []).filter((item) => !item.isPrimary).map((item) => item.name)
               return (
                 <tr key={user.id} className="hover:bg-muted/20 transition-colors">
+                  <td className="px-5 py-3.5">
+                    <input
+                      type="checkbox"
+                      className="size-4 rounded border-border cursor-pointer"
+                      checked={selectedIds.includes(user.id)}
+                      onChange={() => toggleSelectUser(user.id)}
+                      aria-label={`Select ${user.name}`}
+                    />
+                  </td>
                   <td className="px-5 py-3.5">
                     <div className="flex items-center gap-3">
                       <div className="size-8 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs font-bold uppercase flex-shrink-0">
@@ -419,6 +494,25 @@ export default function AdminUsersPage() {
             <AlertDialogAction onClick={handleDeleteConfirm} disabled={isDeleting} className="bg-red-600 hover:bg-red-700 text-white">
               {isDeleting ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Trash2 className="mr-2 size-4" />}
               Delete User
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={isBulkDeleteOpen} onOpenChange={setIsBulkDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete selected users?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete <b>{selectedIds.length}</b> selected user
+              {selectedIds.length === 1 ? '' : 's'} and remove their data from our servers.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleBulkDeleteConfirm} disabled={isDeleting} className="bg-red-600 hover:bg-red-700 text-white">
+              {isDeleting ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Trash2 className="mr-2 size-4" />}
+              Delete Selected
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

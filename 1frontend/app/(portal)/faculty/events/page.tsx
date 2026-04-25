@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
+import Link from 'next/link'
 import { PartyPopper, Loader2, AlertCircle, CheckCircle, XCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -96,6 +97,11 @@ export default function FacultyEventsPage() {
                     <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} placeholder="Note (optional)..."
                       className="w-full bg-background border border-input rounded-md px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring resize-none" />
                     <div className="flex gap-2">
+                      <Button asChild size="sm" variant="outline">
+                        <Link href={`/faculty/requests/${ev.id}?from=/faculty/events`}>
+                          View Detail
+                        </Link>
+                      </Button>
                       <Button size="sm" className="gap-1.5 bg-green-600 hover:bg-green-700" onClick={() => updateStatus(ev.id, 'APPROVED')}>
                         <CheckCircle className="size-3.5" /> Approve
                       </Button>
@@ -106,7 +112,14 @@ export default function FacultyEventsPage() {
                     </div>
                   </div>
                 ) : (
-                  <Button size="sm" variant="outline" onClick={() => setActionId(ev.id)}>Review</Button>
+                  <div className="flex shrink-0 gap-2">
+                    <Button asChild size="sm" variant="outline">
+                      <Link href={`/faculty/requests/${ev.id}?from=/faculty/events`}>
+                        View Detail
+                      </Link>
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => setActionId(ev.id)}>Review</Button>
+                  </div>
                 )}
               </div>
             ))}
@@ -119,7 +132,11 @@ export default function FacultyEventsPage() {
           <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Past Decisions ({others.length})</h2>
           <div className="bg-card border border-border rounded-xl shadow-sm divide-y divide-border overflow-hidden">
             {others.map((ev) => (
-              <div key={ev.id} className="flex items-center justify-between px-5 py-3.5">
+              <Link
+                key={ev.id}
+                href={`/faculty/requests/${ev.id}?from=/faculty/events`}
+                className="flex items-center justify-between px-5 py-3.5 hover:bg-muted/20 transition-colors"
+              >
                 <div className="min-w-0">
                   <p className="text-sm font-medium truncate">{ev.eventName}</p>
                   <p className="text-xs text-muted-foreground mt-0.5">{ev.requestNo} · {ev.requesterName}</p>
@@ -127,7 +144,7 @@ export default function FacultyEventsPage() {
                 <span className={cn('text-xs font-semibold px-2 py-0.5 rounded-full border shrink-0 ml-4', STATUS_BADGE[ev.status] ?? STATUS_BADGE.SUBMITTED)}>
                   {ev.status?.replace(/_/g, ' ')}
                 </span>
-              </div>
+              </Link>
             ))}
           </div>
         </section>

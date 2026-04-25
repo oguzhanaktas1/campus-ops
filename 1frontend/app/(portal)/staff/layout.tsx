@@ -30,7 +30,7 @@ import { fetchProfile, getStoredUser } from "@/lib/auth";
 
 const navItems: NavItem[] = [
   { label: "Dashboard", href: "/staff/dashboard", icon: LayoutDashboard },
-  { label: "Inbox", href: "/staff/inbox", icon: Inbox },
+  { label: "Inbox", href: "/staff/requests", icon: Inbox },
   { label: "IT Tickets", href: "/staff/tickets", icon: Ticket },
   { label: "Equipment", href: "/staff/equipment", icon: Package },
   { label: "Reservations", href: "/staff/reservations", icon: BookMarked },

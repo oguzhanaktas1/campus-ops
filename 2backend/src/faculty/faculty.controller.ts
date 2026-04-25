@@ -35,7 +35,12 @@ export class FacultyController {
     @Param('id') id: string,
     @Body() body: { action: string; comment?: string },
   ) {
-    return this.facultyService.processAction(extractUserId(req), id, body);
+    return this.facultyService.processAction(
+      extractUserId(req),
+      req.user?.roles ?? [],
+      id,
+      body,
+    );
   }
 
   @Get('requests/all')

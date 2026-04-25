@@ -35,9 +35,40 @@ export interface RequestTimelineEvent {
 }
 
 export interface RequestWorkflowStep {
-  id: number
+  id: number | string
   label: string
   status: 'pending' | 'active' | 'completed' | 'failed' | 'warning'
+  key?: string | null
+  stepKey?: string | null
+  name?: string | null
+  type?: string | null
+  isCurrent?: boolean | null
+  assignedRole?: string | null
+  role?: string | null
+  assignedUnit?: { id?: string | null; name?: string | null } | null
+  unitName?: string | null
+  assignedTo?: {
+    id?: string | null
+    fullName?: string | null
+    email?: string | null
+    role?: string | null
+  } | null
+  assignedToName?: string | null
+  actionBy?: {
+    id?: string | null
+    fullName?: string | null
+    email?: string | null
+    role?: string | null
+  } | null
+  actionByName?: string | null
+  actionTaken?: string | null
+  actionNote?: string | null
+  startedAt?: string | null
+  completedAt?: string | null
+  actedAt?: string | null
+  dueAt?: string | null
+  slaHours?: number | null
+  isOverdue?: boolean | null
 }
 
 export interface RequestDetailViewModel {

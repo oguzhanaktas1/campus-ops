@@ -37,7 +37,7 @@ async def handle(payload: BasePayload) -> None:
         case "workflow.revision_requested":
             await _handle_workflow_revision(payload)  # type: ignore[arg-type]
         case _:
-            logger.debug("audit_handler_skip", event=payload.event)
+            logger.debug("audit_handler_skip", event_name=payload.event)
 
 
 async def _handle_direct(p: AuditAppendPayload) -> None:

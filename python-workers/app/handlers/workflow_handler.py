@@ -42,7 +42,7 @@ async def handle(payload: BasePayload) -> None:
         case "sla.check":
             await _handle_sla_check(payload)          # type: ignore[arg-type]
         case _:
-            logger.debug("workflow_handler_skip", event=payload.event)
+            logger.debug("workflow_handler_skip", event_name=payload.event)
 
 
 async def _handle_request_created(p: RequestCreatedPayload) -> None:

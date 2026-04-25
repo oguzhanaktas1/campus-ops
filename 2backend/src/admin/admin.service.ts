@@ -13,7 +13,7 @@ import { PrismaService } from '../core/prisma/prisma.service';
 import { SlaService } from '../workflow/sla.service';
 import { CacheService } from '../infrastructure/cache/cache.service';
 import * as bcrypt from 'bcrypt';
-import { UserStatus, Gender, AuditActionType } from '@prisma/client';
+import { UserStatus, Gender, AuditActionType, RequestStatus } from '@prisma/client';
 import { AssignRoleDto } from './dto/assign-role.dto';
 import { AdminUpdateProfileDto } from './dto/admin-update-profile.dto';
 import { UpdateRequestTypeDto } from '../requests/dto/update-request-type.dto';
@@ -23,6 +23,107 @@ import {
   makeCacheHash,
 } from '../infrastructure/cache/cache-keys';
 import { FilesService } from '../files/files.service';
+import { buildWorkflowSummary } from '../workflow/workflow-summary';
+
+const TERMINAL_REQUEST_STATUSES: RequestStatus[] = [
+  'APPROVED',
+  'REJECTED',
+  'CANCELLED',
+  'CLOSED',
+  'COMPLETED',
+  'EXPIRED',
+];
+
+function deriveAdminWorkflowStepStatus(params: {
+  instanceStep: any;
+  isCurrent: boolean;
+  requestStatus: RequestStatus;
+  workflowStatus?: string | null;
+  stepType?: string | null;
+}) {
+  const { instanceStep, isCurrent, requestStatus, workflowStatus, stepType } = params;
+  const isCompletedWorkflow = workflowStatus === 'COMPLETED';
+  const isTerminalRequest = TERMINAL_REQUEST_STATUSES.includes(requestStatus);
+
+  if (instanceStep?.isOverdue) return 'warning';
+  if (instanceStep?.actionTaken === 'REJECT') return 'failed';
+  if (instanceStep?.actionTaken === 'REQUEST_REVISION') return 'warning';
+  if (isCurrent && requestStatus === RequestStatus.REJECTED) return 'failed';
+  if (isCurrent && requestStatus === RequestStatus.REVISION_REQUESTED) return 'warning';
+  if (isCurrent) return 'active';
+  if (instanceStep?.status === 'COMPLETED') return 'completed';
+  if (instanceStep?.status === 'FAILED') return 'failed';
+  if (isCompletedWorkflow && isTerminalRequest && stepType === 'END') {
+    return requestStatus === RequestStatus.REJECTED ? 'failed' : 'completed';
+  }
+  return 'pending';
+}
+
+function shouldShowAdminWorkflowStep(params: {
+  step: any;
+  instanceStep: any;
+  requestStatus: RequestStatus;
+}) {
+  const { step, instanceStep, requestStatus } = params;
+  const stepKey = String(step.stepKey ?? '').toUpperCase();
+  const stepName = String(step.stepName ?? '').toUpperCase();
+
+  if (step.stepType === 'REVISION') {
+    return Boolean(instanceStep) || requestStatus === RequestStatus.REVISION_REQUESTED;
+  }
+
+  if (step.stepType !== 'END') return true;
+
+  if (requestStatus === RequestStatus.APPROVED) {
+    return stepKey.includes('APPROV') || stepName.includes('APPROV');
+  }
+
+  if (requestStatus === RequestStatus.REJECTED) {
+    return stepKey.includes('REJECT') || stepName.includes('REJECT');
+  }
+
+  if (
+    requestStatus === RequestStatus.COMPLETED ||
+    requestStatus === RequestStatus.CLOSED
+  ) {
+    return (
+      stepKey.includes('COMPLETE') ||
+      stepName.includes('COMPLETE') ||
+      stepKey.includes('APPROV') ||
+      stepName.includes('APPROV')
+    );
+  }
+
+  if (requestStatus === RequestStatus.CANCELLED) {
+    return stepKey.includes('CANCEL') || stepName.includes('CANCEL');
+  }
+
+  return Boolean(instanceStep);
+}
+
+function buildAdminWorkflowStepLabel(step: any, instanceStep: any) {
+  const stepName = String(step.stepName ?? 'Step');
+  const actionTaken = String(instanceStep?.actionTaken ?? '');
+  const stepKey = String(step.stepKey ?? '').toUpperCase();
+
+  if (!['REJECT', 'REQUEST_REVISION', 'APPROVE'].includes(actionTaken)) {
+    return stepName;
+  }
+
+  const actorLabel = stepKey.includes('COORDINATOR')
+    ? 'Internship Coordinator'
+    : stepKey.includes('ADVISOR')
+      ? 'Advisor'
+      : stepName.replace(/\s+Review$/i, '');
+
+  if (actionTaken === 'REJECT') return `${actorLabel} Rejected`;
+  if (actionTaken === 'REQUEST_REVISION') return `${actorLabel} Revision Requested`;
+  if (actionTaken === 'APPROVE' && stepKey.includes('ADVISOR')) {
+    return `${actorLabel} Approved`;
+  }
+
+  return stepName;
+}
 
 @Injectable()
 export class AdminService {
@@ -181,7 +282,7 @@ export class AdminService {
     const limit = Math.min(100, Math.max(1, opts.limit ?? 20));
     const skip = (page - 1) * limit;
 
-    const searchWhere: any = {};
+    const searchWhere: any = { deletedAt: null };
 
     if (opts.search) {
       const roleSearch = opts.search.trim().replace(/[\s-]+/g, '_');
@@ -480,6 +581,51 @@ export class AdminService {
 
   // KULLANICI SİL (AUDIT LOG EKLENDİ)
   async deleteUser(adminId: string, id: string) {
+    const user = await this.prisma.user.findUnique({ where: { id } });
+    if (!user) throw new NotFoundException('User not found.');
+
+    const deletedAt = new Date();
+    const anonymizedEmail = `deleted-${id}-${deletedAt.getTime()}@deleted.local`;
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.requestAssignment.updateMany({
+        where: { assignedToUserId: id, isActive: true },
+        data: { isActive: false, unassignedAt: deletedAt },
+      });
+
+      await tx.request.updateMany({
+        where: { currentAssigneeUserId: id },
+        data: { currentAssigneeUserId: null },
+      });
+
+      await tx.userRole.deleteMany({ where: { userId: id } });
+
+      await tx.userProfile.deleteMany({ where: { userId: id } });
+
+      await tx.user.update({
+        where: { id },
+        data: {
+          email: anonymizedEmail,
+          phoneNumber: null,
+          status: UserStatus.INACTIVE,
+          isEmailVerified: false,
+          deletedAt,
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          userId: adminId,
+          actionType: AuditActionType.DELETE,
+          entityType: 'User',
+          entityId: id,
+          oldValuesJson: { email: user.email },
+        },
+      });
+    });
+
+    return { message: 'User successfully deleted' };
+/*
     // Delete uploaded files first (FK: File.uploadedByUserId -> User.id)
     const userFiles = await this.prisma.file.findMany({
       where: { uploadedByUserId: id },
@@ -512,6 +658,7 @@ export class AdminService {
     });
 
     return { message: 'User successfully deleted' };
+*/
   }
 
   // TOPLU SİLME FONKSİYONU (Requests)
@@ -539,11 +686,23 @@ export class AdminService {
           requester: { include: { profile: true } },
           requestType: true,
           currentAssignee: { include: { profile: true } },
+          assignments: {
+            where: { isActive: true },
+            include: { assignedTo: { include: { profile: true } } },
+            orderBy: { assignedAt: 'desc' },
+          },
         },
         orderBy: { createdAt: 'desc' },
       });
 
-      return requests.map((req) => ({
+      return requests.map((req) => {
+        const assignedToNames = req.assignments
+          .map((assignment) =>
+            assignment.assignedTo.profile?.fullName || assignment.assignedTo.email,
+          )
+          .filter(Boolean);
+
+        return {
         id: req.id,
         requestNo: req.requestNo,
         title: req.title,
@@ -554,10 +713,14 @@ export class AdminService {
         submittedByName:
           req.requester.profile?.fullName || req.requester.email,
         assignedToName:
-          req.currentAssignee?.profile?.fullName || 'Unassigned',
+          assignedToNames.length > 0
+            ? assignedToNames.join(', ')
+            : req.currentAssignee?.profile?.fullName || 'Unassigned',
+        assignedToNames,
         createdAt: req.createdAt,
         updatedAt: req.updatedAt,
-      }));
+        };
+      });
     });
   }
 
@@ -565,7 +728,7 @@ export class AdminService {
     const version = await this.cacheService.getVersion(
       CacheKeys.version(`request:detail:${requestId}`),
     );
-    const cacheKey = `admin:request:detail:${requestId}:v${version}`;
+    const cacheKey = `admin:request:detail:${requestId}:v${version}:workflow-preview-v6`;
 
     return this.cacheService.getOrSet(cacheKey, CacheTtls.long, async () => {
     const request = await this.prisma.request.findUnique({
@@ -617,7 +780,12 @@ export class AdminService {
         },
         approvalActions: {
           include: {
-            actionBy: { include: { profile: true } },
+            actionBy: {
+              include: {
+                profile: true,
+                primaryRoles: { include: { role: true } },
+              },
+            },
             workflowInstanceStep: {
               include: { workflowStep: true },
             },
@@ -629,10 +797,36 @@ export class AdminService {
             currentStep: true,
             workflowDefinition: {
               include: {
-                steps: { orderBy: { stepOrder: 'asc' } },
+                steps: {
+                  include: {
+                    assignedRole: true,
+                    assignedUnit: true,
+                    assignedUser: {
+                      include: {
+                        profile: true,
+                        primaryRoles: { include: { role: true } },
+                      },
+                    },
+                  },
+                  orderBy: { stepOrder: 'asc' },
+                },
               },
             },
             instanceSteps: {
+              include: {
+                assignedTo: {
+                  include: {
+                    profile: true,
+                    primaryRoles: { include: { role: true } },
+                  },
+                },
+                actionBy: {
+                  include: {
+                    profile: true,
+                    primaryRoles: { include: { role: true } },
+                  },
+                },
+              },
               orderBy: { createdAt: 'asc' },
             },
           },
@@ -717,6 +911,14 @@ export class AdminService {
             title: request.currentAssignee.profile?.title || null,
           }
         : null,
+      assignedToNames: request.assignments
+        .filter((assignment) => assignment.isActive)
+        .map((assignment) =>
+          assignment.assignedTo?.profile?.fullName ||
+          assignment.assignedTo?.email ||
+          null,
+        )
+        .filter(Boolean),
       formData: this.buildRequestDomainData(request),
       attachments: await Promise.all(
         request.fileLinks.map((fl) => this.filesService.buildAttachmentResponse(fl.file)),
@@ -776,6 +978,7 @@ export class AdminService {
           id: action.actionBy.id,
           fullName: action.actionBy.profile?.fullName || action.actionBy.email,
           email: action.actionBy.email,
+          role: action.actionBy.primaryRoles?.[0]?.role?.name ?? null,
         },
         workflowStep: action.workflowInstanceStep?.workflowStep
           ? {
@@ -785,35 +988,7 @@ export class AdminService {
             }
           : null,
       })),
-      workflow: (() => {
-        const workflowInstance = request.workflowInstance;
-        if (!workflowInstance) return null;
-
-        return {
-          status: workflowInstance.status,
-          currentStep: workflowInstance.currentStep?.stepName || null,
-          workflowName: workflowInstance.workflowDefinition?.name || null,
-          steps:
-            workflowInstance.workflowDefinition?.steps?.map((step) => {
-              const instanceStep = workflowInstance.instanceSteps.find(
-                (item) => item.workflowStepId === step.id,
-              );
-              return {
-                id: step.id,
-                label: step.stepName,
-                status:
-                  step.id === workflowInstance.currentStepId
-                    ? 'active'
-                    : instanceStep?.status === 'COMPLETED'
-                      ? 'completed'
-                      : request.status === 'REJECTED' &&
-                          step.id === workflowInstance.currentStepId
-                        ? 'failed'
-                        : 'pending',
-              };
-            }) || [],
-        };
-      })(),
+      workflow: buildWorkflowSummary(request.workflowInstance, request.status),
     };
     }); // end cacheService.getOrSet
   }

@@ -14,6 +14,7 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '../core/prisma/prisma.service';
 import { WorkflowEngineService } from '../workflow/workflow-engine.service';
+import { buildWorkflowSummary as buildEngineWorkflowSummary } from '../workflow/workflow-summary';
 import { SlaService } from '../workflow/sla.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { CreateItTicketDto } from './dto/create-it-ticket.dto';
@@ -287,17 +288,37 @@ export class TicketsService {
             workflowInstance: {
               include: {
                 workflowDefinition: {
-                  include: { steps: { orderBy: { stepOrder: 'asc' } } },
+                  include: {
+                    steps: {
+                      include: {
+                        assignedRole: true,
+                        assignedUnit: true,
+                        assignedUser: {
+                          include: {
+                            profile: true,
+                            primaryRoles: { include: { role: true } },
+                          },
+                        },
+                      },
+                      orderBy: { stepOrder: 'asc' },
+                    },
+                  },
                 },
                 currentStep: true,
                 instanceSteps: {
                   include: {
                     workflowStep: true,
                     assignedTo: {
-                      include: { profile: { select: { fullName: true } } },
+                      include: {
+                        profile: true,
+                        primaryRoles: { include: { role: true } },
+                      },
                     },
                     actionBy: {
-                      include: { profile: { select: { fullName: true } } },
+                      include: {
+                        profile: true,
+                        primaryRoles: { include: { role: true } },
+                      },
                     },
                     approvalActions: {
                       include: {
@@ -717,34 +738,7 @@ export class TicketsService {
       reopenedAt: reopenedHistory?.changedAt ?? null,
       reopenedBy: actorName(reopenedHistory?.changedBy),
       engineWorkflow: workflowInstance
-        ? {
-            id: workflowInstance.id,
-            status: workflowInstance.status,
-            workflowName: workflowInstance.workflowDefinition?.name ?? null,
-            currentStep: workflowInstance.currentStep?.stepName ?? null,
-            steps: (workflowInstance.workflowDefinition?.steps ?? []).map(
-              (definitionStep: any) => {
-                const instanceStep = workflowInstance.instanceSteps.find(
-                  (step: any) => step.workflowStepId === definitionStep.id,
-                );
-
-                return {
-                  id: instanceStep?.id ?? definitionStep.id,
-                  workflowStepId: definitionStep.id,
-                  name: definitionStep.stepName ?? null,
-                  status: deriveWorkflowStepStatus({
-                    instanceStep,
-                    isCurrent: definitionStep.id === workflowInstance.currentStepId,
-                    requestStatus: ticket.request.status,
-                  }),
-                  startedAt: instanceStep?.startedAt ?? null,
-                  completedAt: instanceStep?.completedAt ?? null,
-                  dueAt: instanceStep?.dueAt ?? null,
-                  isOverdue: instanceStep?.isOverdue ?? false,
-                };
-              },
-            ),
-          }
+        ? buildEngineWorkflowSummary(workflowInstance, ticket.request.status)
         : null,
       steps: baseSteps.map((step) => ({
         id: step.id,

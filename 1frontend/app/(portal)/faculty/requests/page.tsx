@@ -135,7 +135,7 @@ export default function FacultyRequestsPage() {
                     <StatusBadge status={req.status} />
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <Link href={`/faculty/requests/${req.id}`}>
+                    <Link href={`/faculty/requests/${req.id}?from=/faculty/requests`}>
                       <Button
                         variant="ghost"
                         size="sm"

@@ -18,7 +18,6 @@ import {
   CheckCircle2,
   XCircle,
   RotateCcw,
-  Lock,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { getToken } from '@/lib/auth'
@@ -82,11 +81,17 @@ export default function FacultyInternshipDetailPage() {
       })
 
       if (res.ok) {
+        const result = await res.json().catch(() => ({}))
         toast.success(`Request ${action === 'approve' ? 'approved' : action === 'reject' ? 'rejected' : 'sent for revision'}.`)
-        setDoneAction(action)
+        const nextStatus = result.status ?? (action === 'approve' ? 'APPROVED' : action === 'reject' ? 'REJECTED' : 'REVISION_REQUESTED')
+        if (TERMINAL.includes(nextStatus)) setDoneAction(action)
         setData((prev: any) => ({
           ...prev,
-          status: action === 'approve' ? 'APPROVED' : action === 'reject' ? 'REJECTED' : 'REVISION_REQUESTED',
+          status: nextStatus,
+          displayStatus: result.nextStep === 'Internship Coordinator Review'
+            ? 'COORDINATOR_REVIEW'
+            : nextStatus,
+          canAct: false,
         }))
         setComment('')
       } else {
@@ -122,7 +127,7 @@ export default function FacultyInternshipDetailPage() {
     )
   }
 
-  const isTerminal = TERMINAL.includes(data.status) || !!doneAction
+  const canAct = data.canAct === true && !TERMINAL.includes(data.status) && !doneAction
 
   return (
     <div className="p-6 space-y-5 max-w-3xl mx-auto pb-20">
@@ -147,7 +152,7 @@ export default function FacultyInternshipDetailPage() {
             </p>
           </div>
         </div>
-        <StatusBadge status={data.status} />
+        <StatusBadge status={data.displayStatus ?? data.status} />
       </div>
 
       {/* Student info */}
@@ -199,15 +204,7 @@ export default function FacultyInternshipDetailPage() {
       </div>
 
       {/* Action panel */}
-      {isTerminal ? (
-        <div className="bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900 p-6 rounded-lg flex flex-col items-center text-center gap-3">
-          <Lock className="size-7 text-emerald-600" />
-          <div>
-            <p className="text-sm font-bold text-emerald-800 dark:text-emerald-400 uppercase tracking-wider">Action Recorded</p>
-            <p className="text-xs text-emerald-700 dark:text-emerald-500 mt-1">This internship request has been processed and is locked.</p>
-          </div>
-        </div>
-      ) : (
+      {canAct && (
         <div className="bg-card border border-border rounded-lg p-5 shadow-sm space-y-4">
           <div className="flex justify-between items-center">
             <p className="text-sm font-semibold text-foreground">Faculty Decision</p>

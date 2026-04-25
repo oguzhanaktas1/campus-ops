@@ -2,7 +2,7 @@ import type {
   RequestDetailViewModel,
   RequestPortal,
 } from '@/features/request-detail/types'
-import { formatBytes } from '@/features/request-detail/utils'
+import { buildWorkflowSteps, formatBytes } from '@/features/request-detail/utils'
 
 function fallbackId() {
   return `tmp-${Math.random().toString(36).slice(2)}`
@@ -12,7 +12,9 @@ function toComment(comment: any) {
   return {
     id: String(comment.id),
     author:
-      comment.author ??
+      comment.author?.fullName ??
+      comment.author?.email ??
+      (typeof comment.author === 'string' ? comment.author : null) ??
       comment.user?.profile?.fullName ??
       comment.user?.email ??
       'Unknown',
@@ -121,6 +123,90 @@ function deriveAssignee(raw: any) {
   }
 }
 
+function deriveAssignedPeople(raw: any) {
+  const names = new Set<string>()
+  const requester = deriveRequester(raw)
+  const requesterIds = new Set(
+    [requester?.id, raw.requesterUserId, raw.submittedById]
+      .filter(Boolean)
+      .map((value) => String(value).toLowerCase()),
+  )
+  const requesterEmails = new Set(
+    [requester?.email, raw.requester?.email]
+      .filter(Boolean)
+      .map((value) => String(value).toLowerCase()),
+  )
+  const requesterNames = new Set(
+    [requester?.fullName, raw.submittedByName]
+      .filter(Boolean)
+      .map((value) => String(value).trim().toLowerCase()),
+  )
+
+  function isRequester(person: any, fallbackName?: unknown) {
+    const id = person?.id ?? person?.userId ?? null
+    const email = person?.email ?? null
+    const name =
+      fallbackName ??
+      person?.fullName ??
+      person?.profile?.fullName ??
+      person?.name ??
+      null
+
+    return (
+      (id && requesterIds.has(String(id).toLowerCase())) ||
+      (email && requesterEmails.has(String(email).toLowerCase())) ||
+      (name && requesterEmails.has(String(name).trim().toLowerCase())) ||
+      (name && requesterNames.has(String(name).trim().toLowerCase()))
+    )
+  }
+
+  function addAssignedName(name: unknown, person?: any) {
+    if (!name || isRequester(person, name)) return
+    names.add(String(name))
+  }
+
+  if (Array.isArray(raw.assignedToNames)) {
+    raw.assignedToNames.forEach((name: unknown) => {
+      addAssignedName(name)
+    })
+  }
+
+  if (raw.assignedToName) {
+    addAssignedName(raw.assignedToName)
+  }
+
+  if (raw.currentAssignee) {
+    const currentName =
+      raw.currentAssignee.fullName ??
+      raw.currentAssignee.profile?.fullName ??
+      raw.currentAssignee.email ??
+      null
+    addAssignedName(currentName, raw.currentAssignee)
+  }
+
+  if (Array.isArray(raw.assignments)) {
+    raw.assignments.forEach((assignment: any) => {
+      const assignedName =
+        assignment?.assignedTo?.fullName ??
+        assignment?.assignedTo?.profile?.fullName ??
+        assignment?.assignedTo?.email ??
+        null
+      addAssignedName(assignedName, assignment?.assignedTo)
+    })
+  }
+
+  const workflowSteps = Array.isArray(raw.workflow?.steps) ? raw.workflow.steps : []
+  workflowSteps.forEach((step: any) => {
+    const assignedName =
+      step?.assignedToName ??
+      step?.assignedTo?.fullName ??
+      null
+    addAssignedName(assignedName, step?.assignedTo)
+  })
+
+  return Array.from(names)
+}
+
 function normalizeWorkflowStepStatus(
   raw: any,
   step: any,
@@ -177,6 +263,50 @@ function normalizeWorkflowStepStatus(
   return 'pending'
 }
 
+function labelWorkflowStep(
+  raw: any,
+  baseLabel: string,
+  stepStatus: 'pending' | 'active' | 'completed' | 'failed' | 'warning',
+) {
+  const requestStatus = String(raw.status ?? '').toUpperCase()
+  const stepNameLower = baseLabel.toLowerCase()
+
+  if (
+    requestStatus === 'APPROVED' &&
+    (stepNameLower.includes('final') || stepNameLower.includes('decision') || stepNameLower === 'approved')
+  ) {
+    return 'Approved'
+  }
+
+  if (
+    requestStatus === 'REJECTED' &&
+    (stepNameLower.includes('final') || stepNameLower.includes('decision'))
+  ) {
+    return 'Rejected'
+  }
+
+  if (stepStatus === 'warning') {
+    return `${baseLabel} — Revision Requested`
+  }
+
+  return baseLabel
+}
+
+function buildWorkflowStepsForPortal(raw: any, portal: RequestPortal) {
+  const workflowSteps = Array.isArray(raw.workflow?.steps) ? raw.workflow.steps : []
+
+  return workflowSteps.map((step: any) => {
+    const stepStatus = normalizeWorkflowStepStatus(raw, step)
+    const baseLabel = String(step.label ?? step.stepName ?? 'Step')
+
+    return {
+      id: Number(step.id ?? fallbackId()),
+      label: labelWorkflowStep(raw, baseLabel, stepStatus),
+      status: stepStatus,
+    }
+  })
+}
+
 export function mapRequestDetailToViewModel(
   portal: RequestPortal,
   raw: any,
@@ -187,6 +317,7 @@ export function mapRequestDetailToViewModel(
     name: raw.typeName ?? raw.type ?? 'General Request',
     category: raw.category ?? null,
   }
+  const workflowSource = raw.workflow?.engineWorkflow ?? raw.workflow ?? null
 
   const timeline = Array.isArray(raw.timeline)
     ? raw.timeline.map(toTimeline)
@@ -202,7 +333,7 @@ export function mapRequestDetailToViewModel(
     requestNo: String(raw.requestNo ?? raw.requestNumber ?? raw.id),
     title: String(raw.title ?? requestType.name ?? 'Request Detail'),
     description: String(raw.description ?? ''),
-    status: String(raw.status ?? 'PENDING'),
+    status: String(raw.status ?? raw.displayStatus ?? 'PENDING'),
     priority: String(raw.priority ?? 'MEDIUM'),
     createdAt: raw.createdAt ?? null,
     submittedAt: raw.submittedAt ?? null,
@@ -214,15 +345,7 @@ export function mapRequestDetailToViewModel(
     },
     requester: deriveRequester(raw),
     currentAssignee: deriveAssignee(raw),
-    assignedPeople: Array.isArray(raw.assignedToNames)
-      ? raw.assignedToNames.filter(Boolean)
-      : raw.assignedToName
-        ? [raw.assignedToName]
-        : Array.isArray(raw.assignments)
-          ? raw.assignments
-              .map((assignment: any) => assignment?.assignedTo?.fullName)
-              .filter(Boolean)
-        : [],
+    assignedPeople: deriveAssignedPeople(raw),
     comments: Array.isArray(raw.comments) ? raw.comments.map(toComment) : [],
     attachments: Array.isArray(raw.attachments)
       ? raw.attachments.map(toAttachment)
@@ -233,19 +356,18 @@ export function mapRequestDetailToViewModel(
     statusHistory: timeline,
     workflow: {
       currentStep:
-        raw.workflow?.currentStep?.stepName ??
-        raw.workflow?.currentStep ??
-        raw.workflow?.currentStepName ??
+        workflowSource?.currentStep?.stepName ??
+        workflowSource?.currentStep ??
+        workflowSource?.currentStepName ??
         null,
-      name: raw.workflow?.workflowName ?? raw.workflow?.name ?? null,
-      status: raw.workflow?.status ?? null,
-      steps: Array.isArray(raw.workflow?.steps)
-        ? raw.workflow.steps.map((step: any) => ({
-            id: Number(step.id ?? fallbackId()),
-            label: String(step.label ?? step.stepName ?? 'Step'),
-            status: normalizeWorkflowStepStatus(raw, step),
-          }))
-        : [],
+      name: workflowSource?.workflowName ?? workflowSource?.name ?? null,
+      status: workflowSource?.status ?? null,
+      steps: buildWorkflowSteps(
+        String(requestType.key ?? raw.type ?? 'GENERAL_REQUEST'),
+        String(raw.status ?? raw.displayStatus ?? 'PENDING'),
+        workflowSource,
+        raw.ticket?.ticketStatus ?? raw.itTicket?.ticketStatus ?? null,
+      ),
     },
     domainData:
       domainData ??

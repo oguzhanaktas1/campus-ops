@@ -96,7 +96,7 @@ export default function FacultyEquipmentPage() {
           filtered.map((r) => (
             <Link
               key={r.id}
-              href={`/faculty/equipment/${r.id}`}
+              href={`/faculty/requests/${r.id}?from=/faculty/equipment`}
               className="flex items-center justify-between px-5 py-4 hover:bg-muted/20 transition-colors"
             >
               <div className="min-w-0">

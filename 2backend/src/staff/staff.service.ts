@@ -10,6 +10,7 @@ import { PrismaService } from '../core/prisma/prisma.service';
 import { RequestStatus, Prisma, AuditActionType } from '@prisma/client'; // 🔥 AuditActionType Eklendi
 import * as bcrypt from 'bcrypt';
 import { SlaService } from '../workflow/sla.service';
+import { buildWorkflowSummary } from '../workflow/workflow-summary';
 
 function deriveWorkflowStepStatus(params: {
   instanceStep: any;
@@ -334,6 +335,18 @@ export class StaffService {
         requestType: true,
         currentAssignee: { include: { profile: true } },
         fileLinks: true,
+        statusHistory: { orderBy: { changedAt: 'desc' } },
+        comments: {
+          orderBy: { createdAt: 'asc' },
+          include: {
+            user: {
+              include: {
+                profile: true,
+                primaryRoles: { include: { role: true } },
+              },
+            },
+          },
+        },
         assignments: {
           include: {
             assignedTo: { include: { profile: true } },
@@ -355,10 +368,36 @@ export class StaffService {
             currentStep: true,
             workflowDefinition: {
               include: {
-                steps: { orderBy: { stepOrder: 'asc' } },
+                steps: {
+                  include: {
+                    assignedRole: true,
+                    assignedUnit: true,
+                    assignedUser: {
+                      include: {
+                        profile: true,
+                        primaryRoles: { include: { role: true } },
+                      },
+                    },
+                  },
+                  orderBy: { stepOrder: 'asc' },
+                },
               },
             },
             instanceSteps: {
+              include: {
+                assignedTo: {
+                  include: {
+                    profile: true,
+                    primaryRoles: { include: { role: true } },
+                  },
+                },
+                actionBy: {
+                  include: {
+                    profile: true,
+                    primaryRoles: { include: { role: true } },
+                  },
+                },
+              },
               orderBy: { createdAt: 'asc' },
             },
           },
@@ -399,6 +438,13 @@ export class StaffService {
 
     if (!request) return null;
 
+    const auditHistory = await this.prisma.auditLog.findMany({
+      where: { entityType: 'Request', entityId: id },
+      include: { user: { include: { profile: true } } },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+    });
+
     return {
       ...request,
       requester: request.requester
@@ -418,30 +464,7 @@ export class StaffService {
             title: request.requester.profile?.title || null,
           }
         : null,
-      workflow: request.workflowInstance
-        ? {
-            status: request.workflowInstance.status,
-            currentStep: request.workflowInstance.currentStep?.stepName ?? null,
-            workflowName:
-              request.workflowInstance.workflowDefinition?.name ?? null,
-            steps:
-              request.workflowInstance.workflowDefinition?.steps?.map((step) => {
-                const instanceStep = request.workflowInstance?.instanceSteps.find(
-                  (item) => item.workflowStepId === step.id,
-                );
-                return {
-                  id: step.id,
-                  label: step.stepName,
-                  status: deriveWorkflowStepStatus({
-                    instanceStep,
-                    isCurrent: step.id === request.workflowInstance?.currentStepId,
-                    requestStatus: request.status,
-                  }),
-                  isOverdue: instanceStep?.isOverdue ?? false,
-                };
-              }) ?? [],
-          }
-        : null,
+      workflow: buildWorkflowSummary(request.workflowInstance, request.status),
       formData: {
         ...(request.dynamicData as Record<string, unknown> | null),
         ...(request.documentRequest
@@ -575,6 +598,35 @@ export class StaffService {
             }
           : null,
       })),
+      timeline: request.statusHistory.map((history) => ({
+        id: history.id,
+        status: history.newStatus,
+        date: history.changedAt,
+        note: history.changeReason,
+      })),
+      statusHistory: request.statusHistory.map((history) => ({
+        id: history.id,
+        status: history.newStatus,
+        date: history.changedAt,
+        note: history.changeReason,
+      })),
+      auditHistory: auditHistory.map((audit) => ({
+        id: audit.id,
+        actionType: audit.actionType,
+        status: audit.actionType,
+        entityType: audit.entityType,
+        entityId: audit.entityId,
+        createdAt: audit.createdAt,
+        date: audit.createdAt,
+        actor: audit.user
+          ? {
+              id: audit.user.id,
+              fullName: audit.user.profile?.fullName || audit.user.email,
+              email: audit.user.email,
+            }
+          : null,
+        note: `${audit.actionType.replace(/_/g, ' ')} on ${audit.entityType}`,
+      })),
       approvalHistory: request.approvalActions.map((action) => ({
         id: action.id,
         actionType: action.actionType,
@@ -631,9 +683,28 @@ export class StaffService {
       include: {
         currentAssignee: { include: { profile: true } },
         requester: { include: { profile: true } },
+        workflowInstance: { select: { status: true } },
       },
     });
     if (!request) throw new NotFoundException('Request not found.');
+
+    const terminalStatuses: RequestStatus[] = [
+      RequestStatus.APPROVED,
+      RequestStatus.REJECTED,
+      RequestStatus.CANCELLED,
+      RequestStatus.CLOSED,
+      RequestStatus.COMPLETED,
+      RequestStatus.EXPIRED,
+    ];
+
+    if (
+      terminalStatuses.includes(request.status) ||
+      request.workflowInstance?.status === 'COMPLETED'
+    ) {
+      throw new BadRequestException(
+        'This request is already completed and cannot be reassigned.',
+      );
+    }
 
     const assignee = await this.prisma.user.findUnique({
       where: { id: assigneeUserId },

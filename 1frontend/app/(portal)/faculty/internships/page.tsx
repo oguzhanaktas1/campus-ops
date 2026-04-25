@@ -72,10 +72,20 @@ export default function FacultyInternshipsPage() {
         body: JSON.stringify({ action }),
       })
       if (res.ok) {
+        const result = await res.json().catch(() => ({}))
         toast.success(action === 'approve' ? 'Internship approved.' : 'Internship rejected.')
         setInternships((prev) =>
           prev.map((r) =>
-            r.id === id ? { ...r, status: action === 'approve' ? 'APPROVED' : 'REJECTED' } : r,
+            r.id === id
+              ? {
+                  ...r,
+                  status: result.status ?? (action === 'approve' ? 'APPROVED' : 'REJECTED'),
+                  displayStatus: result.nextStep === 'Internship Coordinator Review'
+                    ? 'COORDINATOR_REVIEW'
+                    : result.status ?? (action === 'approve' ? 'APPROVED' : 'REJECTED'),
+                  canAct: false,
+                }
+              : r,
           ),
         )
       } else {
@@ -177,7 +187,7 @@ export default function FacultyInternshipsPage() {
               </thead>
               <tbody className="divide-y divide-border">
                 {filtered.map((req) => {
-                  const isPending = PENDING_STATUSES.includes(req.status)
+                  const canAct = req.canAct === true && PENDING_STATUSES.includes(req.status)
                   const isProcessing = processingId === req.id
 
                   return (
@@ -204,13 +214,13 @@ export default function FacultyInternshipsPage() {
                       <td className="px-5 py-4 text-muted-foreground text-xs">{req.internshipType}</td>
                       <td className="px-5 py-4 text-muted-foreground text-xs">{formatDate(req.startDate)}</td>
                       <td className="px-5 py-4 text-muted-foreground text-xs">{formatDate(req.endDate)}</td>
-                      <td className="px-5 py-4"><StatusBadge status={req.status} /></td>
+                      <td className="px-5 py-4"><StatusBadge status={req.displayStatus ?? req.status} /></td>
                       <td className="px-5 py-4">
                         <div className="flex items-center gap-2">
-                          <Button size="sm" variant="outline" className="h-7 gap-1 text-xs" onClick={() => router.push(`/faculty/internships/${req.id}`)}>
+                          <Button size="sm" variant="outline" className="h-7 gap-1 text-xs" onClick={() => router.push(`/faculty/requests/${req.id}?from=/faculty/internships`)}>
                             <Eye className="size-3" /> View
                           </Button>
-                          {isPending && (
+                          {canAct && (
                             <>
                               <Button size="sm" className="h-7 gap-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs" disabled={isProcessing} onClick={() => handleAction(req.id, 'approve')}>
                                 {isProcessing ? <Loader2 className="size-3 animate-spin" /> : <CheckCircle2 className="size-3" />}

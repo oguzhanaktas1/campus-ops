@@ -13,12 +13,12 @@ import { CreateRequestDto } from './dto/create-request.dto';
 import { AddCommentDto } from './dto/add-comment.dto';
 import { WorkflowEngineService } from '../workflow/workflow-engine.service';
 import { SlaService } from '../workflow/sla.service';
+import { buildWorkflowSummary } from '../workflow/workflow-summary';
 import { CacheService } from '../infrastructure/cache/cache.service';
 import { FilesService } from '../files/files.service';
 import {
   CacheKeys,
   CacheTtls,
-  getPortalFromRoles,
 } from '../infrastructure/cache/cache-keys';
 import { RabbitmqPublisher } from '../infrastructure/rabbitmq/rabbitmq.publisher';
 import { OutboxService } from '../infrastructure/rabbitmq/outbox.service';
@@ -54,6 +54,8 @@ function deriveWorkflowStepStatus(params: {
   const { instanceStep, isCurrent, requestStatus } = params;
 
   if (instanceStep?.isOverdue) return 'warning';
+  if (instanceStep?.actionTaken === 'REJECT') return 'failed';
+  if (instanceStep?.actionTaken === 'REQUEST_REVISION') return 'warning';
   if (isCurrent && requestStatus === RequestStatus.REJECTED) return 'failed';
   if (isCurrent && requestStatus === RequestStatus.REVISION_REQUESTED) {
     return 'warning';
@@ -62,6 +64,30 @@ function deriveWorkflowStepStatus(params: {
   if (instanceStep?.status === 'COMPLETED') return 'completed';
   if (instanceStep?.status === 'FAILED') return 'failed';
   return 'pending';
+}
+
+function buildWorkflowStepLabel(step: any, instanceStep: any) {
+  const stepName = String(step.stepName ?? 'Step');
+  const actionTaken = String(instanceStep?.actionTaken ?? '');
+  const stepKey = String(step.stepKey ?? '').toUpperCase();
+
+  if (!['REJECT', 'REQUEST_REVISION', 'APPROVE'].includes(actionTaken)) {
+    return stepName;
+  }
+
+  const actorLabel = stepKey.includes('COORDINATOR')
+    ? 'Internship Coordinator'
+    : stepKey.includes('ADVISOR')
+      ? 'Advisor'
+      : stepName.replace(/\s+Review$/i, '');
+
+  if (actionTaken === 'REJECT') return `${actorLabel} Rejected`;
+  if (actionTaken === 'REQUEST_REVISION') return `${actorLabel} Revision Requested`;
+  if (actionTaken === 'APPROVE' && stepKey.includes('ADVISOR')) {
+    return `${actorLabel} Approved`;
+  }
+
+  return stepName;
 }
 
 @Injectable()
@@ -94,6 +120,41 @@ export class RequestsService {
     if (isOwner || isAssigned || isWatcher) return;
 
     if (isStudent || !OPEN_STATUSES.includes(req.status)) {
+      throw new ForbiddenException('Access denied.');
+    }
+  }
+
+  // Lightweight access check used by findById — avoids loading the full request graph.
+  private async checkRequestAccess(userId: string, roles: string[], requestId: string): Promise<void> {
+    if (roles.includes('ADMIN')) return;
+
+    const req = await this.prisma.request.findUnique({
+      where: { id: requestId },
+      select: {
+        requesterUserId: true,
+        currentAssigneeUserId: true,
+        status: true,
+        assignments: {
+          where: { assignedToUserId: userId, isActive: true },
+          select: { id: true },
+        },
+        watchers: {
+          where: { userId },
+          select: { userId: true },
+        },
+      },
+    });
+
+    if (!req) throw new NotFoundException('Request not found.');
+
+    const isOwner = req.requesterUserId === userId;
+    const isAssigned = req.currentAssigneeUserId === userId || req.assignments.length > 0;
+    const isWatcher = req.watchers.length > 0;
+
+    if (isOwner || isAssigned || isWatcher) return;
+
+    const isStudent = roles.includes('STUDENT') && !roles.includes('ADMIN');
+    if (isStudent || !OPEN_STATUSES.includes(req.status as RequestStatus)) {
       throw new ForbiddenException('Access denied.');
     }
   }
@@ -258,15 +319,18 @@ export class RequestsService {
   // ─── DETAIL ───────────────────────────────────────────────────────────────
 
   async findById(userId: string, roles: string[], requestId: string) {
-    const portal = getPortalFromRoles(roles);
-    const version = await this.cacheService.getVersion(
-      CacheKeys.version(`request:detail:${requestId}`),
-    );
-    const cacheKey = CacheKeys.requestDetail(portal, requestId, userId, version);
+    // Fast lightweight access check — only reads primary key + 2 filtered relations
+    await this.checkRequestAccess(userId, roles, requestId);
 
-    return this.cacheService.getOrSet(cacheKey, CacheTtls.long, async () => {
-      const canSeeInternal = roles.some((r) => INTERNAL_ROLES.includes(r));
+    const canSeeInternal = roles.some((r) => INTERNAL_ROLES.includes(r));
 
+    // Shared cache keyed by requestId only (not userId) — all users share the same entry.
+    // Single Lua round-trip fetches version + cached data atomically.
+    const data = await this.cacheService.getWithVersion(
+      `request:detail:${requestId}`,
+      `request:detail:${requestId}`,
+      CacheTtls.long,
+      async () => {
       const req: any = await this.prisma.request.findUnique({
         where: { id: requestId },
         include: {
@@ -279,11 +343,9 @@ export class RequestsService {
           currentAssignee: { select: assigneeInclude },
           statusHistory: { orderBy: { changedAt: 'asc' } },
           comments: {
-            where: canSeeInternal ? {} : { isInternal: false },
             include: {
               user: { select: requesterInclude },
               replies: {
-                where: canSeeInternal ? {} : { isInternal: false },
                 include: { user: { select: requesterInclude } },
                 orderBy: { createdAt: 'asc' },
               },
@@ -321,9 +383,39 @@ export class RequestsService {
             include: {
               currentStep: true,
               workflowDefinition: {
-                include: { steps: { orderBy: { stepOrder: 'asc' } } },
+                include: {
+                  steps: {
+                    include: {
+                      assignedRole: true,
+                      assignedUnit: true,
+                      assignedUser: {
+                        include: {
+                          profile: true,
+                          primaryRoles: { include: { role: true } },
+                        },
+                      },
+                    },
+                    orderBy: { stepOrder: 'asc' },
+                  },
+                },
               },
-              instanceSteps: { orderBy: { createdAt: 'asc' } },
+              instanceSteps: {
+                include: {
+                  assignedTo: {
+                    include: {
+                      profile: true,
+                      primaryRoles: { include: { role: true } },
+                    },
+                  },
+                  actionBy: {
+                    include: {
+                      profile: true,
+                      primaryRoles: { include: { role: true } },
+                    },
+                  },
+                },
+                orderBy: { createdAt: 'asc' },
+              },
             },
           },
           fileLinks: {
@@ -356,8 +448,6 @@ export class RequestsService {
       });
 
       if (!req) throw new NotFoundException('Request not found.');
-
-      this.assertRequestAccess(req, userId, roles);
 
       const attachments = await Promise.all(
         req.fileLinks.map((fl: any) => this.filesService.buildAttachmentResponse(fl.file)),
@@ -469,34 +559,27 @@ export class RequestsService {
             }
           : null,
       })),
-      workflow: req.workflowInstance
-        ? {
-            status: req.workflowInstance.status,
-            currentStep: req.workflowInstance.currentStep?.stepName ?? null,
-            workflowName: req.workflowInstance.workflowDefinition?.name ?? null,
-            steps:
-              req.workflowInstance.workflowDefinition?.steps?.map((step: any) => {
-                const instanceStep = req.workflowInstance.instanceSteps.find(
-                  (item: any) => item.workflowStepId === step.id,
-                );
-                return {
-                  id: step.id,
-                  label: step.stepName,
-                  status: deriveWorkflowStepStatus({
-                    instanceStep,
-                    isCurrent: step.id === req.workflowInstance.currentStepId,
-                    requestStatus: req.status,
-                  }),
-                  dueAt: instanceStep?.dueAt ?? null,
-                  isOverdue: instanceStep?.isOverdue ?? false,
-                };
-              }) ?? [],
-          }
-        : null,
+      workflow: buildWorkflowSummary(req.workflowInstance, req.status),
       attachments,
       domainData,
       };
-    });
+    },
+    );
+
+    // Filter internal comments for non-internal users (students, organizers)
+    if (!canSeeInternal && (data as any).comments?.length) {
+      return {
+        ...(data as any),
+        comments: ((data as any).comments as any[])
+          .filter((c) => !c.isInternal)
+          .map((c: any) => ({
+            ...c,
+            replies: ((c.replies ?? []) as any[]).filter((r: any) => !r.isInternal),
+          })),
+      };
+    }
+
+    return data;
   }
 
   // ─── ACTIONS ──────────────────────────────────────────────────────────────
@@ -640,17 +723,14 @@ export class RequestsService {
     if (!req) throw new NotFoundException('Request not found.');
     this.assertRequestAccess(req, userId, roles);
 
-    const canSeeInternal = roles.some((r) => INTERNAL_ROLES.includes(r));
     return this.prisma.requestComment.findMany({
       where: {
         requestId,
         parentCommentId: null,
-        ...(canSeeInternal ? {} : { isInternal: false }),
       },
       include: {
         user: { select: requesterInclude },
         replies: {
-          where: canSeeInternal ? {} : { isInternal: false },
           include: { user: { select: requesterInclude } },
           orderBy: { createdAt: 'asc' },
         },

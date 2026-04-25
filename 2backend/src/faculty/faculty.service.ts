@@ -9,6 +9,8 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../core/prisma/prisma.service';
 import { SlaService } from '../workflow/sla.service';
+import { WorkflowEngineService } from '../workflow/workflow-engine.service';
+import { buildWorkflowSummary } from '../workflow/workflow-summary';
 import { CacheService } from '../infrastructure/cache/cache.service';
 import { FilesService } from '../files/files.service';
 import {
@@ -22,6 +24,48 @@ import {
   AuditActionType,
 } from '@prisma/client'; // 🔥 AuditActionType Added
 
+function deriveFacultyWorkflowStepStatus(params: {
+  instanceStep: any;
+  isCurrent: boolean;
+  requestStatus: RequestStatus;
+}) {
+  const { instanceStep, isCurrent, requestStatus } = params;
+
+  if (instanceStep?.isOverdue) return 'warning';
+  if (instanceStep?.actionTaken === 'REJECT') return 'failed';
+  if (instanceStep?.actionTaken === 'REQUEST_REVISION') return 'warning';
+  if (isCurrent && requestStatus === RequestStatus.REJECTED) return 'failed';
+  if (isCurrent && requestStatus === RequestStatus.REVISION_REQUESTED) return 'warning';
+  if (isCurrent) return 'active';
+  if (instanceStep?.status === 'COMPLETED') return 'completed';
+  if (instanceStep?.status === 'FAILED') return 'failed';
+  return 'pending';
+}
+
+function buildFacultyWorkflowStepLabel(step: any, instanceStep: any) {
+  const stepName = String(step.stepName ?? 'Step');
+  const actionTaken = String(instanceStep?.actionTaken ?? '');
+  const stepKey = String(step.stepKey ?? '').toUpperCase();
+
+  if (!['REJECT', 'REQUEST_REVISION', 'APPROVE'].includes(actionTaken)) {
+    return stepName;
+  }
+
+  const actorLabel = stepKey.includes('COORDINATOR')
+    ? 'Internship Coordinator'
+    : stepKey.includes('ADVISOR')
+      ? 'Advisor'
+      : stepName.replace(/\s+Review$/i, '');
+
+  if (actionTaken === 'REJECT') return `${actorLabel} Rejected`;
+  if (actionTaken === 'REQUEST_REVISION') return `${actorLabel} Revision Requested`;
+  if (actionTaken === 'APPROVE' && stepKey.includes('ADVISOR')) {
+    return `${actorLabel} Approved`;
+  }
+
+  return stepName;
+}
+
 @Injectable()
 export class FacultyService {
   constructor(
@@ -29,6 +73,7 @@ export class FacultyService {
     private slaService: SlaService,
     private cacheService: CacheService,
     private filesService: FilesService,
+    private workflowEngine: WorkflowEngineService,
   ) {}
 
   private buildRequestDomainData(request: any) {
@@ -228,6 +273,7 @@ export class FacultyService {
   // 2. PROCESS ACTION (Approve / Reject / Revise) + IN-APP NOTIFICATION & AUDIT
   async processAction(
     userId: string,
+    roles: string[],
     requestId: string,
     data: { action: string; comment?: string },
   ) {
@@ -256,6 +302,47 @@ export class FacultyService {
       throw new BadRequestException(
         'A comment/reason is required for reject or revision actions!',
       );
+    }
+
+    const workflowInstance = await this.prisma.workflowInstance.findUnique({
+      where: { requestId },
+      select: { id: true },
+    });
+
+    if (workflowInstance) {
+      const auditAction =
+        data.action === 'approve'
+          ? AuditActionType.APPROVE
+          : data.action === 'reject'
+            ? AuditActionType.REJECT
+            : AuditActionType.STATUS_CHANGE;
+
+      const result = await this.workflowEngine.processAction(userId, roles, requestId, {
+        action: data.action,
+        comment: data.comment,
+      });
+
+      await this.prisma.auditLog.create({
+        data: {
+          userId,
+          actionType: auditAction,
+          entityType: 'Request',
+          entityId: requestId,
+        },
+      });
+
+      await Promise.all([
+        this.cacheService.bumpVersion(CacheKeys.version('faculty:approvals:list')),
+        this.cacheService.bumpVersion(
+          CacheKeys.version(`request:detail:${requestId}`),
+        ),
+        this.cacheService.bumpVersion(CacheKeys.version('admin:requests:list')),
+        this.cacheService.bumpVersion(
+          CacheKeys.version('admin:dashboard:summary'),
+        ),
+      ]);
+
+      return result;
     }
 
     let newStatus: RequestStatus;
@@ -518,10 +605,36 @@ export class FacultyService {
             currentStep: true,
             workflowDefinition: {
               include: {
-                steps: { orderBy: { stepOrder: 'asc' } },
+                steps: {
+                  include: {
+                    assignedRole: true,
+                    assignedUnit: true,
+                    assignedUser: {
+                      include: {
+                        profile: true,
+                        primaryRoles: { include: { role: true } },
+                      },
+                    },
+                  },
+                  orderBy: { stepOrder: 'asc' },
+                },
               },
             },
             instanceSteps: {
+              include: {
+                assignedTo: {
+                  include: {
+                    profile: true,
+                    primaryRoles: { include: { role: true } },
+                  },
+                },
+                actionBy: {
+                  include: {
+                    profile: true,
+                    primaryRoles: { include: { role: true } },
+                  },
+                },
+              },
               orderBy: { createdAt: 'asc' },
             },
           },
@@ -670,32 +783,7 @@ export class FacultyService {
             }
           : null,
       })),
-      workflow: (() => {
-        const workflowInstance = request.workflowInstance;
-        if (!workflowInstance) return null;
-
-        return {
-          status: workflowInstance.status,
-          currentStep: workflowInstance.currentStep?.stepName || null,
-          workflowName: workflowInstance.workflowDefinition?.name || null,
-          steps:
-            workflowInstance.workflowDefinition?.steps?.map((step) => {
-              const instanceStep = workflowInstance.instanceSteps.find(
-                (item) => item.workflowStepId === step.id,
-              );
-              return {
-                id: step.id,
-                label: step.stepName,
-                status:
-                  step.id === workflowInstance.currentStepId
-                    ? 'active'
-                    : instanceStep?.status === 'COMPLETED'
-                      ? 'completed'
-                      : 'pending',
-              };
-            }) || [],
-        };
-      })(),
+      workflow: buildWorkflowSummary(request.workflowInstance, request.status),
     };
   }
 
@@ -774,6 +862,15 @@ export class FacultyService {
         request: {
           include: {
             requestType: { select: { id: true, key: true, name: true } },
+            assignments: {
+              where: { assignedToUserId: userId, isActive: true },
+              select: { id: true },
+            },
+            workflowInstance: {
+              include: {
+                currentStep: { select: { stepKey: true, stepName: true } },
+              },
+            },
           },
         },
         student: { include: { profile: { select: { fullName: true, studentNumber: true } } } },
@@ -788,6 +885,11 @@ export class FacultyService {
       requestNo: r.request.requestNo,
       title: r.request.title,
       status: r.request.status,
+      displayStatus: r.request.workflowInstance?.currentStep?.stepKey ?? r.request.status,
+      currentStepName: r.request.workflowInstance?.currentStep?.stepName ?? null,
+      canAct:
+        r.request.currentAssigneeUserId === userId ||
+        r.request.assignments.length > 0,
       priority: r.request.priority,
       companyName: r.companyName,
       companySector: r.companySector,
@@ -818,6 +920,15 @@ export class FacultyService {
         request: {
           include: {
             requestType: true,
+            workflowInstance: {
+              include: {
+                currentStep: { select: { stepKey: true, stepName: true } },
+              },
+            },
+            assignments: {
+              where: { assignedToUserId: userId, isActive: true },
+              select: { id: true },
+            },
             statusHistory: { orderBy: { changedAt: 'asc' } },
             fileLinks: { include: { file: true } },
             comments: {
@@ -848,6 +959,11 @@ export class FacultyService {
       title: r.request.title,
       description: r.request.description,
       status: r.request.status,
+      displayStatus: (r.request as any).workflowInstance?.currentStep?.stepKey ?? r.request.status,
+      currentStepName: (r.request as any).workflowInstance?.currentStep?.stepName ?? null,
+      canAct:
+        r.request.currentAssigneeUserId === userId ||
+        (r.request as any).assignments.length > 0,
       priority: r.request.priority,
       createdAt: r.createdAt,
       companyName: r.companyName,

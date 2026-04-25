@@ -32,7 +32,7 @@ async def handle(payload: BasePayload) -> None:
         case "sla.check":
             await _handle_sla(payload)       # type: ignore[arg-type]
         case _:
-            logger.debug("reminder_handler_skip", event=payload.event)
+            logger.debug("reminder_handler_skip", event_name=payload.event)
 
 
 async def _handle_schedule(p: ReminderSchedulePayload) -> None:

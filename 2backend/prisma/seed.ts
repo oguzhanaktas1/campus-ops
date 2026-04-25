@@ -242,6 +242,11 @@ async function main() {
       description: 'Operational staff portal user',
       scopeType: RoleScope.UNIT,
     },
+    {
+      name: 'ORGANIZER',
+      description: 'Event organizer responsible for creating and managing event plans',
+      scopeType: RoleScope.UNIT,
+    },
   ];
 
   const operationalRoles: SeedRole[] = [
@@ -318,11 +323,6 @@ async function main() {
     {
       name: 'EVENT_COORDINATOR',
       description: 'Event coordination and operational planning role',
-      scopeType: RoleScope.UNIT,
-    },
-    {
-      name: 'ORGANIZER',
-      description: 'Event organizer responsible for creating and managing event plans',
       scopeType: RoleScope.UNIT,
     },
   ];

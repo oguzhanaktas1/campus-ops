@@ -44,7 +44,7 @@ export default function NewFacultyTicketPage() {
 
       const created = await res.json()
       toast.success('Ticket created.')
-      router.push(`/faculty/tickets/${created.requestId}`)
+      router.push(`/faculty/requests/${created.requestId}?from=/faculty/tickets`)
     } catch {
       toast.error('Ticket could not be created.')
     } finally {

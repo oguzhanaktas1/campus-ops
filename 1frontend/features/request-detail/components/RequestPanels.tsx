@@ -9,11 +9,13 @@ import {
   Download,
   Loader2,
   Paperclip,
+  RotateCcw,
   Search,
   ShieldX,
   UserCheck,
   UserPlus,
   X,
+  XCircle,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { CommentThread } from '@/components/comment-thread'
@@ -22,7 +24,9 @@ import { NT } from '@/components/no-translate'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { getToken } from '@/lib/auth'
+import { Textarea } from '@/components/ui/textarea'
+import { getStoredUser, getToken } from '@/lib/auth'
+import { mapRequestDetailToViewModel } from '@/features/request-detail/mappers/mapRequestDetailToViewModel'
 import type { RequestDetailViewModel } from '@/features/request-detail/types'
 
 export function RequestAttachmentsPanel({
@@ -87,14 +91,14 @@ export function RequestCommentsPanel({
     setIsSubmitting(true)
     try {
       const response = await fetch(
-        `${backendUrl}/${detail.portal}/requests/${detail.id}/comments`,
+        `${backendUrl}/requests/${detail.id}/comments`,
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify({ text }),
+          body: JSON.stringify({ commentText: text }),
         },
       )
 
@@ -106,7 +110,9 @@ export function RequestCommentsPanel({
         {
           id: String(created.id ?? `tmp-${Date.now()}`),
           author:
-            created.author ??
+            created.author?.fullName ??
+            created.author?.email ??
+            (typeof created.author === 'string' ? created.author : null) ??
             created.user?.profile?.fullName ??
             created.user?.email ??
             'You',
@@ -151,6 +157,19 @@ export function RequestTimelineTabs({
   const approvalHistory = Array.isArray((detail.raw as any).approvalHistory)
     ? ((detail.raw as any).approvalHistory as any[])
     : []
+  const auditHistory = Array.isArray((detail.raw as any).auditHistory)
+    ? ((detail.raw as any).auditHistory as any[])
+    : []
+  const auditEvents = auditHistory.map((audit) => ({
+    id: String(audit.id),
+    status: String(audit.status ?? audit.actionType ?? 'AUDIT'),
+    date: String(audit.date ?? audit.createdAt ?? new Date().toISOString()),
+    note: [
+      audit.note ?? null,
+      audit.actor?.fullName ? `Actor: ${audit.actor.fullName}` : null,
+      audit.entityType ? `Entity: ${audit.entityType}` : null,
+    ].filter(Boolean).join(' | ') || undefined,
+  }))
 
   return (
     <Card>
@@ -256,7 +275,9 @@ export function RequestTimelineTabs({
             )}
           </TabsContent>
           <TabsContent value="audit">
-            <RequestTimeline events={detail.timeline as any} />
+            <RequestTimeline
+              events={(auditEvents.length > 0 ? auditEvents : detail.timeline) as any}
+            />
           </TabsContent>
         </Tabs>
       </CardContent>
@@ -271,6 +292,9 @@ export function RequestActionPanel({
   detail: RequestDetailViewModel
   onDetailChange: (detail: RequestDetailViewModel) => void
 }) {
+  const canDecide = canCurrentUserDecide(detail)
+  const isTerminal = isTerminalRequest(detail)
+
   if (detail.portal === 'student') {
     return (
       <Card>
@@ -320,7 +344,15 @@ export function RequestActionPanel({
     )
   }
 
+  if (isTerminal && detail.portal !== 'admin') {
+    return <TerminalActionPanel detail={detail} />
+  }
+
   if (detail.portal === 'faculty') {
+    if (canDecide) {
+      return <DecisionActionPanel detail={detail} onDetailChange={onDetailChange} />
+    }
+
     return (
       <Card>
         <CardHeader>
@@ -343,7 +375,243 @@ export function RequestActionPanel({
     return <AdminActionPanel detail={detail} />
   }
 
+  if (canDecide) {
+    return <DecisionActionPanel detail={detail} onDetailChange={onDetailChange} />
+  }
+
   return <StaffActionPanel detail={detail} onDetailChange={onDetailChange} />
+}
+
+type DecisionAction = 'approve' | 'reject' | 'revision'
+
+const ACTIONABLE_REQUEST_STATUSES = new Set([
+  'SUBMITTED',
+  'IN_REVIEW',
+  'WAITING_APPROVAL',
+  'ASSIGNED',
+])
+
+const TERMINAL_REQUEST_STATUSES = new Set([
+  'APPROVED',
+  'REJECTED',
+  'CANCELLED',
+  'CLOSED',
+  'COMPLETED',
+  'EXPIRED',
+])
+
+function isTerminalRequest(detail: RequestDetailViewModel) {
+  return (
+    TERMINAL_REQUEST_STATUSES.has(String(detail.status).toUpperCase()) ||
+    String(detail.workflow.status ?? '').toUpperCase() === 'COMPLETED'
+  )
+}
+
+function normalizeRole(value?: string | null) {
+  return String(value ?? '').trim().toUpperCase()
+}
+
+function activeWorkflowStep(detail: RequestDetailViewModel) {
+  return (
+    detail.workflow.steps?.find((step) =>
+      step.status === 'active' || step.status === 'warning',
+    ) ?? null
+  )
+}
+
+function canCurrentUserDecide(detail: RequestDetailViewModel) {
+  if (!['faculty', 'staff'].includes(detail.portal)) return false
+  if (!ACTIONABLE_REQUEST_STATUSES.has(String(detail.status).toUpperCase())) return false
+
+  const user = getStoredUser()
+  if (!user?.id) return false
+
+  const userRoles = new Set((user.roles ?? []).map(normalizeRole))
+  const assignments = Array.isArray((detail.raw as any).assignments)
+    ? ((detail.raw as any).assignments as any[])
+    : []
+  const step = activeWorkflowStep(detail)
+
+  const isCurrentAssignee = detail.currentAssignee?.id === user.id
+  const isActiveAssignment = assignments.some((assignment) => {
+    if (assignment?.isActive === false) return false
+    return (
+      assignment?.assignedToUserId === user.id ||
+      assignment?.assignedTo?.id === user.id
+    )
+  })
+  const isStepAssignee =
+    step?.assignedTo?.id === user.id ||
+    (step?.assignedToName &&
+      step.assignedToName === detail.currentAssignee?.fullName &&
+      detail.currentAssignee?.id === user.id)
+  const stepRole = normalizeRole(step?.assignedRole ?? step?.role)
+  const isStepRoleOwner = Boolean(stepRole) && userRoles.has(stepRole)
+
+  return isCurrentAssignee || isActiveAssignment || isStepAssignee || isStepRoleOwner
+}
+
+function TerminalActionPanel({ detail }: { detail: RequestDetailViewModel }) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Actions</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="rounded-lg border bg-muted/30 p-3">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Workflow Completed
+          </p>
+          <p className="mt-1 text-sm font-semibold text-foreground">
+            {detail.status.replace(/_/g, ' ')}
+          </p>
+        </div>
+        <p className="text-sm text-muted-foreground">
+          This request has reached a terminal workflow step. It cannot be reassigned or processed further.
+        </p>
+      </CardContent>
+    </Card>
+  )
+}
+
+function DecisionActionPanel({
+  detail,
+  onDetailChange,
+}: {
+  detail: RequestDetailViewModel
+  onDetailChange: (detail: RequestDetailViewModel) => void
+}) {
+  const [comment, setComment] = useState('')
+  const [isProcessing, setIsProcessing] = useState(false)
+
+  const refreshDetail = async (backendUrl: string, token: string) => {
+    const response = await fetch(`${backendUrl}/${detail.portal}/requests/${detail.id}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    if (!response.ok) return false
+
+    const fresh = await response.json()
+    const inlineDomain = fresh.domainData ?? null
+    onDetailChange(
+      mapRequestDetailToViewModel(detail.portal, fresh, inlineDomain?.data ?? null),
+    )
+    return true
+  }
+
+  const handleDecision = async (action: DecisionAction) => {
+    const trimmedComment = comment.trim()
+    if ((action === 'reject' || action === 'revision') && !trimmedComment) {
+      toast.error('Reject or revision requires a comment.')
+      return
+    }
+
+    const token = getToken()
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000'
+    if (!token) return
+
+    setIsProcessing(true)
+    try {
+      const response = await fetch(`${backendUrl}/requests/${detail.id}/actions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          action,
+          comment: trimmedComment || undefined,
+        }),
+      })
+
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}))
+        throw new Error(err?.message ?? 'Action failed')
+      }
+
+      const result = await response.json().catch(() => ({}))
+      toast.success(
+        action === 'approve'
+          ? 'Request approved.'
+          : action === 'reject'
+            ? 'Request rejected.'
+            : 'Revision requested.',
+      )
+      setComment('')
+
+      const refreshed = await refreshDetail(backendUrl, token)
+      if (!refreshed) {
+        onDetailChange({
+          ...detail,
+          status:
+            result?.status ??
+            (action === 'approve'
+              ? 'APPROVED'
+              : action === 'reject'
+                ? 'REJECTED'
+                : 'REVISION_REQUESTED'),
+        })
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Action failed')
+    } finally {
+      setIsProcessing(false)
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Actions</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="rounded-lg border bg-muted/30 p-3">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Current Decision Step
+          </p>
+          <p className="mt-1 text-sm font-semibold text-foreground">
+            {detail.workflow.currentStep ?? activeWorkflowStep(detail)?.label ?? 'Workflow step'}
+          </p>
+        </div>
+
+        <Textarea
+          placeholder="Add a decision note. Required for reject or revision."
+          value={comment}
+          onChange={(event) => setComment(event.target.value)}
+          disabled={isProcessing}
+          className="min-h-[110px] resize-none"
+        />
+
+        <div className="grid gap-2">
+          <Button
+            className="w-full gap-2 bg-emerald-600 text-white hover:bg-emerald-700"
+            disabled={isProcessing}
+            onClick={() => handleDecision('approve')}
+          >
+            {isProcessing ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
+            Approve
+          </Button>
+          <Button
+            variant="destructive"
+            className="w-full gap-2"
+            disabled={isProcessing}
+            onClick={() => handleDecision('reject')}
+          >
+            {isProcessing ? <Loader2 className="size-4 animate-spin" /> : <XCircle className="size-4" />}
+            Reject
+          </Button>
+          <Button
+            variant="outline"
+            className="w-full gap-2 border-amber-200 text-amber-700 hover:bg-amber-50 hover:text-amber-800"
+            disabled={isProcessing}
+            onClick={() => handleDecision('revision')}
+          >
+            {isProcessing ? <Loader2 className="size-4 animate-spin" /> : <RotateCcw className="size-4" />}
+            Request Revision
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  )
 }
 
 function AdminActionPanel({ detail }: { detail: RequestDetailViewModel }) {

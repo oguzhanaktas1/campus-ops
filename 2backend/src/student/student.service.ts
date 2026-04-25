@@ -20,6 +20,7 @@ import {
   Prisma,
 } from '@prisma/client';
 import { WorkflowEngineService } from '../workflow/workflow-engine.service';
+import { buildWorkflowSummary } from '../workflow/workflow-summary';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { CreateInternshipDto } from './dto/create-internship.dto';
 import { CreateGenericRequestDto } from './dto/create-generic-request.dto';
@@ -65,6 +66,27 @@ export class StudentService {
     }
 
     return this.supabase;
+  }
+
+  private async getInternshipWorkflowDefinitionId(
+    requestTypeId: string,
+    currentWorkflowDefinitionId?: string | null,
+  ) {
+    if (currentWorkflowDefinitionId) return currentWorkflowDefinitionId;
+
+    const workflow = await this.prisma.workflowDefinition.findUnique({
+      where: { key: 'WF_INTERNSHIP_REQUEST_V1' },
+      select: { id: true },
+    });
+
+    if (!workflow) return null;
+
+    await this.prisma.requestType.update({
+      where: { id: requestTypeId },
+      data: { workflowDefinitionId: workflow.id },
+    });
+
+    return workflow.id;
   }
 
   async getTotalUsedStorage(userId: string): Promise<number> {
@@ -695,14 +717,14 @@ export class StudentService {
         });
       }
 
-      const coordinators = await this.prisma.user.findMany({
-        where: {
-          status: 'ACTIVE',
-          primaryRoles: {
-            some: { role: { name: 'INTERNSHIP_COORDINATOR' } },
-          },
-        },
-        select: { id: true },
+      const workflowDefinitionId = await this.getInternshipWorkflowDefinitionId(
+        requestType.id,
+        requestType.workflowDefinitionId,
+      );
+
+      const studentProfile = await this.prisma.userProfile.findUnique({
+        where: { userId },
+        select: { facultyId: true, departmentId: true, unitId: true },
       });
 
       const requestNo = `INT-${Date.now().toString().slice(-6)}-${Math.floor(Math.random() * 1000)}`;
@@ -717,6 +739,9 @@ export class StudentService {
             status: RequestStatus.SUBMITTED,
             submittedAt: new Date(),
             priority: PriorityLevel.MEDIUM,
+            facultyId: studentProfile?.facultyId ?? null,
+            departmentId: studentProfile?.departmentId ?? null,
+            unitId: studentProfile?.unitId ?? null,
             internshipRequest: {
               create: {
                 studentUserId: userId,
@@ -745,27 +770,29 @@ export class StudentService {
           },
         });
 
-        if (coordinators.length > 0) {
-          await tx.requestAssignment.createMany({
-            data: coordinators.map((coordinator) => ({
-              requestId: req.id,
-              assignedToUserId: coordinator.id,
-              assignedByUserId: userId,
-              assignmentNote: 'Routed to internship coordinators.',
-            })),
-          });
+        if (workflowDefinitionId) {
+          const workflowStatus = await this.workflowEngine.bootstrapInstance(
+            tx,
+            req.id,
+            workflowDefinitionId,
+          );
 
-          await tx.notification.createMany({
-            data: coordinators.map((coordinator) => ({
-              userId: coordinator.id,
-              requestId: req.id,
-              type: 'IN_APP',
-              title: 'New Internship Request',
-              message:
-                'A new internship application is waiting for coordinator review.',
-              actionUrl: `/staff/requests/internship/${req.id}`,
-            })),
-          });
+          if (workflowStatus && workflowStatus !== RequestStatus.SUBMITTED) {
+            await tx.request.update({
+              where: { id: req.id },
+              data: { status: workflowStatus },
+            });
+
+            await tx.requestStatusHistory.create({
+              data: {
+                requestId: req.id,
+                oldStatus: RequestStatus.SUBMITTED,
+                newStatus: workflowStatus,
+                changedByUserId: userId,
+                changeReason: 'Workflow moved to Advisor Review.',
+              },
+            });
+          }
         }
 
         return req;
@@ -1022,7 +1049,7 @@ export class StudentService {
   ) {
     const existingRequest = await this.prisma.request.findFirst({
       where: { id: requestId, requesterUserId: userId },
-      include: { requestType: true },
+      include: { requestType: true, workflowInstance: { select: { id: true } } },
     });
 
     if (!existingRequest)
@@ -1159,25 +1186,46 @@ export class StudentService {
         });
       }
 
-      if (false && existingRequest?.currentAssigneeUserId) {
-        await tx.requestAssignment.updateMany({
-          where: {
-            requestId: req.id,
-            assignedToUserId: existingRequest?.currentAssigneeUserId ?? undefined,
-          },
-          data: { isActive: true },
+      if (!existingRequest.workflowInstance) {
+        const revisionAction = await tx.approvalAction.findFirst({
+          where: { requestId: req.id, actionType: 'REQUEST_REVISION' },
+          orderBy: { createdAt: 'desc' },
         });
-
-        await tx.notification.create({
-          data: {
-            userId: existingRequest?.currentAssigneeUserId ?? userId,
-            requestId: req.id,
-            type: 'IN_APP',
-            title: '🔄 Request Resubmitted',
-            message: `The student has revised and resubmitted the ${existingRequest?.requestType?.name ?? 'request'} request. It requires your approval again.`,
-            actionUrl: `/faculty/approvals?id=${req.id}`,
-          },
-        });
+        if (revisionAction?.actionByUserId) {
+          const prevAssignment = await tx.requestAssignment.findFirst({
+            where: { requestId: req.id, assignedToUserId: revisionAction.actionByUserId },
+            orderBy: { assignedAt: 'desc' },
+          });
+          if (prevAssignment) {
+            await tx.requestAssignment.update({
+              where: { id: prevAssignment.id },
+              data: { isActive: true, unassignedAt: null },
+            });
+          } else {
+            await tx.requestAssignment.create({
+              data: {
+                requestId: req.id,
+                assignedToUserId: revisionAction.actionByUserId,
+                assignedByUserId: userId,
+                assignmentNote: 'Resubmitted after revision.',
+              },
+            });
+          }
+          await tx.request.update({
+            where: { id: req.id },
+            data: { currentAssigneeUserId: revisionAction.actionByUserId },
+          });
+          await tx.notification.create({
+            data: {
+              userId: revisionAction.actionByUserId,
+              requestId: req.id,
+              type: 'IN_APP',
+              title: '🔄 Request Resubmitted',
+              message: `The student has revised and resubmitted the ${existingRequest.requestType?.name ?? 'request'} request. It requires your review again.`,
+              actionUrl: `/faculty/approvals?id=${req.id}`,
+            },
+          });
+        }
       }
 
       // 🔥 AUDIT LOG EKLENDİ 🔥
@@ -1299,16 +1347,56 @@ export class StudentService {
           },
         },
         // 🔥 1. EKSİK OLAN SORGULAMA BURASI: Timeline verilerini DB'den çek
+        approvalActions: {
+          include: {
+            actionBy: {
+              include: {
+                profile: true,
+                primaryRoles: { include: { role: true } },
+              },
+            },
+            workflowInstanceStep: {
+              include: { workflowStep: true },
+            },
+          },
+          orderBy: { createdAt: 'asc' },
+        },
         statusHistory: { orderBy: { changedAt: 'desc' } },
         workflowInstance: {
           include: {
             currentStep: true,
             workflowDefinition: {
               include: {
-                steps: { orderBy: { stepOrder: 'asc' } },
+                steps: {
+                  include: {
+                    assignedRole: true,
+                    assignedUnit: true,
+                    assignedUser: {
+                      include: {
+                        profile: true,
+                        primaryRoles: { include: { role: true } },
+                      },
+                    },
+                  },
+                  orderBy: { stepOrder: 'asc' },
+                },
               },
             },
             instanceSteps: {
+              include: {
+                assignedTo: {
+                  include: {
+                    profile: true,
+                    primaryRoles: { include: { role: true } },
+                  },
+                },
+                actionBy: {
+                  include: {
+                    profile: true,
+                    primaryRoles: { include: { role: true } },
+                  },
+                },
+              },
               orderBy: { createdAt: 'asc' },
             },
           },
@@ -1359,6 +1447,8 @@ export class StudentService {
       title: request.title,
       description: request.description,
       status: request.status,
+      displayStatus: workflowInstance?.currentStep?.stepKey ?? request.status,
+      currentStepName: workflowInstance?.currentStep?.stepName ?? null,
       priority: request.priority,
       type: request.requestType?.key || 'unknown',
       typeName: request.requestType?.name || 'Bilinmeyen Tür',
@@ -1394,6 +1484,25 @@ export class StudentService {
       assignedToNames: request.assignments
         .map((a) => a.assignedTo.profile?.fullName)
         .filter(Boolean),
+      approvalHistory: request.approvalActions.map((action) => ({
+        id: action.id,
+        actionType: action.actionType,
+        decisionNote: action.decisionNote,
+        createdAt: action.createdAt,
+        actor: {
+          id: action.actionBy.id,
+          fullName: action.actionBy.profile?.fullName || action.actionBy.email,
+          email: action.actionBy.email,
+          role: action.actionBy.primaryRoles?.[0]?.role?.name ?? null,
+        },
+        workflowStep: action.workflowInstanceStep?.workflowStep
+          ? {
+              id: action.workflowInstanceStep.workflowStep.id,
+              key: action.workflowInstanceStep.workflowStep.stepKey,
+              name: action.workflowInstanceStep.workflowStep.stepName,
+            }
+          : null,
+      })),
       attachments:
         (request as any).fileLinks
           ? await Promise.all(
@@ -1427,34 +1536,7 @@ export class StudentService {
         date: h.changedAt,
         note: h.changeReason || 'Status updated.',
       })),
-      workflow: (() => {
-        if (!workflowInstance) return null;
-
-        return {
-          status: workflowInstance.status,
-          currentStep: workflowInstance.currentStep?.stepName || null,
-          workflowName: workflowInstance.workflowDefinition?.name || null,
-          steps:
-            workflowInstance.workflowDefinition?.steps?.map((step) => {
-              const instanceStep = workflowInstance.instanceSteps.find(
-                (item) => item.workflowStepId === step.id,
-              );
-              return {
-                id: step.id,
-                label: step.stepName,
-                status:
-                  step.id === workflowInstance.currentStepId
-                    ? 'active'
-                    : instanceStep?.status === 'COMPLETED'
-                      ? 'completed'
-                      : request.status === 'REJECTED' &&
-                          step.id === workflowInstance.currentStepId
-                        ? 'failed'
-                        : 'pending',
-              };
-            }) || [],
-        };
-      })(),
+      workflow: buildWorkflowSummary(workflowInstance, request.status),
     };
   }
 
@@ -1565,6 +1647,11 @@ export class StudentService {
         request: {
           include: {
             requestType: { select: { id: true, key: true, name: true } },
+            workflowInstance: {
+              include: {
+                currentStep: { select: { stepKey: true, stepName: true } },
+              },
+            },
           },
         },
         advisor: {
@@ -1581,6 +1668,8 @@ export class StudentService {
       requestNo: r.request.requestNo,
       title: r.request.title,
       status: r.request.status,
+      displayStatus: r.request.workflowInstance?.currentStep?.stepKey ?? r.request.status,
+      currentStepName: r.request.workflowInstance?.currentStep?.stepName ?? null,
       priority: r.request.priority,
       companyName: r.companyName,
       companySector: r.companySector,
@@ -1604,6 +1693,11 @@ export class StudentService {
         request: {
           include: {
             requestType: true,
+            workflowInstance: {
+              include: {
+                currentStep: { select: { stepKey: true, stepName: true } },
+              },
+            },
             statusHistory: { orderBy: { changedAt: 'asc' } },
             fileLinks: { include: { file: true } },
             comments: {
@@ -1627,6 +1721,8 @@ export class StudentService {
       title: r.request.title,
       description: r.request.description,
       status: r.request.status,
+      displayStatus: (r.request as any).workflowInstance?.currentStep?.stepKey ?? r.request.status,
+      currentStepName: (r.request as any).workflowInstance?.currentStep?.stepName ?? null,
       priority: r.request.priority,
       createdAt: r.createdAt,
       companyName: r.companyName,

@@ -81,6 +81,42 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
     return value;
   }
 
+  // Fetches version + cached value in a single Lua round-trip instead of two sequential GETs.
+  async getWithVersion<T>(
+    versionNamespace: string,
+    baseKey: string,
+    ttlSeconds: number,
+    factory: () => Promise<T>,
+  ): Promise<T> {
+    const lua = `
+      local ver = redis.call('GET', KEYS[1])
+      if not ver then ver = '1' end
+      local fullKey = KEYS[2] .. ':v' .. ver
+      local data = redis.call('GET', fullKey)
+      return {ver, data, fullKey}
+    `;
+    const result = (await this.redis.eval(
+      lua,
+      2,
+      `version:${versionNamespace}`,
+      baseKey,
+    )) as [string, string | null, string];
+
+    const [, raw, cacheKey] = result;
+
+    if (raw !== null && raw !== undefined) {
+      try {
+        return JSON.parse(raw) as T;
+      } catch {
+        this.logger.warn(`Cache parse error for key: ${cacheKey}`);
+      }
+    }
+
+    const value = await factory();
+    await this.redis.set(cacheKey, JSON.stringify(value), 'EX', ttlSeconds);
+    return value;
+  }
+
   async getVersion(namespace: string): Promise<number> {
     const value = await this.redis.get(`version:${namespace}`);
     return value ? Number(value) : 1;

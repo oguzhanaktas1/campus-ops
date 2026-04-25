@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { MetricCard } from '@/components/metric-card'
@@ -304,11 +305,9 @@ export default function FacultyAppointmentsPage() {
                   <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                     Status
                   </th>
-                  {activeTab === 'requests' && (
-                    <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                      Actions
-                    </th>
-                  )}
+                  <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    Actions
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -342,9 +341,15 @@ export default function FacultyAppointmentsPage() {
                       <td className="px-5 py-4">
                         <AppointmentStatusBadge status={apt.status} />
                       </td>
-                      {activeTab === 'requests' && (
-                        <td className="px-5 py-4">
-                          <div className="flex items-center gap-2">
+                      <td className="px-5 py-4">
+                        <div className="flex items-center gap-2">
+                          <Button asChild size="sm" variant="outline" className="h-7 gap-1 text-xs">
+                            <Link href={`/faculty/requests/${apt.id}?from=/faculty/appointments`}>
+                              View
+                            </Link>
+                          </Button>
+                          {activeTab === 'requests' && (
+                            <>
                             <Button
                               size="sm"
                               className="h-7 gap-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs"
@@ -372,9 +377,10 @@ export default function FacultyAppointmentsPage() {
                               )}
                               Decline
                             </Button>
-                          </div>
-                        </td>
-                      )}
+                            </>
+                          )}
+                        </div>
+                      </td>
                     </tr>
                   )
                 })}

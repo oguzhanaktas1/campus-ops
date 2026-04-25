@@ -50,7 +50,7 @@ async def handle(payload: BasePayload) -> None:
         case "workflow.revision_requested":
             await _handle_workflow_revision(payload)  # type: ignore[arg-type]
         case _:
-            logger.debug("notification_handler_skip", event=payload.event)
+            logger.debug("notification_handler_skip", event_name=payload.event)
 
 
 # ─── Handler'lar ──────────────────────────────────────────────────────────────

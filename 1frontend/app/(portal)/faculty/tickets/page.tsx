@@ -101,7 +101,7 @@ export default function FacultyTicketsPage() {
             return (
               <Link
                 key={t.id}
-                href={`/faculty/tickets/${t.id}`}
+                href={`/faculty/requests/${t.requestId ?? t.id}?from=/faculty/tickets`}
                 className="flex items-center justify-between px-5 py-4 hover:bg-muted/20 transition-colors"
               >
                 <div className="min-w-0">

@@ -151,8 +151,6 @@ export class WorkflowEngineService {
     fallback: RequestStatus,
   ): RequestStatus {
     switch (stepType) {
-      case 'APPROVAL':
-        return RequestStatus.WAITING_APPROVAL;
       case 'REVISION':
         return RequestStatus.REVISION_REQUESTED;
       case 'END':
@@ -580,7 +578,7 @@ export class WorkflowEngineService {
       `Workflow moved to "${nextStep.stepName}".`,
     );
 
-    return RequestStatus.SUBMITTED;
+    return this.mapStepTypeToStatus(nextStep.stepType, RequestStatus.SUBMITTED);
   }
 
   /**
@@ -607,9 +605,17 @@ export class WorkflowEngineService {
     const request = await this.prisma.request.findUnique({
       where: { id: requestId },
       include: {
+        assignments: {
+          where: { isActive: true },
+          select: { assignedToUserId: true },
+        },
         workflowInstance: {
           include: {
-            currentStep: true,
+            currentStep: {
+              include: {
+                assignedRole: { select: { name: true } },
+              },
+            },
             instanceSteps: {
               where: { status: 'PENDING' },
               orderBy: { createdAt: 'desc' },
@@ -622,14 +628,31 @@ export class WorkflowEngineService {
 
     if (!request) throw new NotFoundException('Request not found.');
 
-    const isPrivileged = roles.some((r) =>
+    const normalizedRoles = roles.map((role) => String(role).toUpperCase());
+    const pendingStep = request.workflowInstance?.instanceSteps?.[0] ?? null;
+    const activeStepRole = request.workflowInstance?.currentStep?.assignedRole?.name
+      ? String(request.workflowInstance.currentStep.assignedRole.name).toUpperCase()
+      : null;
+    const isPrivileged = normalizedRoles.some((r) =>
       ['ADMIN', 'FACULTY', 'STAFF'].includes(r),
     );
+    const isAssignedActor =
+      request.currentAssigneeUserId === userId ||
+      request.assignments.some((assignment) => assignment.assignedToUserId === userId) ||
+      pendingStep?.assignedToUserId === userId;
+    const isActiveStepRoleActor =
+      activeStepRole !== null && normalizedRoles.includes(activeStepRole);
     const isRequesterSubmit =
       dto.action === 'submit' && request.requesterUserId === userId;
     const isRequesterCancel =
       dto.action === 'cancel' && request.requesterUserId === userId;
-    if (!isPrivileged && !isRequesterCancel && !isRequesterSubmit) {
+    if (
+      !isPrivileged &&
+      !isAssignedActor &&
+      !isActiveStepRoleActor &&
+      !isRequesterCancel &&
+      !isRequesterSubmit
+    ) {
       throw new ForbiddenException('Insufficient permissions.');
     }
 
@@ -643,7 +666,6 @@ export class WorkflowEngineService {
 
     const txResult = await this.prisma.$transaction(async (tx) => {
       const workflowInstance = request.workflowInstance;
-      const pendingStep = workflowInstance?.instanceSteps?.[0] ?? null;
 
       let nextStep: {
         id: string;
@@ -665,6 +687,37 @@ export class WorkflowEngineService {
           request.dynamicData,
         );
         nextStep = transition?.toStep ?? null;
+      }
+
+      if (dto.action === 'reject' && workflowInstance) {
+        const rejectedEndStep = await tx.workflowStep.findFirst({
+          where: {
+            workflowDefinitionId: workflowInstance.workflowDefinitionId,
+            stepKey: 'REJECTED_END',
+          },
+        });
+
+        if (rejectedEndStep) {
+          nextStep = rejectedEndStep;
+        }
+      }
+
+      if (
+        dto.action === 'submit' &&
+        request.status === RequestStatus.REVISION_REQUESTED &&
+        nextStep &&
+        workflowInstance
+      ) {
+        const revisionInstanceStep = await tx.workflowInstanceStep.findFirst({
+          where: {
+            workflowInstanceId: workflowInstance.id,
+            actionTaken: WorkflowActionType.REQUEST_REVISION,
+          },
+          orderBy: { completedAt: 'desc' },
+        });
+        if (revisionInstanceStep?.actionByUserId) {
+          nextStep = { ...nextStep, assignedUserId: revisionInstanceStep.actionByUserId };
+        }
       }
 
       const nextStatus = nextStep
@@ -783,6 +836,26 @@ export class WorkflowEngineService {
           };
         } else {
           await this.slaService.markResolution(tx, requestId, nextStatus);
+
+          if (nextStep?.stepType === 'END') {
+            const existingTerminalStep = await tx.workflowInstanceStep.findFirst({
+              where: {
+                workflowInstanceId: workflowInstance.id,
+                workflowStepId: nextStep.id,
+              },
+            });
+
+            if (!existingTerminalStep) {
+              await this.createCompletedStep(
+                tx,
+                workflowInstance.id,
+                nextStep,
+                mapped.wfAction,
+                userId,
+                dto.comment ?? `${dto.action} action processed.`,
+              );
+            }
+          }
 
           await tx.workflowInstance.update({
             where: { id: workflowInstance.id },

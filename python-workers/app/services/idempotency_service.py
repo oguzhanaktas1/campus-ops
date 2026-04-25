@@ -115,7 +115,7 @@ async def purge_old_processed_events() -> int:
         result = await pool.execute(
             """
             DELETE FROM "ProcessedEvent"
-            WHERE "processedAt" < NOW() - INTERVAL '$1 days'
+            WHERE "processedAt" < NOW() - ($1::int * INTERVAL '1 day')
             """,
             DB_PURGE_DAYS,
         )

@@ -1,3 +1,7 @@
+'use client'
+
+import { useState } from 'react'
+import { ChevronDown } from 'lucide-react'
 import { NT } from '@/components/no-translate'
 import { StatusBadge } from '@/components/status-badge'
 import { WorkflowStepIndicator } from '@/components/workflow-step-indicator'
@@ -9,17 +13,27 @@ import {
   humanize,
   titleize,
 } from '@/features/request-detail/utils'
+import type { Step } from '@/components/workflow-step-indicator'
+import { cn } from '@/lib/utils'
 
 function KeyValueList({
   items,
 }: {
-  items: Array<{ label: string; value: string | null; noTranslate?: boolean }>
+  items: Array<{
+    label: string
+    value: string | null
+    noTranslate?: boolean
+    fullWidth?: boolean
+  }>
 }) {
   return (
     <div className="grid gap-3 sm:grid-cols-2">
       {items.map((item) =>
         item.value ? (
-          <div key={item.label} className="space-y-1">
+          <div
+            key={item.label}
+            className={cn('space-y-1', item.fullWidth && 'sm:col-span-2')}
+          >
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               {item.label}
             </p>
@@ -74,21 +88,244 @@ export function WorkflowCurrentStepCard({
       : buildWorkflowSteps(detail.requestType.key, detail.status)
 
   return (
+    <WorkflowProgressCard
+      currentStep={detail.workflow.currentStep ?? 'Workflow progression'}
+      steps={steps}
+    />
+  )
+}
+
+export function WorkflowProgressCard({
+  currentStep,
+  steps,
+  title = 'Workflow',
+}: {
+  currentStep?: string | null
+  steps: Step[]
+  title?: string
+}) {
+  const currentWorkflowStep =
+    steps.find((step) => step.isCurrent) ??
+    steps.find((step) => step.status === 'active' || step.status === 'warning' || step.status === 'failed') ??
+    null
+  const currentOwner = currentWorkflowStep ? workflowStepOwner(currentWorkflowStep) : null
+  const currentTiming = currentWorkflowStep ? workflowStepTiming(currentWorkflowStep) : null
+  const [showStepRows, setShowStepRows] = useState(false)
+
+  return (
     <Card>
       <CardHeader>
-        <CardTitle>Workflow</CardTitle>
+        <div className="flex items-center justify-between gap-3">
+          <CardTitle>{title}</CardTitle>
+          <button
+            type="button"
+            aria-label={showStepRows ? 'Hide workflow steps' : 'Show workflow steps'}
+            aria-expanded={showStepRows}
+            className="flex size-7 shrink-0 items-center justify-center rounded-md border bg-background text-muted-foreground transition hover:bg-muted hover:text-foreground"
+            onClick={() => setShowStepRows((value) => !value)}
+          >
+            <ChevronDown
+              className={cn('size-4 transition-transform', showStepRows && 'rotate-180')}
+            />
+          </button>
+        </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="flex items-center justify-between rounded-lg border bg-muted/30 px-3 py-2">
-          <span className="text-sm text-muted-foreground">Current Step</span>
-          <span className="text-sm font-medium text-foreground">
-            {detail.workflow.currentStep ?? 'Workflow progression'}
-          </span>
+        <div className="flex items-center justify-between gap-3 rounded-lg border bg-muted/30 px-3 py-2">
+          <span className="shrink-0 text-sm text-muted-foreground">Current Step</span>
+          <div className="min-w-0 text-right">
+            <span className="block truncate text-sm font-medium text-foreground">
+              {currentStep ?? 'Workflow progression'}
+            </span>
+            {currentWorkflowStep ? (
+              <span className="block truncate text-xs text-muted-foreground">
+                {currentOwner ? `Owner: ${currentOwner}` : null}
+                {currentOwner && currentTiming ? ' | ' : null}
+                {currentTiming ?? null}
+              </span>
+            ) : null}
+          </div>
         </div>
-        <WorkflowStepIndicator steps={steps} />
+        <div className="-mx-1 overflow-x-auto px-1 pb-2">
+          <WorkflowStepIndicator steps={steps} className="min-w-[560px]" />
+        </div>
+        {showStepRows ? (
+          <div className="space-y-2">
+            {steps.map((step, index) => (
+              <WorkflowStepRow key={step.id} step={step} index={index} />
+            ))}
+          </div>
+        ) : null}
       </CardContent>
     </Card>
   )
+}
+
+const workflowStatusStyles: Record<Step['status'], string> = {
+  completed: 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-400',
+  active: 'border-primary/30 bg-primary/10 text-primary',
+  pending: 'border-border bg-background text-muted-foreground',
+  failed: 'border-destructive/30 bg-destructive/10 text-destructive',
+  warning: 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-400',
+}
+
+function WorkflowStatusPill({ status }: { status: Step['status'] }) {
+  return (
+    <span
+      className={cn(
+        'shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-medium capitalize',
+        workflowStatusStyles[status],
+      )}
+    >
+      {status}
+    </span>
+  )
+}
+
+function WorkflowStepRow({
+  step,
+  index,
+}: {
+  step: Step
+  index: number
+}) {
+  return (
+    <div
+      className={cn(
+        'rounded-md border px-3 py-3 text-sm',
+        step.status === 'active' && 'border-primary/40 bg-primary/5',
+        step.status === 'warning' && 'border-amber-300 bg-amber-50/60 dark:border-amber-800 dark:bg-amber-950/20',
+        step.status === 'failed' && 'border-destructive/40 bg-destructive/5',
+      )}
+    >
+      <div className="flex min-w-0 items-start justify-between gap-3">
+        <div className="min-w-0 space-y-1">
+          <div className="flex min-w-0 items-center gap-2">
+            <span className="flex size-6 shrink-0 items-center justify-center rounded-full border bg-background text-xs font-medium text-muted-foreground">
+              {index + 1}
+            </span>
+            <p className="min-w-0 truncate font-medium text-foreground">
+              {step.label}
+            </p>
+            <WorkflowStatusPill status={step.status} />
+          </div>
+          {step.actionNote ? (
+            <p className="line-clamp-2 text-xs text-muted-foreground">
+              {step.actionNote}
+            </p>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="mt-3 grid gap-3 border-t pt-3 sm:grid-cols-3">
+        <WorkflowStepField
+          label="Owner"
+          value={workflowStepOwner(step)}
+          noTranslate
+        />
+        <WorkflowStepField label="Where" value={workflowStepLocation(step)} />
+        <WorkflowStepField label="Time" value={workflowStepTiming(step)} />
+      </div>
+    </div>
+  )
+}
+
+function WorkflowStepField({
+  label,
+  value,
+  noTranslate,
+}: {
+  label: string
+  value?: string | null
+  noTranslate?: boolean
+}) {
+  return (
+    <div className="min-w-0">
+      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+        {label}
+      </p>
+      {noTranslate ? (
+        <NT as="p" className="truncate text-sm text-foreground">{value || '-'}</NT>
+      ) : (
+        <p className="truncate text-sm text-foreground">{value || '-'}</p>
+      )}
+    </div>
+  )
+}
+
+function workflowStepOwner(step: Step) {
+  if (step.status === 'completed' || step.status === 'failed') {
+    return (
+      step.actionByName ??
+      step.actionBy?.fullName ??
+      step.assignedToName ??
+      step.assignedTo?.fullName ??
+      step.assignedRole ??
+      step.role ??
+      null
+    )
+  }
+
+  return (
+    step.assignedToName ??
+    step.assignedTo?.fullName ??
+    step.assignedRole ??
+    step.role ??
+    null
+  )
+}
+
+function workflowStepLocation(step: Step) {
+  return (
+    step.unitName ??
+    step.assignedUnit?.name ??
+    (step.type ? titleize(step.type) : null) ??
+    null
+  )
+}
+
+function workflowStepTiming(step: Step) {
+  if (step.completedAt || step.actedAt) {
+    return `Done ${formatWorkflowDate(step.completedAt ?? step.actedAt)}`
+  }
+
+  if (step.dueAt) {
+    const remaining = formatRemaining(step.dueAt)
+    if (remaining) return remaining
+  }
+
+  if (step.slaHours) return `SLA ${step.slaHours}h`
+
+  return null
+}
+
+function formatWorkflowDate(value?: string | null) {
+  if (!value) return '-'
+  return new Date(value).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+  })
+}
+
+function formatRemaining(value?: string | null) {
+  if (!value) return null
+  const due = new Date(value).getTime()
+  if (Number.isNaN(due)) return null
+
+  const diff = due - Date.now()
+  const abs = Math.abs(diff)
+  const totalMinutes = Math.max(1, Math.round(abs / 60000))
+  const days = Math.floor(totalMinutes / 1440)
+  const hours = Math.floor((totalMinutes % 1440) / 60)
+  const minutes = totalMinutes % 60
+  const duration =
+    days > 0
+      ? `${days}d ${hours}h`
+      : hours > 0
+        ? `${hours}h ${minutes}m`
+        : `${minutes}m`
+
+  return diff < 0 ? `Overdue ${duration}` : `${duration} left`
 }
 
 export function RequestQuickFactsCard({
@@ -140,7 +377,7 @@ export function RelatedEntitiesCard({
         <KeyValueList
           items={[
             { label: 'Full Name',        value: requester?.fullName ?? null,   noTranslate: true },
-            { label: 'Email',            value: requester?.email ?? null,      noTranslate: true },
+            { label: 'Email',            value: requester?.email ?? null,      noTranslate: true, fullWidth: true },
             { label: 'Role',             value: requesterRole },
             { label: 'Department',       value: requester?.department ?? null },
             { label: 'Faculty',          value: requester?.faculty ?? null },

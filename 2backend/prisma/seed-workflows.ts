@@ -26,6 +26,7 @@ type StepInput = {
   slaHours?: number | null;
   isRequired?: boolean;
   allowSkip?: boolean;
+  configJson?: Record<string, unknown>;
 };
 
 type TransitionInput = {
@@ -131,6 +132,11 @@ async function upsertWorkflowStep(params: {
   const assignedRoleId = step.assignedRoleName
     ? await getRoleIdByName(step.assignedRoleName)
     : null;
+  const configJson = {
+    display: true,
+    stageKey: step.stepKey,
+    ...(step.configJson ?? {}),
+  };
 
   return prisma.workflowStep.upsert({
     where: {
@@ -149,6 +155,7 @@ async function upsertWorkflowStep(params: {
       slaHours: step.slaHours ?? null,
       assignedUnitId: null,
       assignedUserId: null,
+      configJson: configJson as Prisma.InputJsonValue,
     },
     create: {
       workflowDefinitionId,
@@ -162,6 +169,7 @@ async function upsertWorkflowStep(params: {
       isRequired: step.isRequired ?? true,
       allowSkip: step.allowSkip ?? false,
       slaHours: step.slaHours ?? null,
+      configJson: configJson as Prisma.InputJsonValue,
     },
   });
 }
@@ -219,14 +227,64 @@ async function seedWorkflow(
     createdByUserId,
   });
 
-  await prisma.workflowStep.updateMany({
+  const existingSteps = await prisma.workflowStep.findMany({
     where: { workflowDefinitionId: workflow.id },
-    data: {
-      stepOrder: {
-        increment: 100,
-      },
-    },
+    orderBy: [{ stepOrder: 'asc' }, { id: 'asc' }],
   });
+
+  for (let idx = 0; idx < existingSteps.length; idx += 1) {
+    await prisma.workflowStep.update({
+      where: { id: existingSteps[idx].id },
+      data: { stepOrder: 1000 + idx },
+    });
+  }
+
+  if (input.workflowKey === 'WF_INTERNSHIP_REQUEST_V1') {
+    const legacyFinalDecision = await prisma.workflowStep.findFirst({
+      where: {
+        workflowDefinitionId: workflow.id,
+        stepKey: 'FINAL_DECISION',
+      },
+    });
+    const approvedEndExists = await prisma.workflowStep.findFirst({
+      where: {
+        workflowDefinitionId: workflow.id,
+        stepKey: 'APPROVED_END',
+      },
+    });
+    const rejectedEndExists = await prisma.workflowStep.findFirst({
+      where: {
+        workflowDefinitionId: workflow.id,
+        stepKey: 'REJECTED_END',
+      },
+    });
+
+    if (legacyFinalDecision) {
+      const targetKey = approvedEndExists ? 'REJECTED_END' : 'APPROVED_END';
+      const targetName = targetKey === 'APPROVED_END' ? 'Approved' : 'Rejected';
+      const targetOrder = targetKey === 'APPROVED_END' ? 4 : 5;
+
+      if (targetKey === 'REJECTED_END' && rejectedEndExists) {
+        // Leave existing terminal nodes intact if both already exist.
+      } else if (targetKey === 'APPROVED_END' && approvedEndExists) {
+        // Leave existing terminal nodes intact if both already exist.
+      } else {
+        await prisma.workflowStep.update({
+          where: { id: legacyFinalDecision.id },
+          data: {
+            stepKey: targetKey,
+            stepName: targetName,
+            stepOrder: targetOrder,
+            stepType: WorkflowStepType.END,
+            assignedRoleId: null,
+            assignedUnitId: null,
+            assignedUserId: null,
+            slaHours: null,
+          },
+        });
+      }
+    }
+  }
 
   const stepMap = new Map<string, string>();
 
@@ -236,6 +294,31 @@ async function seedWorkflow(
       step,
     });
     stepMap.set(step.stepKey, createdStep.id);
+  }
+
+  const activeStepIds = Array.from(stepMap.values());
+  const staleSteps = await prisma.workflowStep.findMany({
+    where: {
+      workflowDefinitionId: workflow.id,
+      id: activeStepIds.length > 0 ? { notIn: activeStepIds } : undefined,
+    },
+    orderBy: [{ stepOrder: 'asc' }, { id: 'asc' }],
+  });
+
+  for (let idx = 0; idx < staleSteps.length; idx += 1) {
+    await prisma.workflowStep.update({
+      where: { id: staleSteps[idx].id },
+      data: {
+        stepOrder: 1000 + idx,
+        isRequired: false,
+        allowSkip: true,
+        configJson: {
+          display: false,
+          deprecated: true,
+          supersededByWorkflowKey: input.workflowKey,
+        } as Prisma.InputJsonValue,
+      },
+    });
   }
 
   await prisma.workflowTransition.deleteMany({
@@ -272,12 +355,12 @@ async function seedWorkflow(
   await attachWorkflowToRequestType(input.requestTypeKey, workflow.id);
 }
 
-const workflows: WorkflowSeedInput[] = [
+const legacyWorkflows: WorkflowSeedInput[] = [
   {
     requestTypeKey: 'INTERNSHIP_REQUEST',
     workflowKey: 'WF_INTERNSHIP_REQUEST_V1',
     workflowName: 'Internship Request Workflow',
-    description: 'Student internship approval workflow',
+    description: 'Student internship approval workflow with advisor and coordinator reviews',
     steps: [
       {
         stepKey: 'SUBMIT',
@@ -302,22 +385,15 @@ const workflows: WorkflowSeedInput[] = [
         slaHours: 48,
       },
       {
-        stepKey: 'REVISION',
-        stepName: 'Student Revision',
+        stepKey: 'REJECTED_END',
+        stepName: 'Rejected',
         stepOrder: 4,
-        stepType: WorkflowStepType.REVISION,
-        slaHours: 72,
+        stepType: WorkflowStepType.END,
       },
       {
         stepKey: 'APPROVED_END',
         stepName: 'Approved',
         stepOrder: 5,
-        stepType: WorkflowStepType.END,
-      },
-      {
-        stepKey: 'REJECTED_END',
-        stepName: 'Rejected',
-        stepOrder: 6,
         stepType: WorkflowStepType.END,
       },
     ],
@@ -334,7 +410,7 @@ const workflows: WorkflowSeedInput[] = [
       },
       {
         fromStepKey: 'ADVISOR_REVIEW',
-        toStepKey: 'REVISION',
+        toStepKey: 'ADVISOR_REVIEW',
         actionType: WorkflowActionType.REQUEST_REVISION,
       },
       {
@@ -343,7 +419,7 @@ const workflows: WorkflowSeedInput[] = [
         actionType: WorkflowActionType.REJECT,
       },
       {
-        fromStepKey: 'REVISION',
+        fromStepKey: 'ADVISOR_REVIEW',
         toStepKey: 'ADVISOR_REVIEW',
         actionType: WorkflowActionType.SUBMIT,
       },
@@ -354,13 +430,18 @@ const workflows: WorkflowSeedInput[] = [
       },
       {
         fromStepKey: 'COORDINATOR_REVIEW',
-        toStepKey: 'REVISION',
+        toStepKey: 'COORDINATOR_REVIEW',
         actionType: WorkflowActionType.REQUEST_REVISION,
       },
       {
         fromStepKey: 'COORDINATOR_REVIEW',
         toStepKey: 'REJECTED_END',
         actionType: WorkflowActionType.REJECT,
+      },
+      {
+        fromStepKey: 'COORDINATOR_REVIEW',
+        toStepKey: 'COORDINATOR_REVIEW',
+        actionType: WorkflowActionType.SUBMIT,
       },
     ],
   },
@@ -369,7 +450,7 @@ const workflows: WorkflowSeedInput[] = [
     requestTypeKey: 'EQUIPMENT',
     workflowKey: 'WF_EQUIPMENT_REQUEST_V2',
     workflowName: 'Equipment Request Workflow',
-    description: 'Equipment request and review workflow',
+    description: 'Equipment request and review workflow: Lab Technician reviews first, then Resource Manager approves',
     steps: [
       {
         stepKey: 'SUBMIT',
@@ -378,20 +459,20 @@ const workflows: WorkflowSeedInput[] = [
         stepType: WorkflowStepType.START,
       },
       {
-        stepKey: 'RESOURCE_REVIEW',
-        stepName: 'Resource Manager Review',
-        stepOrder: 2,
-        stepType: WorkflowStepType.REVIEW,
-        assignedRoleName: 'RESOURCE_MANAGER',
-        slaHours: 24,
-      },
-      {
         stepKey: 'LAB_TECHNICIAN_REVIEW',
         stepName: 'Lab Technician Review',
-        stepOrder: 3,
-        stepType: WorkflowStepType.APPROVAL,
+        stepOrder: 2,
+        stepType: WorkflowStepType.REVIEW,
         assignedRoleName: 'LAB_TECHNICIAN',
         slaHours: 48,
+      },
+      {
+        stepKey: 'RESOURCE_REVIEW',
+        stepName: 'Resource Manager Review',
+        stepOrder: 3,
+        stepType: WorkflowStepType.APPROVAL,
+        assignedRoleName: 'RESOURCE_MANAGER',
+        slaHours: 24,
       },
       {
         stepKey: 'REVISION',
@@ -416,12 +497,27 @@ const workflows: WorkflowSeedInput[] = [
     transitions: [
       {
         fromStepKey: 'SUBMIT',
-        toStepKey: 'RESOURCE_REVIEW',
+        toStepKey: 'LAB_TECHNICIAN_REVIEW',
         actionType: WorkflowActionType.SUBMIT,
       },
       {
+        fromStepKey: 'LAB_TECHNICIAN_REVIEW',
+        toStepKey: 'RESOURCE_REVIEW',
+        actionType: WorkflowActionType.APPROVE,
+      },
+      {
+        fromStepKey: 'LAB_TECHNICIAN_REVIEW',
+        toStepKey: 'REVISION',
+        actionType: WorkflowActionType.REQUEST_REVISION,
+      },
+      {
+        fromStepKey: 'LAB_TECHNICIAN_REVIEW',
+        toStepKey: 'REJECTED_END',
+        actionType: WorkflowActionType.REJECT,
+      },
+      {
         fromStepKey: 'RESOURCE_REVIEW',
-        toStepKey: 'LAB_TECHNICIAN_REVIEW',
+        toStepKey: 'APPROVED_END',
         actionType: WorkflowActionType.APPROVE,
       },
       {
@@ -436,23 +532,8 @@ const workflows: WorkflowSeedInput[] = [
       },
       {
         fromStepKey: 'REVISION',
-        toStepKey: 'RESOURCE_REVIEW',
+        toStepKey: 'LAB_TECHNICIAN_REVIEW',
         actionType: WorkflowActionType.SUBMIT,
-      },
-      {
-        fromStepKey: 'LAB_TECHNICIAN_REVIEW',
-        toStepKey: 'APPROVED_END',
-        actionType: WorkflowActionType.APPROVE,
-      },
-      {
-        fromStepKey: 'LAB_TECHNICIAN_REVIEW',
-        toStepKey: 'REVISION',
-        actionType: WorkflowActionType.REQUEST_REVISION,
-      },
-      {
-        fromStepKey: 'LAB_TECHNICIAN_REVIEW',
-        toStepKey: 'REJECTED_END',
-        actionType: WorkflowActionType.REJECT,
       },
     ],
   },
@@ -1424,6 +1505,346 @@ const workflows: WorkflowSeedInput[] = [
       },
     ],
   },
+];
+
+type UnifiedWorkflowStage = Omit<StepInput, 'stepOrder'>;
+
+function buildUnifiedWorkflow(input: {
+  requestTypeKey: string;
+  workflowKey: string;
+  workflowName: string;
+  description: string;
+  stages: UnifiedWorkflowStage[];
+  revisionReturnStepKey?: string;
+}): WorkflowSeedInput {
+  const steps: StepInput[] = [
+    {
+      stepKey: 'SUBMIT',
+      stepName: 'Submitted',
+      stepOrder: 1,
+      stepType: WorkflowStepType.START,
+      configJson: { lifecycleStatus: 'SUBMITTED' },
+    },
+    ...input.stages.map((stage, index) => ({
+      ...stage,
+      stepOrder: index + 2,
+      configJson: {
+        lifecycleStatus: 'IN_REVIEW',
+        ...(stage.configJson ?? {}),
+      },
+    })),
+    {
+      stepKey: 'REVISION',
+      stepName: 'Revision Requested',
+      stepOrder: input.stages.length + 2,
+      stepType: WorkflowStepType.REVISION,
+      slaHours: 72,
+      configJson: { display: false, lifecycleStatus: 'IN_REVIEW' },
+    },
+    {
+      stepKey: 'APPROVED_END',
+      stepName: 'Approved',
+      stepOrder: input.stages.length + 3,
+      stepType: WorkflowStepType.END,
+      configJson: { lifecycleStatus: 'APPROVED' },
+    },
+    {
+      stepKey: 'REJECTED_END',
+      stepName: 'Rejected',
+      stepOrder: input.stages.length + 4,
+      stepType: WorkflowStepType.END,
+      configJson: { display: false, lifecycleStatus: 'REJECTED' },
+    },
+  ];
+
+  const firstStageKey = input.stages[0]?.stepKey ?? 'APPROVED_END';
+  const transitions: TransitionInput[] = [
+    {
+      fromStepKey: 'SUBMIT',
+      toStepKey: firstStageKey,
+      actionType: WorkflowActionType.SUBMIT,
+    },
+  ];
+
+  input.stages.forEach((stage, index) => {
+    const nextStage = input.stages[index + 1];
+    transitions.push(
+      {
+        fromStepKey: stage.stepKey,
+        toStepKey: nextStage?.stepKey ?? 'APPROVED_END',
+        actionType: WorkflowActionType.APPROVE,
+      },
+      {
+        fromStepKey: stage.stepKey,
+        toStepKey: 'REVISION',
+        actionType: WorkflowActionType.REQUEST_REVISION,
+      },
+      {
+        fromStepKey: stage.stepKey,
+        toStepKey: 'REJECTED_END',
+        actionType: WorkflowActionType.REJECT,
+      },
+    );
+  });
+
+  transitions.push({
+    fromStepKey: 'REVISION',
+    toStepKey: input.revisionReturnStepKey ?? firstStageKey,
+    actionType: WorkflowActionType.SUBMIT,
+  });
+
+  return {
+    requestTypeKey: input.requestTypeKey,
+    workflowKey: input.workflowKey,
+    workflowName: input.workflowName,
+    description: input.description,
+    steps,
+    transitions,
+  };
+}
+
+const workflows: WorkflowSeedInput[] = [
+  buildUnifiedWorkflow({
+    requestTypeKey: 'INTERNSHIP_REQUEST',
+    workflowKey: 'WF_INTERNSHIP_REQUEST_V1',
+    workflowName: 'Internship Request Workflow',
+    description: 'Unified internship approval flow: Advisor Review -> Internship Coordinator Review -> Approved.',
+    stages: [
+      {
+        stepKey: 'ADVISOR_REVIEW',
+        stepName: 'Advisor Review',
+        stepType: WorkflowStepType.REVIEW,
+        assignedRoleName: 'ADVISOR',
+        slaHours: 48,
+      },
+      {
+        stepKey: 'INTERNSHIP_COORDINATOR_REVIEW',
+        stepName: 'Internship Coordinator Review',
+        stepType: WorkflowStepType.APPROVAL,
+        assignedRoleName: 'INTERNSHIP_COORDINATOR',
+        slaHours: 48,
+      },
+    ],
+  }),
+  buildUnifiedWorkflow({
+    requestTypeKey: 'DOCUMENT_REQUEST',
+    workflowKey: 'WF_DOCUMENT_REQUEST_V1',
+    workflowName: 'Document Request Workflow',
+    description: 'Unified document flow: Document Processing -> Approved.',
+    stages: [
+      {
+        stepKey: 'DOCUMENT_PROCESSING',
+        stepName: 'Document Processing',
+        stepType: WorkflowStepType.REVIEW,
+        assignedRoleName: 'DOCUMENT_OFFICER',
+        slaHours: 24,
+      },
+    ],
+  }),
+  buildUnifiedWorkflow({
+    requestTypeKey: 'ROOM_RESERVATION',
+    workflowKey: 'WF_ROOM_RESERVATION_V1',
+    workflowName: 'Room Reservation Workflow',
+    description: 'Unified room reservation flow: Resource Review -> Security Review -> Approved.',
+    stages: [
+      {
+        stepKey: 'RESOURCE_REVIEW',
+        stepName: 'Resource Review',
+        stepType: WorkflowStepType.REVIEW,
+        assignedRoleName: 'RESOURCE_MANAGER',
+        slaHours: 24,
+      },
+      {
+        stepKey: 'SECURITY_REVIEW',
+        stepName: 'Security Review',
+        stepType: WorkflowStepType.APPROVAL,
+        assignedRoleName: 'SECURITY_OFFICER',
+        slaHours: 24,
+      },
+    ],
+  }),
+  buildUnifiedWorkflow({
+    requestTypeKey: 'APPOINTMENT',
+    workflowKey: 'WF_APPOINTMENT_V1',
+    workflowName: 'Appointment Workflow',
+    description: 'Unified appointment flow: Resource Review -> Approved.',
+    stages: [
+      {
+        stepKey: 'RESOURCE_REVIEW',
+        stepName: 'Resource Review',
+        stepType: WorkflowStepType.REVIEW,
+        assignedRoleName: 'FACULTY_SECRETARY',
+        slaHours: 24,
+      },
+    ],
+  }),
+  buildUnifiedWorkflow({
+    requestTypeKey: 'IT_SUPPORT',
+    workflowKey: 'WF_IT_SUPPORT_V1',
+    workflowName: 'IT Support Workflow',
+    description: 'Unified IT support flow: IT Review -> Manager Approval -> Approved. Ticket execution continues with ticket status.',
+    stages: [
+      {
+        stepKey: 'IT_REVIEW',
+        stepName: 'IT Review',
+        stepType: WorkflowStepType.REVIEW,
+        assignedRoleName: 'IT_AGENT',
+        slaHours: 8,
+      },
+      {
+        stepKey: 'MANAGER_APPROVAL',
+        stepName: 'Manager Approval',
+        stepType: WorkflowStepType.APPROVAL,
+        assignedRoleName: 'IT_MANAGER',
+        slaHours: 24,
+      },
+    ],
+  }),
+  buildUnifiedWorkflow({
+    requestTypeKey: 'EQUIPMENT',
+    workflowKey: 'WF_EQUIPMENT_REQUEST_V2',
+    workflowName: 'Equipment Request Workflow',
+    description: 'Unified equipment flow: Technical Review -> Resource Review -> Approved.',
+    stages: [
+      {
+        stepKey: 'TECHNICAL_REVIEW',
+        stepName: 'Technical Review',
+        stepType: WorkflowStepType.REVIEW,
+        assignedRoleName: 'LAB_TECHNICIAN',
+        slaHours: 48,
+      },
+      {
+        stepKey: 'RESOURCE_REVIEW',
+        stepName: 'Resource Review',
+        stepType: WorkflowStepType.APPROVAL,
+        assignedRoleName: 'RESOURCE_MANAGER',
+        slaHours: 24,
+      },
+    ],
+  }),
+  buildUnifiedWorkflow({
+    requestTypeKey: 'ACCESS_REQUEST',
+    workflowKey: 'WF_ACCESS_REQUEST_V2',
+    workflowName: 'Access Request Workflow',
+    description: 'Unified access flow: Security Review -> IT Review -> Manager Approval -> Approved.',
+    stages: [
+      {
+        stepKey: 'SECURITY_REVIEW',
+        stepName: 'Security Review',
+        stepType: WorkflowStepType.REVIEW,
+        assignedRoleName: 'SECURITY_OFFICER',
+        slaHours: 24,
+      },
+      {
+        stepKey: 'IT_REVIEW',
+        stepName: 'IT Review',
+        stepType: WorkflowStepType.REVIEW,
+        assignedRoleName: 'IT_AGENT',
+        slaHours: 24,
+      },
+      {
+        stepKey: 'MANAGER_APPROVAL',
+        stepName: 'Manager Approval',
+        stepType: WorkflowStepType.APPROVAL,
+        assignedRoleName: 'IT_MANAGER',
+        slaHours: 24,
+      },
+    ],
+  }),
+  buildUnifiedWorkflow({
+    requestTypeKey: 'PROCUREMENT_REQUEST',
+    workflowKey: 'WF_PROCUREMENT_REQUEST_V2',
+    workflowName: 'Procurement Request Workflow',
+    description: 'Unified procurement flow: Budget Review -> Procurement Review -> Finance Review -> Approved.',
+    stages: [
+      {
+        stepKey: 'BUDGET_REVIEW',
+        stepName: 'Budget Review',
+        stepType: WorkflowStepType.REVIEW,
+        assignedRoleName: 'BUDGET_APPROVER',
+        slaHours: 24,
+      },
+      {
+        stepKey: 'PROCUREMENT_REVIEW',
+        stepName: 'Procurement Review',
+        stepType: WorkflowStepType.REVIEW,
+        assignedRoleName: 'PROCUREMENT_OFFICER',
+        slaHours: 24,
+      },
+      {
+        stepKey: 'FINANCE_REVIEW',
+        stepName: 'Finance Review',
+        stepType: WorkflowStepType.APPROVAL,
+        assignedRoleName: 'FINANCE_OFFICER',
+        slaHours: 24,
+      },
+    ],
+  }),
+  buildUnifiedWorkflow({
+    requestTypeKey: 'EVENT_REQUEST',
+    workflowKey: 'WF_EVENT_REQUEST_V2',
+    workflowName: 'Event Request Workflow',
+    description: 'Unified event flow: Event Coordinator Review -> Resource Review -> Security Review -> Approved.',
+    stages: [
+      {
+        stepKey: 'EVENT_COORDINATOR_REVIEW',
+        stepName: 'Event Coordinator Review',
+        stepType: WorkflowStepType.REVIEW,
+        assignedRoleName: 'EVENT_COORDINATOR',
+        slaHours: 24,
+      },
+      {
+        stepKey: 'RESOURCE_REVIEW',
+        stepName: 'Resource Review',
+        stepType: WorkflowStepType.REVIEW,
+        assignedRoleName: 'RESOURCE_MANAGER',
+        slaHours: 24,
+      },
+      {
+        stepKey: 'SECURITY_REVIEW',
+        stepName: 'Security Review',
+        stepType: WorkflowStepType.APPROVAL,
+        assignedRoleName: 'SECURITY_OFFICER',
+        slaHours: 24,
+      },
+    ],
+  }),
+  buildUnifiedWorkflow({
+    requestTypeKey: 'EVENT_CREATION_REQUEST',
+    workflowKey: 'WF_EVENT_CREATION_REQUEST_V1',
+    workflowName: 'Event Creation Request Workflow',
+    description: 'Unified event creation flow: Advisor Review -> Event Coordinator Review -> Resource Review -> Security Review -> Approved.',
+    stages: [
+      {
+        stepKey: 'ADVISOR_REVIEW',
+        stepName: 'Advisor Review',
+        stepType: WorkflowStepType.REVIEW,
+        assignedRoleName: 'ADVISOR',
+        slaHours: 48,
+      },
+      {
+        stepKey: 'EVENT_COORDINATOR_REVIEW',
+        stepName: 'Event Coordinator Review',
+        stepType: WorkflowStepType.REVIEW,
+        assignedRoleName: 'EVENT_COORDINATOR',
+        slaHours: 24,
+      },
+      {
+        stepKey: 'RESOURCE_REVIEW',
+        stepName: 'Resource Review',
+        stepType: WorkflowStepType.REVIEW,
+        assignedRoleName: 'RESOURCE_MANAGER',
+        slaHours: 24,
+      },
+      {
+        stepKey: 'SECURITY_REVIEW',
+        stepName: 'Security Review',
+        stepType: WorkflowStepType.APPROVAL,
+        assignedRoleName: 'SECURITY_OFFICER',
+        slaHours: 24,
+      },
+    ],
+  }),
 ];
 
 export async function seedWorkflows() {

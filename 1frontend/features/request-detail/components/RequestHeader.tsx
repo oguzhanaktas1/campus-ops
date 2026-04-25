@@ -6,8 +6,16 @@ import { NT } from '@/components/no-translate'
 import type { RequestDetailViewModel } from '@/features/request-detail/types'
 import { formatDate } from '@/features/request-detail/utils'
 
-export function RequestHeader({ detail }: { detail: RequestDetailViewModel }) {
-  const backHref = detail.portal === 'staff' ? '/staff/inbox' : `/${detail.portal}/requests`
+export function RequestHeader({
+  detail,
+  backHref: customBackHref,
+}: {
+  detail: RequestDetailViewModel
+  backHref?: string
+}) {
+  const backHref =
+    customBackHref ??
+    (detail.portal === 'staff' ? '/staff/requests' : `/${detail.portal}/requests`)
 
   return (
     <div className="flex flex-col gap-4 sm:flex-row sm:items-start">

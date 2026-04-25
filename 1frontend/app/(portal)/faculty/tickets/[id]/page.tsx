@@ -12,12 +12,13 @@ import {
   User,
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { WorkflowStepIndicator, type Step } from '@/components/workflow-step-indicator'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { StatusBadge } from '@/components/status-badge'
 import { RequestTimeline } from '@/components/request-timeline'
+import { WorkflowProgressCard } from '@/features/request-detail/components/RequestCards'
+import { buildWorkflowSteps } from '@/features/request-detail/utils'
 import { getToken } from '@/lib/auth'
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000'
@@ -29,32 +30,6 @@ function fmt(d: string | null | undefined) {
     day: 'numeric',
     year: 'numeric',
   })
-}
-
-function mapTicketWorkflowSteps(workflow: any): Step[] {
-  if (!Array.isArray(workflow?.steps)) return []
-
-  return workflow.steps.map((step: any, index: number) => ({
-    id: index + 1,
-    label: String(step.name ?? step.label ?? 'Step'),
-    status:
-      step.status === 'completed' ||
-      step.status === 'active' ||
-      step.status === 'pending' ||
-      step.status === 'failed' ||
-      step.status === 'warning'
-        ? step.status
-        : 'pending',
-  }))
-}
-
-function renderLifecycleMeta(step: any) {
-  const parts = [
-    step?.actorName ? `By ${step.actorName}` : null,
-    step?.startedAt ? fmt(step.startedAt) : null,
-  ].filter(Boolean)
-
-  return parts.length > 0 ? parts.join(' | ') : '-'
 }
 
 function InfoRow({ label, value }: { label: string; value?: string | null }) {
@@ -161,7 +136,22 @@ export default function FacultyTicketDetailPage() {
   const t = data.ticket
   const canClose = t?.ticketStatus === 'RESOLVED'
   const canReopen = t?.ticketStatus === 'RESOLVED' || t?.ticketStatus === 'CLOSED'
-  const lifecycleSteps = mapTicketWorkflowSteps(data.workflow)
+  const workflowSource = data.workflow?.engineWorkflow ?? data.workflow
+  const lifecycleSteps = buildWorkflowSteps(
+    'IT_SUPPORT',
+    data.status,
+    workflowSource,
+    data.ticket?.ticketStatus,
+  )
+  const currentWorkflowStep =
+    workflowSource?.currentStep ??
+    (data.ticket?.ticketStatus === 'IN_PROGRESS'
+      ? 'In Progress'
+      : data.ticket?.ticketStatus === 'RESOLVED' || data.ticket?.ticketStatus === 'CLOSED'
+        ? 'Completed'
+        : data.ticket?.ticketStatus === 'WAITING_USER'
+          ? 'Revision Requested'
+          : data.workflow?.currentStep ?? 'In progress')
 
   return (
     <div className="mx-auto max-w-4xl space-y-5 p-6 pb-20">
@@ -263,40 +253,10 @@ export default function FacultyTicketDetailPage() {
             </p>
           </div>
 
-          {lifecycleSteps.length > 0 ? (
-            <div className="space-y-4 rounded-lg border border-border bg-card p-5">
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-sm font-semibold">Ticket Lifecycle</p>
-                <p className="text-xs text-muted-foreground">
-                  {data.workflow?.currentStep ?? 'In progress'}
-                </p>
-              </div>
-              <WorkflowStepIndicator steps={lifecycleSteps} />
-              <div className="grid gap-3 text-xs text-muted-foreground">
-                <div className="rounded-md bg-muted/20 p-3 space-y-1">
-                  <p>Opened By: <span className="text-foreground">{data.workflow?.openedBy ?? '-'}</span></p>
-                  <p>Opened At: <span className="text-foreground">{fmt(data.workflow?.openedAt)}</span></p>
-                  <p>Resolved By: <span className="text-foreground">{data.workflow?.resolvedBy ?? '-'}</span></p>
-                  <p>Resolved At: <span className="text-foreground">{fmt(data.workflow?.resolvedAt)}</span></p>
-                  <p>Closed At: <span className="text-foreground">{fmt(data.workflow?.closedAt)}</span></p>
-                </div>
-                {Array.isArray(data.workflow?.steps)
-                  ? data.workflow.steps.map((step: any) => (
-                      <div key={String(step.id)} className="rounded-md border border-border p-3 text-xs text-muted-foreground">
-                        <div className="flex items-center justify-between gap-3">
-                          <p className="font-medium text-foreground">{step.name}</p>
-                          <p>{String(step.status ?? 'pending').toUpperCase()}</p>
-                        </div>
-                        <p className="mt-2">{renderLifecycleMeta(step)}</p>
-                        {step?.note ? (
-                          <p className="mt-1 text-foreground">{step.note}</p>
-                        ) : null}
-                      </div>
-                    ))
-                  : null}
-              </div>
-            </div>
-          ) : null}
+          <WorkflowProgressCard
+            currentStep={currentWorkflowStep}
+            steps={lifecycleSteps}
+          />
 
           <div className="space-y-3 rounded-lg border border-border bg-card p-5">
             <p className="text-sm font-semibold">Requester Actions</p>
