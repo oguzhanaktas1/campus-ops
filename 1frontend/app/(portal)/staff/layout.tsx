@@ -5,7 +5,6 @@ import { PortalLayout, type NavItem } from "@/components/portal-layout";
 import { NotificationBell } from "@/components/notification-bell";
 import { ProfileDropdown } from "@/components/profile-dropdown";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { LanguageSwitcher } from "@/components/language-switcher";
 import {
   LayoutDashboard,
   Ticket,
@@ -95,7 +94,6 @@ export default function StaffLayout({
       </div>
       <div className="flex items-center gap-1 ml-auto">
         <ThemeToggle />
-        <LanguageSwitcher />
         <NotificationBell role="staff" />
         <ProfileDropdown user={user} settingsHref="/staff/settings" />
       </div>

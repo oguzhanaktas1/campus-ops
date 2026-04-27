@@ -5,7 +5,6 @@ import { PortalLayout, type NavItem } from "@/components/portal-layout";
 import { NotificationBell } from "@/components/notification-bell";
 import { ProfileDropdown } from "@/components/profile-dropdown";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { LanguageSwitcher } from "@/components/language-switcher";
 import {
   LayoutDashboard,
   CheckSquare,
@@ -106,7 +105,6 @@ export default function FacultyLayout({ children }: { children: React.ReactNode 
       </div>
       <div className="flex items-center gap-1 ml-auto">
         <ThemeToggle />
-        <LanguageSwitcher />
         <NotificationBell role="faculty" />
         <ProfileDropdown user={user} settingsHref="/faculty/settings" />
       </div>

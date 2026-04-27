@@ -2,7 +2,6 @@ import type { Metadata, Viewport } from 'next'
 import { Analytics } from '@vercel/analytics/next'
 import { ThemeProvider } from '@/components/theme-provider'
 import { AuthFetchProvider } from '@/components/auth-fetch-provider'
-import { LanguageProvider } from '@/contexts/language-context'
 import './globals.css'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://campusflow.app'
@@ -153,7 +152,7 @@ export default function RootLayout({
   return (
     <html lang="tr" suppressHydrationWarning>
       <head>
-        {/* 1) Flash önleyici — tema cookie'den okunur (dil artık hep EN başlar) */}
+        {/* Prevent theme flash by reading the theme cookie before hydration. */}
         <script dangerouslySetInnerHTML={{ __html: `(function(){
   try{
     var tc=document.cookie.match(/cf_theme=([^;]+)/);
@@ -164,19 +163,6 @@ export default function RootLayout({
   }catch(e){}
 })();` }} />
 
-        {/* 2) Google Translate — init fonksiyonu script yüklenmeden önce tanımlanmalı */}
-        <script dangerouslySetInnerHTML={{ __html: `
-function googleTranslateElementInit(){
-  new google.translate.TranslateElement({
-    pageLanguage:'en',
-    includedLanguages:'tr,en',
-    autoDisplay:false,
-    layout:google.translate.TranslateElement.InlineLayout.SIMPLE
-  },'google_translate_element');
-}` }} />
-        {/* eslint-disable-next-line @next/next/no-sync-scripts */}
-        <script src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit" />
-
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
@@ -186,18 +172,13 @@ function googleTranslateElementInit(){
         className="font-sans antialiased"
         suppressHydrationWarning
       >
-        {/* Google Translate gizli container — widget burada başlatılır */}
-        <div id="google_translate_element" style={{ display: 'none' }} />
-
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
           enableSystem
           disableTransitionOnChange
         >
-          <LanguageProvider>
-            <AuthFetchProvider>{children}</AuthFetchProvider>
-          </LanguageProvider>
+          <AuthFetchProvider>{children}</AuthFetchProvider>
           <Analytics />
         </ThemeProvider>
       </body>

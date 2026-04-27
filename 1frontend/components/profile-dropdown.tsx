@@ -14,8 +14,6 @@ import {
 import { LogOut, Settings } from 'lucide-react'
 import type { User as UserType } from '@/lib/mock-data'
 import { apiLogout, clearAuth } from '@/lib/auth'
-import { LanguageSwitcher } from '@/components/language-switcher'
-import { NT } from '@/components/no-translate'
 
 function getInitials(name: string) {
   return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
@@ -44,16 +42,16 @@ export function ProfileDropdown({ user, settingsHref = '/student/settings' }: Pr
               {getInitials(user.name)}
             </AvatarFallback>
           </Avatar>
-          <NT className="text-sm font-medium hidden sm:block max-w-[120px] truncate">{user.name}</NT>
+          <span className="text-sm font-medium hidden sm:block max-w-[120px] truncate">{user.name}</span>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-52">
         <DropdownMenuLabel className="font-normal">
           <div className="flex flex-col gap-0.5">
-            <NT as="p" className="text-sm font-medium">{user.name}</NT>
-            <NT as="p" className="text-xs text-muted-foreground">{user.email}</NT>
+            <p className="text-sm font-medium">{user.name}</p>
+            <p className="text-xs text-muted-foreground">{user.email}</p>
             {user.department && (
-              <NT as="p" className="text-xs text-muted-foreground">{user.department}</NT>
+              <p className="text-xs text-muted-foreground">{user.department}</p>
             )}
           </div>
         </DropdownMenuLabel>

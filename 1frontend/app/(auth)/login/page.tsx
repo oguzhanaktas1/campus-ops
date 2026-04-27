@@ -10,9 +10,7 @@ import { CampusFlowLogo } from '@/components/campusflow-logo'
 import { AlertTriangle, ArrowRight, Eye, EyeOff, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { apiLogin, resolvePortalPath, setAuth } from '@/lib/auth'
-import { LanguageSwitcher } from '@/components/language-switcher'
 import { ThemeToggle } from '@/components/theme-toggle'
-import { NT } from '@/components/no-translate'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -48,7 +46,7 @@ export default function LoginPage() {
       <div className="hidden lg:flex w-1/2 bg-sidebar flex-col justify-between p-12">
         <Link href="/" className="flex items-center gap-2">
           <CampusFlowLogo containerClassName="size-9" priority />
-          <NT className="text-xl font-bold text-sidebar-foreground">CampusFlow</NT>
+          <span className="text-xl font-bold text-sidebar-foreground">CampusFlow</span>
         </Link>
         <div>
           <blockquote className="text-sidebar-foreground/90 text-lg font-medium leading-relaxed mb-6">
@@ -67,14 +65,13 @@ export default function LoginPage() {
         {/* Tema + Dil toggle — sağ üst köşe */}
         <div className="absolute top-4 right-4 flex items-center gap-1">
           <ThemeToggle />
-          <LanguageSwitcher variant="full" />
         </div>
 
         <div className="w-full max-w-sm">
           <div className="mb-8">
             <Link href="/" className="lg:hidden flex items-center gap-2 mb-6">
               <CampusFlowLogo containerClassName="size-7" priority />
-              <NT className="font-bold text-foreground">CampusFlow</NT>
+              <span className="font-bold text-foreground">CampusFlow</span>
             </Link>
             <h1 className="text-2xl font-bold text-foreground">Welcome back</h1>
             <p className="text-muted-foreground text-sm mt-1">Sign in to your portal</p>

@@ -20,7 +20,6 @@ import {
 import { toast } from 'sonner'
 import { CommentThread } from '@/components/comment-thread'
 import { RequestTimeline } from '@/components/request-timeline'
-import { NT } from '@/components/no-translate'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -197,7 +196,7 @@ export function RequestTimelineTabs({
                   >
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <span className="font-medium text-foreground">
-                          <NT>{assignment.assignedTo?.fullName ?? 'Unknown assignee'}</NT>
+                          {assignment.assignedTo?.fullName ?? 'Unknown assignee'}
                       </span>
                       <span className="text-xs text-muted-foreground">
                         {assignment.isActive ? 'Active' : 'Completed'}
@@ -213,7 +212,7 @@ export function RequestTimelineTabs({
                           : '-'}
                       </p>
                       {assignment.assignedBy?.fullName ? (
-                        <p>Assigned by: <NT>{assignment.assignedBy.fullName}</NT></p>
+                        <p>Assigned by: {assignment.assignedBy.fullName}</p>
                       ) : null}
                       {assignment.unassignedAt ? (
                         <p>
@@ -256,7 +255,7 @@ export function RequestTimelineTabs({
                     </div>
                     <div className="mt-2 space-y-1 text-muted-foreground">
                       {action.actor?.fullName ? (
-                        <p>Actor: <NT>{action.actor.fullName}</NT></p>
+                        <p>Actor: {action.actor.fullName}</p>
                       ) : null}
                       {action.workflowStep?.name ? (
                         <p>Step: {action.workflowStep.name}</p>
@@ -835,9 +834,9 @@ function StaffActionPanel({
               <p className="text-xs font-medium uppercase tracking-wide text-emerald-700">
                 Current Assignee
               </p>
-              <NT as="p" className="text-sm font-semibold text-foreground">
+              <p className="text-sm font-semibold text-foreground">
                 {detail.currentAssignee.fullName}
-              </NT>
+              </p>
             </div>
           </div>
         ) : selected ? (
@@ -847,9 +846,9 @@ function StaffActionPanel({
                 <p className="text-xs font-medium uppercase tracking-wide text-amber-700">
                   Ready to Assign
                 </p>
-                <NT as="p" className="text-sm font-semibold text-foreground">
+                <p className="text-sm font-semibold text-foreground">
                   {selected.profile?.fullName ?? selected.fullName}
-                </NT>
+                </p>
               </div>
               <Button
                 variant="ghost"
@@ -921,9 +920,9 @@ function StaffActionPanel({
                           {(item.profile?.fullName ?? item.fullName ?? '?').charAt(0)}
                         </div>
                         <div className="min-w-0">
-                          <NT as="p" className="truncate text-sm font-medium text-foreground">
+                          <p className="truncate text-sm font-medium text-foreground">
                             {item.profile?.fullName ?? item.fullName ?? 'Unknown'}
-                          </NT>
+                          </p>
                           {item.profile?.department?.name ? (
                             <p className="truncate text-xs text-muted-foreground">
                               {item.profile.department.name}

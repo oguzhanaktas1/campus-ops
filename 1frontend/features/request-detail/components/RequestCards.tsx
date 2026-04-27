@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import { ChevronDown } from 'lucide-react'
-import { NT } from '@/components/no-translate'
 import { StatusBadge } from '@/components/status-badge'
 import { WorkflowStepIndicator } from '@/components/workflow-step-indicator'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -22,7 +21,6 @@ function KeyValueList({
   items: Array<{
     label: string
     value: string | null
-    noTranslate?: boolean
     fullWidth?: boolean
   }>
 }) {
@@ -37,11 +35,7 @@ function KeyValueList({
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               {item.label}
             </p>
-            {item.noTranslate ? (
-              <NT as="p" className="text-sm text-foreground">{item.value}</NT>
-            ) : (
-              <p className="text-sm text-foreground">{item.value}</p>
-            )}
+            <p className="text-sm text-foreground">{item.value}</p>
           </div>
         ) : null,
       )}
@@ -218,11 +212,7 @@ function WorkflowStepRow({
       </div>
 
       <div className="mt-3 grid gap-3 border-t pt-3 sm:grid-cols-3">
-        <WorkflowStepField
-          label="Owner"
-          value={workflowStepOwner(step)}
-          noTranslate
-        />
+        <WorkflowStepField label="Owner" value={workflowStepOwner(step)} />
         <WorkflowStepField label="Where" value={workflowStepLocation(step)} />
         <WorkflowStepField label="Time" value={workflowStepTiming(step)} />
       </div>
@@ -233,22 +223,16 @@ function WorkflowStepRow({
 function WorkflowStepField({
   label,
   value,
-  noTranslate,
 }: {
   label: string
   value?: string | null
-  noTranslate?: boolean
 }) {
   return (
     <div className="min-w-0">
       <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
         {label}
       </p>
-      {noTranslate ? (
-        <NT as="p" className="truncate text-sm text-foreground">{value || '-'}</NT>
-      ) : (
-        <p className="truncate text-sm text-foreground">{value || '-'}</p>
-      )}
+      <p className="truncate text-sm text-foreground">{value || '-'}</p>
     </div>
   )
 }
@@ -339,12 +323,11 @@ export function RequestQuickFactsCard({
       <CardContent>
         <KeyValueList
           items={[
-            { label: 'Requester',        value: detail.requester?.fullName ?? null,        noTranslate: true },
-            { label: 'Current Assignee', value: detail.currentAssignee?.fullName ?? null,  noTranslate: true },
+            { label: 'Requester',        value: detail.requester?.fullName ?? null },
+            { label: 'Current Assignee', value: detail.currentAssignee?.fullName ?? null },
             {
               label: 'Assigned People',
               value: detail.assignedPeople.length > 0 ? detail.assignedPeople.join(', ') : null,
-              noTranslate: true,
             },
             { label: 'Activity Count',   value: String(detail.timeline.length) },
           ]}
@@ -374,8 +357,8 @@ export function RelatedEntitiesCard({
       <CardContent className="space-y-4">
         <KeyValueList
           items={[
-            { label: 'Full Name',        value: requester?.fullName ?? null,   noTranslate: true },
-            { label: 'Email',            value: requester?.email ?? null,      noTranslate: true, fullWidth: true },
+            { label: 'Full Name',        value: requester?.fullName ?? null },
+            { label: 'Email',            value: requester?.email ?? null, fullWidth: true },
             { label: 'Role',             value: requesterRole },
             { label: 'Department',       value: requester?.department ?? null },
             { label: 'Faculty',          value: requester?.faculty ?? null },
@@ -383,13 +366,11 @@ export function RelatedEntitiesCard({
             {
               label: requester?.role?.toUpperCase().includes('STUDENT') ? 'Student Number' : 'Staff Number',
               value: requesterNumber ?? null,
-              noTranslate: true,
             },
-            { label: 'Current Assignee', value: detail.currentAssignee?.fullName ?? null, noTranslate: true },
+            { label: 'Current Assignee', value: detail.currentAssignee?.fullName ?? null },
             {
               label: 'Assigned People',
               value: detail.assignedPeople.length > 0 ? detail.assignedPeople.join(', ') : null,
-              noTranslate: true,
             },
             { label: 'Domain Key',       value: humanize(detail.requestType.key) },
           ]}

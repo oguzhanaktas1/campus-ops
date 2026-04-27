@@ -9,7 +9,6 @@ import { CampusFlowLogo } from '@/components/campusflow-logo'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { Menu, ChevronDown } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
-import { NT } from '@/components/no-translate'
 
 export interface NavItem {
   label: string
@@ -82,7 +81,7 @@ function SidebarNav({ navItems, portalName }: Pick<PortalLayoutProps, 'navItems'
       <div className="flex items-center gap-2.5 px-4 py-4 border-b border-sidebar-border flex-shrink-0">
         <CampusFlowLogo containerClassName="size-8" priority />
         <div>
-          <NT as="p" className="text-sm font-bold text-sidebar-foreground">CampusFlow</NT>
+          <p className="text-sm font-bold text-sidebar-foreground">CampusFlow</p>
           <p className="text-xs text-sidebar-foreground/60">{portalName}</p>
         </div>
       </div>
@@ -172,7 +171,7 @@ function SidebarNav({ navItems, portalName }: Pick<PortalLayoutProps, 'navItems'
 
       {/* Alt Footer */}
       <div className="px-4 py-3 border-t border-sidebar-border flex-shrink-0">
-        <NT as="p" className="text-xs text-sidebar-foreground/40">CampusFlow v2.4.1</NT>
+        <p className="text-xs text-sidebar-foreground/40">CampusFlow v2.4.1</p>
       </div>
     </div>
   )

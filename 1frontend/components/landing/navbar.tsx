@@ -5,10 +5,8 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { CampusFlowLogo } from '@/components/campusflow-logo'
 import { ThemeToggle } from '@/components/theme-toggle'
-import { LanguageSwitcher } from '@/components/language-switcher'
 import { Menu, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { NT } from '@/components/no-translate'
 
 const navLinks = [
   { href: '#features', label: 'Features' },
@@ -40,7 +38,7 @@ export function Navbar() {
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2.5 shrink-0" aria-label="CampusFlow home">
           <CampusFlowLogo containerClassName="size-8" priority />
-          <NT className="font-bold text-foreground text-lg tracking-tight">CampusFlow</NT>
+          <span className="font-bold text-foreground text-lg tracking-tight">CampusFlow</span>
         </Link>
 
         {/* Desktop nav */}
@@ -59,7 +57,6 @@ export function Navbar() {
         {/* Desktop actions */}
         <div className="hidden md:flex items-center gap-2">
           <ThemeToggle />
-          <LanguageSwitcher />
           <Link href="/login">
             <Button variant="ghost" size="sm">Log in</Button>
           </Link>
@@ -68,7 +65,6 @@ export function Navbar() {
         {/* Mobile actions */}
         <div className="flex md:hidden items-center gap-2">
           <ThemeToggle />
-          <LanguageSwitcher />
           <Button
             variant="ghost"
             size="icon"

@@ -160,7 +160,7 @@ campus-ops/
   1frontend/
     app/                  Next.js App Router rotaları
     components/           Ortak UI, portal layout, auth guard, AI assistant
-    lib/                  Auth, i18n, tarih, workflow ve yardımcı fonksiyonlar
+    lib/                  Auth, tema, tarih, workflow ve yardımcı fonksiyonlar
     hooks/                React hook'ları
     types/                Frontend tipleri
     Dockerfile

@@ -3,7 +3,7 @@
 import { Moon, Sun } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useEffect, useState } from 'react'
-import { getSavedTheme, saveTheme } from '@/lib/i18n'
+import { getSavedTheme, saveTheme } from '@/lib/theme-storage'
 
 export function ThemeToggle() {
   const [dark, setDark] = useState(false)
