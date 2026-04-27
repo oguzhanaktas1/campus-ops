@@ -110,7 +110,7 @@ jobs:
         run: npm run build
 
       - name: Test
-        run: npm run test -- --runInBand
+        run: npx jest --runInBand
 
   python-workers:
     name: Python Workers
