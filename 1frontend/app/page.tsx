@@ -222,8 +222,8 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* 5 — Role Cards */}
-        <RoleCards />
+        {/* 5 — Role Cards 
+        <RoleCards />*/}
 
         {/* 6 — Testimonials */}
         <section
