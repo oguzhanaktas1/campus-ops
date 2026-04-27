@@ -5,7 +5,6 @@ const footerLinks = {
   Product: [
     { label: 'Features', href: '#features' },
     { label: 'How it works', href: '#how-it-works' },
-    { label: 'Role portals', href: '#portals' },
     { label: 'Security', href: '#' },
     { label: 'Changelog', href: '#' },
   ],

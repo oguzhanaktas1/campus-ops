@@ -151,7 +151,7 @@ export function Hero() {
           </Link>
           <Link href="/login">
             <Button size="lg" variant="outline" className="h-12 px-6 text-base">
-              View demo portals
+              Login
             </Button>
           </Link>
         </div>
