@@ -37,6 +37,16 @@ const PROCUREMENT_CATEGORIES = [
   'Technical Equipment',
   'Other',
 ]
+const IT_CATEGORIES = [
+  'Hardware',
+  'Software',
+  'Network / Connectivity',
+  'Account / Access',
+  'Printer / Peripheral',
+  'Email / Collaboration',
+  'Security',
+  'Other',
+]
 const ACCESS_TYPES = ['System / Portal', 'Lab Access', 'Network Resource', 'Software License', 'Campus Area', 'Other']
 const EVENT_TYPES = ['Conference', 'Workshop', 'Club Activity', 'Social Event', 'Sports', 'Cultural', 'Academic', 'Other']
 const EQUIPMENT_CATEGORIES = [
@@ -54,6 +64,7 @@ const WORK_MODES = ['ONSITE', 'REMOTE', 'HYBRID']
 type Props = {
   requestId: string
   request: any
+  portal?: string
 }
 
 function toDateInput(value?: string | null) {
@@ -72,8 +83,8 @@ function toDateTimeLocalInput(value?: string | null) {
   return adjusted.toISOString().slice(0, 16)
 }
 
-async function updateRequest(requestId: string, payload: Record<string, unknown>) {
-  const res = await fetch(`${BACKEND}/student/requests/${requestId}`, {
+async function updateRequest(endpoint: string, payload: Record<string, unknown>) {
+  const res = await fetch(`${BACKEND}/${endpoint}`, {
     method: 'PUT',
     headers: {
       'Content-Type': 'application/json',
@@ -89,10 +100,10 @@ async function updateRequest(requestId: string, payload: Record<string, unknown>
   return data
 }
 
-function Header({ requestId, title, description }: { requestId: string; title: string; description: string }) {
+function Header({ backPath, title, description }: { backPath: string; title: string; description: string }) {
   return (
     <div className="flex items-center gap-3">
-      <Link href={`/student/requests/${requestId}`}>
+      <Link href={backPath}>
         <Button variant="ghost" size="icon" className="size-8">
           <ArrowLeft className="size-4" />
         </Button>
@@ -105,14 +116,14 @@ function Header({ requestId, title, description }: { requestId: string; title: s
   )
 }
 
-function Footer({ requestId, isSubmitting, submitLabel }: { requestId: string; isSubmitting: boolean; submitLabel: string }) {
+function Footer({ backPath, isSubmitting, submitLabel }: { backPath: string; isSubmitting: boolean; submitLabel: string }) {
   return (
     <div className="flex items-center gap-3 pt-4 border-t border-border">
       <Button type="submit" disabled={isSubmitting} className="gap-2">
         {isSubmitting && <Loader2 className="size-4 animate-spin" />}
         {submitLabel}
       </Button>
-      <Link href={`/student/requests/${requestId}`}>
+      <Link href={backPath}>
         <Button type="button" variant="outline">
           Cancel
         </Button>
@@ -121,8 +132,9 @@ function Footer({ requestId, isSubmitting, submitLabel }: { requestId: string; i
   )
 }
 
-function DocumentRevisionForm({ requestId, request }: Props) {
+function DocumentRevisionForm({ requestId, request, portal = 'student' }: Props) {
   const router = useRouter()
+  const backPath = `/${portal}/requests/${requestId}`
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [form, setForm] = useState({
     documentType: request.formData?.documentType ?? 'TRANSCRIPT',
@@ -137,9 +149,13 @@ function DocumentRevisionForm({ requestId, request }: Props) {
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
+    if (!form.category) {
+      toast.error('Category is required.')
+      return
+    }
     setIsSubmitting(true)
     try {
-      await updateRequest(requestId, {
+      await updateRequest(`${portal}/requests/${requestId}`, {
         documentType: form.documentType,
         language: form.language,
         copiesCount: Number(form.copiesCount),
@@ -148,7 +164,7 @@ function DocumentRevisionForm({ requestId, request }: Props) {
         description: form.description || null,
       })
       toast.success('Request updated and resubmitted.')
-      router.push(`/student/requests/${requestId}`)
+      router.push(backPath)
     } catch (error: any) {
       toast.error(error.message ?? 'Failed to update request.')
     } finally {
@@ -158,7 +174,7 @@ function DocumentRevisionForm({ requestId, request }: Props) {
 
   return (
     <div className="p-6 max-w-2xl mx-auto space-y-6">
-      <Header requestId={requestId} title="Revise Document Request" description="Update your document request and resubmit it." />
+      <Header backPath={backPath} title="Revise Document Request" description="Update your document request and resubmit it." />
       <form onSubmit={handleSubmit} className="bg-card border border-border rounded-lg shadow-sm divide-y divide-border">
         <div className="px-5 py-4 space-y-3">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -204,15 +220,16 @@ function DocumentRevisionForm({ requestId, request }: Props) {
           <textarea rows={3} value={form.description} onChange={(e) => set('description', e.target.value)} className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm resize-none" />
         </div>
         <div className="px-5 py-4">
-          <Footer requestId={requestId} isSubmitting={isSubmitting} submitLabel="Resubmit Request" />
+          <Footer backPath={backPath} isSubmitting={isSubmitting} submitLabel="Resubmit Request" />
         </div>
       </form>
     </div>
   )
 }
 
-function AccessRevisionForm({ requestId, request }: Props) {
+function AccessRevisionForm({ requestId, request, portal = 'student' }: Props) {
   const router = useRouter()
+  const backPath = `/${portal}/requests/${requestId}`
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [form, setForm] = useState({
     accessType: request.formData?.accessType ?? 'System / Portal',
@@ -229,7 +246,7 @@ function AccessRevisionForm({ requestId, request }: Props) {
     event.preventDefault()
     setIsSubmitting(true)
     try {
-      await updateRequest(requestId, {
+      await updateRequest(`${portal}/requests/${requestId}`, {
         accessType: form.accessType,
         targetResource: form.targetResource.trim(),
         requestedRoleOrPermission: form.requestedRoleOrPermission.trim() || null,
@@ -238,7 +255,7 @@ function AccessRevisionForm({ requestId, request }: Props) {
         endAt: form.endAt || null,
       })
       toast.success('Request updated and resubmitted.')
-      router.push(`/student/requests/${requestId}`)
+      router.push(backPath)
     } catch (error: any) {
       toast.error(error.message ?? 'Failed to update request.')
     } finally {
@@ -248,7 +265,7 @@ function AccessRevisionForm({ requestId, request }: Props) {
 
   return (
     <div className="p-6 max-w-2xl mx-auto pb-20 space-y-6">
-      <Header requestId={requestId} title="Revise Access Request" description="Update the access request and resubmit it." />
+      <Header backPath={backPath} title="Revise Access Request" description="Update the access request and resubmit it." />
       <form onSubmit={handleSubmit} className="bg-card border border-border rounded-xl shadow-sm p-6 space-y-5">
         <div className="grid sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">
@@ -280,14 +297,15 @@ function AccessRevisionForm({ requestId, request }: Props) {
           <Label>Justification *</Label>
           <textarea rows={4} value={form.justification} onChange={(e) => set('justification', e.target.value)} className="w-full bg-background border border-input rounded-md px-3 py-2 text-sm resize-none" />
         </div>
-        <Footer requestId={requestId} isSubmitting={isSubmitting} submitLabel="Resubmit Access Request" />
+        <Footer backPath={backPath} isSubmitting={isSubmitting} submitLabel="Resubmit Access Request" />
       </form>
     </div>
   )
 }
 
-function ReservationRevisionForm({ requestId, request }: Props) {
+function ReservationRevisionForm({ requestId, request, portal = 'student' }: Props) {
   const router = useRouter()
+  const backPath = `/${portal}/requests/${requestId}`
   const [resources, setResources] = useState<any[]>([])
   const [isLoadingResources, setIsLoadingResources] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -334,7 +352,7 @@ function ReservationRevisionForm({ requestId, request }: Props) {
     }
     setIsSubmitting(true)
     try {
-      await updateRequest(requestId, {
+      await updateRequest(`${portal}/requests/${requestId}`, {
         resourceId: form.resourceId,
         eventName: form.eventName.trim(),
         reservationPurpose: form.reservationPurpose.trim(),
@@ -347,7 +365,7 @@ function ReservationRevisionForm({ requestId, request }: Props) {
         description: form.description.trim() || null,
       })
       toast.success('Request updated and resubmitted.')
-      router.push(`/student/requests/${requestId}`)
+      router.push(backPath)
     } catch (error: any) {
       toast.error(error.message ?? 'Failed to update request.')
     } finally {
@@ -357,7 +375,7 @@ function ReservationRevisionForm({ requestId, request }: Props) {
 
   return (
     <div className="p-6 max-w-2xl mx-auto space-y-6 pb-20">
-      <Header requestId={requestId} title="Revise Reservation Request" description="Update the reservation details and resubmit it." />
+      <Header backPath={backPath} title="Revise Reservation Request" description="Update the reservation details and resubmit it." />
       <form onSubmit={handleSubmit} className="bg-card border border-border rounded-lg p-6 space-y-5 shadow-sm">
         <div className="space-y-1.5">
           <Label>Resource *</Label>
@@ -418,14 +436,15 @@ function ReservationRevisionForm({ requestId, request }: Props) {
           <Label>Additional Description</Label>
           <Textarea value={form.description} onChange={(e) => set('description', e.target.value)} className="resize-none min-h-[80px]" />
         </div>
-        <Footer requestId={requestId} isSubmitting={isSubmitting} submitLabel="Resubmit Reservation" />
+        <Footer backPath={backPath} isSubmitting={isSubmitting} submitLabel="Resubmit Reservation" />
       </form>
     </div>
   )
 }
 
-function AppointmentRevisionForm({ requestId, request }: Props) {
+function AppointmentRevisionForm({ requestId, request, portal = 'student' }: Props) {
   const router = useRouter()
+  const backPath = `/${portal}/requests/${requestId}`
   const [facultyUsers, setFacultyUsers] = useState<any[]>([])
   const [availability, setAvailability] = useState<any[]>([])
   const [isLoadingUsers, setIsLoadingUsers] = useState(true)
@@ -476,7 +495,7 @@ function AppointmentRevisionForm({ requestId, request }: Props) {
     event.preventDefault()
     setIsSubmitting(true)
     try {
-      await updateRequest(requestId, {
+      await updateRequest(`${portal}/requests/${requestId}`, {
         targetUserId: form.targetUserId,
         appointmentType: form.appointmentType,
         topic: form.topic.trim(),
@@ -485,7 +504,7 @@ function AppointmentRevisionForm({ requestId, request }: Props) {
         preferredEndAt: form.preferredEndAt ? new Date(form.preferredEndAt).toISOString() : null,
       })
       toast.success('Request updated and resubmitted.')
-      router.push(`/student/requests/${requestId}`)
+      router.push(backPath)
     } catch (error: any) {
       toast.error(error.message ?? 'Failed to update request.')
     } finally {
@@ -495,7 +514,7 @@ function AppointmentRevisionForm({ requestId, request }: Props) {
 
   return (
     <div className="p-6 max-w-2xl mx-auto space-y-6 pb-20">
-      <Header requestId={requestId} title="Revise Appointment Request" description="Update the appointment request and resubmit it." />
+      <Header backPath={backPath} title="Revise Appointment Request" description="Update the appointment request and resubmit it." />
       <form onSubmit={handleSubmit} className="bg-card border border-border rounded-lg p-6 space-y-5 shadow-sm">
         <div className="space-y-1.5">
           <Label>Person *</Label>
@@ -553,14 +572,15 @@ function AppointmentRevisionForm({ requestId, request }: Props) {
           <Label>Details</Label>
           <Textarea value={form.details} onChange={(e) => setForm((prev) => ({ ...prev, details: e.target.value }))} className="resize-none min-h-[80px]" />
         </div>
-        <Footer requestId={requestId} isSubmitting={isSubmitting} submitLabel="Resubmit Appointment" />
+        <Footer backPath={backPath} isSubmitting={isSubmitting} submitLabel="Resubmit Appointment" />
       </form>
     </div>
   )
 }
 
-function ProcurementRevisionForm({ requestId, request }: Props) {
+function ProcurementRevisionForm({ requestId, request, portal = 'student' }: Props) {
   const router = useRouter()
+  const backPath = `/${portal}/requests/${requestId}`
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [form, setForm] = useState({
     itemName: request.formData?.itemName ?? '',
@@ -579,7 +599,7 @@ function ProcurementRevisionForm({ requestId, request }: Props) {
     event.preventDefault()
     setIsSubmitting(true)
     try {
-      await updateRequest(requestId, {
+      await updateRequest(`${portal}/requests/${requestId}`, {
         itemName: form.itemName.trim(),
         itemCategory: form.itemCategory,
         quantity: Number(form.quantity),
@@ -590,7 +610,7 @@ function ProcurementRevisionForm({ requestId, request }: Props) {
         priority: form.priority,
       })
       toast.success('Request updated and resubmitted.')
-      router.push(`/student/requests/${requestId}`)
+      router.push(backPath)
     } catch (error: any) {
       toast.error(error.message ?? 'Failed to update request.')
     } finally {
@@ -600,7 +620,7 @@ function ProcurementRevisionForm({ requestId, request }: Props) {
 
   return (
     <div className="p-6 max-w-3xl mx-auto space-y-6 pb-20">
-      <Header requestId={requestId} title="Revise Procurement Request" description="Update the procurement details and resubmit it." />
+      <Header backPath={backPath} title="Revise Procurement Request" description="Update the procurement details and resubmit it." />
       <form onSubmit={handleSubmit} className="bg-card border border-border rounded-xl shadow-sm p-6 space-y-5">
         <div className="grid sm:grid-cols-2 gap-4">
           <div className="space-y-1.5 sm:col-span-2">
@@ -640,14 +660,15 @@ function ProcurementRevisionForm({ requestId, request }: Props) {
           <Label>Justification *</Label>
           <textarea rows={5} value={form.justification} onChange={(e) => setValue('justification', e.target.value)} className="w-full bg-background border border-input rounded-md px-3 py-2 text-sm resize-none" />
         </div>
-        <Footer requestId={requestId} isSubmitting={isSubmitting} submitLabel="Resubmit Procurement" />
+        <Footer backPath={backPath} isSubmitting={isSubmitting} submitLabel="Resubmit Procurement" />
       </form>
     </div>
   )
 }
 
-function EventRevisionForm({ requestId, request }: Props) {
+function EventRevisionForm({ requestId, request, portal = 'student' }: Props) {
   const router = useRouter()
+  const backPath = `/${portal}/requests/${requestId}`
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [form, setForm] = useState({
     eventName: request.formData?.eventName ?? '',
@@ -670,7 +691,7 @@ function EventRevisionForm({ requestId, request }: Props) {
     event.preventDefault()
     setIsSubmitting(true)
     try {
-      await updateRequest(requestId, {
+      await updateRequest(`${portal}/requests/${requestId}`, {
         eventName: form.eventName.trim(),
         eventType: form.eventType,
         description: form.description.trim(),
@@ -685,7 +706,7 @@ function EventRevisionForm({ requestId, request }: Props) {
         needsTechnicalSupport: form.needsTechnicalSupport,
       })
       toast.success('Request updated and resubmitted.')
-      router.push(`/student/requests/${requestId}`)
+      router.push(backPath)
     } catch (error: any) {
       toast.error(error.message ?? 'Failed to update request.')
     } finally {
@@ -695,7 +716,7 @@ function EventRevisionForm({ requestId, request }: Props) {
 
   return (
     <div className="p-6 max-w-2xl mx-auto pb-20 space-y-6">
-      <Header requestId={requestId} title="Revise Event Request" description="Update the event details and resubmit it." />
+      <Header backPath={backPath} title="Revise Event Request" description="Update the event details and resubmit it." />
       <form onSubmit={handleSubmit} className="bg-card border border-border rounded-xl shadow-sm p-6 space-y-5">
         <div className="space-y-1.5">
           <Label>Event Name *</Label>
@@ -752,14 +773,15 @@ function EventRevisionForm({ requestId, request }: Props) {
             </div>
           )}
         </div>
-        <Footer requestId={requestId} isSubmitting={isSubmitting} submitLabel="Resubmit Event Request" />
+        <Footer backPath={backPath} isSubmitting={isSubmitting} submitLabel="Resubmit Event Request" />
       </form>
     </div>
   )
 }
 
-function EquipmentRevisionForm({ requestId, request }: Props) {
+function EquipmentRevisionForm({ requestId, request, portal = 'student' }: Props) {
   const router = useRouter()
+  const backPath = `/${portal}/requests/${requestId}`
   const [resources, setResources] = useState<any[]>([])
   const [isLoadingResources, setIsLoadingResources] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -800,7 +822,7 @@ function EquipmentRevisionForm({ requestId, request }: Props) {
     event.preventDefault()
     setIsSubmitting(true)
     try {
-      await updateRequest(requestId, {
+      await updateRequest(`${portal}/requests/${requestId}`, {
         labResourceId: form.labResourceId || null,
         equipmentName: form.equipmentName.trim(),
         equipmentCategory: form.equipmentCategory,
@@ -811,7 +833,7 @@ function EquipmentRevisionForm({ requestId, request }: Props) {
         urgencyReason: form.urgencyReason.trim() || null,
       })
       toast.success('Request updated and resubmitted.')
-      router.push(`/student/requests/${requestId}`)
+      router.push(backPath)
     } catch (error: any) {
       toast.error(error.message ?? 'Failed to update request.')
     } finally {
@@ -821,7 +843,7 @@ function EquipmentRevisionForm({ requestId, request }: Props) {
 
   return (
     <div className="p-6 max-w-2xl mx-auto space-y-6 pb-20">
-      <Header requestId={requestId} title="Revise Equipment Request" description="Update the equipment request and resubmit it." />
+      <Header backPath={backPath} title="Revise Equipment Request" description="Update the equipment request and resubmit it." />
       <form onSubmit={handleSubmit} className="bg-card border border-border rounded-xl shadow-sm p-6 space-y-5">
         <div className="space-y-1.5">
           <Label>Select from Equipment Catalog</Label>
@@ -872,14 +894,15 @@ function EquipmentRevisionForm({ requestId, request }: Props) {
           <Label>Urgency Reason</Label>
           <Input value={form.urgencyReason} onChange={(e) => setForm((prev) => ({ ...prev, urgencyReason: e.target.value }))} />
         </div>
-        <Footer requestId={requestId} isSubmitting={isSubmitting} submitLabel="Resubmit Equipment Request" />
+        <Footer backPath={backPath} isSubmitting={isSubmitting} submitLabel="Resubmit Equipment Request" />
       </form>
     </div>
   )
 }
 
-function InternshipRevisionForm({ requestId, request }: Props) {
+function InternshipRevisionForm({ requestId, request, portal = 'student' }: Props) {
   const router = useRouter()
+  const backPath = `/${portal}/requests/${requestId}`
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [form, setForm] = useState({
     companyName: request.formData?.companyName ?? '',
@@ -898,7 +921,7 @@ function InternshipRevisionForm({ requestId, request }: Props) {
     event.preventDefault()
     setIsSubmitting(true)
     try {
-      await updateRequest(requestId, {
+      await updateRequest(`${portal}/requests/${requestId}`, {
         companyName: form.companyName.trim(),
         companySector: form.companySector.trim() || null,
         companyContactName: form.companyContactName.trim() || null,
@@ -911,7 +934,7 @@ function InternshipRevisionForm({ requestId, request }: Props) {
         insuranceRequired: form.insuranceRequired,
       })
       toast.success('Request updated and resubmitted.')
-      router.push(`/student/requests/${requestId}`)
+      router.push(backPath)
     } catch (error: any) {
       toast.error(error.message ?? 'Failed to update request.')
     } finally {
@@ -928,7 +951,7 @@ function InternshipRevisionForm({ requestId, request }: Props) {
 
   return (
     <div className="mx-auto max-w-2xl p-6 pb-20 space-y-6">
-      <Header requestId={requestId} title="Revise Internship Application" description="Update the internship application and resubmit it." />
+      <Header backPath={backPath} title="Revise Internship Application" description="Update the internship application and resubmit it." />
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="space-y-4 rounded-lg border border-border bg-card p-5">
           <h2 className="text-sm font-semibold text-foreground">Company Information</h2>
@@ -970,7 +993,7 @@ function InternshipRevisionForm({ requestId, request }: Props) {
           </div>
         </div>
         <div className="flex justify-end gap-3">
-          <Link href={`/student/requests/${requestId}`}>
+          <Link href={backPath}>
             <Button type="button" variant="outline" disabled={isSubmitting}>Cancel</Button>
           </Link>
           <Button type="submit" disabled={isSubmitting}>
@@ -983,15 +1006,145 @@ function InternshipRevisionForm({ requestId, request }: Props) {
   )
 }
 
-function UnsupportedRevisionForm({ requestId, request }: Props) {
+function ItTicketRevisionForm({ requestId, request, portal = 'faculty' }: Props) {
+  const router = useRouter()
+  const backPath = `/${portal}/requests/${requestId}`
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [form, setForm] = useState({
+    title: request.title ?? '',
+    category: request.formData?.category ?? '',
+    description: request.formData?.description ?? request.description ?? '',
+    priority: request.priority ?? 'MEDIUM',
+    affectedSystem: request.formData?.affectedSystem ?? '',
+    locationText: request.formData?.locationText ?? '',
+    subcategory: request.formData?.subcategory ?? '',
+  })
+
+  const set = (key: keyof typeof form, value: string) =>
+    setForm((prev) => ({ ...prev, [key]: value }))
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault()
+    setIsSubmitting(true)
+    try {
+      await updateRequest(`${portal}/requests/${requestId}`, {
+        title: form.title.trim(),
+        category: form.category,
+        description: form.description.trim() || null,
+        priority: form.priority,
+        affectedSystem: form.affectedSystem.trim() || null,
+        locationText: form.locationText.trim() || null,
+        subcategory: form.subcategory.trim() || null,
+      })
+      toast.success('Ticket updated and resubmitted.')
+      router.push(backPath)
+    } catch (error: any) {
+      toast.error(error.message ?? 'Failed to update ticket.')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  return (
+    <div className="mx-auto max-w-3xl space-y-5 p-6 pb-20">
+      <Header backPath={backPath} title="Revise IT Ticket" description="Update the ticket details and resubmit it to IT." />
+
+      <form onSubmit={handleSubmit} className="space-y-4 rounded-xl border border-border bg-card p-5">
+        <div className="space-y-2">
+          <Label>Title *</Label>
+          <Input
+            value={form.title}
+            onChange={(event) => set('title', event.target.value)}
+            placeholder="Printer not working in faculty office"
+            required
+          />
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="space-y-2">
+            <Label>Category *</Label>
+            <Select value={form.category} onValueChange={(value) => set('category', value)} required>
+              <SelectTrigger>
+                <SelectValue placeholder="Select category..." />
+              </SelectTrigger>
+              <SelectContent>
+                {IT_CATEGORIES.map((category) => (
+                  <SelectItem key={category} value={category}>{category}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Priority</Label>
+            <Select value={form.priority} onValueChange={(value) => set('priority', value)}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {PROCUREMENT_PRIORITIES.map((priority) => (
+                  <SelectItem key={priority} value={priority}>{priority}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="space-y-2">
+            <Label>Affected System</Label>
+            <Input
+              value={form.affectedSystem}
+              onChange={(event) => set('affectedSystem', event.target.value)}
+              placeholder="Printer / Wi-Fi / LMS"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Location</Label>
+            <Input
+              value={form.locationText}
+              onChange={(event) => set('locationText', event.target.value)}
+              placeholder="Engineering Building, Room 214"
+            />
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label>Subcategory</Label>
+          <Input
+            value={form.subcategory}
+            onChange={(event) => set('subcategory', event.target.value)}
+            placeholder="VPN, Outlook, printer driver..."
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label>Description</Label>
+          <Textarea
+            value={form.description}
+            onChange={(event) => set('description', event.target.value)}
+            placeholder="Describe the issue, what you tried, and when it started."
+            rows={6}
+          />
+        </div>
+
+        <Footer backPath={backPath} isSubmitting={isSubmitting} submitLabel="Resubmit Ticket" />
+      </form>
+    </div>
+  )
+}
+
+function UnsupportedRevisionForm({ requestId, request, portal = 'student' }: Props) {
+  const backPath = `/${portal}/requests/${requestId}`
   return (
     <div className="p-6 max-w-2xl mx-auto space-y-6">
-      <Header requestId={requestId} title="Revise Request" description="This request type does not have a specialized revision form yet." />
+      <Header backPath={backPath} title="Revise Request" description="This request type does not have a specialized revision form yet." />
       <div className="rounded-lg border border-border bg-card p-6 space-y-3">
         <p className="text-sm text-muted-foreground">
           Request type: <span className="font-medium text-foreground">{request.typeName ?? request.type}</span>
         </p>
-        <Link href={`/student/requests/${requestId}`}>
+        <Link href={backPath}>
           <Button variant="outline">Back to Detail</Button>
         </Link>
       </div>
@@ -999,27 +1152,30 @@ function UnsupportedRevisionForm({ requestId, request }: Props) {
   )
 }
 
-export function RequestRevisionForm({ requestId, request }: Props) {
+export function RequestRevisionForm({ requestId, request, portal = 'student' }: Props) {
   const key = useMemo(() => request?.type, [request?.type])
 
   switch (key) {
     case 'DOCUMENT_REQUEST':
-      return <DocumentRevisionForm requestId={requestId} request={request} />
+      return <DocumentRevisionForm requestId={requestId} request={request} portal={portal} />
     case 'ROOM_RESERVATION':
-      return <ReservationRevisionForm requestId={requestId} request={request} />
+      return <ReservationRevisionForm requestId={requestId} request={request} portal={portal} />
     case 'APPOINTMENT':
-      return <AppointmentRevisionForm requestId={requestId} request={request} />
+      return <AppointmentRevisionForm requestId={requestId} request={request} portal={portal} />
     case 'PROCUREMENT_REQUEST':
-      return <ProcurementRevisionForm requestId={requestId} request={request} />
+      return <ProcurementRevisionForm requestId={requestId} request={request} portal={portal} />
     case 'ACCESS_REQUEST':
-      return <AccessRevisionForm requestId={requestId} request={request} />
+      return <AccessRevisionForm requestId={requestId} request={request} portal={portal} />
     case 'EVENT_REQUEST':
-      return <EventRevisionForm requestId={requestId} request={request} />
+      return <EventRevisionForm requestId={requestId} request={request} portal={portal} />
     case 'EQUIPMENT':
-      return <EquipmentRevisionForm requestId={requestId} request={request} />
+      return <EquipmentRevisionForm requestId={requestId} request={request} portal={portal} />
     case 'INTERNSHIP_REQUEST':
-      return <InternshipRevisionForm requestId={requestId} request={request} />
+      return <InternshipRevisionForm requestId={requestId} request={request} portal={portal} />
+    case 'IT_SUPPORT':
+    case 'IT_TICKET':
+      return <ItTicketRevisionForm requestId={requestId} request={request} portal={portal} />
     default:
-      return <UnsupportedRevisionForm requestId={requestId} request={request} />
+      return <UnsupportedRevisionForm requestId={requestId} request={request} portal={portal} />
   }
 }

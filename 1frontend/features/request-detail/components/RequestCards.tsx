@@ -294,8 +294,6 @@ function workflowStepTiming(step: Step) {
     if (remaining) return remaining
   }
 
-  if (step.slaHours) return `SLA ${step.slaHours}h`
-
   return null
 }
 

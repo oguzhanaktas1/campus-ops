@@ -119,8 +119,8 @@ export class AiClientService {
       '/assistant/ask': '120000',
       '/summary/approval': '120000',
       '/parse/request': '120000',
-      '/triage/ticket': '120000',
-      '/health': '120000',
+      '/triage/ticket': '4000',
+      '/health': '5000',
     };
 
     const timeoutKey = timeoutKeyByPath[path];

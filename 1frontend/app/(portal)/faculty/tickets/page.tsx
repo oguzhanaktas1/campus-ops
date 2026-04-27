@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
 import { Ticket, Loader2, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { PriorityBadge } from '@/components/status-badge'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { getToken } from '@/lib/auth'
@@ -18,11 +19,31 @@ const STATUS_BADGE: Record<string, string> = {
   RESOLVED:     'bg-green-50 text-green-700 border-green-200',
   CLOSED:       'bg-gray-50 text-gray-500 border-gray-200',
   REOPENED:     'bg-red-50 text-red-700 border-red-200',
+  APPROVED:     'bg-emerald-50 text-emerald-700 border-emerald-200',
+  REJECTED:     'bg-red-50 text-red-700 border-red-200',
+  COMPLETED:    'bg-emerald-50 text-emerald-700 border-emerald-200',
+  CANCELLED:    'bg-gray-50 text-gray-500 border-gray-200',
+  EXPIRED:      'bg-red-50 text-red-700 border-red-200',
 }
+
+const TERMINAL_REQUEST_STATUSES = new Set([
+  'APPROVED',
+  'REJECTED',
+  'COMPLETED',
+  'CLOSED',
+  'CANCELLED',
+  'EXPIRED',
+])
 
 function fmt(d: any) {
   if (!d) return '—'
   return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+function getDisplayStatus(ticket: any) {
+  const requestStatus = String(ticket.status ?? '').toUpperCase()
+  if (TERMINAL_REQUEST_STATUSES.has(requestStatus)) return requestStatus
+  return String(ticket.ticketStatus ?? ticket.status ?? 'OPEN').toUpperCase()
 }
 
 export default function FacultyTicketsPage() {
@@ -45,9 +66,7 @@ export default function FacultyTicketsPage() {
 
   useEffect(() => { fetchTickets() }, [fetchTickets])
 
-  const filtered = filter === 'all' ? tickets : tickets.filter((t) =>
-    (t.ticketStatus ?? t.status) === filter
-  )
+  const filtered = filter === 'all' ? tickets : tickets.filter((t) => getDisplayStatus(t) === filter)
 
   if (isLoading) return (
     <div className="flex h-[60vh] items-center justify-center">
@@ -57,23 +76,22 @@ export default function FacultyTicketsPage() {
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6 pb-20">
-      <div>
-        <h1 className="text-xl font-bold flex items-center gap-2">
-          <Ticket className="size-5 text-primary" /> IT Tickets
-        </h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
-          Create and track your IT support tickets.
-        </p>
-      </div>
-
-      <div className="flex justify-end">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-xl font-bold flex items-center gap-2">
+            <Ticket className="size-5 text-primary" /> IT Tickets
+          </h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Create and track your IT support tickets.
+          </p>
+        </div>
         <Button asChild>
           <Link href="/faculty/tickets/new">New Ticket</Link>
         </Button>
       </div>
 
       <div className="flex gap-2 flex-wrap">
-        {['all', 'OPEN', 'IN_PROGRESS', 'WAITING_USER', 'RESOLVED', 'CLOSED'].map((s) => (
+        {['all', 'OPEN', 'IN_PROGRESS', 'WAITING_USER', 'APPROVED', 'REJECTED', 'COMPLETED', 'CLOSED'].map((s) => (
           <button
             key={s}
             onClick={() => setFilter(s)}
@@ -97,7 +115,7 @@ export default function FacultyTicketsPage() {
           </div>
         ) : (
           filtered.map((t) => {
-            const status = t.ticketStatus ?? t.status
+            const status = getDisplayStatus(t)
             return (
               <Link
                 key={t.id}
@@ -114,12 +132,15 @@ export default function FacultyTicketsPage() {
                     {t.createdAt && ` · ${fmt(t.createdAt)}`}
                   </p>
                 </div>
-                <span className={cn(
-                  'text-xs font-semibold px-2 py-0.5 rounded-full border shrink-0 ml-4',
-                  STATUS_BADGE[status] ?? STATUS_BADGE.OPEN
-                )}>
-                  {status?.replace(/_/g, ' ')}
-                </span>
+                <div className="ml-4 flex shrink-0 flex-col items-end gap-2 sm:flex-row sm:items-center">
+                  <PriorityBadge priority={t.priority} />
+                  <span className={cn(
+                    'text-xs font-semibold px-2 py-0.5 rounded-full border',
+                    STATUS_BADGE[status] ?? STATUS_BADGE.OPEN
+                  )}>
+                    {status?.replace(/_/g, ' ')}
+                  </span>
+                </div>
               </Link>
             )
           })

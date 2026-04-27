@@ -49,6 +49,15 @@ export class StaffController {
     return this.staffService.getRequestDetail(id);
   }
 
+  @Put('requests/:id')
+  reviseRequest(
+    @Request() req: any,
+    @Param('id') requestId: string,
+    @Body() body: any,
+  ) {
+    return this.staffService.reviseRequest(extractUserId(req), requestId, body);
+  }
+
   // staff.controller.ts
 
   @Get('faculty-members') // 🔥 Frontend bu ismi bekliyor!

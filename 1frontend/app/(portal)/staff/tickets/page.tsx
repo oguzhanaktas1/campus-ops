@@ -14,8 +14,11 @@ import {
   AlertTriangle,
   Loader2,
   Archive,
+  Plus,
 } from 'lucide-react'
 import { getStoredUser, getToken } from '@/lib/auth'
+import { toast } from 'sonner'
+import { Button } from '@/components/ui/button'
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000'
 
@@ -29,6 +32,37 @@ function formatRelative(d: string) {
   return `${Math.round(diff / 1440)}d ago`
 }
 
+function getAssignee(ticket: any) {
+  const raw =
+    ticket.assignedTo ??
+    ticket.currentAssignee ??
+    ticket.assignee ??
+    null
+
+  if (!raw) return null
+
+  if (typeof raw === 'string') {
+    return {
+      id: ticket.assignedToUserId ?? ticket.assignedItUserId ?? null,
+      fullName: raw,
+    }
+  }
+
+  const fullName =
+    raw.fullName ??
+    raw.name ??
+    raw.profile?.fullName ??
+    raw.email ??
+    null
+
+  if (!fullName) return null
+
+  return {
+    id: raw.id ?? raw.userId ?? ticket.assignedToUserId ?? ticket.assignedItUserId ?? null,
+    fullName,
+  }
+}
+
 export default function StaffTicketsPage() {
   const [activeTickets, setActiveTickets] = useState<any[]>([])
   const [completedTickets, setCompletedTickets] = useState<any[]>([])
@@ -36,6 +70,8 @@ export default function StaffTicketsPage() {
   const [activeFilter, setActiveFilter] = useState<FilterTab>('all')
   const [search, setSearch] = useState('')
   const currentUser = getStoredUser()
+  const IT_STAFF_ROLES = ['IT_AGENT', 'IT_MANAGER']
+  const isItStaff = currentUser?.roles?.some((r) => IT_STAFF_ROLES.includes(r)) ?? false
 
   const fetchTickets = useCallback(async () => {
     try {
@@ -45,9 +81,17 @@ export default function StaffTicketsPage() {
         fetch(`${BACKEND}/it-tickets/completed`, { headers }),
       ])
 
-      setActiveTickets(activeRes.ok ? await activeRes.json() : [])
+      if (!activeRes.ok) {
+        const err = await activeRes.json().catch(() => ({}))
+        toast.error(`Inbox error ${activeRes.status}: ${err.message ?? 'Failed to load tickets'}`)
+        setActiveTickets([])
+      } else {
+        setActiveTickets(await activeRes.json())
+      }
+
       setCompletedTickets(completedRes.ok ? await completedRes.json() : [])
-    } catch {
+    } catch (e) {
+      toast.error('Network error loading tickets')
       setActiveTickets([])
       setCompletedTickets([])
     } finally {
@@ -58,9 +102,9 @@ export default function StaffTicketsPage() {
   useEffect(() => { void fetchTickets() }, [fetchTickets])
 
   const allTickets = [...activeTickets, ...completedTickets]
-  const unassigned = activeTickets.filter((t) => !t.assignedTo)
+  const unassigned = activeTickets.filter((t) => !getAssignee(t))
   const urgent = activeTickets.filter((t) => t.priority === 'URGENT' || t.priority === 'HIGH')
-  const mine = activeTickets.filter((t) => t.assignedTo?.id === currentUser?.id)
+  const mine = activeTickets.filter((t) => getAssignee(t)?.id === currentUser?.id)
 
   const baseList =
     activeFilter === 'unassigned' ? unassigned :
@@ -104,6 +148,13 @@ export default function StaffTicketsPage() {
             {allTickets.length} IT tickets visible to your team.
           </p>
         </div>
+        {!isItStaff && (
+          <Button asChild size="sm">
+            <Link href="/staff/tickets/new">
+              <Plus className="size-4 mr-1" /> New Ticket
+            </Link>
+          </Button>
+        )}
       </div>
 
       <div className="flex items-center gap-1 border-b border-border overflow-x-auto">
@@ -154,9 +205,10 @@ export default function StaffTicketsPage() {
               const isCompleted = ['RESOLVED', 'CLOSED'].includes(ticket.ticketStatus)
               const dateLabel = isCompleted ? 'Completed' : 'Opened'
               const dateValue = ticket.completedAt ?? ticket.createdAt
+              const assignee = getAssignee(ticket)
 
               return (
-                <Link key={ticket.id} href={`/staff/tickets/${ticket.id}`}>
+                <Link key={ticket.id} href={`/staff/requests/it-support/${ticket.id}`}>
                   <div className="px-5 py-4 hover:bg-muted/20 transition-colors cursor-pointer">
                     <div className="flex items-start gap-4">
                       <div className="flex-1 min-w-0">
@@ -183,10 +235,10 @@ export default function StaffTicketsPage() {
                             <Clock className="size-3" />
                             {dateLabel}: {formatRelative(dateValue)}
                           </span>
-                          {ticket.assignedTo ? (
+                          {assignee ? (
                             <span className="flex items-center gap-1 text-emerald-600">
                               <CheckCircle2 className="size-3" />
-                              {ticket.assignedTo.fullName}
+                              {assignee.fullName}
                             </span>
                           ) : (
                             <span className="flex items-center gap-1 text-amber-600 font-medium">
@@ -194,11 +246,6 @@ export default function StaffTicketsPage() {
                               Unassigned
                             </span>
                           )}
-                          {ticket.slaPolicy?.name ? (
-                            <span className="text-[10px] text-muted-foreground border border-border px-1.5 py-0.5 rounded">
-                              SLA: {ticket.slaPolicy.name}
-                            </span>
-                          ) : null}
                         </div>
                       </div>
                       <div className="flex flex-col items-end gap-2 flex-shrink-0">

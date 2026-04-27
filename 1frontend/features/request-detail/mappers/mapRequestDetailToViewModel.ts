@@ -105,22 +105,41 @@ function deriveAssignee(raw: any) {
     raw.assignments?.find?.((assignment: any) => assignment?.isActive)?.assignedTo ??
     null
 
-  if (!currentAssignee) return null
-
-  return {
-    id: currentAssignee.id ?? null,
-    fullName:
-      currentAssignee.fullName ??
-      currentAssignee.profile?.fullName ??
-      currentAssignee.email ??
-      'Unknown',
-    email: currentAssignee.email ?? null,
-    role:
-      currentAssignee.role ??
-      currentAssignee.primaryRoles?.[0]?.role?.name ??
-      null,
-    title: currentAssignee.title ?? currentAssignee.profile?.title ?? null,
+  if (currentAssignee) {
+    return {
+      id: currentAssignee.id ?? null,
+      fullName:
+        currentAssignee.fullName ??
+        currentAssignee.profile?.fullName ??
+        currentAssignee.email ??
+        'Unknown',
+      email: currentAssignee.email ?? null,
+      role:
+        currentAssignee.role ??
+        currentAssignee.primaryRoles?.[0]?.role?.name ??
+        null,
+      title: currentAssignee.title ?? currentAssignee.profile?.title ?? null,
+    }
   }
+
+  // When revision is requested and no active assignee, show the reviewer who requested it
+  const status = String(raw.status ?? raw.request?.status ?? '').toUpperCase()
+  if (status === 'REVISION_REQUESTED') {
+    const revisionAction = (raw.approvalHistory ?? []).find(
+      (a: any) => String(a.actionType ?? '').toUpperCase() === 'REQUEST_REVISION',
+    )
+    if (revisionAction?.actor) {
+      return {
+        id: revisionAction.actor.id ?? null,
+        fullName: revisionAction.actor.fullName ?? 'Unknown',
+        email: revisionAction.actor.email ?? null,
+        role: null,
+        title: null,
+      }
+    }
+  }
+
+  return null
 }
 
 function deriveAssignedPeople(raw: any) {

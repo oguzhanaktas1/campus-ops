@@ -22,6 +22,7 @@ import {
   RequestStatus,
   WorkflowActionType,
   AuditActionType,
+  TicketStatus,
 } from '@prisma/client'; // 🔥 AuditActionType Added
 
 function deriveFacultyWorkflowStepStatus(params: {
@@ -75,6 +76,37 @@ export class FacultyService {
     private filesService: FilesService,
     private workflowEngine: WorkflowEngineService,
   ) {}
+
+  private definedData(data: Record<string, any>): Record<string, any> {
+    return Object.fromEntries(
+      Object.entries(data).filter(([, value]) => value !== undefined),
+    ) as Record<string, any>;
+  }
+
+  private toNullableDate(value: unknown) {
+    if (value === undefined) return undefined;
+    if (value === null || value === '') return null;
+    return new Date(String(value));
+  }
+
+  private toNullableNumber(value: unknown) {
+    if (value === undefined) return undefined;
+    if (value === null || value === '') return null;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+
+  private toNullableInt(value: unknown) {
+    const parsed = this.toNullableNumber(value);
+    return typeof parsed === 'number' ? Math.trunc(parsed) : parsed;
+  }
+
+  private toNullableText(value: unknown) {
+    if (value === undefined) return undefined;
+    if (value === null) return null;
+    const trimmed = String(value).trim();
+    return trimmed ? trimmed : null;
+  }
 
   private buildRequestDomainData(request: any) {
     switch (request.requestType?.key) {
@@ -199,6 +231,19 @@ export class FacultyService {
               durationDays: request.internshipRequest.durationDays,
               insuranceRequired:
                 request.internshipRequest.insuranceRequired,
+            }
+          : null;
+      case 'IT_SUPPORT':
+        return request.itTicket
+          ? {
+              category: request.itTicket.category,
+              subcategory: request.itTicket.subcategory,
+              affectedSystem: request.itTicket.affectedSystem,
+              assetId: request.itTicket.assetId,
+              locationText: request.itTicket.locationText,
+              incidentStartedAt: request.itTicket.incidentStartedAt,
+              ticketStatus: request.itTicket.ticketStatus,
+              description: request.description,
             }
           : null;
       default:
@@ -541,6 +586,7 @@ export class FacultyService {
       where: {
         id: requestId,
         OR: [
+          { requesterUserId: userId },
           { currentAssigneeUserId: userId },
           { assignments: { some: { assignedToUserId: userId } } },
           { approvalActions: { some: { actionByUserId: userId } } },
@@ -669,6 +715,7 @@ export class FacultyService {
             },
           },
         },
+        itTicket: true,
         internshipRequest: true,
       },
     });
@@ -1149,5 +1196,269 @@ export class FacultyService {
     });
 
     return { message: 'Office hours updated successfully.' };
+  }
+
+  async reviseRequest(
+    userId: string,
+    requestId: string,
+    body: any,
+  ) {
+    const existing = await this.prisma.request.findFirst({
+      where: { id: requestId, requesterUserId: userId },
+      include: {
+        requestType: true,
+        itTicket: true,
+        workflowInstance: true,
+      },
+    });
+
+    if (!existing) throw new NotFoundException('Request not found or access denied.');
+    if (existing.status !== RequestStatus.REVISION_REQUESTED) {
+      throw new BadRequestException('Only revision-requested requests can be revised.');
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      const updateData: any = {
+        title: body.title ?? existing.title,
+        description: body.description !== undefined ? body.description : existing.description,
+        status: RequestStatus.IN_REVIEW,
+      };
+
+      if (body.priority !== undefined) {
+        updateData.priority = body.priority;
+      }
+
+      if (body.dynamicData !== undefined) {
+        updateData.dynamicData = body.dynamicData;
+      }
+
+      await tx.request.update({
+        where: { id: requestId },
+        data: updateData,
+      });
+
+      switch (existing.requestType?.key) {
+        case 'DOCUMENT_REQUEST':
+          await tx.documentRequest.updateMany({
+            where: { requestId },
+            data: this.definedData({
+              documentType: body.documentType,
+              language: this.toNullableText(body.language),
+              copiesCount: this.toNullableInt(body.copiesCount),
+              deliveryMethod: body.deliveryMethod,
+              deliveryAddress: this.toNullableText(body.deliveryAddress),
+            }),
+          });
+          break;
+        case 'ROOM_RESERVATION':
+          await tx.roomReservationRequest.updateMany({
+            where: { requestId },
+            data: this.definedData({
+              resourceId: body.resourceId,
+              eventName: body.eventName,
+              reservationPurpose: body.reservationPurpose,
+              attendeeCount: this.toNullableInt(body.attendeeCount),
+              startAt: this.toNullableDate(body.startAt),
+              endAt: this.toNullableDate(body.endAt),
+              requiresSecurityApproval: body.requiresSecurityApproval,
+              requiresTechnicalSupport: body.requiresTechnicalSupport,
+              setupNotes: this.toNullableText(body.setupNotes),
+            }),
+          });
+          break;
+        case 'APPOINTMENT':
+          await tx.appointmentRequest.updateMany({
+            where: { requestId },
+            data: this.definedData({
+              targetUserId: body.targetUserId,
+              appointmentType: body.appointmentType,
+              topic: body.topic,
+              details: this.toNullableText(body.details),
+              preferredStartAt: this.toNullableDate(body.preferredStartAt),
+              preferredEndAt: this.toNullableDate(body.preferredEndAt),
+            }),
+          });
+          break;
+        case 'PROCUREMENT_REQUEST':
+          await tx.procurementRequest.updateMany({
+            where: { requestId },
+            data: this.definedData({
+              itemName: body.itemName,
+              itemCategory: body.itemCategory,
+              quantity: this.toNullableInt(body.quantity),
+              unitPriceEstimate: this.toNullableNumber(body.unitPriceEstimate),
+              vendorPreference: this.toNullableText(body.vendorPreference),
+              justification: body.justification,
+              budgetCode: this.toNullableText(body.budgetCode),
+            }),
+          });
+          break;
+        case 'ACCESS_REQUEST':
+          await tx.accessRequest.updateMany({
+            where: { requestId },
+            data: this.definedData({
+              accessType: body.accessType,
+              targetResource: body.targetResource,
+              requestedRoleOrPermission: this.toNullableText(body.requestedRoleOrPermission),
+              justification: body.justification,
+              startAt: this.toNullableDate(body.startAt),
+              endAt: this.toNullableDate(body.endAt),
+            }),
+          });
+          break;
+        case 'EVENT_REQUEST':
+          await tx.eventRequest.updateMany({
+            where: { requestId },
+            data: this.definedData({
+              eventName: body.eventName,
+              eventType: body.eventType,
+              description: body.description,
+              expectedAttendance: this.toNullableInt(body.expectedAttendance),
+              locationPreference: this.toNullableText(body.locationPreference),
+              startAt: this.toNullableDate(body.startAt),
+              endAt: this.toNullableDate(body.endAt),
+              needsBudget: body.needsBudget,
+              estimatedBudget: this.toNullableNumber(body.estimatedBudget),
+              needsPosterApproval: body.needsPosterApproval,
+              needsSecuritySupport: body.needsSecuritySupport,
+              needsTechnicalSupport: body.needsTechnicalSupport,
+            }),
+          });
+          break;
+        case 'EQUIPMENT':
+          await tx.equipmentRequest.updateMany({
+            where: { requestId },
+            data: this.definedData({
+              labResourceId: this.toNullableText(body.labResourceId),
+              equipmentName: body.equipmentName,
+              equipmentCategory: body.equipmentCategory,
+              quantity: this.toNullableInt(body.quantity),
+              purpose: body.purpose,
+              neededFrom: this.toNullableDate(body.neededFrom),
+              neededUntil: this.toNullableDate(body.neededUntil),
+              urgencyReason: this.toNullableText(body.urgencyReason),
+            }),
+          });
+          break;
+        case 'INTERNSHIP_REQUEST':
+          await tx.internshipRequest.updateMany({
+            where: { requestId },
+            data: this.definedData({
+              companyName: body.companyName,
+              companySector: this.toNullableText(body.companySector),
+              companyContactName: this.toNullableText(body.companyContactName),
+              companyContactEmail: this.toNullableText(body.companyContactEmail),
+              internshipType: body.internshipType,
+              workMode: body.workMode,
+              startDate: this.toNullableDate(body.startDate),
+              endDate: this.toNullableDate(body.endDate),
+              durationDays: this.toNullableInt(body.durationDays),
+              insuranceRequired: body.insuranceRequired,
+            }),
+          });
+          break;
+        case 'IT_SUPPORT':
+          await tx.itTicket.updateMany({
+            where: { requestId },
+            data: this.definedData({
+              category: body.category,
+              subcategory: this.toNullableText(body.subcategory),
+              affectedSystem: this.toNullableText(body.affectedSystem),
+              locationText: this.toNullableText(body.locationText),
+              ticketStatus: TicketStatus.IN_PROGRESS,
+            }),
+          });
+          break;
+        default:
+          break;
+      }
+
+      await tx.requestStatusHistory.create({
+        data: {
+          requestId,
+          oldStatus: RequestStatus.REVISION_REQUESTED,
+          newStatus: RequestStatus.IN_REVIEW,
+          changedByUserId: userId,
+          changeReason: 'Revised and resubmitted by requester.',
+        },
+      });
+
+      const revisionAction = await tx.approvalAction.findFirst({
+        where: { requestId, actionType: 'REQUEST_REVISION' as any },
+        include: { workflowInstanceStep: true },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      if (revisionAction?.actionByUserId) {
+        await tx.request.update({
+          where: { id: requestId },
+          data: { currentAssigneeUserId: revisionAction.actionByUserId },
+        });
+
+        const prevAssignment = await tx.requestAssignment.findFirst({
+          where: { requestId, assignedToUserId: revisionAction.actionByUserId },
+          orderBy: { assignedAt: 'desc' },
+        });
+
+        if (prevAssignment) {
+          await tx.requestAssignment.update({
+            where: { id: prevAssignment.id },
+            data: { isActive: true, unassignedAt: null },
+          });
+        } else {
+          await tx.requestAssignment.create({
+            data: {
+              requestId,
+              assignedToUserId: revisionAction.actionByUserId,
+              assignedByUserId: userId,
+              assignmentNote: 'Resubmitted after revision.',
+            },
+          });
+        }
+      }
+
+      const revisionStep = revisionAction?.workflowInstanceStep;
+      const revisionActorUserId = revisionAction?.actionByUserId ?? null;
+      if (existing.workflowInstanceId && revisionStep?.workflowStepId && revisionActorUserId) {
+        await tx.workflowInstance.update({
+          where: { id: existing.workflowInstanceId },
+          data: {
+            status: 'ACTIVE',
+            endedAt: null,
+            currentStepId: revisionStep.workflowStepId,
+          },
+        });
+
+        const pendingStep = await tx.workflowInstanceStep.findFirst({
+          where: {
+            workflowInstanceId: existing.workflowInstanceId,
+            workflowStepId: revisionStep.workflowStepId,
+            status: 'PENDING',
+          },
+          orderBy: { createdAt: 'desc' },
+        });
+
+        if (pendingStep) {
+          await tx.workflowInstanceStep.update({
+            where: { id: pendingStep.id },
+            data: { assignedToUserId: revisionActorUserId },
+          });
+        } else {
+          await tx.workflowInstanceStep.create({
+            data: {
+              workflowInstanceId: existing.workflowInstanceId,
+              workflowStepId: revisionStep.workflowStepId,
+              status: 'PENDING',
+              startedAt: new Date(),
+              assignedToUserId: revisionActorUserId,
+            },
+          });
+        }
+      }
+    });
+
+    await this.cacheService.bumpVersion(CacheKeys.version(`request:detail:${requestId}`));
+    await this.cacheService.bumpVersion(CacheKeys.version('staff:tickets:list'));
+    return { success: true, requestId };
   }
 }

@@ -55,6 +55,16 @@ export class FacultyController {
     return this.facultyService.getRequestDetail(userId, id);
   }
 
+  @Put('requests/:id')
+  reviseRequest(
+    @Request() req: any,
+    @Param('id') requestId: string,
+    @Body() body: any,
+  ) {
+    const userId = req.user?.userId || req.user?.id;
+    return this.facultyService.reviseRequest(userId, requestId, body);
+  }
+
   @Post('requests/:id/comments')
   addComment(
     @Request() req: any,

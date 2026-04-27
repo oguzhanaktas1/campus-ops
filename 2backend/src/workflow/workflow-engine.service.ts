@@ -723,6 +723,8 @@ export class WorkflowEngineService {
       const nextStatus = nextStep
         ? this.mapStepTypeToStatus(nextStep.stepType, mapped.terminalStatus)
         : mapped.terminalStatus;
+      const isRevisionHold =
+        dto.action === 'revision' && !nextStep && Boolean(workflowInstance);
 
       await tx.request.update({
         where: { id: requestId },
@@ -768,7 +770,7 @@ export class WorkflowEngineService {
         skipDuplicates: true,
       });
 
-      if (pendingStep) {
+      if (pendingStep && !isRevisionHold) {
         if (pendingStep.dueAt && pendingStep.dueAt < new Date()) {
           await this.slaService.markStepOverdue(tx, pendingStep.id);
         }
@@ -792,7 +794,16 @@ export class WorkflowEngineService {
       }
 
       if (workflowInstance) {
-        if (shouldContinue && nextStep) {
+        if (isRevisionHold) {
+          await tx.workflowInstance.update({
+            where: { id: workflowInstance.id },
+            data: {
+              status: 'ACTIVE',
+              endedAt: null,
+              currentStepId: workflowInstance.currentStepId,
+            },
+          });
+        } else if (shouldContinue && nextStep) {
           await tx.workflowInstance.update({
             where: { id: workflowInstance.id },
             data: { currentStepId: nextStep.id, status: 'ACTIVE' },

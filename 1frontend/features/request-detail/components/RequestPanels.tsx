@@ -294,6 +294,8 @@ export function RequestActionPanel({
 }) {
   const canDecide = canCurrentUserDecide(detail)
   const isTerminal = isTerminalRequest(detail)
+  const currentUser = getStoredUser()
+  const isRequester = !!currentUser?.id && detail.requester?.id === currentUser.id
 
   if (detail.portal === 'student') {
     return (
@@ -344,11 +346,31 @@ export function RequestActionPanel({
     )
   }
 
-  if (isTerminal && detail.portal !== 'admin') {
-    return <TerminalActionPanel detail={detail} />
-  }
-
   if (detail.portal === 'faculty') {
+    if (detail.status === 'REVISION_REQUESTED' && isRequester) {
+      return (
+        <Card>
+          <CardHeader>
+            <CardTitle>Actions</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <Button asChild className="w-full">
+              <Link href={`/faculty/requests/${detail.id}/edit`}>
+                Revise Submission
+              </Link>
+            </Button>
+            <p className="text-sm text-muted-foreground">
+              The reviewer has requested changes. Edit and resubmit your request.
+            </p>
+          </CardContent>
+        </Card>
+      )
+    }
+
+    if (isTerminal) {
+      return <TerminalActionPanel detail={detail} />
+    }
+
     if (canDecide) {
       return <DecisionActionPanel detail={detail} onDetailChange={onDetailChange} />
     }
@@ -375,6 +397,32 @@ export function RequestActionPanel({
     return <AdminActionPanel detail={detail} />
   }
 
+  // Requester viewing their own REVISION_REQUESTED request on staff portal — show revise button
+  if (detail.portal === 'staff' && detail.status === 'REVISION_REQUESTED' && isRequester) {
+    const categorySlug = toCategorySlug(detail.requestType?.category)
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Actions</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <Button asChild className="w-full">
+            <Link href={`/staff/requests/${categorySlug}/${detail.id}/edit`}>
+              Revise Submission
+            </Link>
+          </Button>
+          <p className="text-sm text-muted-foreground">
+            The reviewer has requested changes. Edit and resubmit your request.
+          </p>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (isTerminal && detail.portal !== 'admin') {
+    return <TerminalActionPanel detail={detail} />
+  }
+
   if (canDecide) {
     return <DecisionActionPanel detail={detail} onDetailChange={onDetailChange} />
   }
@@ -390,6 +438,17 @@ const ACTIONABLE_REQUEST_STATUSES = new Set([
   'WAITING_APPROVAL',
   'ASSIGNED',
 ])
+
+function toCategorySlug(category?: string | null) {
+  const map: Record<string, string> = {
+    IT_SUPPORT: 'it-support',
+    ADMINISTRATIVE: 'administrative',
+    INVENTORY: 'inventory',
+    CAMPUS_SERVICES: 'campus-services',
+    STUDENT_LIFE: 'student-life',
+  }
+  return map[String(category ?? '').toUpperCase()] ?? 'general'
+}
 
 const TERMINAL_REQUEST_STATUSES = new Set([
   'APPROVED',

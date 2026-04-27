@@ -173,22 +173,11 @@ export default function StaffTicketDetailPage() {
               <div><span className="text-muted-foreground">Affected System:</span> {data.ticket?.affectedSystem || '-'}</div>
               <div><span className="text-muted-foreground">Location:</span> {data.ticket?.locationText || '-'}</div>
               <div><span className="text-muted-foreground">Assigned To:</span> {data.ticket?.assignedTo?.fullName || 'Unassigned'}</div>
-              <div><span className="text-muted-foreground">Due At:</span> {fmt(data.sla?.resolutionDeadline || data.dueAt)}</div>
             </div>
             <div>
               <p className="text-sm text-muted-foreground">
                 {data.description || 'No description provided.'}
               </p>
-            </div>
-          </div>
-
-          <div className="space-y-3 rounded-xl border border-border bg-card p-5">
-            <p className="text-sm font-semibold">SLA</p>
-            <div className="grid gap-3 text-sm md:grid-cols-2">
-              <div><span className="text-muted-foreground">First Response:</span> {data.sla?.firstResponseState}</div>
-              <div><span className="text-muted-foreground">Resolution:</span> {data.sla?.resolutionState}</div>
-              <div><span className="text-muted-foreground">First Response Deadline:</span> {fmt(data.sla?.firstResponseDeadline)}</div>
-              <div><span className="text-muted-foreground">Resolution Deadline:</span> {fmt(data.sla?.resolutionDeadline)}</div>
             </div>
           </div>
 

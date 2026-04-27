@@ -27,8 +27,8 @@ const categorySlugMap: Record<string, string> = {
 }
 
 const TABS = [
-  { id: 'unassigned', label: 'Needs Assignment' },
   { id: 'active', label: 'Active' },
+  { id: 'unassigned', label: 'Needs Assignment' },
   { id: 'all', label: 'All Requests' },
   { id: 'closed', label: 'Closed' },
 ]

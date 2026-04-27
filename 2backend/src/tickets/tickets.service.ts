@@ -205,6 +205,28 @@ export class TicketsService {
     return policy;
   }
 
+  private toUserSummary(user: any) {
+    return user
+      ? {
+          id: user.id,
+          fullName: user.profile?.fullName ?? user.email,
+        }
+      : null;
+  }
+
+  private resolveListAssignee(ticket: any) {
+    const request = ticket.request;
+    const latestAssignment = Array.isArray(request?.assignments)
+      ? request.assignments.find((assignment: any) => assignment?.assignedTo)
+      : null;
+
+    return (
+      this.toUserSummary(ticket.assignedTo) ??
+      this.toUserSummary(request?.currentAssignee) ??
+      this.toUserSummary(latestAssignment?.assignedTo)
+    );
+  }
+
   private toListItem(r: any) {
     const req = r.request;
     return {
@@ -220,19 +242,7 @@ export class TicketsService {
       affectedSystem: r.affectedSystem,
       assetId: r.assetId,
       locationText: r.locationText,
-      currentAssignee: req.currentAssignee
-        ? {
-            id: req.currentAssignee.id,
-            fullName:
-              req.currentAssignee.profile?.fullName ?? req.currentAssignee.email,
-          }
-        : null,
-      assignee: r.assignedTo
-        ? {
-            id: r.assignedTo.id,
-            fullName: r.assignedTo.profile?.fullName ?? r.assignedTo.email,
-          }
-        : null,
+      assignedTo: this.resolveListAssignee(r),
       requesterName: req.requester?.profile?.fullName ?? req.requester?.email,
       createdAt: r.createdAt,
       updatedAt: r.updatedAt,
@@ -1091,6 +1101,12 @@ export class TicketsService {
             currentAssignee: {
               include: { profile: { select: { fullName: true } } },
             },
+            assignments: {
+              include: {
+                assignedTo: { include: { profile: { select: { fullName: true } } } },
+              },
+              orderBy: { assignedAt: 'desc' },
+            },
           },
         },
         assignedTo: { include: { profile: { select: { fullName: true } } } },
@@ -1136,6 +1152,12 @@ export class TicketsService {
             requester: { include: { profile: { select: { fullName: true } } } },
             currentAssignee: {
               include: { profile: { select: { fullName: true } } },
+            },
+            assignments: {
+              include: {
+                assignedTo: { include: { profile: { select: { fullName: true } } } },
+              },
+              orderBy: { assignedAt: 'desc' },
             },
           },
         },
@@ -1229,6 +1251,12 @@ export class TicketsService {
             currentAssignee: {
               include: { profile: { select: { fullName: true } } },
             },
+            assignments: {
+              include: {
+                assignedTo: { include: { profile: { select: { fullName: true } } } },
+              },
+              orderBy: { assignedAt: 'desc' },
+            },
           },
         },
         assignedTo: { include: { profile: { select: { fullName: true } } } },
@@ -1297,6 +1325,12 @@ export class TicketsService {
               currentAssignee: {
                 include: { profile: { select: { fullName: true } } },
               },
+              assignments: {
+                include: {
+                  assignedTo: { include: { profile: { select: { fullName: true } } } },
+                },
+                orderBy: { assignedAt: 'desc' },
+              },
             },
           },
           assignedTo: { include: { profile: { select: { fullName: true } } } },
@@ -1317,13 +1351,6 @@ export class TicketsService {
         requesterName:
           record.request.requester.profile?.fullName ??
           record.request.requester.email,
-        assignedTo: record.assignedTo
-          ? {
-              id: record.assignedTo.id,
-              fullName:
-                record.assignedTo.profile?.fullName ?? record.assignedTo.email,
-            }
-          : null,
         slaPolicy: record.slaPolicy ?? null,
       }));
     });
@@ -1377,13 +1404,7 @@ export class TicketsService {
         resolvedAt: ticket.resolvedAt,
         closedAt: ticket.closedAt,
         reopenedCount: ticket.reopenedCount,
-        assignedTo: ticket.assignedTo
-          ? {
-              id: ticket.assignedTo.id,
-              fullName:
-                ticket.assignedTo.profile?.fullName ?? ticket.assignedTo.email,
-            }
-          : null,
+        assignedTo: this.resolveListAssignee(ticket),
       },
       workflow: this.buildWorkflowSummary(ticket),
       sla: this.buildSlaSummary(ticket),

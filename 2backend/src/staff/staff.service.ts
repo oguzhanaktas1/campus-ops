@@ -11,6 +11,8 @@ import { RequestStatus, Prisma, AuditActionType } from '@prisma/client'; // 🔥
 import * as bcrypt from 'bcrypt';
 import { SlaService } from '../workflow/sla.service';
 import { buildWorkflowSummary } from '../workflow/workflow-summary';
+import { CacheService } from '../infrastructure/cache/cache.service';
+import { CacheKeys } from '../infrastructure/cache/cache-keys';
 
 function deriveWorkflowStepStatus(params: {
   instanceStep: any;
@@ -35,6 +37,7 @@ export class StaffService {
   constructor(
     private prisma: PrismaService,
     private slaService: SlaService,
+    private cacheService: CacheService,
   ) {}
 
   // 1. DASHBOARD METRICS
@@ -297,22 +300,38 @@ export class StaffService {
         requester: { include: { profile: true } },
         requestType: true,
         currentAssignee: { include: { profile: true } },
+        assignments: {
+          where: { isActive: true },
+          include: { assignedTo: { include: { profile: true } } },
+          orderBy: { assignedAt: 'desc' },
+          take: 1,
+        },
       },
       orderBy: { createdAt: 'desc' },
     });
 
-    return requests.map((req) => ({
-      id: req.id,
-      requestNo: req.requestNo,
-      title: req.title,
-      status: req.status,
-      priority: req.priority,
-      typeName: req.requestType?.name || 'General',
-      category: req.requestType?.category,
-      requesterName: req.requester?.profile?.fullName || req.requester?.email,
-      assignedTo: req.currentAssignee?.profile?.fullName || null,
-      createdAt: req.createdAt,
-    }));
+    return requests.map((req: any) => {
+      const activeAssignee =
+        req.currentAssignee?.profile?.fullName ||
+        req.currentAssignee?.email ||
+        req.assignments?.[0]?.assignedTo?.profile?.fullName ||
+        req.assignments?.[0]?.assignedTo?.email ||
+        null;
+
+      return {
+        id: req.id,
+        requestNo: req.requestNo,
+        title: req.title,
+        status: req.status,
+        priority: req.priority,
+        typeName: req.requestType?.name || 'General',
+        category: req.requestType?.category,
+        requesterName: req.requester?.profile?.fullName || req.requester?.email,
+        assignedTo: activeAssignee,
+        commentCount: req._count?.comments ?? 0,
+        createdAt: req.createdAt,
+      };
+    });
   }
 
   // 3. REQUEST DETAILS
@@ -429,6 +448,13 @@ export class StaffService {
                 resourceType: true,
                 locationText: true,
               },
+            },
+          },
+        },
+        itTicket: {
+          include: {
+            assignedTo: {
+              include: { profile: { select: { fullName: true } } },
             },
           },
         },
@@ -570,6 +596,29 @@ export class StaffService {
               endDate: request.internshipRequest.endDate,
               durationDays: request.internshipRequest.durationDays,
               insuranceRequired: request.internshipRequest.insuranceRequired,
+            }
+          : {}),
+        ...(request.itTicket
+          ? {
+              category: request.itTicket.category,
+              subcategory: request.itTicket.subcategory,
+              affectedSystem: request.itTicket.affectedSystem,
+              assetId: request.itTicket.assetId,
+              locationText: request.itTicket.locationText,
+              incidentStartedAt: request.itTicket.incidentStartedAt,
+              ticketStatus: request.itTicket.ticketStatus,
+              resolvedAt: request.itTicket.resolvedAt,
+              reopenedCount: request.itTicket.reopenedCount,
+              assignedTo: request.itTicket.assignedTo
+                ? {
+                    id: request.itTicket.assignedTo.id,
+                    fullName:
+                      request.itTicket.assignedTo.profile?.fullName ||
+                      request.itTicket.assignedTo.email,
+                    email: request.itTicket.assignedTo.email,
+                  }
+                : null,
+              resolutionSummary: request.itTicket.resolutionSummary,
             }
           : {}),
       },
@@ -933,5 +982,121 @@ export class StaffService {
     });
 
     return { message: 'Password successfully updated.' };
+  }
+
+  async reviseRequest(
+    userId: string,
+    requestId: string,
+    body: { title?: string; description?: string; dynamicData?: any },
+  ) {
+    const existing = await this.prisma.request.findFirst({
+      where: { id: requestId, requesterUserId: userId },
+      include: { workflowInstance: true },
+    });
+
+    if (!existing) throw new NotFoundException('Request not found or access denied.');
+    if (existing.status !== RequestStatus.REVISION_REQUESTED) {
+      throw new BadRequestException('Only revision-requested requests can be revised.');
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      const updateData: Prisma.RequestUpdateInput = {
+        title: body.title ?? existing.title,
+        description: body.description !== undefined ? body.description : existing.description,
+        status: RequestStatus.IN_REVIEW,
+      };
+      if (body.dynamicData !== undefined) {
+        updateData.dynamicData = body.dynamicData as Prisma.InputJsonValue;
+      }
+
+      await tx.request.update({ where: { id: requestId }, data: updateData });
+
+      await tx.requestStatusHistory.create({
+        data: {
+          requestId,
+          oldStatus: RequestStatus.REVISION_REQUESTED,
+          newStatus: RequestStatus.IN_REVIEW,
+          changedByUserId: userId,
+          changeReason: 'Revised and resubmitted by requester.',
+        },
+      });
+
+      const revisionAction = await tx.approvalAction.findFirst({
+        where: { requestId, actionType: 'REQUEST_REVISION' },
+        include: { workflowInstanceStep: true },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      if (revisionAction?.actionByUserId) {
+        await tx.request.update({
+          where: { id: requestId },
+          data: { currentAssigneeUserId: revisionAction.actionByUserId },
+        });
+
+        const prevAssignment = await tx.requestAssignment.findFirst({
+          where: { requestId, assignedToUserId: revisionAction.actionByUserId },
+          orderBy: { assignedAt: 'desc' },
+        });
+
+        if (prevAssignment) {
+          await tx.requestAssignment.update({
+            where: { id: prevAssignment.id },
+            data: { isActive: true, unassignedAt: null },
+          });
+        } else {
+          await tx.requestAssignment.create({
+            data: {
+              requestId,
+              assignedToUserId: revisionAction.actionByUserId,
+              assignedByUserId: userId,
+              assignmentNote: 'Resubmitted after revision.',
+            },
+          });
+        }
+      }
+
+      const revisionStep = revisionAction?.workflowInstanceStep;
+      const revisionActorUserId = revisionAction?.actionByUserId ?? null;
+      if (existing.workflowInstanceId && revisionStep?.workflowStepId && revisionActorUserId) {
+        await tx.workflowInstance.update({
+          where: { id: existing.workflowInstanceId },
+          data: {
+            status: 'ACTIVE',
+            endedAt: null,
+            currentStepId: revisionStep.workflowStepId,
+          },
+        });
+
+        const pendingStep = await tx.workflowInstanceStep.findFirst({
+          where: {
+            workflowInstanceId: existing.workflowInstanceId,
+            workflowStepId: revisionStep.workflowStepId,
+            status: 'PENDING',
+          },
+          orderBy: { createdAt: 'desc' },
+        });
+
+        if (pendingStep) {
+          await tx.workflowInstanceStep.update({
+            where: { id: pendingStep.id },
+            data: { assignedToUserId: revisionActorUserId },
+          });
+        } else {
+          await tx.workflowInstanceStep.create({
+            data: {
+              workflowInstanceId: existing.workflowInstanceId,
+              workflowStepId: revisionStep.workflowStepId,
+              status: 'PENDING',
+              startedAt: new Date(),
+              assignedToUserId: revisionActorUserId,
+            },
+          });
+        }
+      }
+    });
+
+    await this.cacheService.bumpVersion(CacheKeys.version(`request:detail:${requestId}`));
+
+    return { success: true, requestId };
   }
 }
