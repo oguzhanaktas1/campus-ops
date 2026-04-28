@@ -1,5 +1,5 @@
-const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000';
-const SESSION_SENTINEL = 'cookie-session';
+const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:5000";
+const SESSION_SENTINEL = "cookie-session";
 
 export interface StoredUser {
   id: string;
@@ -31,7 +31,11 @@ function uniqueRoles(values: Array<string | null | undefined>) {
   return Array.from(
     new Set(
       values
-        .map((value) => String(value ?? '').toUpperCase().trim())
+        .map((value) =>
+          String(value ?? "")
+            .toUpperCase()
+            .trim(),
+        )
         .filter(Boolean),
     ),
   );
@@ -40,7 +44,7 @@ function uniqueRoles(values: Array<string | null | undefined>) {
 export function extractRoles(source: any): string[] {
   const directRoles = Array.isArray(source?.roles)
     ? source.roles.map((role: any) =>
-        typeof role === 'string' ? role : role?.name ?? role?.role?.name,
+        typeof role === "string" ? role : (role?.name ?? role?.role?.name),
       )
     : [];
 
@@ -54,31 +58,31 @@ export function extractRoles(source: any): string[] {
 export function resolvePortalPath(source: any): string {
   const roles = extractRoles(source);
 
-  if (roles.includes('ADMIN')) return '/admin/dashboard';
-  if (roles.includes('ORGANIZER')) return '/organizer/dashboard';
-  if (roles.includes('FACULTY')) return '/faculty/dashboard';
-  if (roles.includes('STAFF')) return '/staff/dashboard';
-  return '/student/dashboard';
+  if (roles.includes("ADMIN")) return "/admin/dashboard";
+  if (roles.includes("ORGANIZER")) return "/organizer/dashboard";
+  if (roles.includes("FACULTY")) return "/faculty/dashboard";
+  if (roles.includes("STAFF")) return "/staff/dashboard";
+  return "/student/dashboard";
 }
 
 export function resolvePrimaryRole(source: any): string | null {
   const roles = extractRoles(source);
-  if (roles.includes('ADMIN')) return 'ADMIN';
-  if (roles.includes('ORGANIZER')) return 'ORGANIZER';
-  if (roles.includes('FACULTY')) return 'FACULTY';
-  if (roles.includes('STAFF')) return 'STAFF';
-  if (roles.includes('STUDENT')) return 'STUDENT';
+  if (roles.includes("ADMIN")) return "ADMIN";
+  if (roles.includes("ORGANIZER")) return "ORGANIZER";
+  if (roles.includes("FACULTY")) return "FACULTY";
+  if (roles.includes("STAFF")) return "STAFF";
+  if (roles.includes("STUDENT")) return "STUDENT";
   return roles[0] ?? null;
 }
 
 export function getToken(): string | null {
-  if (typeof window === 'undefined') return null;
-  return localStorage.getItem('access_token');
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem("access_token");
 }
 
 export function getStoredUser(): StoredUser | null {
-  if (typeof window === 'undefined') return null;
-  const raw = localStorage.getItem('user');
+  if (typeof window === "undefined") return null;
+  const raw = localStorage.getItem("user");
   if (!raw) return null;
   try {
     return JSON.parse(raw) as StoredUser;
@@ -88,17 +92,21 @@ export function getStoredUser(): StoredUser | null {
 }
 
 export function setAuth(_token: string | undefined, user: StoredUser): void {
-  if (typeof window === 'undefined') return;
-  localStorage.setItem('access_token', SESSION_SENTINEL);
-  localStorage.setItem('user', JSON.stringify(user));
+  if (typeof window === "undefined") return;
+  localStorage.setItem("access_token", SESSION_SENTINEL);
+  localStorage.setItem("user", JSON.stringify(user));
 }
 
 export function clearAuth(): void {
-  if (typeof window === 'undefined') return;
-  localStorage.removeItem('access_token');
-  localStorage.removeItem('user');
+  if (typeof window === "undefined") return;
+  localStorage.removeItem("access_token");
+  localStorage.removeItem("user");
   Object.keys(sessionStorage)
-    .filter((key) => key.startsWith('campusops-ai-session:') || key.startsWith('campusops-ai-summary:'))
+    .filter(
+      (key) =>
+        key.startsWith("campusops-ai-session:") ||
+        key.startsWith("campusops-ai-summary:"),
+    )
     .forEach((key) => sessionStorage.removeItem(key));
 }
 
@@ -111,7 +119,9 @@ export function getRoleFromToken(_token: string): string | null {
 }
 
 async function parseError(res: Response, fallback: string) {
-  const err = (await res.json().catch(() => null)) as { message?: string } | null;
+  const err = (await res.json().catch(() => null)) as {
+    message?: string;
+  } | null;
   return err?.message ?? fallback;
 }
 
@@ -120,13 +130,13 @@ export async function apiLogin(
   password: string,
 ): Promise<{ access_token?: string; user: StoredUser }> {
   const res = await fetch(`${BACKEND}/auth/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
     body: JSON.stringify({ email, password }),
   });
   if (!res.ok) {
-    throw new Error(await parseError(res, 'Login failed'));
+    throw new Error(await parseError(res, "Login failed"));
   }
   return res.json() as Promise<{ access_token?: string; user: StoredUser }>;
 }
@@ -138,36 +148,40 @@ export async function apiRegister(data: {
   lastName?: string;
 }): Promise<{ access_token?: string; user: StoredUser }> {
   const res = await fetch(`${BACKEND}/auth/register`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
     body: JSON.stringify(data),
   });
   if (!res.ok) {
-    throw new Error(await parseError(res, 'Registration failed'));
+    throw new Error(await parseError(res, "Registration failed"));
   }
   return res.json() as Promise<{ access_token?: string; user: StoredUser }>;
 }
 
 export async function apiLogout(): Promise<void> {
   await fetch(`${BACKEND}/auth/logout`, {
-    method: 'POST',
-    credentials: 'include',
+    method: "POST",
+    credentials: "include",
   }).catch(() => undefined);
 }
 
 export async function fetchMe(): Promise<MeResponse> {
   const res = await fetch(`${BACKEND}/auth/me`, {
-    credentials: 'include',
+    credentials: "include",
   });
-  if (!res.ok) throw new Error('Unauthorized');
+  if (!res.ok) throw new Error("Unauthorized");
   return res.json() as Promise<MeResponse>;
 }
 
 export async function fetchProfile(): Promise<Record<string, unknown>> {
+  const token = localStorage.getItem("access_token");
+
   const res = await fetch(`${BACKEND}/auth/profile`, {
-    credentials: 'include',
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
   });
-  if (!res.ok) throw new Error('Unauthorized');
+  if (!res.ok) throw new Error("Unauthorized");
   return res.json() as Promise<Record<string, unknown>>;
 }

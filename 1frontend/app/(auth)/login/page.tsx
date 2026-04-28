@@ -1,44 +1,47 @@
-'use client'
+"use client";
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import Link from 'next/link'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { CampusFlowLogo } from '@/components/campusflow-logo'
-import { AlertTriangle, ArrowRight, Eye, EyeOff, Loader2 } from 'lucide-react'
-import { toast } from 'sonner'
-import { apiLogin, resolvePortalPath, setAuth } from '@/lib/auth'
-import { ThemeToggle } from '@/components/theme-toggle'
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { CampusFlowLogo } from "@/components/campusflow-logo";
+import { AlertTriangle, ArrowRight, Eye, EyeOff, Loader2 } from "lucide-react";
+import { toast } from "sonner";
+import { apiLogin, resolvePortalPath, setAuth } from "@/lib/auth";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 export default function LoginPage() {
-  const router = useRouter()
+  const router = useRouter();
 
-  const [showPass, setShowPass] = useState(false)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [capsLock, setCapsLock] = useState(false)
+  const [showPass, setShowPass] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [capsLock, setCapsLock] = useState(false);
 
   const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-    setError('')
+    e.preventDefault();
+    setLoading(true);
+    setError("");
     try {
-      const data = await apiLogin(email, password)
-      setAuth(data.access_token, data.user)
-      toast.success('Login successful, redirecting...')
-      router.push(resolvePortalPath(data.user))
+      const data = await apiLogin(email, password);
+      setAuth(data.access_token, data.user);
+      if (data.access_token) {
+        localStorage.setItem("access_token", data.access_token);
+      }
+      toast.success("Login successful, redirecting...");
+      router.push(resolvePortalPath(data.user));
     } catch (err: any) {
-      const msg = err.message || 'An error occurred'
-      setError(msg)
-      toast.error(msg)
+      const msg = err.message || "An error occurred";
+      setError(msg);
+      toast.error(msg);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   return (
     <div className="min-h-screen bg-background flex">
@@ -46,18 +49,27 @@ export default function LoginPage() {
       <div className="hidden lg:flex w-1/2 bg-sidebar flex-col justify-between p-12">
         <Link href="/" className="flex items-center gap-2">
           <CampusFlowLogo containerClassName="size-9" priority />
-          <span className="text-xl font-bold text-sidebar-foreground">CampusFlow</span>
+          <span className="text-xl font-bold text-sidebar-foreground">
+            CampusFlow
+          </span>
         </Link>
         <div>
           <blockquote className="text-sidebar-foreground/90 text-lg font-medium leading-relaxed mb-6">
-            "CampusFlow transformed how we handle administrative workflows. What used to take days now takes hours."
+            "CampusFlow transformed how we handle administrative workflows. What
+            used to take days now takes hours."
           </blockquote>
           <div>
-            <p className="text-sidebar-foreground font-semibold text-sm">Dr. Margaret Liu</p>
-            <p className="text-sidebar-foreground/60 text-sm">Provost, Westfield University</p>
+            <p className="text-sidebar-foreground font-semibold text-sm">
+              Dr. Margaret Liu
+            </p>
+            <p className="text-sidebar-foreground/60 text-sm">
+              Provost, Westfield University
+            </p>
           </div>
         </div>
-        <p className="text-sidebar-foreground/40 text-xs">Smart Campus Operations Platform</p>
+        <p className="text-sidebar-foreground/40 text-xs">
+          Smart Campus Operations Platform
+        </p>
       </div>
 
       {/* Sağ panel */}
@@ -74,7 +86,9 @@ export default function LoginPage() {
               <span className="font-bold text-foreground">CampusFlow</span>
             </Link>
             <h1 className="text-2xl font-bold text-foreground">Welcome back</h1>
-            <p className="text-muted-foreground text-sm mt-1">Sign in to your portal</p>
+            <p className="text-muted-foreground text-sm mt-1">
+              Sign in to your portal
+            </p>
           </div>
 
           <form onSubmit={handleLogin} className="space-y-4">
@@ -102,12 +116,12 @@ export default function LoginPage() {
                 <Input
                   id="password"
                   required
-                  type={showPass ? 'text' : 'password'}
+                  type={showPass ? "text" : "password"}
                   placeholder="••••••••"
                   className="pr-9"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  onKeyUp={(e) => setCapsLock(e.getModifierState('CapsLock'))}
+                  onKeyUp={(e) => setCapsLock(e.getModifierState("CapsLock"))}
                   onBlur={() => setCapsLock(false)}
                 />
                 <button
@@ -115,7 +129,11 @@ export default function LoginPage() {
                   className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                   onClick={() => setShowPass(!showPass)}
                 >
-                  {showPass ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                  {showPass ? (
+                    <EyeOff className="size-4" />
+                  ) : (
+                    <Eye className="size-4" />
+                  )}
                 </button>
               </div>
               {capsLock && (
@@ -140,5 +158,5 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
-  )
+  );
 }

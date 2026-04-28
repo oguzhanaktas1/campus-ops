@@ -64,7 +64,6 @@ export default function AuthGuard({ children, allowedRoles }: AuthGuardProps) {
     }
 
     try {
-      localStorage.setItem('access_token', 'cookie-session')
       localStorage.setItem('user', JSON.stringify(profile))
     } catch {}
     return true
