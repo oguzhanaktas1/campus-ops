@@ -13,6 +13,11 @@ class AssistantCard(BaseModel):
     description: str | None = None
 
 
+class ConversationMessage(BaseModel):
+    role: str  # "user" | "assistant"
+    content: str
+
+
 class AssistantAskRequest(BaseModel):
     portal: str
     message: str = Field(min_length=1, max_length=4000)
@@ -28,6 +33,9 @@ class AssistantAskRequest(BaseModel):
     visibility_scope: dict[str, object] = Field(default_factory=dict, alias="visibilityScope")
     open_requests: list[dict[str, object]] = Field(default_factory=list, alias="openRequests")
     live_data_context: dict[str, object] = Field(default_factory=dict, alias="liveDataContext")
+    conversation_history: list[ConversationMessage] = Field(
+        default_factory=list, alias="conversationHistory"
+    )
 
 
 class AssistantAskResponse(BaseModel):

@@ -19,6 +19,7 @@ class Settings(BaseSettings):
         default="http://localhost:11434",
         validation_alias=AliasChoices("AI_RUNTIME_BASE_URL", "OLLAMA_BASE_URL"),
     )
+    runtime_fallback_urls: str = Field(default="", alias="AI_RUNTIME_FALLBACK_URLS")
     request_timeout_seconds: float = Field(default=30.0, alias="AI_REQUEST_TIMEOUT_SECONDS")
     internal_api_key: str = Field(default="campusops-ai-internal-dev-key", alias="AI_INTERNAL_API_KEY")
     fallback_confidence: float = Field(default=0.25, alias="AI_FALLBACK_CONFIDENCE")

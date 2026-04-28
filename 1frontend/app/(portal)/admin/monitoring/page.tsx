@@ -16,6 +16,7 @@ import {
   ChevronDown,
   ChevronUp,
   Clock,
+  Bot,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -28,6 +29,30 @@ interface ServiceStatus {
   error?: string
   checks?: Record<string, boolean>
   timestamp?: string
+  model?: string
+  provider?: string
+  enabled?: boolean
+  runtime?: AiRuntimeStatus
+}
+
+interface AiRuntimeStatus {
+  status: 'ok' | 'disabled' | 'unreachable' | 'error' | string
+  baseUrl?: string
+  model?: string
+  modelAvailable?: boolean
+  availableModels?: string[]
+  latencyMs?: number
+  error?: string
+  checkedUrls?: string[]
+  checkedEndpoints?: AiRuntimeEndpointStatus[]
+}
+
+interface AiRuntimeEndpointStatus {
+  status: string
+  baseUrl?: string
+  latencyMs?: number
+  error?: string
+  modelAvailable?: boolean
 }
 
 interface QueueStats {
@@ -84,7 +109,7 @@ function StatusDot({ ok }: { ok: boolean }) {
 
 function StatusBadge({ status }: { status: string }) {
   const ok = status === 'ok' || status === 'ready'
-  const warn = status === 'not_ready'
+  const warn = status === 'not_ready' || status === 'degraded' || status === 'disabled'
   return (
     <span
       className={cn(
@@ -218,7 +243,7 @@ export default function MonitoringPage() {
             System Monitoring
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Backend · Worker · RabbitMQ · Prometheus — her 30 saniyede otomatik yenilenir.
+            Backend, workers, AI runtime VM, RabbitMQ ve Prometheus her 30 saniyede yenilenir.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -281,6 +306,7 @@ export default function MonitoringPage() {
           title="AI Service"
           subtitle="FastAPI · port 8010"
           status={snapshot?.ai}
+          details={snapshot?.ai && <AiRuntimeDetails ai={snapshot.ai} />}
           extraLinks={
             snapshot?.urls && (
               <div className="flex gap-3 flex-wrap">
@@ -437,12 +463,14 @@ function ServiceCard({
   title,
   subtitle,
   status,
+  details,
   extraLinks,
 }: {
   icon: React.ReactNode
   title: string
   subtitle: string
   status?: ServiceStatus
+  details?: React.ReactNode
   extraLinks?: React.ReactNode
 }) {
   const ok = status ? isOk(status) : false
@@ -489,7 +517,93 @@ function ServiceCard({
         <p className="text-[10px] text-muted-foreground">Checked at {formatTs(status.timestamp)}</p>
       )}
 
+      {details}
+
       {extraLinks && <div className="pt-1 border-t border-border/50">{extraLinks}</div>}
+    </div>
+  )
+}
+
+function AiRuntimeDetails({ ai }: { ai: ServiceStatus }) {
+  const runtime = ai.runtime
+  const runtimeOk = runtime?.status === 'ok'
+  const modelAvailable = runtime?.modelAvailable === true
+
+  return (
+    <div className="space-y-2 rounded-md border border-border/70 bg-muted/20 p-3">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-2">
+          <Bot className={cn('size-3.5 flex-shrink-0', runtimeOk ? 'text-emerald-500' : 'text-red-500')} />
+          <div className="min-w-0">
+            <p className="text-xs font-semibold text-foreground">Gemma runtime VM</p>
+            <p className="truncate text-[11px] text-muted-foreground">{runtime?.baseUrl ?? 'Runtime URL yok'}</p>
+          </div>
+        </div>
+        <StatusBadge status={runtime?.status ?? 'unknown'} />
+      </div>
+
+      <div className="grid grid-cols-2 gap-2 text-xs">
+        <RuntimeFact label="Provider" value={ai.provider ?? 'unknown'} />
+        <RuntimeFact label="Model" value={runtime?.model ?? ai.model ?? 'unknown'} />
+        <RuntimeFact label="Latency" value={typeof runtime?.latencyMs === 'number' ? `${runtime.latencyMs} ms` : 'n/a'} />
+        <RuntimeFact label="Model loaded" value={modelAvailable ? 'yes' : 'no'} tone={modelAvailable ? 'ok' : 'warn'} />
+      </div>
+
+      {!!runtime?.availableModels?.length && (
+        <div className="flex flex-wrap gap-1">
+          {runtime.availableModels.slice(0, 4).map((model) => (
+            <span key={model} className="rounded bg-background px-1.5 py-0.5 text-[10px] text-muted-foreground">
+              {model}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {!!runtime?.checkedEndpoints?.length && (
+        <div className="space-y-1">
+          {runtime.checkedEndpoints.map((endpoint) => (
+            <div key={endpoint.baseUrl} className="flex items-center justify-between gap-2 rounded bg-background/80 px-2 py-1.5 text-[11px]">
+              <span className="min-w-0 truncate text-muted-foreground">{endpoint.baseUrl}</span>
+              <span className={cn('flex-shrink-0 font-medium', endpoint.status === 'ok' ? 'text-emerald-600' : 'text-red-600')}>
+                {endpoint.status}
+                {typeof endpoint.latencyMs === 'number' ? ` · ${endpoint.latencyMs} ms` : ''}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {runtime?.error && (
+        <p className="rounded bg-red-50 px-2 py-1 text-xs text-red-600 dark:bg-red-950/30">
+          {runtime.error}
+        </p>
+      )}
+    </div>
+  )
+}
+
+function RuntimeFact({
+  label,
+  value,
+  tone,
+}: {
+  label: string
+  value: string
+  tone?: 'ok' | 'warn'
+}) {
+  return (
+    <div className="rounded bg-background/80 px-2 py-1.5">
+      <p className="text-[10px] uppercase text-muted-foreground">{label}</p>
+      <p
+        className={cn(
+          'truncate font-medium',
+          tone === 'ok' && 'text-emerald-600',
+          tone === 'warn' && 'text-amber-600',
+          !tone && 'text-foreground',
+        )}
+      >
+        {value}
+      </p>
     </div>
   )
 }

@@ -35,12 +35,14 @@ class AssistantService:
         if not self.settings.ai_enabled:
             return fallback
 
+        history_text = self._format_conversation_history(payload)
         prompt = PromptService.render(
             "assistant/portal.md",
-            payload=json.dumps(payload.model_dump(), ensure_ascii=False, indent=2),
+            payload=json.dumps(payload.model_dump(by_alias=True), ensure_ascii=False, indent=2),
             intent=intent.name,
             intent_entities=json.dumps(intent.entities, ensure_ascii=False, indent=2),
             tool_context=json.dumps(tool_result.context, ensure_ascii=False, indent=2),
+            conversation_history=history_text,
         )
 
         try:
@@ -66,6 +68,16 @@ class AssistantService:
         except (httpx.HTTPError, ValueError, KeyError):
             return fallback
 
+    def _format_conversation_history(self, payload: AssistantAskRequest) -> str:
+        history = payload.conversation_history
+        if not history:
+            return "No conversation history."
+        lines: list[str] = []
+        for msg in history[-6:]:
+            role_label = "User" if msg.role == "user" else "Assistant"
+            lines.append(f"{role_label}: {msg.content}")
+        return "\n".join(lines)
+
     def _fallback(
         self,
         payload: AssistantAskRequest,
@@ -76,47 +88,46 @@ class AssistantService:
         recent_requests = payload.live_data_context.get("recentRequests", [])
         cards = tool_result.cards if getattr(tool_result, "cards", None) else []
 
-        answer = (
-            "Bu soruyu su an netlestiremedim. CampusOps icinde hangi modul, kayit veya islemden soz ettiginizi biraz daha acik yazabilirsiniz."
-        )
+        answer = "I couldn't fully understand your question. Could you be more specific about which module, record, or action you're referring to in CampusOps?"
 
         metric_intents = {
             "analytics_summary",
             "ticket_queue_summary",
             "my_open_requests_count",
             "my_today_summary",
+            "system_overview",
         }
 
         if intent_name in metric_intents and isinstance(summary, dict):
             parts: list[str] = []
             for key, label in (
-                ("totalUsers", "Toplam kullanici"),
-                ("activeUsers", "Aktif kullanici"),
-                ("openRequests", "Acik request"),
-                ("openTickets", "Acik ticket"),
-                ("unreadNotifications", "Okunmamis bildirim"),
+                ("totalUsers", "Total users"),
+                ("activeUsers", "Active users"),
+                ("openRequests", "Open requests"),
+                ("openTickets", "Open tickets"),
+                ("unreadNotifications", "Unread notifications"),
             ):
                 if key in summary:
-                    parts.append(f"{label} {summary[key]}")
+                    parts.append(f"{label}: {summary[key]}")
             if parts:
                 answer = ". ".join(parts) + "."
             elif isinstance(recent_requests, list) and recent_requests:
                 first = recent_requests[0]
                 if isinstance(first, dict):
-                    request_no = first.get("requestNo") or "Kayit"
+                    request_no = first.get("requestNo") or "Record"
                     status = first.get("status") or "UNKNOWN"
-                    answer = f"En guncel gorunen kayit {request_no}; durumu {status}."
+                    answer = f"Most recent visible record is {request_no} with status {status}."
+
         elif intent_name == "help_navigation":
-            answer = (
-                "CampusOps icinde ilgili sayfayi bulmaya calistim ama su an net eslestiremedim. Islemi veya modul adini biraz daha spesifik yazabilirsiniz."
-            )
+            answer = "I couldn't find an exact page match. Could you be more specific about which action or module you're looking for?"
+
         elif intent_name in {"request_summary", "request_status_explanation"}:
             if isinstance(recent_requests, list) and recent_requests:
                 first = recent_requests[0]
                 if isinstance(first, dict):
-                    request_no = first.get("requestNo") or "Kayit"
+                    request_no = first.get("requestNo") or "Record"
                     status = first.get("status") or "UNKNOWN"
-                    answer = f"Ilgili kaydi dogrudan cozemedim. Gorunen en guncel kayit {request_no}; durumu {status}."
+                    answer = f"Couldn't find that specific request. Most recent visible record: {request_no} — status: {status}."
 
         return AssistantAskResponse(
             answer=answer,

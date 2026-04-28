@@ -102,7 +102,7 @@ export class AiClientService {
 
   private resolveTimeoutMs(path: string): number {
     const defaultTimeoutMs = Number(
-      this.configService.get<string>('AI_SERVICE_TIMEOUT_MS', '120000'),
+      this.configService.get<string>('AI_SERVICE_TIMEOUT_MS', '60000'),
     );
 
     const timeoutKeyByPath: Record<string, string> = {
@@ -115,12 +115,12 @@ export class AiClientService {
     };
 
     const defaultByPath: Record<string, string> = {
-      '/analytics/summary': '120000',
-      '/assistant/ask': '120000',
-      '/summary/approval': '120000',
-      '/parse/request': '120000',
-      '/triage/ticket': '4000',
-      '/health': '5000',
+      '/analytics/summary': '60000',
+      '/assistant/ask': '60000',
+      '/summary/approval': '60000',
+      '/parse/request': '60000',
+      '/triage/ticket': '60000',
+      '/health': '60000',
     };
 
     const timeoutKey = timeoutKeyByPath[path];

@@ -593,8 +593,11 @@ export class AiService {
       subRoles,
     );
     const conversation = await this.getOrCreateConversation(user, dto, portal);
-    const openRequests = await this.resolveVisibleRequests(user, portal);
-    const liveDataContext = await this.resolveAssistantLiveDataContext(user, portal);
+    const [openRequests, liveDataContext, conversationHistory] = await Promise.all([
+      this.resolveVisibleRequests(user, portal),
+      this.resolveAssistantLiveDataContext(user, portal),
+      this.loadConversationHistory(conversation.id, 6),
+    ]);
 
     await this.persistMessage(conversation.id, user.userId, 'user', dto.message, {
       portal,
@@ -635,6 +638,7 @@ export class AiService {
         },
         openRequests,
         liveDataContext,
+        conversationHistory,
         requestTypeHelpMapping: Object.fromEntries(
           authorizedRouteDetails.map((route) => [route.label, route.href]),
         ),
@@ -905,7 +909,7 @@ export class AiService {
     }
 
     if (portal === 'student') {
-      const [myRequests, upcomingAppointments, upcomingReservations, unreadNotifications] =
+      const [myRequests, upcomingAppointments, upcomingReservations, unreadNotifications, upcomingEvents] =
         await Promise.all([
           this.prisma.request.findMany({
             where: { requesterUserId: user.userId, deletedAt: null },
@@ -948,17 +952,33 @@ export class AiService {
           this.prisma.notification.count({
             where: { userId: user.userId, isRead: false },
           }),
+          this.prisma.event.findMany({
+            where: { startAt: { gte: now }, status: 'PUBLISHED' },
+            orderBy: { startAt: 'asc' },
+            take: 5,
+            select: {
+              title: true,
+              startAt: true,
+              endAt: true,
+              status: true,
+              locationText: true,
+            },
+          }),
         ]);
+
+      const openCount = myRequests.filter((item) =>
+        !['COMPLETED', 'APPROVED', 'REJECTED', 'CANCELLED', 'CLOSED', 'EXPIRED'].includes(item.status),
+      ).length;
 
       return {
         generatedAt: now.toISOString(),
         portal,
         summary: {
           totalRequests: myRequests.length,
-          openRequests: myRequests.filter((item) =>
-            !['COMPLETED', 'APPROVED', 'REJECTED', 'CANCELLED', 'CLOSED', 'EXPIRED'].includes(item.status),
-          ).length,
+          openRequests: openCount,
           unreadNotifications,
+          upcomingAppointments: upcomingAppointments.length,
+          upcomingEvents: upcomingEvents.length,
         },
         recentRequests: myRequests.map((item) => ({
           requestNo: item.requestNo,
@@ -969,46 +989,64 @@ export class AiService {
         })),
         upcomingAppointments,
         upcomingReservations,
+        upcomingEvents,
       };
     }
 
     if (portal === 'faculty') {
-      const visibleRequests = await this.prisma.request.findMany({
-        where: {
-          OR: [
-            { currentAssigneeUserId: user.userId },
-            { requesterUserId: user.userId },
-            {
-              workflowInstance: {
-                instanceSteps: {
-                  some: {
-                    assignedToUserId: user.userId,
+      const [visibleRequests, upcomingAppointments] = await Promise.all([
+        this.prisma.request.findMany({
+          where: {
+            OR: [
+              { currentAssigneeUserId: user.userId },
+              { requesterUserId: user.userId },
+              {
+                workflowInstance: {
+                  instanceSteps: {
+                    some: { assignedToUserId: user.userId },
                   },
                 },
               },
-            },
-          ],
-          deletedAt: null,
-        },
-        orderBy: { updatedAt: 'desc' },
-        take: 10,
-        select: {
-          requestNo: true,
-          title: true,
-          status: true,
-          updatedAt: true,
-          requestType: { select: { key: true, name: true } },
-        },
-      });
+            ],
+            deletedAt: null,
+          },
+          orderBy: { updatedAt: 'desc' },
+          take: 10,
+          select: {
+            requestNo: true,
+            title: true,
+            status: true,
+            updatedAt: true,
+            requestType: { select: { key: true, name: true } },
+          },
+        }),
+        this.prisma.appointment.findMany({
+          where: {
+            OR: [{ requesterUserId: user.userId }, { hostUserId: user.userId }],
+            startAt: { gte: now },
+          },
+          orderBy: { startAt: 'asc' },
+          take: 5,
+          select: {
+            title: true,
+            status: true,
+            startAt: true,
+            endAt: true,
+            locationText: true,
+          },
+        }),
+      ]);
+
+      const pendingApprovals = visibleRequests.filter((item) =>
+        ['WAITING_APPROVAL', 'IN_REVIEW', 'SUBMITTED'].includes(item.status),
+      ).length;
 
       return {
         generatedAt: now.toISOString(),
         portal,
         summary: {
           visibleRequests: visibleRequests.length,
-          pendingApprovals: visibleRequests.filter((item) =>
-            ['WAITING_APPROVAL', 'IN_REVIEW', 'SUBMITTED'].includes(item.status),
-          ).length,
+          pendingApprovals,
         },
         recentRequests: visibleRequests.map((item) => ({
           requestNo: item.requestNo,
@@ -1017,6 +1055,7 @@ export class AiService {
           requestType: item.requestType?.name ?? item.requestType?.key ?? null,
           updatedAt: item.updatedAt,
         })),
+        upcomingAppointments,
       };
     }
 
@@ -1163,6 +1202,36 @@ export class AiService {
       portal,
       summary: {},
     };
+  }
+
+  private async loadConversationHistory(
+    conversationId: string,
+    limit: number,
+  ): Promise<Array<{ role: string; content: string }>> {
+    if (conversationId === 'ephemeral') {
+      return [];
+    }
+
+    const aiMessage = (this.prisma as any).aiMessage;
+    if (!aiMessage) {
+      return [];
+    }
+
+    try {
+      const messages = await aiMessage.findMany({
+        where: { conversationId },
+        orderBy: { createdAt: 'asc' },
+        take: limit,
+        select: { messageType: true, content: true },
+      });
+
+      return (messages as Array<{ messageType: string; content: string }>).map((msg) => ({
+        role: msg.messageType === 'assistant' ? 'assistant' : 'user',
+        content: msg.content,
+      }));
+    } catch {
+      return [];
+    }
   }
 
   private async getOrCreateConversation(
