@@ -40,6 +40,8 @@ interface AiRuntimeStatus {
   baseUrl?: string
   model?: string
   modelAvailable?: boolean
+  fallbackModel?: string
+  fallbackModelAvailable?: boolean
   availableModels?: string[]
   latencyMs?: number
   error?: string
@@ -527,15 +529,17 @@ function ServiceCard({
 function AiRuntimeDetails({ ai }: { ai: ServiceStatus }) {
   const runtime = ai.runtime
   const runtimeOk = runtime?.status === 'ok'
+  const runtimeUnreachable = runtime?.status === 'unreachable'
   const modelAvailable = runtime?.modelAvailable === true
+  const fallbackAvailable = runtime?.fallbackModelAvailable === true
 
   return (
     <div className="space-y-2 rounded-md border border-border/70 bg-muted/20 p-3">
       <div className="flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2">
-          <Bot className={cn('size-3.5 flex-shrink-0', runtimeOk ? 'text-emerald-500' : 'text-red-500')} />
+          <Bot className={cn('size-3.5 flex-shrink-0', runtimeOk ? 'text-emerald-500' : runtimeUnreachable ? 'text-red-500 animate-pulse' : 'text-amber-500')} />
           <div className="min-w-0">
-            <p className="text-xs font-semibold text-foreground">Gemma runtime VM</p>
+            <p className="text-xs font-semibold text-foreground">Qwen2.5 runtime VM</p>
             <p className="truncate text-[11px] text-muted-foreground">{runtime?.baseUrl ?? 'Runtime URL yok'}</p>
           </div>
         </div>
@@ -544,14 +548,43 @@ function AiRuntimeDetails({ ai }: { ai: ServiceStatus }) {
 
       <div className="grid grid-cols-2 gap-2 text-xs">
         <RuntimeFact label="Provider" value={ai.provider ?? 'unknown'} />
-        <RuntimeFact label="Model" value={runtime?.model ?? ai.model ?? 'unknown'} />
         <RuntimeFact label="Latency" value={typeof runtime?.latencyMs === 'number' ? `${runtime.latencyMs} ms` : 'n/a'} />
-        <RuntimeFact label="Model loaded" value={modelAvailable ? 'yes' : 'no'} tone={modelAvailable ? 'ok' : 'warn'} />
+        <RuntimeFact
+          label={`Primary · ${runtime?.model ?? ai.model ?? 'qwen2.5:3b-instruct'}`}
+          value={modelAvailable ? 'loaded' : runtimeUnreachable ? 'unreachable' : 'not loaded'}
+          tone={modelAvailable ? 'ok' : 'warn'}
+        />
+        <RuntimeFact
+          label={`Fallback · ${runtime?.fallbackModel ?? 'llama3.2:1b'}`}
+          value={fallbackAvailable ? 'loaded' : runtimeUnreachable ? 'unreachable' : 'not loaded'}
+          tone={fallbackAvailable ? 'ok' : 'warn'}
+        />
       </div>
+
+      {runtimeUnreachable && (
+        <div className="flex items-center gap-1.5 rounded bg-red-50 px-2 py-1.5 text-xs text-red-700 dark:bg-red-950/30 dark:text-red-400">
+          <XCircle className="size-3.5 flex-shrink-0" />
+          VM erişilemiyor — AI özellikleri devre dışı, sistem çalışmaya devam ediyor
+        </div>
+      )}
+
+      {!runtimeUnreachable && !modelAvailable && !fallbackAvailable && (
+        <div className="flex items-center gap-1.5 rounded bg-amber-50 px-2 py-1.5 text-xs text-amber-700 dark:bg-amber-950/30 dark:text-amber-400">
+          <AlertCircle className="size-3.5 flex-shrink-0" />
+          VM erişilebilir ancak hiçbir model yüklü değil
+        </div>
+      )}
+
+      {!runtimeUnreachable && !modelAvailable && fallbackAvailable && (
+        <div className="flex items-center gap-1.5 rounded bg-amber-50 px-2 py-1.5 text-xs text-amber-700 dark:bg-amber-950/30 dark:text-amber-400">
+          <AlertCircle className="size-3.5 flex-shrink-0" />
+          Primary model yüklü değil, fallback aktif
+        </div>
+      )}
 
       {!!runtime?.availableModels?.length && (
         <div className="flex flex-wrap gap-1">
-          {runtime.availableModels.slice(0, 4).map((model) => (
+          {runtime.availableModels.slice(0, 6).map((model) => (
             <span key={model} className="rounded bg-background px-1.5 py-0.5 text-[10px] text-muted-foreground">
               {model}
             </span>

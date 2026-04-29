@@ -70,6 +70,8 @@ async def _check_runtime() -> dict[str, object]:
         "baseUrl": runtime_urls[0] if runtime_urls else "",
         "model": settings.default_model,
         "modelAvailable": False,
+        "fallbackModel": settings.fallback_model,
+        "fallbackModelAvailable": False,
         "availableModels": [],
         "latencyMs": round((perf_counter() - started_at) * 1000),
         "error": last.get("error", "No AI runtime URL configured."),
@@ -99,6 +101,8 @@ async def _check_runtime_url(runtime_url: str, started_at: float) -> dict[str, o
             "baseUrl": runtime_url,
             "model": settings.default_model,
             "modelAvailable": settings.default_model in model_names,
+            "fallbackModel": settings.fallback_model,
+            "fallbackModelAvailable": settings.fallback_model in model_names,
             "availableModels": model_names[:20],
             "latencyMs": round((perf_counter() - started_at) * 1000),
         }

@@ -12,23 +12,26 @@ class OllamaClient:
 
     async def generate_json(self, prompt: str) -> dict[str, object]:
         last_error: Exception | None = None
+        models = [self.settings.default_model, self.settings.fallback_model]
 
-        for runtime_base_url in self._runtime_base_urls():
-            try:
-                return await self._generate_json_from(runtime_base_url, prompt)
-            except (httpx.HTTPError, ValueError) as exc:
-                last_error = exc
+        for model in models:
+            for runtime_base_url in self._runtime_base_urls():
+                try:
+                    return await self._generate_json_from(runtime_base_url, prompt, model)
+                except (httpx.HTTPError, ValueError) as exc:
+                    last_error = exc
 
         if last_error:
             raise last_error
         raise ValueError("No AI runtime URL configured.")
 
-    async def _generate_json_from(self, runtime_base_url: str, prompt: str) -> dict[str, object]:
+    async def _generate_json_from(self, runtime_base_url: str, prompt: str, model: str | None = None) -> dict[str, object]:
+        active_model = model or self.settings.default_model
         async with httpx.AsyncClient(timeout=self.settings.request_timeout_seconds) as client:
             response = await client.post(
                 f"{runtime_base_url}/api/generate",
                 json={
-                    "model": self.settings.default_model,
+                    "model": active_model,
                     "prompt": prompt,
                     "stream": False,
                     "format": "json",
