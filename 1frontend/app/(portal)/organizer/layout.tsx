@@ -105,9 +105,9 @@ export default function OrganizerLayout({
           title="Organizer AI Assistant"
           description="Event, reservation, equipment, and access-request guidance within organizer routes."
           prompts={[
-            "Yeni etkinlik planını nereden oluştururum?",
-            "Rezervasyon sürecini açıklar mısın?",
-            "Ekipman talebi için hangi sayfaya gitmeliyim?",
+            "Where do I create a new event plan?",
+            "Can you explain the reservation process?",
+            "Which page should I go to for an equipment request?",
           ]}
         />
       </PortalLayout>

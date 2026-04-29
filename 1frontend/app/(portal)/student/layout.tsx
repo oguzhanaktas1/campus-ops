@@ -143,9 +143,9 @@ export default function StudentLayout({
           title="Student AI Assistant"
           description="Route guidance, request status explanations, and next-step help within your own student scope."
           prompts={[
-            "Staj başvurusu nasıl yapılır?",
-            "Açık taleplerimi nasıl takip ederim?",
-            "Rezervasyon için hangi sayfaya gitmeliyim?",
+            "How do I submit an internship application?",
+            "How do I track my open requests?",
+            "Which page should I go to for a reservation?",
           ]}
         />
       </PortalLayout>

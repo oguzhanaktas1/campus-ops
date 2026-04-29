@@ -582,6 +582,11 @@ export class FacultyService {
 
   // 4. GET SINGLE REQUEST DETAIL
   async getRequestDetail(userId: string, requestId: string) {
+    const version = await this.cacheService.getVersion(
+      CacheKeys.version(`request:detail:${requestId}`),
+    );
+    const cacheKey = `faculty:request:detail:${requestId}:v${version}:v2`;
+    return this.cacheService.getOrSet(cacheKey, CacheTtls.long, async () => {
     const request = await this.prisma.request.findFirst({
       where: {
         id: requestId,
@@ -602,63 +607,119 @@ export class FacultyService {
                 unit: { select: { name: true } },
               },
             },
-            primaryRoles: { include: { role: true } },
+            primaryRoles: { select: { role: { select: { name: true } } }, take: 1 },
           },
         },
         requestType: true,
-        fileLinks: { include: { file: true } },
+        fileLinks: {
+          select: {
+            file: {
+              select: {
+                id: true,
+                originalFileName: true,
+                fileSizeBytes: true,
+                mimeType: true,
+                bucketName: true,
+                storagePath: true,
+              },
+            },
+          },
+        },
         currentAssignee: {
-          include: {
-            profile: true,
-            primaryRoles: { include: { role: true } },
+          select: {
+            id: true,
+            email: true,
+            profile: { select: { fullName: true, title: true } },
+            primaryRoles: { select: { role: { select: { name: true } } }, take: 1 },
           },
         },
         comments: {
           orderBy: { createdAt: 'asc' },
-          include: {
+          select: {
+            id: true,
+            commentText: true,
+            createdAt: true,
             user: {
-              include: {
-                profile: true,
-                primaryRoles: { include: { role: true } },
+              select: {
+                id: true,
+                email: true,
+                profile: { select: { fullName: true } },
+                primaryRoles: { select: { role: { select: { name: true } } }, take: 1 },
               },
             },
           },
         },
         assignments: {
-          include: {
+          select: {
+            id: true,
+            assignedAt: true,
+            unassignedAt: true,
+            isActive: true,
+            assignmentNote: true,
             assignedTo: {
-              include: {
-                profile: true,
-                primaryRoles: { include: { role: true } },
+              select: {
+                id: true,
+                email: true,
+                profile: { select: { fullName: true } },
+                primaryRoles: { select: { role: { select: { name: true } } }, take: 1 },
               },
             },
-            assignedBy: { include: { profile: true } },
+            assignedBy: {
+              select: {
+                id: true,
+                email: true,
+                profile: { select: { fullName: true } },
+              },
+            },
           },
           orderBy: { assignedAt: 'desc' },
         },
         approvalActions: {
-          include: {
-            actionBy: { include: { profile: true } },
+          select: {
+            id: true,
+            actionType: true,
+            decisionNote: true,
+            createdAt: true,
+            actionBy: {
+              select: {
+                id: true,
+                email: true,
+                profile: { select: { fullName: true } },
+              },
+            },
             workflowInstanceStep: {
-              include: { workflowStep: true },
+              select: { workflowStep: { select: { id: true, stepKey: true, stepName: true } } },
             },
           },
           orderBy: { createdAt: 'desc' },
         },
         statusHistory: { orderBy: { changedAt: 'desc' } },
         workflowInstance: {
-          include: {
-            currentStep: true,
+          select: {
+            id: true,
+            status: true,
+            currentStepId: true,
+            currentStep: { select: { id: true, stepName: true, stepKey: true } },
             workflowDefinition: {
-              include: {
+              select: {
+                name: true,
                 steps: {
-                  include: {
-                    assignedRole: true,
-                    assignedUnit: true,
+                  select: {
+                    id: true,
+                    stepKey: true,
+                    stepName: true,
+                    stepType: true,
+                    stepOrder: true,
+                    slaHours: true,
+                    configJson: true,
+                    assignedRole: { select: { name: true } },
+                    assignedUnit: { select: { id: true, name: true } },
                     assignedUser: {
-                      include: {
-                        profile: true,
-                        primaryRoles: { include: { role: true } },
+                      select: {
+                        id: true,
+                        email: true,
+                        profile: { select: { fullName: true } },
+                        primaryRoles: { select: { role: { select: { name: true } } }, take: 1 },
                       },
                     },
                   },
@@ -667,17 +728,30 @@ export class FacultyService {
               },
             },
             instanceSteps: {
-              include: {
+              select: {
+                id: true,
+                workflowStepId: true,
+                status: true,
+                actionTaken: true,
+                actionNote: true,
+                isOverdue: true,
+                startedAt: true,
+                completedAt: true,
+                dueAt: true,
                 assignedTo: {
-                  include: {
-                    profile: true,
-                    primaryRoles: { include: { role: true } },
+                  select: {
+                    id: true,
+                    email: true,
+                    profile: { select: { fullName: true } },
+                    primaryRoles: { select: { role: { select: { name: true } } }, take: 1 },
                   },
                 },
                 actionBy: {
-                  include: {
-                    profile: true,
-                    primaryRoles: { include: { role: true } },
+                  select: {
+                    id: true,
+                    email: true,
+                    profile: { select: { fullName: true } },
+                    primaryRoles: { select: { role: { select: { name: true } } }, take: 1 },
                   },
                 },
               },
@@ -832,6 +906,7 @@ export class FacultyService {
       })),
       workflow: buildWorkflowSummary(request.workflowInstance, request.status),
     };
+    }); // end cacheService.getOrSet
   }
 
   // ─── INTERNSHIP DEDICATED ENDPOINTS ──────────────────────────────────────

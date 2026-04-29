@@ -255,6 +255,28 @@ export class AdminService {
                 : null,
             }
           : null;
+      case 'IT_SUPPORT':
+        return request.itTicket
+          ? {
+              category: request.itTicket.category,
+              subcategory: request.itTicket.subcategory,
+              affectedSystem: request.itTicket.affectedSystem,
+              assetId: request.itTicket.assetId,
+              locationText: request.itTicket.locationText,
+              ticketStatus: request.itTicket.ticketStatus,
+              incidentStartedAt: request.itTicket.incidentStartedAt,
+              resolvedAt: request.itTicket.resolvedAt,
+              reopenedCount: request.itTicket.reopenedCount,
+              resolutionSummary: request.itTicket.resolutionSummary,
+              assignedTo: request.itTicket.assignedTo
+                ? {
+                    fullName:
+                      request.itTicket.assignedTo.profile?.fullName ||
+                      request.itTicket.assignedTo.email,
+                  }
+                : null,
+            }
+          : null;
       case 'INTERNSHIP_REQUEST':
         return request.internshipRequest
           ? {
@@ -728,7 +750,7 @@ export class AdminService {
     const version = await this.cacheService.getVersion(
       CacheKeys.version(`request:detail:${requestId}`),
     );
-    const cacheKey = `admin:request:detail:${requestId}:v${version}:workflow-preview-v6`;
+    const cacheKey = `admin:request:detail:${requestId}:v${version}:workflow-preview-v8`;
 
     return this.cacheService.getOrSet(cacheKey, CacheTtls.long, async () => {
     const request = await this.prisma.request.findUnique({
@@ -748,63 +770,115 @@ export class AdminService {
         },
         requestType: true,
         currentAssignee: {
-          include: {
-            profile: true,
-            primaryRoles: { include: { role: true } },
+          select: {
+            id: true,
+            email: true,
+            profile: { select: { fullName: true, title: true } },
+            primaryRoles: { select: { role: { select: { name: true } } }, take: 1 },
           },
         },
-        fileLinks: { include: { file: true } },
+        fileLinks: {
+          select: {
+            file: {
+              select: {
+                id: true,
+                originalFileName: true,
+                fileSizeBytes: true,
+                mimeType: true,
+                bucketName: true,
+                storagePath: true,
+              },
+            },
+          },
+        },
         statusHistory: { orderBy: { changedAt: 'desc' } },
         comments: {
-          include: {
+          select: {
+            id: true,
+            commentText: true,
+            createdAt: true,
             user: {
-              include: {
-                profile: true,
-                primaryRoles: { include: { role: true } },
+              select: {
+                id: true,
+                email: true,
+                profile: { select: { fullName: true } },
+                primaryRoles: { select: { role: { select: { name: true } } }, take: 1 },
               },
             },
           },
           orderBy: { createdAt: 'asc' },
         },
         assignments: {
-          include: {
+          select: {
+            id: true,
+            assignedAt: true,
+            unassignedAt: true,
+            isActive: true,
+            assignmentNote: true,
             assignedTo: {
-              include: {
-                profile: true,
-                primaryRoles: { include: { role: true } },
+              select: {
+                id: true,
+                email: true,
+                profile: { select: { fullName: true } },
+                primaryRoles: { select: { role: { select: { name: true } } }, take: 1 },
               },
             },
-            assignedBy: { include: { profile: true } },
+            assignedBy: {
+              select: {
+                id: true,
+                email: true,
+                profile: { select: { fullName: true } },
+              },
+            },
           },
           orderBy: { assignedAt: 'desc' },
         },
         approvalActions: {
-          include: {
+          select: {
+            id: true,
+            actionType: true,
+            decisionNote: true,
+            createdAt: true,
             actionBy: {
-              include: {
-                profile: true,
-                primaryRoles: { include: { role: true } },
+              select: {
+                id: true,
+                email: true,
+                profile: { select: { fullName: true } },
+                primaryRoles: { select: { role: { select: { name: true } } }, take: 1 },
               },
             },
             workflowInstanceStep: {
-              include: { workflowStep: true },
+              select: { workflowStep: { select: { id: true, stepKey: true, stepName: true } } },
             },
           },
           orderBy: { createdAt: 'desc' },
         },
         workflowInstance: {
-          include: {
-            currentStep: true,
+          select: {
+            id: true,
+            status: true,
+            currentStepId: true,
+            currentStep: { select: { id: true, stepName: true, stepKey: true } },
             workflowDefinition: {
-              include: {
+              select: {
+                name: true,
                 steps: {
-                  include: {
-                    assignedRole: true,
-                    assignedUnit: true,
+                  select: {
+                    id: true,
+                    stepKey: true,
+                    stepName: true,
+                    stepType: true,
+                    stepOrder: true,
+                    slaHours: true,
+                    configJson: true,
+                    assignedRole: { select: { name: true } },
+                    assignedUnit: { select: { id: true, name: true } },
                     assignedUser: {
-                      include: {
-                        profile: true,
-                        primaryRoles: { include: { role: true } },
+                      select: {
+                        id: true,
+                        email: true,
+                        profile: { select: { fullName: true } },
+                        primaryRoles: { select: { role: { select: { name: true } } }, take: 1 },
                       },
                     },
                   },
@@ -813,17 +887,30 @@ export class AdminService {
               },
             },
             instanceSteps: {
-              include: {
+              select: {
+                id: true,
+                workflowStepId: true,
+                status: true,
+                actionTaken: true,
+                actionNote: true,
+                isOverdue: true,
+                startedAt: true,
+                completedAt: true,
+                dueAt: true,
                 assignedTo: {
-                  include: {
-                    profile: true,
-                    primaryRoles: { include: { role: true } },
+                  select: {
+                    id: true,
+                    email: true,
+                    profile: { select: { fullName: true } },
+                    primaryRoles: { select: { role: { select: { name: true } } }, take: 1 },
                   },
                 },
                 actionBy: {
-                  include: {
-                    profile: true,
-                    primaryRoles: { include: { role: true } },
+                  select: {
+                    id: true,
+                    email: true,
+                    profile: { select: { fullName: true } },
+                    primaryRoles: { select: { role: { select: { name: true } } }, take: 1 },
                   },
                 },
               },
@@ -862,6 +949,17 @@ export class AdminService {
           },
         },
         internshipRequest: true,
+        itTicket: {
+          include: {
+            assignedTo: {
+              select: {
+                id: true,
+                email: true,
+                profile: { select: { fullName: true } },
+              },
+            },
+          },
+        },
       },
     });
     if (!request) throw new NotFoundException('Request not found');

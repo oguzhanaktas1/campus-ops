@@ -55,4 +55,9 @@ export class OrganizerController {
   changePassword(@Request() req: any, @Body() body: any) {
     return this.staffService.changePassword(extractUserId(req), body);
   }
+
+  @Get('requests/:id')
+  getRequestDetail(@Param('id') id: string) {
+    return this.staffService.getRequestDetail(id);
+  }
 }

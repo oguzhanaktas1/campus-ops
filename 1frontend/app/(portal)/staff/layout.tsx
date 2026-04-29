@@ -114,9 +114,9 @@ export default function StaffLayout({
           title="Staff AI Assistant"
           description="Queue navigation, ticket guidance, and role-aware help for staff operations."
           prompts={[
-            "Açık ticketları nereden görebilirim?",
-            "Onay kuyruğuma nasıl giderim?",
-            "Doküman işlemleri için hangi sayfa uygun?",
+            "Where can I see open tickets?",
+            "How do I get to my approval queue?",
+            "Which page is right for document operations?",
           ]}
         />
       </PortalLayout>

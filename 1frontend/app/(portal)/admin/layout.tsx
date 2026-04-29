@@ -163,9 +163,9 @@ export default function AdminLayout({
           title="Admin AI Assistant"
           description="Analytics narration, admin navigation help, and workflow or log guidance for authorized admin areas."
           prompts={[
-            "Analytics ekranına gitmek istiyorum.",
-            "Webhook hatalarını nereden takip ederim?",
-            "Workflow ve request type ekranları arasındaki fark nedir?",
+            "Take me to the Analytics screen.",
+            "Where can I track webhook errors?",
+            "What is the difference between Workflow and Request Type screens?",
           ]}
         />
       </PortalLayout>

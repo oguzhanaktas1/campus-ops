@@ -125,9 +125,9 @@ export default function FacultyLayout({ children }: { children: React.ReactNode 
           title="Faculty AI Assistant"
           description="Approval routing, internship flow help, and role-aware guidance for faculty workflows."
           prompts={[
-            "Bekleyen onaylarımı nereden görebilirim?",
-            "Staj onayı süreci nasıl işliyor?",
-            "Randevu taleplerimi hangi sayfadan yönetirim?",
+            "Where can I see my pending approvals?",
+            "How does the internship approval process work?",
+            "Which page do I use to manage my appointment requests?",
           ]}
         />
       </PortalLayout>

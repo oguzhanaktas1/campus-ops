@@ -12,7 +12,7 @@ import * as bcrypt from 'bcrypt';
 import { SlaService } from '../workflow/sla.service';
 import { buildWorkflowSummary } from '../workflow/workflow-summary';
 import { CacheService } from '../infrastructure/cache/cache.service';
-import { CacheKeys } from '../infrastructure/cache/cache-keys';
+import { CacheKeys, CacheTtls } from '../infrastructure/cache/cache-keys';
 
 function deriveWorkflowStepStatus(params: {
   instanceStep: any;
@@ -336,6 +336,11 @@ export class StaffService {
 
   // 3. REQUEST DETAILS
   async getRequestDetail(id: string) {
+    const version = await this.cacheService.getVersion(
+      CacheKeys.version(`request:detail:${id}`),
+    );
+    const cacheKey = `staff:request:detail:${id}:v${version}:v2`;
+    return this.cacheService.getOrSet(cacheKey, CacheTtls.long, async () => {
     const request = await this.prisma.request.findUnique({
       where: { id },
       include: {
@@ -348,53 +353,118 @@ export class StaffService {
                 unit: { select: { name: true } },
               },
             },
-            primaryRoles: { include: { role: true } },
+            primaryRoles: { select: { role: { select: { name: true } } }, take: 1 },
           },
         },
         requestType: true,
-        currentAssignee: { include: { profile: true } },
-        fileLinks: true,
+        currentAssignee: {
+          select: {
+            id: true,
+            email: true,
+            profile: { select: { fullName: true, title: true } },
+            primaryRoles: { select: { role: { select: { name: true } } }, take: 1 },
+          },
+        },
+        fileLinks: {
+          select: {
+            file: {
+              select: {
+                id: true,
+                originalFileName: true,
+                fileSizeBytes: true,
+                mimeType: true,
+                bucketName: true,
+                storagePath: true,
+              },
+            },
+          },
+        },
         statusHistory: { orderBy: { changedAt: 'desc' } },
         comments: {
           orderBy: { createdAt: 'asc' },
-          include: {
+          select: {
+            id: true,
+            commentText: true,
+            createdAt: true,
             user: {
-              include: {
-                profile: true,
-                primaryRoles: { include: { role: true } },
+              select: {
+                id: true,
+                email: true,
+                profile: { select: { fullName: true } },
+                primaryRoles: { select: { role: { select: { name: true } } }, take: 1 },
               },
             },
           },
         },
         assignments: {
-          include: {
-            assignedTo: { include: { profile: true } },
-            assignedBy: { include: { profile: true } },
+          select: {
+            id: true,
+            assignedAt: true,
+            unassignedAt: true,
+            isActive: true,
+            assignmentNote: true,
+            assignedTo: {
+              select: {
+                id: true,
+                email: true,
+                profile: { select: { fullName: true } },
+              },
+            },
+            assignedBy: {
+              select: {
+                id: true,
+                email: true,
+                profile: { select: { fullName: true } },
+              },
+            },
           },
           orderBy: { assignedAt: 'desc' },
         },
         approvalActions: {
-          include: {
-            actionBy: { include: { profile: true } },
+          select: {
+            id: true,
+            actionType: true,
+            decisionNote: true,
+            createdAt: true,
+            actionBy: {
+              select: {
+                id: true,
+                email: true,
+                profile: { select: { fullName: true } },
+              },
+            },
             workflowInstanceStep: {
-              include: { workflowStep: true },
+              select: { workflowStep: { select: { id: true, stepKey: true, stepName: true } } },
             },
           },
           orderBy: { createdAt: 'desc' },
         },
         workflowInstance: {
-          include: {
-            currentStep: true,
+          select: {
+            id: true,
+            status: true,
+            currentStepId: true,
+            currentStep: { select: { id: true, stepName: true, stepKey: true } },
             workflowDefinition: {
-              include: {
+              select: {
+                name: true,
                 steps: {
-                  include: {
-                    assignedRole: true,
-                    assignedUnit: true,
+                  select: {
+                    id: true,
+                    stepKey: true,
+                    stepName: true,
+                    stepType: true,
+                    stepOrder: true,
+                    slaHours: true,
+                    configJson: true,
+                    assignedRole: { select: { name: true } },
+                    assignedUnit: { select: { id: true, name: true } },
                     assignedUser: {
-                      include: {
-                        profile: true,
-                        primaryRoles: { include: { role: true } },
+                      select: {
+                        id: true,
+                        email: true,
+                        profile: { select: { fullName: true } },
+                        primaryRoles: { select: { role: { select: { name: true } } }, take: 1 },
                       },
                     },
                   },
@@ -403,17 +473,30 @@ export class StaffService {
               },
             },
             instanceSteps: {
-              include: {
+              select: {
+                id: true,
+                workflowStepId: true,
+                status: true,
+                actionTaken: true,
+                actionNote: true,
+                isOverdue: true,
+                startedAt: true,
+                completedAt: true,
+                dueAt: true,
                 assignedTo: {
-                  include: {
-                    profile: true,
-                    primaryRoles: { include: { role: true } },
+                  select: {
+                    id: true,
+                    email: true,
+                    profile: { select: { fullName: true } },
+                    primaryRoles: { select: { role: { select: { name: true } } }, take: 1 },
                   },
                 },
                 actionBy: {
-                  include: {
-                    profile: true,
-                    primaryRoles: { include: { role: true } },
+                  select: {
+                    id: true,
+                    email: true,
+                    profile: { select: { fullName: true } },
+                    primaryRoles: { select: { role: { select: { name: true } } }, take: 1 },
                   },
                 },
               },
@@ -466,7 +549,14 @@ export class StaffService {
 
     const auditHistory = await this.prisma.auditLog.findMany({
       where: { entityType: 'Request', entityId: id },
-      include: { user: { include: { profile: true } } },
+      select: {
+        id: true,
+        actionType: true,
+        entityType: true,
+        entityId: true,
+        createdAt: true,
+        user: { select: { id: true, email: true, profile: { select: { fullName: true } } } },
+      },
       orderBy: { createdAt: 'desc' },
       take: 50,
     });
@@ -695,6 +785,7 @@ export class StaffService {
           : null,
       })),
     };
+    }); // end cacheService.getOrSet
   }
 
   // 4. GET FACULTY MEMBERS

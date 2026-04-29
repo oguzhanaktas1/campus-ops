@@ -1337,44 +1337,67 @@ export class StudentService {
         fileLinks: { include: { file: true } },
         comments: {
           orderBy: { createdAt: 'asc' },
-          include: {
+          select: {
+            id: true,
+            commentText: true,
+            createdAt: true,
             user: {
-              include: {
-                profile: true,
-                primaryRoles: { include: { role: true } },
+              select: {
+                id: true,
+                email: true,
+                profile: { select: { fullName: true } },
+                primaryRoles: { select: { role: { select: { name: true } } }, take: 1 },
               },
             },
           },
         },
-        // 🔥 1. EKSİK OLAN SORGULAMA BURASI: Timeline verilerini DB'den çek
         approvalActions: {
-          include: {
+          select: {
+            id: true,
+            actionType: true,
+            decisionNote: true,
+            createdAt: true,
             actionBy: {
-              include: {
-                profile: true,
-                primaryRoles: { include: { role: true } },
+              select: {
+                id: true,
+                email: true,
+                profile: { select: { fullName: true } },
+                primaryRoles: { select: { role: { select: { name: true } } }, take: 1 },
               },
             },
             workflowInstanceStep: {
-              include: { workflowStep: true },
+              select: { workflowStep: { select: { id: true, stepKey: true, stepName: true } } },
             },
           },
           orderBy: { createdAt: 'asc' },
         },
         statusHistory: { orderBy: { changedAt: 'desc' } },
         workflowInstance: {
-          include: {
-            currentStep: true,
+          select: {
+            id: true,
+            status: true,
+            currentStepId: true,
+            currentStep: { select: { id: true, stepName: true, stepKey: true } },
             workflowDefinition: {
-              include: {
+              select: {
+                name: true,
                 steps: {
-                  include: {
-                    assignedRole: true,
-                    assignedUnit: true,
+                  select: {
+                    id: true,
+                    stepKey: true,
+                    stepName: true,
+                    stepType: true,
+                    stepOrder: true,
+                    slaHours: true,
+                    configJson: true,
+                    assignedRole: { select: { name: true } },
+                    assignedUnit: { select: { id: true, name: true } },
                     assignedUser: {
-                      include: {
-                        profile: true,
-                        primaryRoles: { include: { role: true } },
+                      select: {
+                        id: true,
+                        email: true,
+                        profile: { select: { fullName: true } },
+                        primaryRoles: { select: { role: { select: { name: true } } }, take: 1 },
                       },
                     },
                   },
@@ -1383,17 +1406,30 @@ export class StudentService {
               },
             },
             instanceSteps: {
-              include: {
+              select: {
+                id: true,
+                workflowStepId: true,
+                status: true,
+                actionTaken: true,
+                actionNote: true,
+                isOverdue: true,
+                startedAt: true,
+                completedAt: true,
+                dueAt: true,
                 assignedTo: {
-                  include: {
-                    profile: true,
-                    primaryRoles: { include: { role: true } },
+                  select: {
+                    id: true,
+                    email: true,
+                    profile: { select: { fullName: true } },
+                    primaryRoles: { select: { role: { select: { name: true } } }, take: 1 },
                   },
                 },
                 actionBy: {
-                  include: {
-                    profile: true,
-                    primaryRoles: { include: { role: true } },
+                  select: {
+                    id: true,
+                    email: true,
+                    profile: { select: { fullName: true } },
+                    primaryRoles: { select: { role: { select: { name: true } } }, take: 1 },
                   },
                 },
               },

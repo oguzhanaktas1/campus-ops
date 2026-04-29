@@ -161,14 +161,15 @@ export function PortalAssistant({
   }
 
   return (
-    <div className="pointer-events-none fixed bottom-4 right-4 z-50 flex max-w-[calc(100vw-1rem)] flex-col items-end gap-3 sm:bottom-5 sm:right-5">
+    <div className="pointer-events-none fixed bottom-4 right-4 z-50 flex max-w-[calc(100vw-2rem)] flex-col items-end gap-3 sm:bottom-5 sm:right-5">
       {isOpen && (
-        <div className="pointer-events-auto w-[calc(100vw-1rem)] max-w-sm overflow-hidden rounded-[1.5rem] border border-border/80 bg-background/95 shadow-2xl backdrop-blur">
-          <div className="border-b border-border/70 bg-gradient-to-r from-primary/10 via-background to-background px-4 py-3.5">
+        <div className="pointer-events-auto flex w-[calc(100vw-2rem)] max-h-[calc(100dvh-6rem)] flex-col overflow-hidden rounded-[1.5rem] border border-border/80 bg-background/95 shadow-2xl backdrop-blur sm:w-[400px] sm:max-h-[680px]">
+          {/* Header */}
+          <div className="flex-none border-b border-border/70 bg-gradient-to-r from-primary/10 via-background to-background px-4 py-3.5">
             <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <div className="flex size-9 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-sm">
+                  <div className="flex size-8 shrink-0 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-sm sm:size-9">
                     <Bot className="size-4" />
                   </div>
                   <div className="min-w-0">
@@ -176,10 +177,10 @@ export function PortalAssistant({
                     <p className="text-[11px] text-muted-foreground">AI helper only. Final action stays with you.</p>
                   </div>
                 </div>
-                <p className="mt-3 text-xs leading-5 text-muted-foreground">{description}</p>
+                <p className="mt-2.5 text-xs leading-5 text-muted-foreground sm:mt-3">{description}</p>
               </div>
-              <div className="flex items-center gap-2">
-                <div className="inline-flex items-center gap-1 rounded-full border border-primary/20 bg-primary/10 px-2 py-1 text-[10px] font-medium uppercase tracking-[0.18em] text-primary">
+              <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+                <div className="hidden items-center gap-1 rounded-full border border-primary/20 bg-primary/10 px-2 py-1 text-[10px] font-medium uppercase tracking-[0.18em] text-primary sm:inline-flex">
                   <Sparkles className="size-3" />
                   {portal}
                 </div>
@@ -195,15 +196,17 @@ export function PortalAssistant({
             </div>
           </div>
 
-          <div className="space-y-3 p-3">
-            <div className="flex flex-wrap gap-2">
+          {/* Body */}
+          <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden p-3">
+            {/* Prompt chips */}
+            <div className="flex flex-none flex-wrap gap-1.5 sm:gap-2">
               {prompts.map((prompt) => (
                 <Button
                   key={prompt}
                   type="button"
                   variant="outline"
                   size="sm"
-                  className="h-auto rounded-full px-3 py-1.5 text-[11px]"
+                  className="h-auto rounded-full px-2.5 py-1.5 text-[11px] sm:px-3"
                   onClick={() => void submitMessage(prompt)}
                   disabled={isSending}
                 >
@@ -212,9 +215,10 @@ export function PortalAssistant({
               ))}
             </div>
 
+            {/* Messages */}
             <div
               ref={messagesRef}
-              className="h-80 space-y-3 overflow-y-auto rounded-2xl border border-border/70 bg-muted/20 p-3"
+              className="min-h-[160px] flex-1 space-y-3 overflow-y-auto rounded-2xl border border-border/70 bg-muted/20 p-3"
             >
               {messages.length === 0 ? (
                 <div className="space-y-2 rounded-2xl border border-dashed border-border bg-background/90 p-3 text-sm text-muted-foreground">
@@ -277,29 +281,37 @@ export function PortalAssistant({
               {isSending && (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Loader2 className="size-4 animate-spin" />
-                  Generating reply
+                  Generating reply…
                 </div>
               )}
             </div>
 
-            <div className="space-y-2">
+            {/* Input area */}
+            <div className="flex-none space-y-2">
               <Textarea
                 value={input}
                 onChange={(event) => setInput(event.target.value)}
-                placeholder="Type your question here."
-                className="min-h-24 resize-none rounded-2xl border-border/80 bg-background"
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' && !event.shiftKey) {
+                    event.preventDefault()
+                    void submitMessage(input)
+                  }
+                }}
+                placeholder="Type your question here. (Enter to send, Shift+Enter for newline)"
+                className="min-h-16 resize-none rounded-2xl border-border/80 bg-background text-sm sm:min-h-20"
               />
               <div className="flex items-center justify-between gap-2">
                 <p className="text-[11px] text-muted-foreground">
-                  Advisory assistant. Review before acting.
+                  Advisory only. Review before acting.
                 </p>
                 <Button
                   type="button"
-                  className="gap-2 rounded-full px-4"
+                  size="sm"
+                  className="gap-1.5 rounded-full px-3 sm:gap-2 sm:px-4"
                   onClick={() => void submitMessage(input)}
                   disabled={isSending || !input.trim()}
                 >
-                  <SendHorizonal className="size-4" />
+                  <SendHorizonal className="size-3.5 sm:size-4" />
                   Send
                 </Button>
               </div>
@@ -308,22 +320,29 @@ export function PortalAssistant({
         </div>
       )}
 
+      {/* Trigger button */}
       <button
         type="button"
         className={cn(
-          'pointer-events-auto flex items-center gap-3 rounded-full border border-primary/20 bg-primary px-4 py-3 text-primary-foreground shadow-xl transition-all hover:scale-[1.02] hover:shadow-2xl',
+          'pointer-events-auto flex items-center gap-2 rounded-full border border-primary/20 bg-primary px-3 py-2.5 text-primary-foreground shadow-xl transition-all hover:scale-[1.02] hover:shadow-2xl sm:gap-3 sm:px-4 sm:py-3',
           isOpen && 'bg-foreground text-background',
         )}
         onClick={() => setIsOpen((current) => !current)}
         aria-expanded={isOpen}
         aria-label={isOpen ? 'Collapse AI assistant' : 'Open AI assistant'}
       >
-        <span className="flex size-10 items-center justify-center rounded-full bg-white/15">
-          {isOpen ? <ChevronDown className="size-5" /> : <MessageCircleMore className="size-5" />}
+        <span className="flex size-8 items-center justify-center rounded-full bg-white/15 sm:size-10">
+          {isOpen ? (
+            <ChevronDown className="size-4 sm:size-5" />
+          ) : (
+            <MessageCircleMore className="size-4 sm:size-5" />
+          )}
         </span>
         <span className="text-left">
           <span className="block text-sm font-semibold">AI Assistant</span>
-          <span className="block text-[11px] opacity-85">{isOpen ? 'Hide chat' : 'Ask a quick question'}</span>
+          <span className="block text-[11px] opacity-85">
+            {isOpen ? 'Hide chat' : 'Ask a quick question'}
+          </span>
         </span>
       </button>
     </div>
