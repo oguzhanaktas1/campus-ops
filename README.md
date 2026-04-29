@@ -556,14 +556,16 @@ cd ..
 docker compose up -d --build
 ```
 
-Seed sonrası demo girişleri:
+Seed sonrası demo girişleri (yalnızca yerel geliştirme ortamı için):
 
 ```text
-admin@campusops.edu.tr / aaaaaa
-student@campusops.edu.tr / aaaaaa
-faculty@campusops.edu.tr / aaaaaa
-staff@campusops.edu.tr / aaaaaa
+admin@campusops.edu.tr    / (seed dosyasındaki şifre)
+student@campusops.edu.tr  / (seed dosyasındaki şifre)
+faculty@campusops.edu.tr  / (seed dosyasındaki şifre)
+staff@campusops.edu.tr    / (seed dosyasındaki şifre)
 ```
+
+> **Uyarı:** Bu hesaplar yalnızca lokal geliştirme seed verisidir. Canlı ortamda seed şifrelerini mutlaka değiştirin.
 
 ### Lokal geliştirme
 
