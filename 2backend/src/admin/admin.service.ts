@@ -2071,21 +2071,186 @@ export class AdminService {
     return { message: 'SLA Policy deleted successfully.' };
   }
 
-  async getSystemEvents() {
-    return this.prisma.systemEvent.findMany({
+  async getSystemEvents(severity?: string) {
+    const where: any = {};
+    if (severity && severity !== 'all') where.severity = severity.toUpperCase();
+    const events = await this.prisma.systemEvent.findMany({
+      where,
       orderBy: { createdAt: 'desc' },
-      take: 200,
+      take: 300,
     });
+    return events.map((e) => ({
+      id: e.id,
+      eventType: e.eventKey,
+      severity: e.severity,
+      message: e.message,
+      source: e.sourceService,
+      entityType: e.entityType ?? null,
+      entityId: e.entityId ?? null,
+      metadata: e.metadataJson ?? null,
+      createdAt: e.createdAt,
+    }));
   }
 
-  async getWebhookLogs() {
-    return this.prisma.webhookLog.findMany({
+  async getWebhookLogs(success?: string) {
+    const where: any = {};
+    if (success === 'success') where.status = 'SUCCESS';
+    else if (success === 'failure') where.status = { not: 'SUCCESS' };
+    const logs = await this.prisma.webhookLog.findMany({
+      where,
       include: {
         integration: { select: { id: true, name: true, provider: true } },
       },
       orderBy: { createdAt: 'desc' },
-      take: 200,
+      take: 300,
     });
+    return logs.map((l) => ({
+      id: l.id,
+      url: l.endpointUrl,
+      method: l.httpMethod,
+      statusCode: l.responseStatusCode ?? null,
+      success: l.status === 'SUCCESS',
+      responseTime: (l as any).responseTimeMs ?? null,
+      payload: l.requestBodyJson ? JSON.stringify(l.requestBodyJson) : null,
+      response: l.responseBodyJson ? JSON.stringify(l.responseBodyJson) : null,
+      retryCount: l.retryCount,
+      direction: l.direction,
+      integration: l.integration ?? null,
+      createdAt: l.createdAt,
+    }));
+  }
+
+  async createIntegration(adminId: string, data: any) {
+    if (!data.key || !data.name || !data.provider) {
+      throw new BadRequestException('key, name and provider are required.');
+    }
+    const existing = await this.prisma.integration.findUnique({ where: { key: data.key } });
+    if (existing) throw new BadRequestException('An integration with this key already exists.');
+    const integration = await this.prisma.integration.create({
+      data: {
+        key: String(data.key).toUpperCase().replace(/\s+/g, '_'),
+        name: data.name,
+        provider: data.provider,
+        isActive: data.isActive !== undefined ? Boolean(data.isActive) : true,
+        configJson: data.webhookUrl ? { webhookUrl: data.webhookUrl } : {},
+        createdByUserId: adminId,
+      },
+    });
+    await this.prisma.systemEvent.create({
+      data: {
+        eventKey: 'INTEGRATION_CREATED',
+        severity: 'INFO',
+        sourceService: 'admin',
+        entityType: 'Integration',
+        entityId: integration.id,
+        message: `Integration "${integration.name}" (${integration.provider}) created.`,
+      },
+    });
+    return { ...integration, webhookUrl: data.webhookUrl ?? null };
+  }
+
+  async updateIntegration(adminId: string, id: string, data: any) {
+    const existing = await this.prisma.integration.findUnique({ where: { id } });
+    if (!existing) throw new NotFoundException('Integration not found.');
+    const existingConfig = (existing.configJson as Record<string, unknown>) ?? {};
+    const mergedConfig = data.webhookUrl !== undefined
+      ? { ...existingConfig, webhookUrl: data.webhookUrl }
+      : existingConfig;
+    const integration = await this.prisma.integration.update({
+      where: { id },
+      data: {
+        ...(data.name !== undefined && { name: data.name }),
+        ...(data.isActive !== undefined && { isActive: Boolean(data.isActive) }),
+        ...(data.webhookUrl !== undefined && { configJson: mergedConfig as any }),
+      },
+    });
+    await this.prisma.systemEvent.create({
+      data: {
+        eventKey: 'INTEGRATION_UPDATED',
+        severity: 'INFO',
+        sourceService: 'admin',
+        entityType: 'Integration',
+        entityId: id,
+        message: `Integration "${integration.name}" updated.`,
+      },
+    });
+    return integration;
+  }
+
+  async deleteIntegration(adminId: string, id: string) {
+    const existing = await this.prisma.integration.findUnique({ where: { id } });
+    if (!existing) throw new NotFoundException('Integration not found.');
+    await this.prisma.integration.delete({ where: { id } });
+    await this.prisma.systemEvent.create({
+      data: {
+        eventKey: 'INTEGRATION_DELETED',
+        severity: 'WARNING',
+        sourceService: 'admin',
+        entityType: 'Integration',
+        entityId: id,
+        message: `Integration "${existing.name}" was deleted.`,
+      },
+    });
+    return { deleted: true };
+  }
+
+  async syncIntegration(_adminId: string, id: string) {
+    const integration = await this.prisma.integration.findUnique({ where: { id } });
+    if (!integration) throw new NotFoundException('Integration not found.');
+    const config = (integration.configJson as Record<string, unknown>) ?? {};
+    const webhookUrl = config.webhookUrl as string | undefined;
+    const startedAt = Date.now();
+    let statusCode: number | null = null;
+    let success = false;
+    let responseBody: unknown = null;
+    let errorMessage: string | null = null;
+    if (webhookUrl) {
+      try {
+        const res = await fetch(webhookUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ event: 'PING', integrationId: id, timestamp: new Date().toISOString() }),
+          signal: AbortSignal.timeout(10000),
+        });
+        statusCode = res.status;
+        success = res.ok;
+        try { responseBody = await res.json(); } catch { /* non-JSON body */ }
+      } catch (err: unknown) {
+        errorMessage = err instanceof Error ? err.message : String(err);
+      }
+    } else {
+      success = true;
+      statusCode = 200;
+    }
+    const responseTime = Date.now() - startedAt;
+    const log = await this.prisma.webhookLog.create({
+      data: {
+        integrationId: id,
+        direction: 'OUTGOING',
+        endpointUrl: webhookUrl ?? '(no url configured)',
+        httpMethod: 'POST',
+        requestBodyJson: { event: 'PING', integrationId: id },
+        responseStatusCode: statusCode,
+        responseBodyJson: responseBody as any,
+        status: success ? 'SUCCESS' : 'FAILED',
+        executedAt: new Date(),
+      },
+    });
+    await this.prisma.integration.update({ where: { id }, data: { updatedAt: new Date() } });
+    await this.prisma.systemEvent.create({
+      data: {
+        eventKey: success ? 'INTEGRATION_SYNC_SUCCESS' : 'INTEGRATION_SYNC_FAILED',
+        severity: success ? 'INFO' : 'ERROR',
+        sourceService: 'admin',
+        entityType: 'Integration',
+        entityId: id,
+        message: success
+          ? `Integration "${integration.name}" synced successfully (${responseTime}ms).`
+          : `Integration "${integration.name}" sync failed: ${errorMessage ?? `HTTP ${statusCode}`}`,
+        metadataJson: { responseTime, statusCode, error: errorMessage },
+      },
+    });
+    return { success, statusCode, responseTime, error: errorMessage, logId: log.id };
   }
 
   // ─────────────────────────────────────────────────────────────────────────

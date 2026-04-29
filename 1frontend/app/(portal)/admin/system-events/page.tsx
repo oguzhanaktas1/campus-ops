@@ -13,6 +13,9 @@ interface SystemEvent {
   severity: 'INFO' | 'WARNING' | 'ERROR' | 'CRITICAL'
   message: string
   source: string
+  entityType?: string | null
+  entityId?: string | null
+  metadata?: unknown
   createdAt: string
 }
 
@@ -54,12 +57,15 @@ export default function AdminSystemEventsPage() {
   const [events, setEvents] = useState<SystemEvent[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [severityFilter, setSeverityFilter] = useState('all')
+  const [expandedId, setExpandedId] = useState<string | null>(null)
   const [, setTick] = useState(0)
+
+  const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
 
   const fetchEvents = useCallback(async () => {
     try {
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
-      const res = await fetch(`${backendUrl}/admin/system-events`, {
+      const params = severityFilter !== 'all' ? `?severity=${severityFilter}` : ''
+      const res = await fetch(`${backendUrl}/admin/system-events${params}`, {
         headers: { Authorization: `Bearer ${getToken()}` },
       })
       if (!res.ok) throw new Error()
@@ -69,7 +75,7 @@ export default function AdminSystemEventsPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [backendUrl, severityFilter])
 
   useEffect(() => {
     fetchEvents()
@@ -85,9 +91,7 @@ export default function AdminSystemEventsPage() {
     }
   }, [fetchEvents])
 
-  const filtered = events.filter(e =>
-    severityFilter === 'all' || e.severity === severityFilter
-  )
+  const filtered = events
 
   if (isLoading) {
     return (
@@ -158,36 +162,71 @@ export default function AdminSystemEventsPage() {
             </thead>
             <tbody className="divide-y divide-border">
               {filtered.map(e => (
-                <tr key={e.id} className={cn('hover:bg-muted/20 transition-colors', SEVERITY_ROW[e.severity] ?? '')}>
-                  <td className="px-5 py-3.5">
-                    <div className="flex items-center gap-2">
-                      <SeverityIcon severity={e.severity} />
-                      <span className={cn(
-                        'text-xs font-bold px-2 py-0.5 rounded-full border',
-                        SEVERITY_BADGE[e.severity] ?? SEVERITY_BADGE.INFO,
-                        e.severity === 'CRITICAL' && 'font-black'
-                      )}>
-                        {e.severity}
+                <>
+                  <tr
+                    key={e.id}
+                    className={cn(
+                      'transition-colors',
+                      (e.entityType || e.metadata) ? 'cursor-pointer hover:bg-muted/20' : 'hover:bg-muted/20',
+                      SEVERITY_ROW[e.severity] ?? ''
+                    )}
+                    onClick={() => (e.entityType || e.metadata) && setExpandedId(expandedId === e.id ? null : e.id)}
+                  >
+                    <td className="px-5 py-3.5">
+                      <div className="flex items-center gap-2">
+                        <SeverityIcon severity={e.severity} />
+                        <span className={cn(
+                          'text-xs font-bold px-2 py-0.5 rounded-full border',
+                          SEVERITY_BADGE[e.severity] ?? SEVERITY_BADGE.INFO,
+                          e.severity === 'CRITICAL' && 'font-black'
+                        )}>
+                          {e.severity}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-5 py-3.5">
+                      <div>
+                        <span className="text-xs font-mono bg-muted px-2 py-0.5 rounded text-foreground">
+                          {e.eventType}
+                        </span>
+                        {e.entityType && (
+                          <p className="text-[11px] text-muted-foreground mt-0.5">{e.entityType}</p>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-5 py-3.5 hidden md:table-cell max-w-[280px]">
+                      <p className="text-xs text-muted-foreground truncate" title={e.message}>{e.message}</p>
+                    </td>
+                    <td className="px-5 py-3.5 hidden lg:table-cell">
+                      <span className="text-xs font-mono text-muted-foreground">{e.source}</span>
+                    </td>
+                    <td className="px-5 py-3.5 hidden sm:table-cell">
+                      <span className="flex items-center gap-1.5 text-xs text-muted-foreground whitespace-nowrap">
+                        <Clock className="size-3.5" /> {relativeTime(e.createdAt)}
                       </span>
-                    </div>
-                  </td>
-                  <td className="px-5 py-3.5">
-                    <span className="text-xs font-mono bg-muted px-2 py-0.5 rounded text-foreground">
-                      {e.eventType}
-                    </span>
-                  </td>
-                  <td className="px-5 py-3.5 hidden md:table-cell max-w-[280px]">
-                    <p className="text-xs text-muted-foreground truncate" title={e.message}>{e.message}</p>
-                  </td>
-                  <td className="px-5 py-3.5 hidden lg:table-cell">
-                    <span className="text-xs font-mono text-muted-foreground">{e.source}</span>
-                  </td>
-                  <td className="px-5 py-3.5 hidden sm:table-cell">
-                    <span className="flex items-center gap-1.5 text-xs text-muted-foreground whitespace-nowrap">
-                      <Clock className="size-3.5" /> {relativeTime(e.createdAt)}
-                    </span>
-                  </td>
-                </tr>
+                    </td>
+                  </tr>
+                  {expandedId === e.id && (
+                    <tr key={`${e.id}-detail`} className="bg-muted/30">
+                      <td colSpan={5} className="px-5 py-3 space-y-2">
+                        {e.entityType && e.entityId && (
+                          <p className="text-xs text-muted-foreground">
+                            <span className="font-semibold text-foreground">{e.entityType}</span>{' '}
+                            <span className="font-mono">{e.entityId}</span>
+                          </p>
+                        )}
+                        {e.metadata && (
+                          <div>
+                            <p className="text-xs font-semibold text-muted-foreground mb-1">Metadata</p>
+                            <pre className="text-xs font-mono bg-background border border-border rounded p-3 overflow-x-auto max-h-40 text-foreground">
+                              {JSON.stringify(e.metadata, null, 2)}
+                            </pre>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  )}
+                </>
               ))}
             </tbody>
           </table>

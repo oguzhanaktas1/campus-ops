@@ -486,13 +486,13 @@ export class AdminController {
   }
 
   @Get('system-events')
-  getSystemEvents() {
-    return this.adminService.getSystemEvents();
+  getSystemEvents(@Query('severity') severity?: string) {
+    return this.adminService.getSystemEvents(severity);
   }
 
   @Get('webhook-logs')
-  getWebhookLogs() {
-    return this.adminService.getWebhookLogs();
+  getWebhookLogs(@Query('success') success?: string) {
+    return this.adminService.getWebhookLogs(success);
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -601,6 +601,26 @@ export class AdminController {
   @Get('integrations')
   getIntegrations() {
     return this.adminService.getIntegrations();
+  }
+
+  @Post('integrations')
+  createIntegration(@Request() req: any, @Body() data: any) {
+    return this.adminService.createIntegration(extractUserId(req), data);
+  }
+
+  @Patch('integrations/:id')
+  updateIntegration(@Request() req: any, @Param('id') id: string, @Body() data: any) {
+    return this.adminService.updateIntegration(extractUserId(req), id, data);
+  }
+
+  @Delete('integrations/:id')
+  deleteIntegration(@Request() req: any, @Param('id') id: string) {
+    return this.adminService.deleteIntegration(extractUserId(req), id);
+  }
+
+  @Post('integrations/:id/sync')
+  syncIntegration(@Request() req: any, @Param('id') id: string) {
+    return this.adminService.syncIntegration(extractUserId(req), id);
   }
 
   // ─────────────────────────────────────────────────────────────────────────
