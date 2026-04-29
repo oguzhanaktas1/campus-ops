@@ -111,6 +111,7 @@ export class AiClientService {
       '/summary/approval': 'AI_SERVICE_SUMMARY_TIMEOUT_MS',
       '/parse/request': 'AI_SERVICE_PARSE_TIMEOUT_MS',
       '/triage/ticket': 'AI_SERVICE_TRIAGE_TIMEOUT_MS',
+      '/tickets/similar': 'AI_SERVICE_SIMILAR_TIMEOUT_MS',
       '/health': 'AI_SERVICE_HEALTH_TIMEOUT_MS',
     };
 
@@ -120,6 +121,7 @@ export class AiClientService {
       '/summary/approval': '60000',
       '/parse/request': '60000',
       '/triage/ticket': '60000',
+      '/tickets/similar': '30000',
       '/health': '60000',
     };
 

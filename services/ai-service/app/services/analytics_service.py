@@ -46,6 +46,8 @@ class AnalyticsService:
             summary, highlights = self._build_admin_fallback(payload)
         elif payload.domain == "IT":
             summary, highlights = self._build_it_fallback(payload)
+        elif payload.domain == "DASHBOARD":
+            summary, highlights = self._build_dashboard_fallback(payload)
         else:
             summary = f"{payload.domain} analytics summary is temporarily unavailable."
             highlights = []
@@ -189,6 +191,36 @@ class AnalyticsService:
             highlights.append(f"Günlük ticket hacmi: {latest_daily_volume}")
 
         return " ".join(summary_parts[:4]), highlights[:4]
+
+    def _build_dashboard_fallback(
+        self, payload: AnalyticsSummaryRequest
+    ) -> tuple[str, list[str]]:
+        kpis = payload.kpis
+        my_requests = self._as_int(kpis.get("myRequests"))
+        open_requests = self._as_int(kpis.get("openRequests"))
+        pending_approvals = self._as_int(kpis.get("pendingApprovals"))
+        upcoming_appointments = self._as_int(kpis.get("upcomingAppointments"))
+        upcoming_reservations = self._as_int(kpis.get("upcomingReservations"))
+
+        parts = [f"Toplam {my_requests} talebiniz bulunuyor."]
+        if open_requests:
+            parts.append(f"{open_requests} talebiniz hâlâ açık durumda.")
+        if pending_approvals:
+            parts.append(f"{pending_approvals} talep sizin onayınızı bekliyor.")
+        if upcoming_appointments:
+            parts.append(f"{upcoming_appointments} yaklaşan randevunuz var.")
+        if upcoming_reservations:
+            parts.append(f"{upcoming_reservations} yaklaşan rezervasyonunuz var.")
+
+        highlights = [f"Toplam talepler: {my_requests}"]
+        if open_requests:
+            highlights.append(f"Açık talepler: {open_requests}")
+        if pending_approvals:
+            highlights.append(f"Onay bekleyenler: {pending_approvals}")
+        if upcoming_appointments:
+            highlights.append(f"Yaklaşan randevular: {upcoming_appointments}")
+
+        return " ".join(parts), highlights[:4]
 
     def _as_int(self, value: object) -> int:
         if isinstance(value, bool):

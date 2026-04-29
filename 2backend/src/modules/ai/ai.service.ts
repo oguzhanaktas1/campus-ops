@@ -4,9 +4,11 @@ import { TicketStatus } from '@prisma/client';
 import type { JwtUser } from '../../auth/jwt.strategy';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { AiClientService } from './ai-client.service';
+import { AiResponseValidatorService } from './ai-response-validator.service';
 import { AnalyticsSummaryDto } from './dto/analytics-summary.dto';
 import { AssistantAskDto } from './dto/assistant-ask.dto';
 import { ParseRequestDto } from './dto/parse-request.dto';
+import { SimilarTicketDto } from './dto/similar-ticket.dto';
 import { SummaryApprovalDto } from './dto/summary-approval.dto';
 import { TriageTicketDto } from './dto/triage-ticket.dto';
 
@@ -112,6 +114,7 @@ export class AiService {
   constructor(
     private readonly aiClientService: AiClientService,
     private readonly prisma: PrismaService,
+    private readonly responseValidator: AiResponseValidatorService,
   ) {}
 
   getHealth(): Promise<JsonRecord> {
@@ -1451,5 +1454,107 @@ export class AiService {
     }
 
     return [];
+  }
+
+  async findSimilarTickets(dto: SimilarTicketDto): Promise<JsonRecord> {
+    const titleWords = dto.title.split(/\s+/).slice(0, 6).join(' ');
+    const descWords = dto.description.split(/\s+/).slice(0, 12).join(' ');
+
+    const candidates = await this.prisma.itTicket.findMany({
+      where: {
+        OR: [
+          { request: { title: { contains: titleWords, mode: 'insensitive' } } },
+          { request: { description: { contains: descWords, mode: 'insensitive' } } },
+          ...(dto.category ? [{ category: { contains: dto.category, mode: 'insensitive' as const } }] : []),
+        ],
+      },
+      take: 10,
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        category: true,
+        ticketStatus: true,
+        resolutionSummary: true,
+        request: {
+          select: { title: true, requestNo: true, status: true },
+        },
+      },
+    });
+
+    return this.aiClientService.post(
+      '/tickets/similar',
+      {
+        title: dto.title,
+        description: dto.description,
+        category: dto.category ?? null,
+        candidates: candidates.map((t) => ({
+          id: t.id,
+          title: t.request.title,
+          request_no: t.request.requestNo,
+          category: t.category,
+          ticket_status: t.ticketStatus,
+          resolution_summary: t.resolutionSummary ?? null,
+        })),
+      },
+      {
+        summary: `${candidates.length} benzer ticket bulundu.`,
+        similarCount: candidates.length,
+        highlights: candidates.slice(0, 3).map((t) => t.request.title),
+        confidence: 0.25,
+        fallbackUsed: true,
+      },
+    );
+  }
+
+  async getDashboardSummary(user: JwtUser): Promise<JsonRecord> {
+    const now = new Date();
+
+    const [myRequests, openRequests, pendingApprovals, upcomingAppointments, upcomingReservations] =
+      await Promise.all([
+        this.prisma.request.count({
+          where: { requesterUserId: user.userId, deletedAt: null },
+        }),
+        this.prisma.request.count({
+          where: {
+            requesterUserId: user.userId,
+            deletedAt: null,
+            status: { notIn: ['COMPLETED', 'APPROVED', 'REJECTED', 'CANCELLED', 'CLOSED', 'EXPIRED'] },
+          },
+        }),
+        this.prisma.request.count({
+          where: {
+            currentAssigneeUserId: user.userId,
+            deletedAt: null,
+            status: { in: ['SUBMITTED', 'IN_REVIEW', 'WAITING_APPROVAL'] },
+          },
+        }),
+        this.prisma.appointmentRequest.count({
+          where: {
+            OR: [{ requesterUserId: user.userId }, { targetUserId: user.userId }],
+            request: {
+              status: { notIn: ['REJECTED', 'CANCELLED', 'CLOSED', 'EXPIRED'] },
+            },
+          },
+        }),
+        this.prisma.roomReservationRequest.count({
+          where: {
+            requesterUserId: user.userId,
+            startAt: { gte: now },
+          },
+        }),
+      ]);
+
+    const raw = await this.summarizeAnalytics({
+      domain: 'DASHBOARD',
+      kpis: { myRequests, openRequests, pendingApprovals, upcomingAppointments, upcomingReservations },
+      chartData: {},
+      trendDeltas: {},
+      groupedCounts: {},
+    });
+
+    return this.responseValidator.validateAssistantResponse({
+      ...raw,
+      answer: raw['summary'] ?? raw['answer'],
+    });
   }
 }

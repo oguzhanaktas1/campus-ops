@@ -7,6 +7,7 @@ import { AiService } from './ai.service';
 import { AnalyticsSummaryDto } from './dto/analytics-summary.dto';
 import { AssistantAskDto } from './dto/assistant-ask.dto';
 import { ParseRequestDto } from './dto/parse-request.dto';
+import { SimilarTicketDto } from './dto/similar-ticket.dto';
 import { SummaryApprovalDto } from './dto/summary-approval.dto';
 import { TriageTicketDto } from './dto/triage-ticket.dto';
 
@@ -53,5 +54,15 @@ export class AiController {
   @Post('assistant/ask')
   askAssistant(@CurrentUser() user: JwtUser, @Body() dto: AssistantAskDto) {
     return this.aiService.askAssistant(user, dto);
+  }
+
+  @Post('tickets/similar')
+  findSimilarTickets(@Body() dto: SimilarTicketDto) {
+    return this.aiService.findSimilarTickets(dto);
+  }
+
+  @Get('dashboard/summary')
+  getDashboardSummary(@CurrentUser() user: JwtUser) {
+    return this.aiService.getDashboardSummary(user);
   }
 }

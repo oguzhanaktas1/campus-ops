@@ -1,8 +1,8 @@
 import { IsIn, IsObject } from 'class-validator';
 
 export class AnalyticsSummaryDto {
-  @IsIn(['IT', 'ADMIN'])
-  domain!: 'IT' | 'ADMIN';
+  @IsIn(['IT', 'ADMIN', 'DASHBOARD'])
+  domain!: 'IT' | 'ADMIN' | 'DASHBOARD';
 
   @IsObject()
   kpis: Record<string, string | number | null> = {};
