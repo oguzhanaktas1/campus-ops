@@ -96,7 +96,7 @@ services:
       AI_SERVICE_PARSE_TIMEOUT_MS: 60000
       AI_SERVICE_TRIAGE_TIMEOUT_MS: 60000
       AI_SERVICE_HEALTH_TIMEOUT_MS: 60000
-      OLLAMA_URL: http://188.132.177.29:11434
+      OLLAMA_URL: http://188.132.177.60:11434
       # Public URL — tarayıcıdan erişilen backend adresi
       # Local: http://localhost:5000  |  Prod: https://api.yourdomain.com
       PUBLIC_API_URL: http://localhost:5000
@@ -118,9 +118,10 @@ services:
       ENABLE_DOCS: "false"
       AI_ENABLED: "true"
       AI_RUNTIME_PROVIDER: ollama
-      AI_DEFAULT_MODEL: gemma4:e2b
-      AI_RUNTIME_BASE_URL: http://188.132.177.29:11434
-      AI_RUNTIME_FALLBACK_URLS: http://192.168.25.187:11434
+      AI_DEFAULT_MODEL: qwen2.5:3b-instruct
+      AI_FALLBACK_MODEL: llama3.2:1b
+      AI_RUNTIME_BASE_URL: http://188.132.177.60:11434
+      AI_RUNTIME_FALLBACK_URLS: http://192.168.25.132:11434
       AI_REQUEST_TIMEOUT_SECONDS: 60
       AI_INTERNAL_API_KEY: campusops-ai-internal-dev-key
     expose:
