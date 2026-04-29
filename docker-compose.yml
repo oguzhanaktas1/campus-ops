@@ -4,15 +4,15 @@ services:
     container_name: campusops-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-campusops}
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: campusops
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: campusops_dev
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-campusops}"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d campusops"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -37,11 +37,11 @@ services:
     container_name: campusops-rabbitmq
     restart: unless-stopped
     ports:
-      - "5672:5672"    # AMQP
-      - "15672:15672"  # Management UI
+      - "5672:5672"
+      - "15672:15672"
     environment:
-      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-campusops}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS}
+      RABBITMQ_DEFAULT_USER: campusops
+      RABBITMQ_DEFAULT_PASS: campusops_mq
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     healthcheck:
@@ -68,41 +68,17 @@ services:
       ai-service:
         condition: service_started
     environment:
+      # Docker-specific overrides — service hostnames replace localhost
       NODE_ENV: production
       RUN_MIGRATIONS: "false"
-      BACKEND_PORT: 5000
-      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
-      REDIS_URL: ""
       REDIS_HOST: redis
-      REDIS_PORT: 6379
-      REDIS_PASSWORD: ""
-      REDIS_DB: 0
-      REDIS_TLS: "false"
-      JWT_SECRET: ${JWT_SECRET}
-      RABBITMQ_URL: ${RABBITMQ_URL}
+      REDIS_URL: ""
+      RABBITMQ_URL: amqp://campusops:campusops_mq@rabbitmq:5672
       RABBITMQ_MGMT_URL: http://rabbitmq:15672
-      RABBITMQ_MGMT_USER: ${RABBITMQ_USER:-campusops}
-      RABBITMQ_MGMT_PASS: ${RABBITMQ_PASS}
       WORKERS_INTERNAL_URL: http://python-workers:8001
       METRICS_INTERNAL_URL: http://python-workers:8000
       PROMETHEUS_URL: http://python-workers:8000
-      AI_SERVICE_ENABLED: "true"
       AI_SERVICE_BASE_URL: http://ai-service:8010
-      AI_SERVICE_API_KEY: ${AI_SERVICE_API_KEY}
-      AI_SERVICE_TIMEOUT_MS: 60000
-      AI_SERVICE_ANALYTICS_TIMEOUT_MS: 60000
-      AI_SERVICE_ASSISTANT_TIMEOUT_MS: 60000
-      AI_SERVICE_SUMMARY_TIMEOUT_MS: 60000
-      AI_SERVICE_PARSE_TIMEOUT_MS: 60000
-      AI_SERVICE_TRIAGE_TIMEOUT_MS: 60000
-      AI_SERVICE_SIMILAR_TIMEOUT_MS: 30000
-      AI_SERVICE_HEALTH_TIMEOUT_MS: 60000
-      OLLAMA_URL: ${OLLAMA_BASE_URL}
-      # Public URL — tarayıcıdan erişilen backend adresi
-      # Local: http://localhost:5000  |  Prod: https://api.yourdomain.com
-      PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost:5000}
-      # Prod'da RabbitMQ Management UI public URL'i
-      RABBITMQ_MGMT_PUBLIC: ${RABBITMQ_MGMT_PUBLIC:-http://localhost:15672}
     ports:
       - "5000:5000"
 
@@ -112,19 +88,14 @@ services:
       dockerfile: Dockerfile
     container_name: campusops-ai-service
     restart: unless-stopped
+    env_file:
+      - ./services/ai-service/.env
     environment:
+      # Docker-specific overrides
       APP_ENV: production
       APP_HOST: 0.0.0.0
       APP_PORT: 8010
       ENABLE_DOCS: "false"
-      AI_ENABLED: "true"
-      AI_RUNTIME_PROVIDER: ollama
-      AI_DEFAULT_MODEL: qwen2.5:3b-instruct
-      AI_FALLBACK_MODEL: llama3.2:1b
-      AI_RUNTIME_BASE_URL: ${OLLAMA_BASE_URL}
-      AI_RUNTIME_FALLBACK_URLS: ${OLLAMA_FALLBACK_URL}
-      AI_REQUEST_TIMEOUT_SECONDS: 60
-      AI_INTERNAL_API_KEY: ${AI_SERVICE_API_KEY}
     expose:
       - "8010"
     healthcheck:
@@ -149,13 +120,14 @@ services:
       redis:
         condition: service_healthy
     environment:
-      RABBITMQ_URL: ${RABBITMQ_URL}
+      # Docker-specific overrides — service hostnames replace localhost
+      RABBITMQ_URL: amqp://campusops:campusops_mq@rabbitmq:5672
       REDIS_URL: redis://redis:6379/0
       ENV: production
       LOG_LEVEL: INFO
     ports:
-      - "8000:8000"   # Prometheus metrics
-      - "8001:8001"   # Health check
+      - "8000:8000"
+      - "8001:8001"
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
       interval: 30s
@@ -167,10 +139,12 @@ services:
       context: ./1frontend
       dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_BACKEND_URL: ${NEXT_PUBLIC_BACKEND_URL:-http://localhost:5000}
-        NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
+        NEXT_PUBLIC_BACKEND_URL: http://localhost:5000
+        NEXT_PUBLIC_APP_URL: http://localhost:3000
     container_name: campusops-frontend
     restart: unless-stopped
+    env_file:
+      - ./1frontend/.env
     depends_on:
       backend:
         condition: service_started
@@ -178,8 +152,6 @@ services:
       NODE_ENV: production
       PORT: 3000
       HOSTNAME: 0.0.0.0
-      NEXT_PUBLIC_BACKEND_URL: ${NEXT_PUBLIC_BACKEND_URL:-http://localhost:5000}
-      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
     ports:
       - "3000:3000"
 
