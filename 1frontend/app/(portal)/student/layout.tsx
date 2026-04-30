@@ -58,8 +58,7 @@ export default function StudentLayout({
     const fetchData = async () => {
       const storedUser = getStoredUser();
       if (!storedUser) {
-        setIsLoading(false);
-        router.push("/login");
+        router.replace('/login');
         return;
       }
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { PortalLayout, type NavItem } from "@/components/portal-layout";
 import { NotificationBell } from "@/components/notification-bell";
 import { ProfileDropdown } from "@/components/profile-dropdown";
@@ -47,12 +48,13 @@ export default function FacultyLayout({ children }: { children: React.ReactNode 
   const [user, setUser] = useState<any>(null);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+  const router = useRouter();
 
   useEffect(() => {
     const fetchData = async () => {
       const storedUser = getStoredUser();
       if (!storedUser) {
-        setIsLoading(false);
+        router.replace('/login');
         return;
       }
 
@@ -81,7 +83,7 @@ export default function FacultyLayout({ children }: { children: React.ReactNode 
     void fetchData();
     const interval = setInterval(fetchData, 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [router]);
 
   if (isLoading) {
     return (

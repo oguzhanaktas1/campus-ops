@@ -713,6 +713,7 @@ export class AdminService {
             include: { assignedTo: { include: { profile: true } } },
             orderBy: { assignedAt: 'desc' },
           },
+          itTicket: { include: { assignedTo: { include: { profile: true } } } },
         },
         orderBy: { createdAt: 'desc' },
       });
@@ -723,6 +724,9 @@ export class AdminService {
             assignment.assignedTo.profile?.fullName || assignment.assignedTo.email,
           )
           .filter(Boolean);
+
+        const itTicketAssignee = (req as any).itTicket?.assignedTo?.profile?.fullName
+          || (req as any).itTicket?.assignedTo?.email;
 
         return {
         id: req.id,
@@ -737,7 +741,7 @@ export class AdminService {
         assignedToName:
           assignedToNames.length > 0
             ? assignedToNames.join(', ')
-            : req.currentAssignee?.profile?.fullName || 'Unassigned',
+            : req.currentAssignee?.profile?.fullName || itTicketAssignee || 'Unassigned',
         assignedToNames,
         createdAt: req.createdAt,
         updatedAt: req.updatedAt,

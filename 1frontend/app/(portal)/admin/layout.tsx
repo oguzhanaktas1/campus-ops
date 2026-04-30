@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { PortalLayout, type NavItem } from "@/components/portal-layout";
 import { NotificationBell } from "@/components/notification-bell";
 import { ProfileDropdown } from "@/components/profile-dropdown";
@@ -98,12 +99,13 @@ export default function AdminLayout({
 }) {
   const [user, setUser] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const router = useRouter();
 
   useEffect(() => {
     const fetchUserProfile = async () => {
       const storedUser = getStoredUser();
       if (!storedUser) {
-        setIsLoading(false);
+        router.replace('/login');
         return;
       }
 
@@ -118,7 +120,7 @@ export default function AdminLayout({
     };
 
     void fetchUserProfile();
-  }, []);
+  }, [router]);
 
   if (isLoading) {
     return (

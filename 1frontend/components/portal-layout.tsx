@@ -211,7 +211,7 @@ export function PortalLayout({ children, navItems, portalName, portalColor, topb
         </header>
 
         {/* Page Content */}
-        <main className="flex-1 overflow-y-auto">
+        <main className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent">
           {children}
         </main>
       </div>

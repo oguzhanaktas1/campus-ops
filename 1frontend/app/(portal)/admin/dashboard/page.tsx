@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
   FileText, Users, CheckSquare, Activity, CheckCircle2, Loader2,
@@ -61,6 +62,7 @@ function timeAgo(date: string) {
 }
 
 export default function AdminDashboard() {
+  const router = useRouter()
   const [metrics, setMetrics]   = useState<any>(null)
   const [recent,  setRecent]    = useState<any[]>([])
   const [reports, setReports]   = useState<any>(null)
@@ -390,14 +392,18 @@ export default function AdminDashboard() {
             </thead>
             <tbody>
               {recent.map((req) => (
-                <tr key={req.id} className="border-b border-border/50 hover:bg-muted/20 transition-colors">
+                <tr
+                  key={req.id}
+                  className="border-b border-border/50 hover:bg-muted/20 transition-colors cursor-pointer"
+                  onClick={() => router.push(`/admin/requests/${req.id}`)}
+                >
                   <td className="py-2.5 px-5">
                     <div className="flex items-center gap-2">
                       <span className={cn('size-1.5 rounded-full flex-shrink-0', PRIORITY_DOT[req.priority] ?? 'bg-slate-400')} />
                       <div>
-                        <Link href={`/admin/requests`} className="font-medium text-foreground hover:text-primary transition-colors">
+                        <span className="font-medium text-foreground">
                           {req.title ?? req.requestNo}
-                        </Link>
+                        </span>
                         <p className="text-muted-foreground text-[10px]">{req.requestNo}</p>
                       </div>
                     </div>
