@@ -1,11 +1,6 @@
 # Prod override — domain bazlı ayarlar
 # Kullanım: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 #
-# Değiştirmen gereken değerler:
-#   yourdomain.com  →  gerçek domain adın
-#   api.yourdomain.com  →  backend subdomain (veya yourdomain.com/api nginx proxy ile)
-#   mq.yourdomain.com  →  opsiyonel RabbitMQ UI subdomain (güvenli ağda bırakabilirsin)
-
 services:
   backend:
     environment:
