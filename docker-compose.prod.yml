@@ -5,7 +5,7 @@ services:
   backend:
     environment:
       NODE_ENV: production
-      FRONTEND_URL: https://campusflow.com.tr
+      FRONTEND_URL: https://campusflow.com.tr,https://www.campusflow.com.tr
       PUBLIC_API_URL: https://api.campusflow.com.tr
       RABBITMQ_MGMT_PUBLIC: https://mq.campusflow.com.tr
 
