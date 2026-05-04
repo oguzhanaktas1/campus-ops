@@ -8,11 +8,15 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { GraduationCap, Eye, EyeOff, Loader2, ArrowLeft } from 'lucide-react'
 import { toast } from 'sonner'
+import { AuthI18nProvider } from '@/components/auth/auth-i18n-provider'
+import { LanguageSwitcher } from '@/components/language-switcher'
+import { useI18n } from '@/lib/i18n'
 
-export default function ResetPasswordPage() {
+function ResetPasswordPageInner() {
   const router = useRouter()
   const params = useParams()
   const token = params?.token as string
+  const { t } = useI18n()
 
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
@@ -22,11 +26,11 @@ export default function ResetPasswordPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (password !== confirm) {
-      toast.error('Passwords do not match.')
+      toast.error(t('reset.mismatch'))
       return
     }
     if (password.length < 8) {
-      toast.error('Password must be at least 8 characters.')
+      toast.error(t('reset.minLength'))
       return
     }
 
@@ -39,14 +43,14 @@ export default function ResetPasswordPage() {
         body: JSON.stringify({ token, newPassword: password }),
       })
       if (res.ok) {
-        toast.success('Password reset successfully!')
+        toast.success(t('reset.success'))
         router.push('/login')
       } else {
         const err = await res.json()
-        toast.error(err.message || 'Reset failed. The link may have expired.')
+        toast.error(err.message || t('reset.fail'))
       }
     } catch {
-      toast.error('Network error. Please try again.')
+      toast.error(t('reset.networkError'))
     } finally {
       setLoading(false)
     }
@@ -54,23 +58,26 @@ export default function ResetPasswordPage() {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-background px-4">
+      <div className="absolute right-4 top-4">
+        <LanguageSwitcher />
+      </div>
       <div className="w-full max-w-sm space-y-6">
         <div className="flex flex-col items-center gap-2 text-center">
           <div className="size-10 rounded-xl bg-primary flex items-center justify-center">
             <GraduationCap className="size-5 text-primary-foreground" />
           </div>
-          <h1 className="text-xl font-bold text-foreground">Reset Password</h1>
-          <p className="text-sm text-muted-foreground">Enter your new password below.</p>
+          <h1 className="text-xl font-bold text-foreground">{t('reset.title')}</h1>
+          <p className="text-sm text-muted-foreground">{t('reset.subtitle')}</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1.5">
-            <Label htmlFor="password">New Password</Label>
+            <Label htmlFor="password">{t('common.newPassword')}</Label>
             <div className="relative">
               <Input
                 id="password"
                 type={showPass ? 'text' : 'password'}
-                placeholder="At least 8 characters"
+                placeholder={t('reset.passwordPlaceholder')}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
@@ -87,11 +94,11 @@ export default function ResetPasswordPage() {
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="confirm">Confirm Password</Label>
+            <Label htmlFor="confirm">{t('common.confirmPassword')}</Label>
             <Input
               id="confirm"
               type="password"
-              placeholder="Repeat your password"
+              placeholder={t('reset.confirmPlaceholder')}
               value={confirm}
               onChange={(e) => setConfirm(e.target.value)}
               required
@@ -100,15 +107,23 @@ export default function ResetPasswordPage() {
 
           <Button type="submit" className="w-full" disabled={loading}>
             {loading && <Loader2 className="size-4 animate-spin mr-2" />}
-            Reset Password
+            {t('reset.submit')}
           </Button>
         </form>
 
         <Link href="/login" className="flex items-center justify-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
           <ArrowLeft className="size-3.5" />
-          Back to login
+          {t('common.backToLogin')}
         </Link>
       </div>
     </div>
+  )
+}
+
+export default function ResetPasswordPage() {
+  return (
+    <AuthI18nProvider>
+      <ResetPasswordPageInner />
+    </AuthI18nProvider>
   )
 }

@@ -11,10 +11,12 @@ import {
   workflowAuthHeaders as authHeaders,
   type WorkflowDetail,
 } from '@/lib/admin-workflow'
+import { useI18n } from '@/lib/i18n'
 
 export default function AdminWorkflowDetailPage() {
   const params = useParams()
   const id = params?.id as string
+  const { t } = useI18n()
 
   const [workflow, setWorkflow] = useState<WorkflowDetail | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -37,17 +39,17 @@ export default function AdminWorkflowDetailPage() {
         } else if (res.status === 404) {
           setWorkflow(null)
         } else {
-          throw new Error('Failed to load workflow.')
+          throw new Error(t('workflows.loadFail'))
         }
       } catch (error) {
-        toast.error(error instanceof Error ? error.message : 'Failed to load workflow.')
+        toast.error(error instanceof Error ? error.message : t('workflows.loadFail'))
       } finally {
         setIsLoading(false)
       }
     }
 
     void fetchWorkflow()
-  }, [id])
+  }, [id, t])
 
   if (isLoading) {
     return (
@@ -62,10 +64,10 @@ export default function AdminWorkflowDetailPage() {
       <div className="mx-auto max-w-3xl p-6">
         <div className="flex flex-col items-center py-16 text-center">
           <AlertTriangle className="mb-3 size-8 text-muted-foreground/40" />
-          <p className="text-sm font-medium text-foreground">Workflow not found</p>
+          <p className="text-sm font-medium text-foreground">{t('workflows.notFound')}</p>
           <Link href="/admin/workflows" className="mt-3">
             <Button variant="outline" size="sm">
-              Back to workflows
+              {t('workflows.backToWorkflows')}
             </Button>
           </Link>
         </div>
@@ -81,7 +83,7 @@ export default function AdminWorkflowDetailPage() {
         <Link href="/admin/workflows">
           <Button variant="ghost" size="sm" className="gap-1.5">
             <ArrowLeft className="size-4" />
-            Back
+            {t('common.back')}
           </Button>
         </Link>
       </div>
@@ -96,9 +98,9 @@ export default function AdminWorkflowDetailPage() {
             <p className="mt-1 text-sm text-muted-foreground">{workflow.description}</p>
           )}
           <div className="mt-2 flex items-center gap-3 text-xs text-muted-foreground">
-            <span>{steps.length} steps</span>
+            <span>{steps.length} {t('workflows.stepsLower')}</span>
             <span className={workflow.isActive ? 'text-emerald-600' : 'text-muted-foreground'}>
-              {workflow.isActive ? 'Active' : 'Inactive'}
+              {workflow.isActive ? t('common.active') : t('common.inactive')}
             </span>
           </div>
         </div>
@@ -106,7 +108,7 @@ export default function AdminWorkflowDetailPage() {
 
       {steps.length > 0 && (
         <div className="rounded-lg border border-border bg-card p-5">
-          <h2 className="mb-4 text-sm font-semibold text-foreground">Workflow Steps</h2>
+          <h2 className="mb-4 text-sm font-semibold text-foreground">{t('workflows.workflowSteps')}</h2>
           <div className="space-y-3">
             {steps.map((step, index) => (
               <div key={step.id} className="flex items-start gap-3">

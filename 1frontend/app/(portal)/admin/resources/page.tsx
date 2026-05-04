@@ -8,6 +8,7 @@ import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import Link from 'next/link'
 import { getToken } from '@/lib/auth'
+import { useI18n } from '@/lib/i18n'
 
 interface Resource {
   id: string
@@ -56,6 +57,7 @@ const EMPTY_FORM = {
 }
 
 export default function AdminResourcesPage() {
+  const { t } = useI18n()
   const [result, setResult] = useState<PagedResult>({ data: [], total: 0, page: 1, totalPages: 1 })
   const [isLoading, setIsLoading] = useState(true)
   const [page, setPage] = useState(1)
@@ -110,7 +112,7 @@ export default function AdminResourcesPage() {
       if (!res.ok) throw new Error()
       setResult(await res.json())
     } catch {
-      toast.error('Failed to load resources.')
+      toast.error(t('resources.saveFail'))
     } finally {
       setIsLoading(false)
     }
@@ -162,7 +164,7 @@ export default function AdminResourcesPage() {
 
   const handleSave = async () => {
     if (!form.name.trim() || !form.code.trim()) {
-      toast.error('Name and code are required.')
+      toast.error(t('resources.saveFail'))
       return
     }
     setIsSaving(true)
@@ -177,12 +179,12 @@ export default function AdminResourcesPage() {
         body: JSON.stringify(payload),
       })
       if (!res.ok) throw new Error()
-      toast.success(editTarget ? 'Resource updated.' : 'Resource created.')
+      toast.success(t('resources.saveSuccess'))
       setShowDialog(false)
       load(page, search, typeFilter)
       loadStats()
     } catch {
-      toast.error('Failed to save resource.')
+      toast.error(t('resources.saveFail'))
     } finally {
       setIsSaving(false)
     }
@@ -197,7 +199,7 @@ export default function AdminResourcesPage() {
         headers: { Authorization: `Bearer ${token}` },
       })
       if (!res.ok) throw new Error()
-      toast.success('Resource deleted.')
+      toast.success(t('resources.deleteSuccess'))
       // mevcut sayfada başka kayıt kalmadıysa önceki sayfaya dön
       const newTotal = result.total - 1
       const newTotalPages = Math.ceil(newTotal / PAGE_SIZE)
@@ -206,7 +208,7 @@ export default function AdminResourcesPage() {
       load(targetPage, search, typeFilter)
       loadStats()
     } catch {
-      toast.error('Failed to delete resource.')
+      toast.error(t('resources.deleteFail'))
     } finally {
       setDeletingId(null)
     }
@@ -221,7 +223,7 @@ export default function AdminResourcesPage() {
       <div className="flex h-[60vh] items-center justify-center">
         <div className="flex flex-col items-center gap-3">
           <Loader2 className="size-8 animate-spin text-primary" />
-          <p className="text-sm text-muted-foreground animate-pulse">Loading resources...</p>
+          <p className="text-sm text-muted-foreground animate-pulse">{t('resources.loading')}</p>
         </div>
       </div>
     )
@@ -234,19 +236,19 @@ export default function AdminResourcesPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
           <div className="bg-background border border-border rounded-xl p-6 max-w-md w-full shadow-2xl space-y-4">
             <h2 className="text-base font-bold text-foreground">
-              {editTarget ? 'Edit Resource' : 'Add Resource'}
+              {editTarget ? t('resources.editResource') : t('resources.addResource')}
             </h2>
             <div className="space-y-3">
               <div>
-                <label className="text-xs font-semibold text-muted-foreground mb-1 block">Name *</label>
-                <Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Computer Lab A" />
+                <label className="text-xs font-semibold text-muted-foreground mb-1 block">{t('resources.name')} *</label>
+                <Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder={t('resources.namePlaceholder')} />
               </div>
               <div>
-                <label className="text-xs font-semibold text-muted-foreground mb-1 block">Code *</label>
-                <Input value={form.code} onChange={e => setForm(f => ({ ...f, code: e.target.value }))} placeholder="e.g. CL-A" />
+                <label className="text-xs font-semibold text-muted-foreground mb-1 block">{t('resources.code')} *</label>
+                <Input value={form.code} onChange={e => setForm(f => ({ ...f, code: e.target.value }))} placeholder={t('resources.codePlaceholder')} />
               </div>
               <div>
-                <label className="text-xs font-semibold text-muted-foreground mb-1 block">Type</label>
+                <label className="text-xs font-semibold text-muted-foreground mb-1 block">{t('resources.colType')}</label>
                 <select
                   value={form.resourceType}
                   onChange={e => setForm(f => ({ ...f, resourceType: e.target.value as Resource['resourceType'] }))}
@@ -256,22 +258,22 @@ export default function AdminResourcesPage() {
                 </select>
               </div>
               <div>
-                <label className="text-xs font-semibold text-muted-foreground mb-1 block">Capacity</label>
-                <Input type="number" value={form.capacity} onChange={e => setForm(f => ({ ...f, capacity: e.target.value }))} placeholder="e.g. 30" />
+                <label className="text-xs font-semibold text-muted-foreground mb-1 block">{t('resources.colCapacity')}</label>
+                <Input type="number" value={form.capacity} onChange={e => setForm(f => ({ ...f, capacity: e.target.value }))} placeholder={t('resources.capacityPlaceholder')} />
               </div>
               <div>
-                <label className="text-xs font-semibold text-muted-foreground mb-1 block">Description</label>
-                <Input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Optional description" />
+                <label className="text-xs font-semibold text-muted-foreground mb-1 block">{t('common.description')}</label>
+                <Input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder={t('resources.optionalDescription')} />
               </div>
               <div className="flex items-center gap-2">
                 <input type="checkbox" id="isActive" checked={form.isActive} onChange={e => setForm(f => ({ ...f, isActive: e.target.checked }))} className="rounded" />
-                <label htmlFor="isActive" className="text-sm text-foreground">Active</label>
+                <label htmlFor="isActive" className="text-sm text-foreground">{t('common.active')}</label>
               </div>
             </div>
             <div className="flex gap-3 pt-2">
-              <Button variant="outline" className="flex-1" onClick={() => setShowDialog(false)} disabled={isSaving}>Cancel</Button>
+              <Button variant="outline" className="flex-1" onClick={() => setShowDialog(false)} disabled={isSaving}>{t('common.cancel')}</Button>
               <Button className="flex-1" onClick={handleSave} disabled={isSaving}>
-                {isSaving ? <Loader2 className="size-4 animate-spin" /> : editTarget ? 'Update' : 'Create'}
+                {isSaving ? <Loader2 className="size-4 animate-spin" /> : t('common.save')}
               </Button>
             </div>
           </div>
@@ -281,11 +283,11 @@ export default function AdminResourcesPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold text-foreground">Resources</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Campus facilities, labs, equipment and vehicles</p>
+          <h1 className="text-xl font-bold text-foreground">{t('resources.title')}</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">{t('resources.subtitle', { count: total })}</p>
         </div>
         <Button onClick={openAdd} className="gap-2 self-start shrink-0">
-          <Plus className="size-4" /> Add Resource
+          <Plus className="size-4" /> {t('resources.addResource')}
         </Button>
       </div>
 
@@ -297,7 +299,7 @@ export default function AdminResourcesPage() {
             <LayoutGrid className="size-4 text-primary" />
           </div>
           <div>
-            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">Total</p>
+            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">{t('common.total')}</p>
             <p className="text-2xl font-bold text-foreground leading-none mt-0.5">
               {statsLoading ? <span className="inline-block w-8 h-6 bg-muted animate-pulse rounded" /> : (typeCounts['all'] ?? 0)}
             </p>
@@ -339,7 +341,7 @@ export default function AdminResourcesPage() {
           <div className="relative flex-1 max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
             <Input
-              placeholder="Search by name or code..."
+              placeholder={t('resources.searchPlaceholder')}
               className="pl-9"
               value={search}
               onChange={e => handleSearch(e.target.value)}
@@ -387,7 +389,7 @@ export default function AdminResourcesPage() {
             )}
           >
             <LayoutGrid className="size-3" />
-            All
+            {t('common.all')}
             {!statsLoading && <span className="ml-0.5 opacity-70">({typeCounts['all'] ?? 0})</span>}
           </button>
           {RESOURCE_TYPES.map(type => {
@@ -440,12 +442,12 @@ export default function AdminResourcesPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border bg-muted/40">
-                <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Name</th>
-                <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden sm:table-cell">Code</th>
-                <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Type</th>
-                <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden md:table-cell">Capacity</th>
-                <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden lg:table-cell">Status</th>
-                <th className="px-5 py-3 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide">Actions</th>
+                <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">{t('resources.colName')}</th>
+                <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden sm:table-cell">{t('resources.colLocation')}</th>
+                <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">{t('resources.colType')}</th>
+                <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden md:table-cell">{t('resources.colCapacity')}</th>
+                <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden lg:table-cell">{t('resources.colStatus')}</th>
+                <th className="px-5 py-3 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide">{t('common.actions')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -476,7 +478,7 @@ export default function AdminResourcesPage() {
                         ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800'
                         : 'bg-slate-50 text-slate-600 border-slate-200 dark:bg-slate-800/30 dark:text-slate-400 dark:border-slate-700'
                     )}>
-                      {r.isActive ? 'Active' : 'Inactive'}
+                      {r.isActive ? t('common.active') : t('common.inactive')}
                     </span>
                   </td>
                   <td className="px-5 py-3.5 text-right">
@@ -504,8 +506,7 @@ export default function AdminResourcesPage() {
           {!isLoading && resources.length === 0 && (
             <div className="text-center py-16">
               <Box className="size-10 text-muted-foreground/30 mx-auto mb-3" />
-              <p className="text-sm font-medium text-foreground">No resources found.</p>
-              <p className="text-xs text-muted-foreground mt-1">Try adjusting your filters or add a new resource.</p>
+              <p className="text-sm font-medium text-foreground">{t('resources.noResources')}</p>
             </div>
           )}
         </div>
@@ -514,14 +515,14 @@ export default function AdminResourcesPage() {
       {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex items-center justify-between text-sm">
-          <p className="text-muted-foreground">Page {page} of {totalPages}</p>
+          <p className="text-muted-foreground">{t('resources.pageOf', { page, total: totalPages })}</p>
           <div className="flex items-center gap-1">
             <Button
               variant="outline" size="sm" className="gap-1"
               disabled={page <= 1 || isLoading}
               onClick={() => handlePageChange(page - 1)}
             >
-              <ChevronLeft className="size-4" /> Prev
+              <ChevronLeft className="size-4" /> {t('common.prev')}
             </Button>
             {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
               const pg = totalPages <= 7
@@ -549,7 +550,7 @@ export default function AdminResourcesPage() {
               disabled={page >= totalPages || isLoading}
               onClick={() => handlePageChange(page + 1)}
             >
-              Next <ChevronRight className="size-4" />
+              {t('common.next')} <ChevronRight className="size-4" />
             </Button>
           </div>
         </div>

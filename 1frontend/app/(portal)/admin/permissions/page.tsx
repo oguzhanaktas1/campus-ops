@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Input } from '@/components/ui/input'
 import { Search, Loader2, ShieldCheck } from 'lucide-react'
 import { toast } from 'sonner'
+import { useI18n } from '@/lib/i18n'
 
 interface Permission {
   id: string
@@ -12,6 +13,7 @@ interface Permission {
 }
 
 export default function PermissionsPage() {
+  const { t } = useI18n()
   const [permissions, setPermissions] = useState<Permission[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -25,14 +27,14 @@ export default function PermissionsPage() {
         headers: { Authorization: `Bearer ${token}` },
       })
       if (res.ok) setPermissions(await res.json())
-      else toast.error('Failed to load permissions')
+      else toast.error(t('permissions.noPermissions'))
     } catch (error) {
       console.error('API Error:', error)
-      toast.error('Failed to load permissions')
+      toast.error(t('permissions.noPermissions'))
     } finally {
       setIsLoading(false)
     }
-  }, [backendUrl])
+  }, [backendUrl, t])
 
   useEffect(() => { fetchPermissions() }, [fetchPermissions])
 
@@ -71,14 +73,14 @@ export default function PermissionsPage() {
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold text-foreground">Permissions</h1>
+          <h1 className="text-xl font-bold text-foreground">{t('permissions.title')}</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {permissions.length} system-defined permission{permissions.length !== 1 ? 's' : ''}. Read-only — permissions are defined by the system.
+            {t('permissions.countSubtitle', { count: permissions.length, suffix: permissions.length !== 1 ? 's' : '' })}
           </p>
         </div>
         <div className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-muted border border-border text-xs text-muted-foreground font-medium">
           <ShieldCheck className="size-3.5" />
-          System Defined
+          {t('permissions.systemDefined')}
         </div>
       </div>
 
@@ -87,7 +89,7 @@ export default function PermissionsPage() {
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
           <Input
-            placeholder="Search permissions by name or description..."
+            placeholder={t('permissions.searchDetailed')}
             className="pl-9 h-9"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -95,10 +97,10 @@ export default function PermissionsPage() {
         </div>
         <div className="flex items-center gap-4 text-sm ml-auto">
           <span className="text-muted-foreground">
-            <span className="font-semibold text-foreground">{filtered.length}</span> of {permissions.length} shown
+            {t('permissions.shown', { shown: filtered.length, total: permissions.length })}
           </span>
           <span className="text-muted-foreground">
-            <span className="font-semibold text-foreground">{sortedGroupKeys.length}</span> group{sortedGroupKeys.length !== 1 ? 's' : ''}
+            {t('permissions.groups', { count: sortedGroupKeys.length, suffix: sortedGroupKeys.length !== 1 ? 's' : '' })}
           </span>
         </div>
       </div>
@@ -114,7 +116,7 @@ export default function PermissionsPage() {
                   <ShieldCheck className="size-3" />
                 </div>
                 <span className="text-xs font-bold tracking-wider text-muted-foreground">{group}</span>
-                <span className="ml-auto text-xs text-muted-foreground">{groups[group].length} permission{groups[group].length !== 1 ? 's' : ''}</span>
+                <span className="ml-auto text-xs text-muted-foreground">{t('permissions.permissionCount', { count: groups[group].length, suffix: groups[group].length !== 1 ? 's' : '' })}</span>
               </div>
 
               {/* Permissions in group */}
@@ -128,7 +130,7 @@ export default function PermissionsPage() {
                         </code>
                       </td>
                       <td className="px-5 py-3 text-sm text-muted-foreground">
-                        {perm.description || <span className="italic text-muted-foreground/60">No description</span>}
+                        {perm.description || <span className="italic text-muted-foreground/60">{t('permissions.noDescription')}</span>}
                       </td>
                     </tr>
                   ))}
@@ -140,7 +142,7 @@ export default function PermissionsPage() {
       ) : (
         <div className="text-center py-16 bg-card border border-border rounded-lg shadow-sm">
           <ShieldCheck className="size-8 text-muted-foreground/40 mx-auto mb-3" />
-          <p className="text-sm text-muted-foreground">No permissions found matching your search.</p>
+          <p className="text-sm text-muted-foreground">{t('permissions.noSearchResults')}</p>
         </div>
       )}
     </div>

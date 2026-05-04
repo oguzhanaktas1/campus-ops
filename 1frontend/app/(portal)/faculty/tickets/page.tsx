@@ -8,6 +8,7 @@ import { PriorityBadge } from '@/components/status-badge'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { getToken } from '@/lib/auth'
+import { useI18n } from '@/lib/i18n'
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000'
 
@@ -47,6 +48,7 @@ function getDisplayStatus(ticket: any) {
 }
 
 export default function FacultyTicketsPage() {
+  const { t } = useI18n()
   const [tickets, setTickets] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [filter, setFilter] = useState('all')
@@ -58,11 +60,11 @@ export default function FacultyTicketsPage() {
       })
       if (res.ok) setTickets(await res.json())
     } catch {
-      toast.error('Failed to load tickets.')
+      toast.error(t('tickets.loadFail'))
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [t])
 
   useEffect(() => { fetchTickets() }, [fetchTickets])
 
@@ -79,14 +81,14 @@ export default function FacultyTicketsPage() {
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-xl font-bold flex items-center gap-2">
-            <Ticket className="size-5 text-primary" /> IT Tickets
+            <Ticket className="size-5 text-primary" /> {t('tickets.title')}
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Create and track your IT support tickets.
+            {t('tickets.subtitle', { count: tickets.length })}
           </p>
         </div>
         <Button asChild>
-          <Link href="/faculty/tickets/new">New Ticket</Link>
+          <Link href="/faculty/tickets/new">{t('tickets.newTicket')}</Link>
         </Button>
       </div>
 
@@ -102,7 +104,7 @@ export default function FacultyTicketsPage() {
                 : 'bg-background text-muted-foreground border-border hover:border-foreground'
             )}
           >
-            {s === 'all' ? 'All' : s.replace(/_/g, ' ')}
+            {s === 'all' ? t('common.all') : s.replace(/_/g, ' ')}
           </button>
         ))}
       </div>
@@ -111,7 +113,7 @@ export default function FacultyTicketsPage() {
         {filtered.length === 0 ? (
           <div className="py-16 flex flex-col items-center text-center opacity-50">
             <AlertCircle className="size-10 mb-3" />
-            <p className="text-sm font-medium">No tickets found.</p>
+            <p className="text-sm font-medium">{t('tickets.noTickets')}</p>
           </div>
         ) : (
           filtered.map((t) => {
@@ -124,7 +126,7 @@ export default function FacultyTicketsPage() {
               >
                 <div className="min-w-0">
                   <p className="text-sm font-semibold truncate">
-                    {t.title || t.category || 'IT Ticket'}
+                    {t.title || t.category || t('tickets.title')}
                   </p>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     {t.requestNo} · {t.requesterName}

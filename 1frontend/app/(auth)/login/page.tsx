@@ -11,9 +11,13 @@ import { AlertTriangle, ArrowRight, Eye, EyeOff, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { apiLogin, resolvePortalPath, setAuth } from "@/lib/auth";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { LanguageSwitcher } from "@/components/language-switcher";
+import { AuthI18nProvider } from "@/components/auth/auth-i18n-provider";
+import { useI18n } from "@/lib/i18n";
 
-export default function LoginPage() {
+function LoginPageInner() {
   const router = useRouter();
+  const { t } = useI18n();
 
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -32,10 +36,10 @@ export default function LoginPage() {
       if (data.access_token) {
         localStorage.setItem("access_token", data.access_token);
       }
-      toast.success("Login successful, redirecting...");
+      toast.success(t("login.success"));
       router.push(resolvePortalPath(data.user));
     } catch (err: any) {
-      const msg = err.message || "An error occurred";
+      const msg = err.message || t("login.genericError");
       setError(msg);
       toast.error(msg);
     } finally {
@@ -55,20 +59,19 @@ export default function LoginPage() {
         </Link>
         <div>
           <blockquote className="text-sidebar-foreground/90 text-lg font-medium leading-relaxed mb-6">
-            "CampusFlow transformed how we handle administrative workflows. What
-            used to take days now takes hours."
+            {t("login.quote")}
           </blockquote>
           <div>
             <p className="text-sidebar-foreground font-semibold text-sm">
-              Dr. Margaret Liu
+              {t("login.quoteAuthor")}
             </p>
             <p className="text-sidebar-foreground/60 text-sm">
-              Provost, Westfield University
+              {t("login.quoteRole")}
             </p>
           </div>
         </div>
         <p className="text-sidebar-foreground/40 text-xs">
-          Smart Campus Operations Platform
+          {t("login.platform")}
         </p>
       </div>
 
@@ -77,6 +80,7 @@ export default function LoginPage() {
         {/* Tema + Dil toggle — sağ üst köşe */}
         <div className="absolute top-4 right-4 flex items-center gap-1">
           <ThemeToggle />
+          <LanguageSwitcher />
         </div>
 
         <div className="w-full max-w-sm">
@@ -85,9 +89,9 @@ export default function LoginPage() {
               <CampusFlowLogo containerClassName="size-7" priority />
               <span className="font-bold text-foreground">CampusFlow</span>
             </Link>
-            <h1 className="text-2xl font-bold text-foreground">Welcome back</h1>
+            <h1 className="text-2xl font-bold text-foreground">{t("login.title")}</h1>
             <p className="text-muted-foreground text-sm mt-1">
-              Sign in to your portal
+              {t("login.subtitle")}
             </p>
           </div>
 
@@ -99,25 +103,25 @@ export default function LoginPage() {
             )}
 
             <div className="space-y-1.5">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email">{t("common.email")}</Label>
               <Input
                 id="email"
                 type="email"
                 required
-                placeholder="you@campus.edu.tr"
+                placeholder={t("login.emailPlaceholder")}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
               />
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password">{t("common.password")}</Label>
               <div className="relative">
                 <Input
                   id="password"
                   required
                   type={showPass ? "text" : "password"}
-                  placeholder="••••••••"
+                  placeholder={t("login.passwordPlaceholder")}
                   className="pr-9"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -139,7 +143,7 @@ export default function LoginPage() {
               {capsLock && (
                 <p className="flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400 mt-1.5">
                   <AlertTriangle className="size-3.5 shrink-0" />
-                  Caps Lock is on
+                  {t("login.capsLock")}
                 </p>
               )}
             </div>
@@ -149,7 +153,7 @@ export default function LoginPage() {
                 <Loader2 className="size-4 animate-spin" />
               ) : (
                 <>
-                  Sign in
+                  {t("login.submit")}
                   <ArrowRight className="size-4" />
                 </>
               )}
@@ -158,5 +162,13 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <AuthI18nProvider>
+      <LoginPageInner />
+    </AuthI18nProvider>
   );
 }

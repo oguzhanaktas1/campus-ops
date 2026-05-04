@@ -11,6 +11,8 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { getToken } from '@/lib/auth'
+import { useI18n } from '@/lib/i18n'
+import { formatStudentDate, translateStatus } from '@/lib/student-i18n-utils'
 
 const STATUS_BADGE: Record<string, string> = {
   PUBLISHED:          'bg-blue-50 text-blue-700 border-blue-200',
@@ -30,6 +32,7 @@ export default function StudentEventDetailPage() {
   const [isActionLoading, setIsActionLoading] = useState(false)
   const backend = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
   const headers = { Authorization: `Bearer ${getToken()}` }
+  const { locale, t } = useI18n()
 
   const fetchEvent = useCallback(async () => {
     try {
@@ -37,11 +40,11 @@ export default function StudentEventDetailPage() {
       if (res.ok) {
         setEvent(await res.json())
       } else {
-        toast.error('Event not found.')
+        toast.error(t('messages.eventNotFound'))
         router.push('/student/events')
       }
     } catch {
-      toast.error('Failed to load event.')
+      toast.error(t('messages.loadEventFail'))
     } finally {
       setIsLoading(false)
     }
@@ -58,19 +61,19 @@ export default function StudentEventDetailPage() {
       })
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
-        throw new Error(err.message ?? 'Failed')
+        throw new Error(err.message ?? t('messages.failed'))
       }
-      toast.success('Successfully registered.')
+      toast.success(t('messages.registerSuccess'))
       void fetchEvent()
     } catch (err: any) {
-      toast.error(err.message ?? 'Failed to register.')
+      toast.error(err.message ?? t('messages.registerFail'))
     } finally {
       setIsActionLoading(false)
     }
   }
 
   async function cancelRegistration() {
-    if (!confirm('Cancel your registration?')) return
+    if (!confirm(t('messages.cancelRegistrationConfirm'))) return
     setIsActionLoading(true)
     try {
       const res = await fetch(`${backend}/campus-events/${id}/register`, {
@@ -78,10 +81,10 @@ export default function StudentEventDetailPage() {
         headers,
       })
       if (!res.ok) throw new Error()
-      toast.success('Registration cancelled.')
+      toast.success(t('messages.registrationCancelled'))
       void fetchEvent()
     } catch {
-      toast.error('Failed to cancel registration.')
+      toast.error(t('messages.cancelRegistrationFail'))
     } finally {
       setIsActionLoading(false)
     }
@@ -106,7 +109,7 @@ export default function StudentEventDetailPage() {
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-xs text-muted-foreground">
         <Link href="/student/events" className="hover:underline flex items-center gap-1">
-          <ChevronLeft className="size-3" /> Events
+          <ChevronLeft className="size-3" /> {t('pages.eventsTitle')}
         </Link>
       </div>
 
@@ -126,7 +129,7 @@ export default function StudentEventDetailPage() {
             'text-xs font-semibold px-2.5 py-1 rounded-full border shrink-0',
             STATUS_BADGE[event.status] ?? STATUS_BADGE.PUBLISHED,
           )}>
-            {event.status?.replace(/_/g, ' ')}
+            {translateStatus(event.status, t)}
           </span>
         </div>
 
@@ -139,12 +142,12 @@ export default function StudentEventDetailPage() {
           <div className="flex items-start gap-2">
             <CalendarDays className="size-4 text-muted-foreground mt-0.5 shrink-0" />
             <div>
-              <p className="font-medium">Date & Time</p>
+              <p className="font-medium">{t('forms.dateTime')}</p>
               <p className="text-muted-foreground text-xs">
-                {new Date(event.startAt).toLocaleString()}
+                {new Date(event.startAt).toLocaleString(locale === 'tr' ? 'tr-TR' : 'en-US')}
               </p>
               <p className="text-muted-foreground text-xs">
-                to {new Date(event.endAt).toLocaleString()}
+                {locale === 'tr' ? 'bitis' : 'to'} {new Date(event.endAt).toLocaleString(locale === 'tr' ? 'tr-TR' : 'en-US')}
               </p>
             </div>
           </div>
@@ -152,7 +155,7 @@ export default function StudentEventDetailPage() {
             <div className="flex items-start gap-2">
               <MapPin className="size-4 text-muted-foreground mt-0.5 shrink-0" />
               <div>
-                <p className="font-medium">Location</p>
+                <p className="font-medium">{t('forms.preferredLocation')}</p>
                 <p className="text-muted-foreground text-xs">{event.locationText}</p>
               </div>
             </div>
@@ -160,9 +163,9 @@ export default function StudentEventDetailPage() {
           <div className="flex items-start gap-2">
             <Users className="size-4 text-muted-foreground mt-0.5 shrink-0" />
             <div>
-              <p className="font-medium">Attendance</p>
+              <p className="font-medium">{t('forms.attendance')}</p>
               <p className="text-muted-foreground text-xs">
-                {event.registrationCount} registered
+                {event.registrationCount} {locale === 'tr' ? 'kayitli' : 'registered'}
                 {event.minimumAttendance && ` · min ${event.minimumAttendance}`}
                 {event.targetAttendance && ` · target ${event.targetAttendance}`}
               </p>
@@ -171,7 +174,7 @@ export default function StudentEventDetailPage() {
           <div className="flex items-start gap-2">
             <User className="size-4 text-muted-foreground mt-0.5 shrink-0" />
             <div>
-              <p className="font-medium">Organizer</p>
+              <p className="font-medium">{t('forms.organizer')}</p>
               <p className="text-muted-foreground text-xs">
                 {event.organizerName}
                 {event.organizerTitle && ` · ${event.organizerTitle}`}
@@ -182,11 +185,11 @@ export default function StudentEventDetailPage() {
             <div className="flex items-start gap-2 sm:col-span-2">
               <Clock className="size-4 text-muted-foreground mt-0.5 shrink-0" />
               <div>
-                <p className="font-medium">Registration Period</p>
+                <p className="font-medium">{t('forms.registrationPeriod')}</p>
                 <p className="text-muted-foreground text-xs">
-                  {event.registrationStartAt ? new Date(event.registrationStartAt).toLocaleDateString() : '?'}
-                  {' → '}
-                  {event.registrationEndAt ? new Date(event.registrationEndAt).toLocaleDateString() : '?'}
+                  {event.registrationStartAt ? formatStudentDate(event.registrationStartAt, locale) : '?'}
+                  {' -> '}
+                  {event.registrationEndAt ? formatStudentDate(event.registrationEndAt, locale) : '?'}
                 </p>
               </div>
             </div>
@@ -196,18 +199,18 @@ export default function StudentEventDetailPage() {
 
       {/* Registration card */}
       <div className="bg-card border border-border rounded-xl p-5 space-y-3">
-        <p className="text-sm font-semibold">Registration</p>
+        <p className="text-sm font-semibold">{t('forms.registration')}</p>
 
         {isRegistered ? (
           <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg p-3">
             <CheckCircle2 className="size-4 shrink-0" />
-            You are registered for this event.
+            {t('forms.registeredMessage')}
           </div>
         ) : (
           <p className="text-sm text-muted-foreground">
             {canRegister && regOpen && !regClosed
-              ? 'Registration is open. Join this event!'
-              : 'Registration is currently closed.'}
+              ? t('forms.registrationOpenMessage')
+              : t('forms.registrationClosedMessage')}
           </p>
         )}
 
@@ -221,7 +224,7 @@ export default function StudentEventDetailPage() {
               className="gap-2"
             >
               {isActionLoading && <Loader2 className="size-4 animate-spin" />}
-              Cancel Registration
+              {t('forms.cancelRegistration')}
             </Button>
           ) : (
             <Button
@@ -231,7 +234,7 @@ export default function StudentEventDetailPage() {
               className="gap-2"
             >
               {isActionLoading && <Loader2 className="size-4 animate-spin" />}
-              Register
+              {t('forms.register')}
             </Button>
           )}
         </div>

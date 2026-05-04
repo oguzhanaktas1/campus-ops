@@ -33,6 +33,7 @@ import {
 } from '@/features/request-detail/components/RequestPanels'
 import { DomainDetailPanel } from '@/features/request-detail/domain-panels/DomainDetailPanel'
 import { useRequestDetail } from '@/features/request-detail/hooks/useRequestDetail'
+import { useI18n } from '@/lib/i18n'
 
 type ActionType = 'approve' | 'reject' | 'revision' | null
 
@@ -56,6 +57,7 @@ function formatDate(d: string) {
 }
 
 export default function FacultyApprovalsPage() {
+  const { t } = useI18n()
   const router = useRouter()
   const searchParams = useSearchParams()
   const initialSelectedId = searchParams.get('id')
@@ -91,7 +93,7 @@ export default function FacultyApprovalsPage() {
 
         if (!res.ok) {
           const errorData = await res.json().catch(() => ({}))
-          throw new Error(errorData?.message || 'Failed to load queue')
+          throw new Error(errorData?.message || t('approvals.loadFail'))
         }
 
         const data = await res.json()
@@ -110,7 +112,7 @@ export default function FacultyApprovalsPage() {
         )
       } catch (error) {
         toast.error(
-          error instanceof Error ? error.message : 'Failed to load approvals.',
+          error instanceof Error ? error.message : t('approvals.loadFail'),
         )
         setPending([])
       } finally {
@@ -206,7 +208,7 @@ export default function FacultyApprovalsPage() {
     if (!selectedId || !action) return
 
     if ((action === 'reject' || action === 'revision') && comment.trim() === '') {
-      toast.error(`A comment is required to ${action} this request.`)
+      toast.error(t('approvals.revisionNotesPlaceholder'))
       return
     }
 
@@ -227,10 +229,11 @@ export default function FacultyApprovalsPage() {
 
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}))
-        throw new Error(errorData?.message || 'Failed to process request')
+        throw new Error(errorData?.message || t(`approvals.fail${action.charAt(0).toUpperCase() + action.slice(1)}`))
       }
 
-      toast.success(`Request ${action}d successfully.`)
+      const successKey = action === 'approve' ? 'successApprove' : action === 'reject' ? 'successReject' : 'successRevision'
+      toast.success(t(`approvals.${successKey}`))
       setComment('')
 
       setPending((prev) => {
@@ -239,8 +242,9 @@ export default function FacultyApprovalsPage() {
         return next
       })
     } catch (error) {
+      const failKey = action === 'approve' ? 'failApprove' : action === 'reject' ? 'failReject' : 'failRevision'
       toast.error(
-        error instanceof Error ? error.message : 'Failed to process request.',
+        error instanceof Error ? error.message : t(`approvals.${failKey}`),
       )
     } finally {
       setIsProcessing(false)
@@ -254,11 +258,10 @@ export default function FacultyApprovalsPage() {
           <div className="border-b border-border px-4 py-4">
             <h1 className="flex items-center gap-2 text-sm font-semibold text-foreground">
               <Inbox className="size-4 text-primary" />
-              Faculty Approval Queue
+              {t('approvals.title')}
             </h1>
             <p className="mt-1 text-xs text-muted-foreground">
-              {pending.length} request{pending.length === 1 ? '' : 's'} waiting
-              for review
+              {t('approvals.subtitle', { count: pending.length })}
             </p>
           </div>
 
@@ -270,8 +273,8 @@ export default function FacultyApprovalsPage() {
             ) : pending.length === 0 ? (
               <div className="p-4">
                 <EmptyState
-                  title="No pending approvals"
-                  description="Faculty review queue is currently empty."
+                  title={t('approvals.noPending')}
+                  description={t('approvals.noPendingDesc')}
                   icon={<CheckCircle2 className="size-6 text-emerald-500" />}
                 />
               </div>
@@ -311,8 +314,8 @@ export default function FacultyApprovalsPage() {
           {!selectedId ? (
             <div className="flex h-full items-center justify-center p-6">
               <EmptyState
-                title="Select a request"
-                description="Choose a pending approval from the queue to inspect details and decide."
+                title={t('approvals.selectRequest')}
+                description={t('approvals.selectRequestDesc')}
                 icon={<Inbox className="size-6" />}
               />
             </div>
@@ -464,6 +467,7 @@ function FacultyDecisionPanel({
   onCommentChange: (value: string) => void
   onAction: (action: ActionType) => void
 }) {
+  const { t } = useI18n()
   const isLocked = ['APPROVED', 'REJECTED', 'REVISION_REQUESTED'].includes(
     detailStatus,
   )
@@ -471,24 +475,24 @@ function FacultyDecisionPanel({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Faculty Decision</CardTitle>
+        <CardTitle>{t('approvals.title')}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="rounded-lg border bg-muted/30 p-3 text-sm">
           <p className="font-medium text-foreground">{requestTypeName}</p>
           <p className="mt-1 text-muted-foreground">
-            Reviewing request submitted by {submittedByName}.
+            {submittedByName}
           </p>
         </div>
 
         {isLocked ? (
           <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
-            This request has already been processed in the faculty queue.
+            {t('common.completed')}
           </div>
         ) : (
           <>
             <Textarea
-              placeholder="Add a faculty note. Reject and revision actions require a comment."
+              placeholder={t('approvals.notesPlaceholder')}
               value={comment}
               onChange={(event) => onCommentChange(event.target.value)}
               className="min-h-[120px] resize-none"
@@ -506,7 +510,7 @@ function FacultyDecisionPanel({
                 ) : (
                   <CheckCircle2 className="size-4" />
                 )}
-                Approve
+                {t('approvals.approveBtn')}
               </Button>
               <Button
                 variant="destructive"
@@ -519,7 +523,7 @@ function FacultyDecisionPanel({
                 ) : (
                   <XCircle className="size-4" />
                 )}
-                Reject
+                {t('approvals.rejectBtn')}
               </Button>
               <Button
                 variant="outline"
@@ -532,7 +536,7 @@ function FacultyDecisionPanel({
                 ) : (
                   <RotateCcw className="size-4" />
                 )}
-                Request Revision
+                {t('approvals.revisionBtn')}
               </Button>
             </div>
           </>

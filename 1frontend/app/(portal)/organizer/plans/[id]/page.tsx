@@ -14,8 +14,9 @@ import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { getToken } from '@/lib/auth'
+import { useI18n } from '@/lib/i18n'
 
-const TABS = ['Overview', 'Prerequisites', 'Pre-Registrations', 'Readiness', 'Creation Request'] as const
+const TABS = ['overview', 'prerequisites', 'preRegistrations', 'readiness', 'creationRequest'] as const
 type Tab = typeof TABS[number]
 
 const STATUS_BADGE: Record<string, string> = {
@@ -50,8 +51,9 @@ function StatusIcon({ status }: { status: string }) {
 export default function PlanDetailPage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
+  const { t } = useI18n()
   const [plan, setPlan] = useState<any>(null)
-  const [activeTab, setActiveTab] = useState<Tab>('Overview')
+  const [activeTab, setActiveTab] = useState<Tab>('overview')
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -95,15 +97,15 @@ export default function PlanDetailPage() {
             : '',
         }))
       } else {
-        toast.error('Plan not found.')
+        toast.error(t('pages.planNotFound'))
         router.push('/organizer/plans')
       }
     } catch {
-      toast.error('Failed to load plan.')
+      toast.error(t('pages.planLoadFail'))
     } finally {
       setIsLoading(false)
     }
-  }, [id])
+  }, [id, router, backend, t])
 
   useEffect(() => { void fetchPlan() }, [fetchPlan])
 
@@ -115,10 +117,10 @@ export default function PlanDetailPage() {
         body: JSON.stringify({ status: 'REGISTRATION_OPEN' }),
       })
       if (!res.ok) throw new Error()
-      toast.success('Pre-registration opened.')
+      toast.success(t('pages.preregOpened'))
       void fetchPlan()
     } catch {
-      toast.error('Failed to open pre-registration.')
+      toast.error(t('pages.preregOpenFail'))
     }
   }
 
@@ -131,10 +133,10 @@ export default function PlanDetailPage() {
         body: JSON.stringify({ reason: 'Cancelled by organizer.' }),
       })
       if (!res.ok) throw new Error()
-      toast.success('Plan cancelled.')
+      toast.success(t('pages.planCancelled'))
       void fetchPlan()
     } catch {
-      toast.error('Failed to cancel plan.')
+      toast.error(t('pages.planCancelFail'))
     }
   }
 
@@ -142,7 +144,7 @@ export default function PlanDetailPage() {
     e.preventDefault()
     if (!ecrForm.title || !ecrForm.proposedStartAt || !ecrForm.proposedEndAt ||
       !ecrForm.minimumAttendance || !ecrForm.registrationStartAt || !ecrForm.registrationEndAt) {
-      toast.error('Please fill in all required fields.')
+      toast.error(t('pages.fillRequired'))
       return
     }
     setIsSubmitting(true)
@@ -162,11 +164,11 @@ export default function PlanDetailPage() {
         throw new Error(err.message ?? 'Error')
       }
       const data = await res.json()
-      toast.success(`Event creation request ${data.requestNo} submitted.`)
+      toast.success(t('pages.eventCreationSubmittedToast', { requestNo: data.requestNo }))
       void fetchPlan()
-      setActiveTab('Overview')
+      setActiveTab('overview')
     } catch (err: any) {
-      toast.error(err.message ?? 'Failed to submit event creation request.')
+      toast.error(err.message ?? t('pages.eventCreationSubmitFail'))
     } finally {
       setIsSubmitting(false)
     }
@@ -188,7 +190,7 @@ export default function PlanDetailPage() {
       <div className="flex items-start justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
-            <Link href="/organizer/plans" className="hover:underline">Plans</Link>
+            <Link href="/organizer/plans" className="hover:underline">{t('nav.eventPlans')}</Link>
             <ChevronRight className="size-3" />
             <span className="truncate max-w-[200px]">{plan.title}</span>
           </div>
@@ -216,13 +218,13 @@ export default function PlanDetailPage() {
                 : 'border-transparent text-muted-foreground hover:text-foreground',
             )}
           >
-            {tab}
+            {tab === 'overview' ? t('pages.overview') : tab === 'prerequisites' ? t('pages.prerequisites') : tab === 'preRegistrations' ? t('pages.preregistrations') : tab === 'readiness' ? t('pages.readinessCheck') : t('pages.eventCreationRequest')}
           </button>
         ))}
       </div>
 
       {/* ── Overview ── */}
-      {activeTab === 'Overview' && (
+      {activeTab === 'overview' && (
         <div className="space-y-5">
           <div className="bg-card border border-border rounded-xl p-5 space-y-4">
             {plan.description && (
@@ -230,26 +232,26 @@ export default function PlanDetailPage() {
             )}
             <div className="grid sm:grid-cols-2 gap-4 text-sm">
               <div className="space-y-1">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Tentative Dates</p>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{t('pages.tentativeDates')}</p>
                 <p>{plan.tentativeStartAt ? new Date(plan.tentativeStartAt).toLocaleString() : '—'}</p>
                 <p className="text-muted-foreground">to {plan.tentativeEndAt ? new Date(plan.tentativeEndAt).toLocaleString() : '—'}</p>
               </div>
               <div className="space-y-1">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Location</p>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{t('common.location')}</p>
                 <p>{plan.locationPreference ?? '—'}</p>
               </div>
               <div className="space-y-1">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Attendance</p>
-                <p>Min: <span className="font-medium">{plan.minimumAttendance}</span> · Target: <span className="font-medium">{plan.targetAttendance ?? '—'}</span></p>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{t('pages.attendance')}</p>
+                <p>{t('pages.min')} <span className="font-medium">{plan.minimumAttendance}</span> · {t('pages.target')} <span className="font-medium">{plan.targetAttendance ?? '—'}</span></p>
               </div>
               <div className="space-y-1">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Pre-Registration Window</p>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{t('pages.preregWindow')}</p>
                 <p>{plan.registrationStartAt ? new Date(plan.registrationStartAt).toLocaleDateString() : '—'} → {plan.registrationEndAt ? new Date(plan.registrationEndAt).toLocaleDateString() : '—'}</p>
               </div>
             </div>
             {plan.sourceEventRequestId && (
               <div className="pt-2 border-t border-border">
-                <p className="text-xs text-muted-foreground">Source Student Request: </p>
+                <p className="text-xs text-muted-foreground">{t('pages.sourceStudentRequest')} </p>
                 <Link href={`/student/requests/${plan.sourceEventRequestId}`} className="text-xs text-primary hover:underline flex items-center gap-1">
                   {plan.sourceEventRequestId} <ExternalLink className="size-3" />
                 </Link>
@@ -257,7 +259,7 @@ export default function PlanDetailPage() {
             )}
             {plan.notes && (
               <div className="pt-2 border-t border-border">
-                <p className="text-xs text-muted-foreground">Notes</p>
+                <p className="text-xs text-muted-foreground">{t('common.notes')}</p>
                 <p className="text-sm mt-1">{plan.notes}</p>
               </div>
             )}
@@ -268,11 +270,11 @@ export default function PlanDetailPage() {
             <div className="flex flex-wrap gap-2">
               {plan.status === 'DRAFT' || plan.status === 'IN_PREPARATION' ? (
                 <Button size="sm" variant="outline" className="gap-2" onClick={openPreRegistration}>
-                  <Users className="size-4" /> Open Pre-Registration
+                  <Users className="size-4" /> {t('pages.openPreregistration')}
                 </Button>
               ) : null}
               <Button size="sm" variant="destructive" className="gap-2" onClick={cancelPlan}>
-                <Ban className="size-4" /> Cancel Plan
+                <Ban className="size-4" /> {t('pages.cancelPlan')}
               </Button>
             </div>
           )}
@@ -280,7 +282,7 @@ export default function PlanDetailPage() {
           {/* Creation request info */}
           {plan.creationRequest && (
             <div className="bg-card border border-border rounded-xl p-4">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Event Creation Request</p>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">{t('pages.eventCreationRequest')}</p>
               <div className="flex items-center justify-between">
                 <p className="text-sm font-medium">{plan.creationRequest.requestNo}</p>
                 <span className={cn('text-xs font-semibold px-2 py-0.5 rounded-full border',
@@ -294,36 +296,36 @@ export default function PlanDetailPage() {
       )}
 
       {/* ── Prerequisites ── */}
-      {activeTab === 'Prerequisites' && (
+      {activeTab === 'prerequisites' && (
         <div className="space-y-4">
           {[
             {
-              label: 'Room Reservations',
+              label: t('pages.reservations'),
               icon: Building2,
               items: plan.prerequisites?.reservations ?? [],
               href: '/organizer/plans/' + id + '/new-reservation',
-              newLabel: 'Reservation Request',
+              newLabel: t('pages.reserveRoom'),
             },
             {
-              label: 'Access Requests',
+              label: t('nav.accessRequests'),
               icon: ShieldCheck,
               items: plan.prerequisites?.accesses ?? [],
               href: '/student/access-requests/new',
-              newLabel: 'Access Request',
+              newLabel: t('pages.newAccessRequest'),
             },
             {
-              label: 'Procurement',
+              label: t('pages.procurementTitle'),
               icon: ShoppingCart,
               items: plan.prerequisites?.procurements ?? [],
               href: '/student/procurement/new',
-              newLabel: 'Procurement Request',
+              newLabel: t('pages.procurementTitle'),
             },
             {
-              label: 'Equipment',
+              label: t('nav.equipment'),
               icon: Package,
               items: plan.prerequisites?.equipments ?? [],
               href: '/student/equipment/new',
-              newLabel: 'Equipment Request',
+              newLabel: t('pages.requestEquipment'),
             },
           ].map(({ label, icon: Icon, items, href, newLabel }) => (
             <div key={label} className="bg-card border border-border rounded-xl p-4 space-y-3">
@@ -336,7 +338,7 @@ export default function PlanDetailPage() {
                 </Link>
               </div>
               {items.length === 0 ? (
-                <p className="text-xs text-muted-foreground">No requests linked.</p>
+                <p className="text-xs text-muted-foreground">{t('pages.noLinkedRequests')}</p>
               ) : (
                 <div className="space-y-2">
                   {items.map((item: any) => (
@@ -364,26 +366,26 @@ export default function PlanDetailPage() {
       )}
 
       {/* ── Pre-Registrations ── */}
-      {activeTab === 'Pre-Registrations' && (
+      {activeTab === 'preRegistrations' && (
         <div className="space-y-4">
           <div className="bg-card border border-border rounded-xl p-4">
             <div className="grid grid-cols-3 gap-4 text-center">
               <div>
                 <p className="text-2xl font-bold text-primary">{preRegCount}</p>
-                <p className="text-xs text-muted-foreground">Registered</p>
+                <p className="text-xs text-muted-foreground">{t('pages.registered')}</p>
               </div>
               <div>
                 <p className="text-2xl font-bold">{plan.minimumAttendance}</p>
-                <p className="text-xs text-muted-foreground">Minimum</p>
+                <p className="text-xs text-muted-foreground">{t('pages.minimum')}</p>
               </div>
               <div>
                 <p className="text-2xl font-bold">{plan.targetAttendance ?? '—'}</p>
-                <p className="text-xs text-muted-foreground">Target</p>
+                <p className="text-xs text-muted-foreground">{t('pages.targetAttendance')}</p>
               </div>
             </div>
             <div className="mt-4">
               <div className="flex justify-between text-xs text-muted-foreground mb-1">
-                <span>Progress</span>
+                <span>{t('pages.progress')}</span>
                 <span>{preRegCount}/{plan.minimumAttendance}</span>
               </div>
               <div className="w-full bg-muted rounded-full h-2">
@@ -408,11 +410,11 @@ export default function PlanDetailPage() {
                     body: JSON.stringify({ decisionType: 'EXTENDED_REGISTRATION', newRegistrationEndAt: newEnd }),
                   })
                   if (!res.ok) throw new Error()
-                  toast.success('Registration period extended.')
+                  toast.success(t('pages.registrationExtended'))
                   void fetchPlan()
-                } catch { toast.error('Failed.') }
+                } catch { toast.error(t('common.failed')) }
               }}>
-                <RefreshCw className="size-4 mr-1.5" /> Extend Registration
+                <RefreshCw className="size-4 mr-1.5" /> {t('pages.extendRegistration')}
               </Button>
               <Button size="sm" variant="outline" onClick={async () => {
                 const newStart = prompt('New tentative start date (YYYY-MM-DDTHH:MM)')
@@ -424,23 +426,23 @@ export default function PlanDetailPage() {
                     body: JSON.stringify({ decisionType: 'RESCHEDULED', newStartAt: newStart }),
                   })
                   if (!res.ok) throw new Error()
-                  toast.success('Event rescheduled.')
+                  toast.success(t('pages.eventRescheduled'))
                   void fetchPlan()
-                } catch { toast.error('Failed.') }
+                } catch { toast.error(t('common.failed')) }
               }}>
-                <CalendarDays className="size-4 mr-1.5" /> Reschedule
+                <CalendarDays className="size-4 mr-1.5" /> {t('pages.reschedule')}
               </Button>
             </div>
           )}
 
           <div className="bg-card border border-border rounded-xl overflow-hidden">
             <div className="px-4 py-3 border-b border-border bg-muted/30">
-              <p className="text-sm font-semibold">Pre-registrations</p>
+              <p className="text-sm font-semibold">{t('pages.preregistrations')}</p>
             </div>
             {plan.preRegistrations?.length === 0 ? (
               <div className="py-8 text-center opacity-50">
                 <AlertCircle className="size-6 mx-auto mb-2" />
-                <p className="text-sm">No pre-registrations yet.</p>
+                <p className="text-sm">{t('pages.noPreregistrations')}</p>
               </div>
             ) : (
               <div className="divide-y divide-border">
@@ -460,15 +462,15 @@ export default function PlanDetailPage() {
       )}
 
       {/* ── Readiness ── */}
-      {activeTab === 'Readiness' && (
+      {activeTab === 'readiness' && (
         <div className="space-y-4">
           <div className="bg-card border border-border rounded-xl p-4 space-y-3">
-            <p className="text-sm font-semibold">Readiness Check</p>
+            <p className="text-sm font-semibold">{t('pages.readinessCheck')}</p>
             {[
-              { label: 'Reservation', ok: plan.readiness?.reservationApproved },
-              { label: 'Access', ok: plan.readiness?.accessApproved },
-              { label: 'Procurement', ok: plan.readiness?.procurementApproved },
-              { label: 'Equipment', ok: plan.readiness?.equipmentApproved },
+              { label: t('pages.reservations'), ok: plan.readiness?.reservationApproved },
+              { label: t('nav.accessRequests'), ok: plan.readiness?.accessApproved },
+              { label: t('pages.procurementTitle'), ok: plan.readiness?.procurementApproved },
+              { label: t('nav.equipment'), ok: plan.readiness?.equipmentApproved },
               {
                 label: `Pre-registrations (${plan.readiness?.preRegistrationCount ?? 0}/${plan.readiness?.minimumAttendance ?? plan.minimumAttendance})`,
                 ok: plan.readiness?.preRegistrationCount >= plan.minimumAttendance,
@@ -477,8 +479,8 @@ export default function PlanDetailPage() {
               <div key={label} className="flex items-center justify-between">
                 <span className="text-sm">{label}</span>
                 {ok
-                  ? <span className="flex items-center gap-1 text-xs text-green-700 font-medium"><CheckCircle2 className="size-4" /> Approved</span>
-                  : <span className="flex items-center gap-1 text-xs text-yellow-600 font-medium"><Clock className="size-4" /> Pending</span>
+                  ? <span className="flex items-center gap-1 text-xs text-green-700 font-medium"><CheckCircle2 className="size-4" /> {t('common.approved')}</span>
+                  : <span className="flex items-center gap-1 text-xs text-yellow-600 font-medium"><Clock className="size-4" /> {t('common.pending')}</span>
                 }
               </div>
             ))}
@@ -491,13 +493,13 @@ export default function PlanDetailPage() {
               : 'bg-yellow-50 border-yellow-200 text-yellow-800',
           )}>
             {plan.readiness?.isEligible
-              ? <><CheckCircle2 className="size-5 shrink-0" /> Eligible to submit Event Creation Request</>
+              ? <><CheckCircle2 className="size-5 shrink-0" /> {t('pages.eligibleSubmit')}</>
               : <><AlertCircle className="size-5 shrink-0" /> Not yet eligible: {plan.readiness?.blockers?.join(', ')}</>
             }
           </div>
 
           {plan.readiness?.isEligible && !plan.creationRequest && plan.status !== 'CANCELLED' && (
-            <Button className="w-full" onClick={() => setActiveTab('Creation Request')}>
+            <Button className="w-full" onClick={() => setActiveTab('creationRequest')}>
               Proceed to Event Creation Request →
             </Button>
           )}
@@ -505,17 +507,17 @@ export default function PlanDetailPage() {
       )}
 
       {/* ── Creation Request ── */}
-      {activeTab === 'Creation Request' && (
+      {activeTab === 'creationRequest' && (
         <div className="space-y-4">
           {plan.creationRequest ? (
             <div className="bg-card border border-border rounded-xl p-5 space-y-3">
-              <p className="text-sm font-semibold">Event Creation Request Submitted</p>
+              <p className="text-sm font-semibold">{t('pages.eventCreationSubmitted')}</p>
               <div className="flex items-center justify-between">
-                <p className="text-sm text-muted-foreground">Request No</p>
+                <p className="text-sm text-muted-foreground">{t('pages.requestNo')}</p>
                 <p className="text-sm font-medium">{plan.creationRequest.requestNo}</p>
               </div>
               <div className="flex items-center justify-between">
-                <p className="text-sm text-muted-foreground">Status</p>
+                <p className="text-sm text-muted-foreground">{t('common.status')}</p>
                 <span className={cn('text-xs font-semibold px-2 py-0.5 rounded-full border',
                   REQ_STATUS_BADGE[plan.creationRequest.requestStatus] ?? REQ_STATUS_BADGE.SUBMITTED)}>
                   {plan.creationRequest.requestStatus}
@@ -523,14 +525,14 @@ export default function PlanDetailPage() {
               </div>
               <Link href={`/student/requests/${plan.creationRequest.requestId}`}>
                 <Button size="sm" variant="outline" className="gap-1 mt-2">
-                  View Request <ExternalLink className="size-3" />
+                  {t('pages.viewRequest')} <ExternalLink className="size-3" />
                 </Button>
               </Link>
             </div>
           ) : (
             <form onSubmit={submitCreationRequest} className="bg-card border border-border rounded-xl p-5 space-y-4">
               <div>
-                <p className="text-sm font-semibold">Submit Event Creation Request</p>
+                <p className="text-sm font-semibold">{t('pages.submitEventCreation')}</p>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   This will start the official approval chain: Faculty Secretary → Dept. Chair → Finance → Budget → Event Coordinator.
                 </p>
@@ -539,18 +541,18 @@ export default function PlanDetailPage() {
               {/* Readiness snapshot */}
               {plan.readiness && (
                 <div className="p-3 bg-muted/30 rounded-lg text-xs space-y-1">
-                  <p className="font-semibold mb-1">Prerequisite Snapshot</p>
+                  <p className="font-semibold mb-1">{t('pages.prereqSnapshot')}</p>
                   {[
-                    ['Reservation', plan.readiness.reservationApproved],
-                    ['Access', plan.readiness.accessApproved],
-                    ['Procurement', plan.readiness.procurementApproved],
-                    ['Equipment', plan.readiness.equipmentApproved],
+                    [t('pages.reservations'), plan.readiness.reservationApproved],
+                    [t('nav.accessRequests'), plan.readiness.accessApproved],
+                    [t('pages.procurementTitle'), plan.readiness.procurementApproved],
+                    [t('nav.equipment'), plan.readiness.equipmentApproved],
                     [`Pre-reg (${plan.readiness.preRegistrationCount}/${plan.readiness.minimumAttendance})`,
                       plan.readiness.preRegistrationCount >= plan.readiness.minimumAttendance],
                   ].map(([label, ok]: any) => (
                     <div key={label} className="flex items-center gap-2">
                       {ok ? <CheckCircle2 className="size-3 text-green-600" /> : <Clock className="size-3 text-yellow-500" />}
-                      <span>{label}: {ok ? 'Ready' : 'Pending'}</span>
+                      <span>{label}: {ok ? t('pages.ready') : t('common.pending')}</span>
                     </div>
                   ))}
                 </div>
@@ -558,50 +560,50 @@ export default function PlanDetailPage() {
 
               <div className="grid sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5 sm:col-span-2">
-                  <Label>Title <span className="text-destructive">*</span></Label>
+                  <Label>{t('common.title')} <span className="text-destructive">*</span></Label>
                   <Input value={ecrForm.title} onChange={(e) => setEcrForm((f) => ({ ...f, title: e.target.value }))} />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Event Type</Label>
+                  <Label>{t('pages.eventType')}</Label>
                   <select value={ecrForm.eventType} onChange={(e) => setEcrForm((f) => ({ ...f, eventType: e.target.value }))}
                     className="w-full bg-background border border-input rounded-md px-3 h-9 text-sm outline-none focus:ring-2 focus:ring-ring">
                     {EVENT_TYPES.map((t) => <option key={t}>{t}</option>)}
                   </select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Location</Label>
+                  <Label>{t('common.location')}</Label>
                   <Input value={ecrForm.locationText} onChange={(e) => setEcrForm((f) => ({ ...f, locationText: e.target.value }))} />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Proposed Start <span className="text-destructive">*</span></Label>
+                  <Label>{t('pages.proposedStart')} <span className="text-destructive">*</span></Label>
                   <Input type="datetime-local" value={ecrForm.proposedStartAt} onChange={(e) => setEcrForm((f) => ({ ...f, proposedStartAt: e.target.value }))} />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Proposed End <span className="text-destructive">*</span></Label>
+                  <Label>{t('pages.proposedEnd')} <span className="text-destructive">*</span></Label>
                   <Input type="datetime-local" value={ecrForm.proposedEndAt} onChange={(e) => setEcrForm((f) => ({ ...f, proposedEndAt: e.target.value }))} />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Min Attendance <span className="text-destructive">*</span></Label>
+                  <Label>{t('pages.minAttendance')} <span className="text-destructive">*</span></Label>
                   <Input type="number" value={ecrForm.minimumAttendance} onChange={(e) => setEcrForm((f) => ({ ...f, minimumAttendance: e.target.value }))} />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Target Attendance</Label>
+                  <Label>{t('pages.targetAttendance')}</Label>
                   <Input type="number" value={ecrForm.targetAttendance} onChange={(e) => setEcrForm((f) => ({ ...f, targetAttendance: e.target.value }))} />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Registration Opens <span className="text-destructive">*</span></Label>
+                  <Label>{t('pages.registrationOpens')} <span className="text-destructive">*</span></Label>
                   <Input type="datetime-local" value={ecrForm.registrationStartAt} onChange={(e) => setEcrForm((f) => ({ ...f, registrationStartAt: e.target.value }))} />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Registration Closes <span className="text-destructive">*</span></Label>
+                  <Label>{t('pages.registrationCloses')} <span className="text-destructive">*</span></Label>
                   <Input type="datetime-local" value={ecrForm.registrationEndAt} onChange={(e) => setEcrForm((f) => ({ ...f, registrationEndAt: e.target.value }))} />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Expected Budget ($)</Label>
+                  <Label>{t('pages.expectedBudget')}</Label>
                   <Input type="number" step="0.01" value={ecrForm.expectedBudget} onChange={(e) => setEcrForm((f) => ({ ...f, expectedBudget: e.target.value }))} />
                 </div>
                 <div className="space-y-1.5 sm:col-span-2">
-                  <Label>Description</Label>
+                  <Label>{t('common.description')}</Label>
                   <textarea value={ecrForm.description} onChange={(e) => setEcrForm((f) => ({ ...f, description: e.target.value }))} rows={3}
                     className="w-full bg-background border border-input rounded-md px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring resize-none" />
                 </div>
@@ -609,7 +611,7 @@ export default function PlanDetailPage() {
 
               <div className="flex justify-end gap-3">
                 <Button type="submit" disabled={isSubmitting} className="gap-2">
-                  {isSubmitting && <Loader2 className="size-4 animate-spin" />} Submit Creation Request
+                  {isSubmitting && <Loader2 className="size-4 animate-spin" />} {t('pages.submitCreationRequest')}
                 </Button>
               </div>
             </form>

@@ -8,26 +8,23 @@ import { cn } from '@/lib/utils'
 import { Search, FileText, Trash2, Loader2, AlertTriangle, ArrowRight, CheckSquare, Square } from 'lucide-react'
 import { toast } from 'sonner'
 import Link from 'next/link'
+import { useI18n } from '@/lib/i18n'
 
-const requestTypeLabels: Record<string, string> = {
-  ACCESS_REQUEST: 'Access / Permission Request',
-  APPOINTMENT: 'Appointment Request',
-  DOCUMENT_REQUEST: 'Document Request',
-  EQUIPMENT: 'Equipment Request',
-  EVENT_CREATION_REQUEST: 'Event Creation Request',
-  EVENT_REQUEST: 'Event / Activity Request',
-  INTERNSHIP_REQUEST: 'Internship Application',
-  IT_TICKET: 'IT Support Ticket',
-  PROCUREMENT_REQUEST: 'Procurement Request',
-  ROOM_RESERVATION: 'Room / Resource Reservation',
-}
-
-function getRequestTypeLabel(request: { type?: string; typeName?: string }) {
-  if (request.type && requestTypeLabels[request.type]) return requestTypeLabels[request.type]
-  return request.typeName ?? request.type ?? 'Unknown'
+function useRequestTypeLabel() {
+  const { t } = useI18n()
+  return (request: { type?: string; typeName?: string }) => {
+    if (request.type) {
+      const key = `requests.typeLabels.${request.type}`
+      const label = t(key)
+      if (label !== key) return label
+    }
+    return request.typeName ?? request.type ?? t('common.unknown')
+  }
 }
 
 export default function AdminRequestsPage() {
+  const { t } = useI18n()
+  const getRequestTypeLabel = useRequestTypeLabel()
   const [requests, setRequests] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -48,7 +45,7 @@ export default function AdminRequestsPage() {
       })
       if (res.ok) setRequests(await res.json())
     } catch (err) {
-      toast.error("Could not load system requests")
+      toast.error(t('requests.loadFail'))
     } finally {
       setIsLoading(false)
     }
@@ -72,14 +69,14 @@ export default function AdminRequestsPage() {
       })
 
       if (res.ok) {
-        toast.success(`${selectedIds.length} requests deleted successfully`)
+        toast.success(t('requests.deleteSuccess', { count: selectedIds.length }))
         setRequests(prev => prev.filter(r => !selectedIds.includes(r.id)))
-        setSelectedIds([]) // Seçimleri temizle
+        setSelectedIds([])
       } else {
-        toast.error("Failed to delete selected requests")
+        toast.error(t('requests.deleteFail'))
       }
     } catch (err) {
-      toast.error("Network error")
+      toast.error(t('requests.networkError'))
     } finally {
       setIsDeleting(false)
       setShowConfirmModal(false)
@@ -138,13 +135,13 @@ export default function AdminRequestsPage() {
               <div className="size-12 rounded-full bg-destructive/10 flex items-center justify-center text-destructive">
                 <AlertTriangle className="size-6" />
               </div>
-              <h2 className="text-lg font-bold">Delete {selectedIds.length} items?</h2>
-              <p className="text-sm text-muted-foreground">These requests and all their data will be permanently removed.</p>
+              <h2 className="text-lg font-bold">{t('requests.deleteConfirmTitle', { count: selectedIds.length })}</h2>
+              <p className="text-sm text-muted-foreground">{t('requests.deleteConfirmDesc')}</p>
             </div>
             <div className="flex gap-3 mt-6">
-              <Button variant="outline" className="flex-1" disabled={isDeleting} onClick={() => setShowConfirmModal(false)}>Cancel</Button>
+              <Button variant="outline" className="flex-1" disabled={isDeleting} onClick={() => setShowConfirmModal(false)}>{t('common.cancel')}</Button>
               <Button variant="destructive" className="flex-1" disabled={isDeleting} onClick={handleBulkDelete}>
-                {isDeleting ? <Loader2 className="size-4 animate-spin" /> : "Delete Selected"}
+                {isDeleting ? <Loader2 className="size-4 animate-spin" /> : t('common.deleteSelected')}
               </Button>
             </div>
           </div>
@@ -155,20 +152,20 @@ export default function AdminRequestsPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-black tracking-tight text-foreground uppercase flex items-center gap-3">
-            <FileText className="size-7 text-primary" /> System Audit
+            <FileText className="size-7 text-primary" /> {t('requests.title')}
           </h1>
-          <p className="text-sm text-muted-foreground">Managing {requests.length} requests in total.</p>
+          <p className="text-sm text-muted-foreground">{t('requests.subtitle', { count: requests.length })}</p>
         </div>
 
         {/* 🔥 SEÇİLEN VARSA ÇIKAN BUTON 🔥 */}
         {selectedIds.length > 0 && (
-          <Button 
-            variant="destructive" 
-            size="sm" 
+          <Button
+            variant="destructive"
+            size="sm"
             className="animate-in slide-in-from-right-4 gap-2 font-bold shadow-lg"
             onClick={() => setShowConfirmModal(true)}
           >
-            <Trash2 className="size-4" /> Delete Selected ({selectedIds.length})
+            <Trash2 className="size-4" /> {t('common.deleteSelected')} ({selectedIds.length})
           </Button>
         )}
       </div>
@@ -177,30 +174,30 @@ export default function AdminRequestsPage() {
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4 bg-muted/20 p-4 rounded-xl border border-border">
         <div className="md:col-span-2 relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-          <Input 
-            placeholder="Search title, ID, or student..." 
+          <Input
+            placeholder={t('requests.searchPlaceholder')}
             className="pl-9 bg-background"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <select 
+        <select
           className="bg-background border border-input rounded-md px-3 text-sm focus:ring-2 focus:ring-primary outline-none h-10"
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
         >
-          <option value="all">All Statuses</option>
-          <option value="SUBMITTED">Submitted</option>
-          <option value="APPROVED">Approved</option>
-          <option value="REJECTED">Rejected</option>
-          <option value="REVISION_REQUESTED">Revision Req.</option>
+          <option value="all">{t('requests.allStatuses')}</option>
+          <option value="SUBMITTED">{t('requests.statusSubmitted')}</option>
+          <option value="APPROVED">{t('requests.statusApproved')}</option>
+          <option value="REJECTED">{t('requests.statusRejected')}</option>
+          <option value="REVISION_REQUESTED">{t('requests.statusRevision')}</option>
         </select>
         <select
           className="bg-background border border-input rounded-md px-3 text-sm focus:ring-2 focus:ring-primary outline-none h-10"
           value={typeFilter}
           onChange={(e) => setTypeFilter(e.target.value)}
         >
-          <option value="all">All Types</option>
+          <option value="all">{t('requests.allTypes')}</option>
           {requestTypes.map(([key, label]) => (
             <option key={key} value={key}>
               {label}
@@ -208,7 +205,7 @@ export default function AdminRequestsPage() {
           ))}
         </select>
         <div className="flex items-center justify-center text-xs font-bold text-muted-foreground bg-background border border-border rounded-md uppercase">
-          {filtered.length} visible
+          {filtered.length} {t('requests.visible')}
         </div>
       </div>
 
@@ -230,11 +227,11 @@ export default function AdminRequestsPage() {
                     )}
                   </button>
                 </th>
-                <th className="px-5 py-4 font-bold uppercase text-[10px] tracking-widest">Request</th>
-                <th className="px-5 py-4 font-bold uppercase text-[10px] tracking-widest">Type</th>
-                <th className="px-5 py-4 font-bold uppercase text-[10px] tracking-widest">Student</th>
-                <th className="px-5 py-4 font-bold uppercase text-[10px] tracking-widest">Status</th>
-                <th className="px-5 py-4 font-bold uppercase text-[10px] tracking-widest text-right">Link</th>
+                <th className="px-5 py-4 font-bold uppercase text-[10px] tracking-widest">{t('requests.colRequest')}</th>
+                <th className="px-5 py-4 font-bold uppercase text-[10px] tracking-widest">{t('requests.colType')}</th>
+                <th className="px-5 py-4 font-bold uppercase text-[10px] tracking-widest">{t('requests.colStudent')}</th>
+                <th className="px-5 py-4 font-bold uppercase text-[10px] tracking-widest">{t('requests.colStatus')}</th>
+                <th className="px-5 py-4 font-bold uppercase text-[10px] tracking-widest text-right">{t('requests.colLink')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">

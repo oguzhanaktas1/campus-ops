@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useI18n } from '@/lib/i18n'
 import {
   ChevronRight,
   ExternalLink,
@@ -37,6 +38,7 @@ const STEP_TYPES = ['START', 'REVIEW', 'APPROVAL', 'REVISION', 'ASSIGNMENT', 'AU
 const ACTION_TYPES = ['SUBMIT', 'APPROVE', 'REJECT', 'REQUEST_REVISION', 'ASSIGN', 'ESCALATE', 'CANCEL', 'COMPLETE', 'AUTO_TRANSITION']
 
 export default function AdminWorkflowsPage() {
+  const { t } = useI18n()
   const [workflows, setWorkflows] = useState<WorkflowSummary[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [selectedWorkflow, setSelectedWorkflow] = useState<WorkflowDetail | null>(null)
@@ -78,12 +80,12 @@ export default function AdminWorkflowsPage() {
       const res = await fetch(`${BACKEND}/admin/workflows`, {
         headers: authHeaders(),
       })
-      if (!res.ok) throw new Error('Failed to load workflows.')
+      if (!res.ok) throw new Error(t('workflows.loadFail'))
       const data = (await res.json()) as WorkflowSummary[]
       setWorkflows(Array.isArray(data) ? data : [])
       setSelectedId((current) => current ?? data?.[0]?.id ?? null)
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to load workflows.')
+      toast.error(error instanceof Error ? error.message : t('workflows.loadFail'))
       setWorkflows([])
     } finally {
       setIsLoading(false)
@@ -137,11 +139,11 @@ export default function AdminWorkflowsPage() {
       const res = await fetch(`${BACKEND}/admin/workflows/${id}`, {
         headers: authHeaders(),
       })
-      if (!res.ok) throw new Error('Failed to load workflow detail.')
+      if (!res.ok) throw new Error(t('workflows.detailLoadFail'))
       const data = (await res.json()) as WorkflowDetail
       setSelectedWorkflow(data)
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to load workflow detail.')
+      toast.error(error instanceof Error ? error.message : t('workflows.detailLoadFail'))
       setSelectedWorkflow(null)
     } finally {
       setIsDetailLoading(false)
@@ -202,7 +204,7 @@ export default function AdminWorkflowsPage() {
 
   const handleCreateWorkflow = async () => {
     if (!workflowForm.key.trim() || !workflowForm.name.trim()) {
-      toast.error('Key and name are required.')
+      toast.error(t('workflows.keyNameRequired'))
       return
     }
 
@@ -219,14 +221,14 @@ export default function AdminWorkflowsPage() {
       })
 
       const data = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(data.message ?? 'Failed to create workflow.')
+      if (!res.ok) throw new Error(data.message ?? t('workflows.createFail'))
 
-      toast.success('Workflow created.')
+      toast.success(t('workflows.createSuccess'))
       setIsCreateWorkflowOpen(false)
       resetWorkflowForm()
       await refreshAll(data.id ?? null)
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to create workflow.')
+      toast.error(error instanceof Error ? error.message : t('workflows.createFail'))
     } finally {
       setIsSubmitting(false)
     }
@@ -234,28 +236,28 @@ export default function AdminWorkflowsPage() {
 
   const handleDeleteWorkflow = async (id: string, event: React.MouseEvent) => {
     event.stopPropagation()
-    if (!window.confirm('Delete this workflow?')) return
+    if (!window.confirm(t('workflows.deleteConfirm'))) return
 
     try {
       const res = await fetch(`${BACKEND}/admin/workflows/${id}`, {
         method: 'DELETE',
         headers: authHeaders(),
       })
-      if (!res.ok) throw new Error('Failed to delete workflow.')
-      toast.success('Workflow deleted.')
+      if (!res.ok) throw new Error(t('workflows.deleteFail'))
+      toast.success(t('workflows.deleteSuccess'))
       const fallbackId =
         workflows.find((workflow) => workflow.id !== id)?.id ?? null
       setSelectedId((current) => (current === id ? fallbackId : current))
       await fetchWorkflows()
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to delete workflow.')
+      toast.error(error instanceof Error ? error.message : t('workflows.deleteFail'))
     }
   }
 
   const handleCreateStep = async () => {
     if (!selectedId) return
     if (!stepForm.stepKey.trim() || !stepForm.stepName.trim() || !stepForm.stepOrder) {
-      toast.error('Step key, name and order are required.')
+      toast.error(t('workflows.stepRequired'))
       return
     }
 
@@ -276,14 +278,14 @@ export default function AdminWorkflowsPage() {
         }),
       })
       const data = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(data.message ?? 'Failed to add step.')
-      toast.success('Step added.')
+      if (!res.ok) throw new Error(data.message ?? t('workflows.stepAddFail'))
+      toast.success(t('workflows.stepAdded'))
       setIsCreateStepOpen(false)
       resetStepForm()
       await fetchWorkflowDetail(selectedId)
       await fetchWorkflows()
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to add step.')
+      toast.error(error instanceof Error ? error.message : t('workflows.stepAddFail'))
     } finally {
       setIsSubmitting(false)
     }
@@ -292,7 +294,7 @@ export default function AdminWorkflowsPage() {
   const handleCreateTransition = async () => {
     if (!selectedId) return
     if (!transitionForm.fromStepId) {
-      toast.error('From step is required.')
+      toast.error(t('workflows.fromStepRequired'))
       return
     }
 
@@ -308,13 +310,13 @@ export default function AdminWorkflowsPage() {
         }),
       })
       const data = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(data.message ?? 'Failed to add transition.')
-      toast.success('Transition added.')
+      if (!res.ok) throw new Error(data.message ?? t('workflows.transitionAddFail'))
+      toast.success(t('workflows.transitionAdded'))
       setIsCreateTransitionOpen(false)
       resetTransitionForm(selectedWorkflow)
       await fetchWorkflowDetail(selectedId)
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to add transition.')
+      toast.error(error instanceof Error ? error.message : t('workflows.transitionAddFail'))
     } finally {
       setIsSubmitting(false)
     }
@@ -332,9 +334,9 @@ export default function AdminWorkflowsPage() {
     <div className="mx-auto max-w-7xl p-6 space-y-5">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold text-foreground">Workflow Management</h1>
+          <h1 className="text-xl font-bold text-foreground">{t('workflows.title')}</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Admin can inspect workflow definitions, steps and transitions, and extend approval flows.
+            {t('workflows.subtitle', { count: workflows.length })}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -346,7 +348,7 @@ export default function AdminWorkflowsPage() {
           </Button>
           <Button size="sm" className="gap-1.5" onClick={() => setIsCreateWorkflowOpen(true)}>
             <Plus className="size-3.5" />
-            New Workflow
+            {t('workflows.addWorkflow')}
           </Button>
         </div>
       </div>
@@ -356,7 +358,7 @@ export default function AdminWorkflowsPage() {
           {workflows.length === 0 ? (
             <div className="rounded-lg border border-dashed border-border bg-card p-10 text-center">
               <Workflow className="size-10 text-muted-foreground/30 mx-auto mb-3" />
-              <p className="text-sm font-medium text-foreground">No workflows defined</p>
+              <p className="text-sm font-medium text-foreground">{t('workflows.noWorkflows')}</p>
             </div>
           ) : (
             workflows.map((workflow) => (
@@ -384,7 +386,7 @@ export default function AdminWorkflowsPage() {
                       </p>
                       {workflow.isActive && (
                         <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-xs font-medium text-emerald-700">
-                          Active
+                          {t('common.status')}
                         </span>
                       )}
                     </div>
@@ -420,7 +422,7 @@ export default function AdminWorkflowsPage() {
         <div className="rounded-lg border border-border bg-card shadow-sm">
           {!selectedId || !selectedSummary ? (
             <div className="flex min-h-[28rem] items-center justify-center p-6 text-sm text-muted-foreground">
-              Select a workflow to manage it.
+              {t('workflows.editWorkflow')}
             </div>
           ) : isDetailLoading || !selectedWorkflow ? (
             <div className="flex min-h-[28rem] items-center justify-center p-6">
@@ -477,11 +479,11 @@ export default function AdminWorkflowsPage() {
                 <section className="space-y-4">
                   <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                     {[
-                      ['Request Types', selectedWorkflow.metrics?.requestTypeCount ?? 0],
-                      ['Active Instances', selectedWorkflow.metrics?.activeInstances ?? 0],
-                      ['Completed Instances', selectedWorkflow.metrics?.completedInstances ?? 0],
-                      ['Overdue Instances', selectedWorkflow.metrics?.overdueInstances ?? 0],
-                      ['Total Instances', selectedWorkflow.metrics?.totalInstances ?? 0],
+                      [t('workflows.requestTypes'), selectedWorkflow.metrics?.requestTypeCount ?? 0],
+                      [t('workflows.activeInstances'), selectedWorkflow.metrics?.activeInstances ?? 0],
+                      [t('workflows.completedInstances'), selectedWorkflow.metrics?.completedInstances ?? 0],
+                      [t('workflows.overdueInstances'), selectedWorkflow.metrics?.overdueInstances ?? 0],
+                      [t('workflows.totalInstances'), selectedWorkflow.metrics?.totalInstances ?? 0],
                     ].map(([label, value]) => (
                       <div key={label} className="rounded-lg border border-border bg-muted/20 p-3">
                         <p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
@@ -491,7 +493,7 @@ export default function AdminWorkflowsPage() {
                   </div>
 
                   <div className="space-y-3">
-                    <h3 className="text-sm font-semibold text-foreground">Bound Request Types</h3>
+                    <h3 className="text-sm font-semibold text-foreground">{t('workflows.boundRequestTypes')}</h3>
                     {selectedWorkflow.requestTypes?.length ? (
                       <div className="flex flex-wrap gap-2">
                         {selectedWorkflow.requestTypes.map((type) => (
@@ -501,19 +503,19 @@ export default function AdminWorkflowsPage() {
                         ))}
                       </div>
                     ) : (
-                      <p className="text-sm text-muted-foreground">No request types are attached yet.</p>
+                      <p className="text-sm text-muted-foreground">{t('workflows.noRequestTypesAttached')}</p>
                     )}
                   </div>
 
                   <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-semibold text-foreground">Steps</h3>
+                    <h3 className="text-sm font-semibold text-foreground">{t('workflows.steps')}</h3>
                     <span className="text-xs text-muted-foreground">
-                      {selectedWorkflow.steps.length} total
+                      {selectedWorkflow.steps.length} {t('workflows.total')}
                     </span>
                   </div>
                   <div className="space-y-3">
                     {selectedWorkflow.steps.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">No steps defined yet.</p>
+                      <p className="text-sm text-muted-foreground">{t('workflows.noStepsDefined')}</p>
                     ) : (
                       selectedWorkflow.steps
                         .sort((a, b) => a.stepOrder - b.stepOrder)
@@ -534,20 +536,20 @@ export default function AdminWorkflowsPage() {
                                   {step.stepType}
                                 </span>
                                 <span className="rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
-                                  order {step.stepOrder}
+                                  {t('workflows.order')} {step.stepOrder}
                                 </span>
                               </div>
                               <p className="text-xs font-mono text-muted-foreground">{step.stepKey}</p>
                               <div className="flex flex-wrap gap-2 pt-1 text-xs text-muted-foreground">
-                                {step.assignedRole?.name && <span>Role: {step.assignedRole.name}</span>}
+                                {step.assignedRole?.name && <span>{t('workflows.role')}: {step.assignedRole.name}</span>}
                                 {step.assignedUser && (
                                   <span>
-                                    User: {step.assignedUser.profile?.fullName ?? step.assignedUser.email}
+                                    {t('workflows.user')}: {step.assignedUser.profile?.fullName ?? step.assignedUser.email}
                                   </span>
                                 )}
                                 {step.assignedUnit?.name && (
                                   <span>
-                                    Unit: {step.assignedUnit.name}
+                                    {t('workflows.unit')}: {step.assignedUnit.name}
                                   </span>
                                 )}
                               </div>
@@ -560,24 +562,24 @@ export default function AdminWorkflowsPage() {
 
                 <section className="space-y-4">
                   <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-semibold text-foreground">Transitions</h3>
+                    <h3 className="text-sm font-semibold text-foreground">{t('workflows.transitions')}</h3>
                     <span className="text-xs text-muted-foreground">
-                      {selectedWorkflow.transitions.length} total
+                      {selectedWorkflow.transitions.length} {t('workflows.total')}
                     </span>
                   </div>
                   <div className="space-y-3">
                     {selectedWorkflow.transitions.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">No transitions defined yet.</p>
+                      <p className="text-sm text-muted-foreground">{t('workflows.noTransitionsDefined')}</p>
                     ) : (
                       selectedWorkflow.transitions.map((transition) => (
                         <div key={transition.id} className="rounded-lg border border-border p-4">
                           <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-                            <span>{transition.fromStep?.stepName ?? 'Unknown step'}</span>
+                            <span>{transition.fromStep?.stepName ?? t('workflows.unknownStep')}</span>
                             <ChevronRight className="size-4 text-muted-foreground" />
-                            <span>{transition.toStep?.stepName ?? 'Terminal'}</span>
+                            <span>{transition.toStep?.stepName ?? t('workflows.terminal')}</span>
                           </div>
                           <p className="mt-2 text-xs text-muted-foreground">
-                            Action: {transition.actionType}
+                            {t('workflows.action')}: {transition.actionType}
                           </p>
                         </div>
                       ))
@@ -586,13 +588,13 @@ export default function AdminWorkflowsPage() {
 
                   <div className="space-y-3 pt-4 border-t border-border">
                     <div className="flex items-center justify-between">
-                      <h3 className="text-sm font-semibold text-foreground">Recent Workflow Instances</h3>
+                      <h3 className="text-sm font-semibold text-foreground">{t('workflows.recentInstances')}</h3>
                       <span className="text-xs text-muted-foreground">
-                        {selectedWorkflow.instances.length} shown
+                        {selectedWorkflow.instances.length} {t('workflows.shown')}
                       </span>
                     </div>
                     {selectedWorkflow.instances.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">No workflow instance has started yet.</p>
+                      <p className="text-sm text-muted-foreground">{t('workflows.noInstanceStarted')}</p>
                     ) : (
                       <div className="space-y-3">
                         {selectedWorkflow.instances.map((instance) => (
@@ -603,7 +605,7 @@ export default function AdminWorkflowsPage() {
                                   {instance.request.requestNo} · {instance.request.title}
                                 </p>
                                 <p className="mt-1 text-xs text-muted-foreground">
-                                  Request status: {instance.request.status} · Workflow status: {instance.status}
+                                  {t('workflows.requestStatus')}: {instance.request.status} · {t('workflows.workflowStatus')}: {instance.status}
                                 </p>
                               </div>
                               <span
@@ -614,66 +616,66 @@ export default function AdminWorkflowsPage() {
                                     : 'bg-emerald-50 text-emerald-700',
                                 )}
                               >
-                                {instance.isOverdue ? 'Overdue' : 'On Track'}
+                                {instance.isOverdue ? t('workflows.overdue') : t('workflows.onTrack')}
                               </span>
                             </div>
 
                             <div className="grid gap-3 sm:grid-cols-2">
                               <div className="rounded-md bg-muted/30 p-3 text-xs text-muted-foreground space-y-1">
-                                <p>Requester: <span className="text-foreground">{instance.request.requesterName}</span></p>
-                                <p>Current Assignee: <span className="text-foreground">{instance.request.currentAssigneeName ?? 'Unassigned'}</span></p>
-                                <p>Current Step: <span className="text-foreground">{instance.currentStep?.stepName ?? 'Terminal'}</span></p>
-                                <p>Started At: <span className="text-foreground">{formatDate(instance.startedAt)}</span></p>
+                                <p>{t('workflows.requester')}: <span className="text-foreground">{instance.request.requesterName}</span></p>
+                                <p>{t('workflows.currentAssignee')}: <span className="text-foreground">{instance.request.currentAssigneeName ?? t('workflows.unassigned')}</span></p>
+                                <p>{t('workflows.currentStep')}: <span className="text-foreground">{instance.currentStep?.stepName ?? t('workflows.terminal')}</span></p>
+                                <p>{t('workflows.startedAt')}: <span className="text-foreground">{formatDate(instance.startedAt)}</span></p>
                               </div>
                               <div className="rounded-md bg-muted/30 p-3 text-xs text-muted-foreground space-y-1">
-                                <p>Total Age: <span className="text-foreground">{formatDuration(instance.totalAgeMinutes)}</span></p>
-                                <p>Current Step Age: <span className="text-foreground">{formatDuration(instance.currentStepAgeMinutes)}</span></p>
-                                <p>Idle For: <span className="text-foreground">{formatDuration(instance.inactiveMinutes)}</span></p>
-                                <p>Ended At: <span className="text-foreground">{formatDate(instance.endedAt)}</span></p>
+                                <p>{t('workflows.totalAge')}: <span className="text-foreground">{formatDuration(instance.totalAgeMinutes)}</span></p>
+                                <p>{t('workflows.currentStepAge')}: <span className="text-foreground">{formatDuration(instance.currentStepAgeMinutes)}</span></p>
+                                <p>{t('workflows.idleFor')}: <span className="text-foreground">{formatDuration(instance.inactiveMinutes)}</span></p>
+                                <p>{t('workflows.endedAt')}: <span className="text-foreground">{formatDate(instance.endedAt)}</span></p>
                               </div>
                             </div>
 
                             {instance.request.sla && (
                               <div className="rounded-md border border-border p-3 text-xs text-muted-foreground space-y-1">
-                                <p>SLA Due At: <span className="text-foreground">{formatDate(instance.request.sla.dueAt)}</span></p>
-                                <p>First Response: <span className="text-foreground">{instance.request.sla.firstResponseState ?? 'N/A'}</span></p>
-                                <p>Resolution: <span className="text-foreground">{instance.request.sla.resolutionState ?? 'N/A'}</span></p>
-                                <p>Escalated: <span className="text-foreground">{instance.request.sla.escalationTriggered ? 'Yes' : 'No'}</span></p>
-                                <p>Step Overdues: <span className="text-foreground">{instance.request.sla.stepOverdueCount ?? 0}</span></p>
+                                <p>{t('workflows.slaDueAt')}: <span className="text-foreground">{formatDate(instance.request.sla.dueAt)}</span></p>
+                                <p>{t('workflows.firstResponse')}: <span className="text-foreground">{instance.request.sla.firstResponseState ?? 'N/A'}</span></p>
+                                <p>{t('workflows.resolution')}: <span className="text-foreground">{instance.request.sla.resolutionState ?? 'N/A'}</span></p>
+                                <p>{t('workflows.escalated')}: <span className="text-foreground">{instance.request.sla.escalationTriggered ? t('common.yes') : t('common.no')}</span></p>
+                                <p>{t('workflows.stepOverdues')}: <span className="text-foreground">{instance.request.sla.stepOverdueCount ?? 0}</span></p>
                               </div>
                             )}
 
                             {instance.activeAssignment && (
                               <div className="rounded-md border border-border p-3 text-xs text-muted-foreground space-y-1">
                                 <p>
-                                  Assigned To: <span className="text-foreground">{instance.activeAssignment.assignedToName}</span>
+                                  {t('workflows.assignedTo')}: <span className="text-foreground">{instance.activeAssignment.assignedToName}</span>
                                 </p>
                                 <p>
-                                  Assigned By: <span className="text-foreground">{instance.activeAssignment.assignedByName ?? 'System'}</span>
+                                  {t('workflows.assignedBy')}: <span className="text-foreground">{instance.activeAssignment.assignedByName ?? t('common.system')}</span>
                                 </p>
                                 <p>
-                                  Assigned At: <span className="text-foreground">{formatDate(instance.activeAssignment.assignedAt)}</span>
+                                  {t('workflows.assignedAt')}: <span className="text-foreground">{formatDate(instance.activeAssignment.assignedAt)}</span>
                                 </p>
                                 <p>
-                                  Assignment Age: <span className="text-foreground">{formatDuration(instance.activeAssignment.assignedAgeMinutes)}</span>
+                                  {t('workflows.assignmentAge')}: <span className="text-foreground">{formatDuration(instance.activeAssignment.assignedAgeMinutes)}</span>
                                 </p>
                               </div>
                             )}
 
                             {instance.request.ticketLifecycle && (
                               <div className="rounded-md border border-border p-3 text-xs text-muted-foreground space-y-1">
-                                <p>Ticket Status: <span className="text-foreground">{instance.request.ticketLifecycle.status}</span></p>
-                                <p>Opened By: <span className="text-foreground">{instance.request.ticketLifecycle.openedBy ?? 'N/A'}</span></p>
-                                <p>Opened At: <span className="text-foreground">{formatDate(instance.request.ticketLifecycle.openedAt)}</span></p>
-                                <p>Resolved By: <span className="text-foreground">{instance.request.ticketLifecycle.resolvedBy ?? 'N/A'}</span></p>
-                                <p>Resolved At: <span className="text-foreground">{formatDate(instance.request.ticketLifecycle.resolvedAt)}</span></p>
-                                <p>Closed At: <span className="text-foreground">{formatDate(instance.request.ticketLifecycle.closedAt)}</span></p>
+                                <p>{t('workflows.ticketStatus')}: <span className="text-foreground">{instance.request.ticketLifecycle.status}</span></p>
+                                <p>{t('workflows.openedBy')}: <span className="text-foreground">{instance.request.ticketLifecycle.openedBy ?? 'N/A'}</span></p>
+                                <p>{t('workflows.openedAt')}: <span className="text-foreground">{formatDate(instance.request.ticketLifecycle.openedAt)}</span></p>
+                                <p>{t('workflows.resolvedBy')}: <span className="text-foreground">{instance.request.ticketLifecycle.resolvedBy ?? 'N/A'}</span></p>
+                                <p>{t('workflows.resolvedAt')}: <span className="text-foreground">{formatDate(instance.request.ticketLifecycle.resolvedAt)}</span></p>
+                                <p>{t('workflows.closedAt')}: <span className="text-foreground">{formatDate(instance.request.ticketLifecycle.closedAt)}</span></p>
                               </div>
                             )}
 
                             <div className="space-y-2">
                               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                                Step Timeline
+                                {t('workflows.stepTimeline')}
                               </p>
                               <div className="space-y-2">
                                 {instance.instanceSteps.map((step) => (
@@ -696,16 +698,16 @@ export default function AdminWorkflowsPage() {
                                       </span>
                                     </div>
                                     <div className="mt-2 grid gap-1 sm:grid-cols-2">
-                                      <p>Type: <span className="text-foreground">{step.workflowStep.stepType}</span></p>
-                                      <p>Assigned To: <span className="text-foreground">{step.assignedTo?.fullName ?? 'Queue'}</span></p>
-                                      <p>Started: <span className="text-foreground">{formatDate(step.startedAt)}</span></p>
-                                      <p>Due: <span className="text-foreground">{formatDate(step.dueAt)}</span></p>
-                                      <p>Completed: <span className="text-foreground">{formatDate(step.completedAt)}</span></p>
-                                      <p>Action: <span className="text-foreground">{step.actionTaken ?? 'Pending'}</span></p>
+                                      <p>{t('common.type')}: <span className="text-foreground">{step.workflowStep.stepType}</span></p>
+                                      <p>{t('workflows.assignedTo')}: <span className="text-foreground">{step.assignedTo?.fullName ?? 'Queue'}</span></p>
+                                      <p>{t('workflows.colStarted')}: <span className="text-foreground">{formatDate(step.startedAt)}</span></p>
+                                      <p>{t('workflows.due')}: <span className="text-foreground">{formatDate(step.dueAt)}</span></p>
+                                      <p>{t('workflows.completed')}: <span className="text-foreground">{formatDate(step.completedAt)}</span></p>
+                                      <p>{t('workflows.action')}: <span className="text-foreground">{step.actionTaken ?? t('workflows.pending')}</span></p>
                                     </div>
                                     {step.actionBy && (
                                       <p className="mt-2">
-                                        Action By: <span className="text-foreground">{step.actionBy.fullName}</span>
+                                        {t('workflows.actionBy')}: <span className="text-foreground">{step.actionBy.fullName}</span>
                                       </p>
                                     )}
                                   </div>
@@ -716,7 +718,7 @@ export default function AdminWorkflowsPage() {
                             {instance.approvalTimeline.length > 0 && (
                               <div className="space-y-2">
                                 <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                                  Approval Timeline
+                                  {t('workflows.approvalTimeline')}
                                 </p>
                                 <div className="space-y-2">
                                   {instance.approvalTimeline.slice(0, 3).map((action) => (
@@ -748,11 +750,11 @@ export default function AdminWorkflowsPage() {
       <Dialog open={isCreateWorkflowOpen} onOpenChange={setIsCreateWorkflowOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>New Workflow Definition</DialogTitle>
+            <DialogTitle>{t('workflows.addWorkflow')}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-1.5">
-              <Label>Key *</Label>
+              <Label>{t('workflows.colName')} *</Label>
               <Input
                 value={workflowForm.key}
                 onChange={(event) =>
@@ -761,11 +763,11 @@ export default function AdminWorkflowsPage() {
                     key: event.target.value.toUpperCase().replace(/\s/g, '_'),
                   }))
                 }
-                placeholder="INTERNSHIP_APPROVAL"
+                placeholder={t('workflows.keyPlaceholder')}
               />
             </div>
             <div className="space-y-1.5">
-              <Label>Name *</Label>
+              <Label>{t('common.name')} *</Label>
               <Input
                 value={workflowForm.name}
                 onChange={(event) =>
@@ -774,7 +776,7 @@ export default function AdminWorkflowsPage() {
               />
             </div>
             <div className="space-y-1.5">
-              <Label>Description</Label>
+              <Label>{t('common.description')}</Label>
               <Input
                 value={workflowForm.description}
                 onChange={(event) =>
@@ -785,11 +787,11 @@ export default function AdminWorkflowsPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsCreateWorkflowOpen(false)} disabled={isSubmitting}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button onClick={handleCreateWorkflow} disabled={isSubmitting}>
               {isSubmitting && <Loader2 className="mr-2 size-4 animate-spin" />}
-              Create
+              {t('common.save')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -798,11 +800,11 @@ export default function AdminWorkflowsPage() {
       <Dialog open={isCreateStepOpen} onOpenChange={setIsCreateStepOpen}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Add Workflow Step</DialogTitle>
+            <DialogTitle>{t('workflows.colSteps')}</DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-2 sm:grid-cols-2">
             <div className="space-y-1.5">
-              <Label>Step Key *</Label>
+              <Label>{t('workflows.searchPlaceholder')} *</Label>
               <Input
                 value={stepForm.stepKey}
                 onChange={(event) =>
@@ -850,7 +852,7 @@ export default function AdminWorkflowsPage() {
               </select>
             </div>
             <div className="space-y-1.5">
-              <Label>Assigned Role</Label>
+              <Label>{t('workflows.assignedRole')}</Label>
               <select
                 value={stepForm.assignedRoleId}
                 onChange={(event) =>
@@ -858,7 +860,7 @@ export default function AdminWorkflowsPage() {
                 }
                 className="w-full rounded-md border border-input bg-background px-3 h-9 text-sm"
               >
-                <option value="">None</option>
+                <option value="">{t('workflows.none')}</option>
                 {roles.map((role) => (
                   <option key={role.id} value={role.id}>
                     {role.name}
@@ -867,7 +869,7 @@ export default function AdminWorkflowsPage() {
               </select>
             </div>
             <div className="space-y-1.5">
-              <Label>Assigned User</Label>
+              <Label>{t('workflows.assignedUser')}</Label>
               <select
                 value={stepForm.assignedUserId}
                 onChange={(event) =>
@@ -875,7 +877,7 @@ export default function AdminWorkflowsPage() {
                 }
                 className="w-full rounded-md border border-input bg-background px-3 h-9 text-sm"
               >
-                <option value="">None</option>
+                <option value="">{t('workflows.none')}</option>
                 {users.map((user) => (
                   <option key={user.id} value={user.id}>
                     {user.name} ({user.email})
@@ -884,7 +886,7 @@ export default function AdminWorkflowsPage() {
               </select>
             </div>
             <div className="space-y-1.5">
-              <Label>Assigned Unit</Label>
+              <Label>{t('workflows.assignedUnit')}</Label>
               <select
                 value={stepForm.assignedUnitId}
                 onChange={(event) =>
@@ -892,7 +894,7 @@ export default function AdminWorkflowsPage() {
                 }
                 className="w-full rounded-md border border-input bg-background px-3 h-9 text-sm"
               >
-                <option value="">None</option>
+                <option value="">{t('workflows.none')}</option>
                 {units.map((unit) => (
                   <option key={unit.id} value={unit.id}>
                     {unit.name}
@@ -901,7 +903,7 @@ export default function AdminWorkflowsPage() {
               </select>
             </div>
             <div className="space-y-1.5">
-              <Label>SLA Hours</Label>
+              <Label>{t('workflows.slaHours')}</Label>
               <Input
                 type="number"
                 min="0"
@@ -914,11 +916,11 @@ export default function AdminWorkflowsPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsCreateStepOpen(false)} disabled={isSubmitting}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button onClick={handleCreateStep} disabled={isSubmitting}>
               {isSubmitting && <Loader2 className="mr-2 size-4 animate-spin" />}
-              Add Step
+              {t('common.save')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -927,7 +929,7 @@ export default function AdminWorkflowsPage() {
       <Dialog open={isCreateTransitionOpen} onOpenChange={setIsCreateTransitionOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Add Transition</DialogTitle>
+            <DialogTitle>{t('workflows.colActions')}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-1.5">
@@ -939,7 +941,7 @@ export default function AdminWorkflowsPage() {
                 }
                 className="w-full rounded-md border border-input bg-background px-3 h-9 text-sm"
               >
-                <option value="">Select step</option>
+                <option value="">{t('workflows.selectStep')}</option>
                 {selectedWorkflow?.steps.map((step) => (
                   <option key={step.id} value={step.id}>
                     {step.stepName}
@@ -964,7 +966,7 @@ export default function AdminWorkflowsPage() {
               </select>
             </div>
             <div className="space-y-1.5">
-              <Label>To Step</Label>
+              <Label>{t('workflows.toStep')}</Label>
               <select
                 value={transitionForm.toStepId}
                 onChange={(event) =>
@@ -972,7 +974,7 @@ export default function AdminWorkflowsPage() {
                 }
                 className="w-full rounded-md border border-input bg-background px-3 h-9 text-sm"
               >
-                <option value="">Terminal / No next step</option>
+                <option value="">{t('workflows.terminalNoNext')}</option>
                 {selectedWorkflow?.steps.map((step) => (
                   <option key={step.id} value={step.id}>
                     {step.stepName}
@@ -983,11 +985,11 @@ export default function AdminWorkflowsPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsCreateTransitionOpen(false)} disabled={isSubmitting}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button onClick={handleCreateTransition} disabled={isSubmitting}>
               {isSubmitting && <Loader2 className="mr-2 size-4 animate-spin" />}
-              Add Transition
+              {t('common.save')}
             </Button>
           </DialogFooter>
         </DialogContent>

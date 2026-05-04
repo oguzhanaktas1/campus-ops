@@ -12,6 +12,7 @@ import {
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { getToken } from '@/lib/auth'
+import { useI18n } from '@/lib/i18n'
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -68,7 +69,8 @@ function ChartCard({ title, children, className }: { title: string; children: Re
 }
 
 function EmptyChart() {
-  return <div className="flex items-center justify-center h-[200px] text-sm text-muted-foreground">No data available.</div>
+  const { t } = useI18n()
+  return <div className="flex items-center justify-center h-[200px] text-sm text-muted-foreground">{t('common.noData')}</div>
 }
 
 function PieLegend({ data }: { data: { type: string; count: number; color: string }[] }) {
@@ -92,6 +94,7 @@ function PieLegend({ data }: { data: { type: string; count: number; color: strin
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function AdminAnalyticsPage() {
+  const { t } = useI18n()
   const [data,       setData]       = useState<any>(null)
   const [loading,    setLoading]    = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -141,10 +144,10 @@ export default function AdminAnalyticsPage() {
   }))
 
   const TABS: { key: Tab; label: string }[] = [
-    { key: 'overview',    label: 'Overview'    },
-    { key: 'requests',    label: 'Requests'    },
-    { key: 'tickets',     label: 'Tickets'     },
-    { key: 'operations',  label: 'Operations'  },
+    { key: 'overview',    label: t('analytics.tabOverview')    },
+    { key: 'requests',    label: t('analytics.tabRequests')    },
+    { key: 'tickets',     label: t('analytics.tabTickets')     },
+    { key: 'operations',  label: t('analytics.tabOperations')  },
   ]
 
   return (
@@ -153,12 +156,12 @@ export default function AdminAnalyticsPage() {
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold text-foreground">Analytics</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Platform-wide metrics and performance insights.</p>
+          <h1 className="text-xl font-bold text-foreground">{t('analytics.title')}</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">{t('analytics.subtitle')}</p>
         </div>
         <Button size="sm" variant="outline" className="gap-1.5 h-8 text-xs" onClick={() => void fetchData(true)} disabled={refreshing}>
           <RefreshCw className={cn('size-3.5', refreshing && 'animate-spin')} />
-          Refresh
+          {t('analytics.refresh')}
         </Button>
       </div>
 
@@ -184,14 +187,14 @@ export default function AdminAnalyticsPage() {
       {tab === 'overview' && (
         <>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <KpiCard label="Total Requests"  value={(d.totalRequests  ?? 0).toLocaleString()} sub="All time"         icon={<FileText  className="size-4" />} />
-            <KpiCard label="Total Users"     value={(d.totalUsers     ?? 0).toLocaleString()} sub={`${d.activeUsers ?? 0} active`} icon={<Users className="size-4" />} />
-            <KpiCard label="Open Tickets"    value={d.openTickets ?? 0}  sub={`of ${d.totalTickets ?? 0} total`} icon={<Ticket className="size-4" />} accent={(d.openTickets ?? 0) > 0 ? 'text-red-600' : undefined} />
-            <KpiCard label="Approval Rate"   value={`${d.approvalRate ?? 0}%`} icon={<CheckSquare className="size-4" />} accent={(d.approvalRate ?? 0) >= 70 ? 'text-emerald-600' : 'text-amber-600'} />
+            <KpiCard label={t('analytics.totalRequests')}  value={(d.totalRequests  ?? 0).toLocaleString()} sub={t('analytics.allTime')}         icon={<FileText  className="size-4" />} />
+            <KpiCard label={t('analytics.activeUsers')}    value={(d.totalUsers     ?? 0).toLocaleString()} sub={`${d.activeUsers ?? 0} ${t('analytics.registeredUsers')}`} icon={<Users className="size-4" />} />
+            <KpiCard label={t('analytics.openTickets')}    value={d.openTickets ?? 0}  sub={`of ${d.totalTickets ?? 0} total`} icon={<Ticket className="size-4" />} accent={(d.openTickets ?? 0) > 0 ? 'text-red-600' : undefined} />
+            <KpiCard label={t('analytics.approvalRate')}   value={`${d.approvalRate ?? 0}%`} icon={<CheckSquare className="size-4" />} accent={(d.approvalRate ?? 0) >= 70 ? 'text-emerald-600' : 'text-amber-600'} />
           </div>
 
           <div className="grid lg:grid-cols-3 gap-5">
-            <ChartCard title="Requests by Status" className="lg:col-span-2">
+            <ChartCard title={t('analytics.requestsByStatus')} className="lg:col-span-2">
               {requestsByStatus.length > 0 ? (
                 <ResponsiveContainer width="100%" height={230}>
                   <BarChart data={requestsByStatus} barSize={20}>
@@ -199,7 +202,7 @@ export default function AdminAnalyticsPage() {
                     <XAxis dataKey="status" tick={{ fontSize: 10 }} axisLine={false} tickLine={false}
                       tickFormatter={(v) => v.replace(/_/g, ' ').slice(0, 12)} />
                     <YAxis tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
-                    <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8 }} formatter={(v) => [v, 'Requests']} />
+                    <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8 }} formatter={(v) => [v, t('analytics.tabRequests')]} />
                     <Bar dataKey="count" radius={[4, 4, 0, 0]}>
                       {requestsByStatus.map((e, i) => <Cell key={i} fill={STATUS_COLORS[e.status] ?? '#6366f1'} />)}
                     </Bar>
@@ -208,7 +211,7 @@ export default function AdminAnalyticsPage() {
               ) : <EmptyChart />}
             </ChartCard>
 
-            <ChartCard title="Status Distribution">
+            <ChartCard title={t('analytics.requestsByStatus')}>
               {reqPieData.length > 0 ? (
                 <>
                   <ResponsiveContainer width="100%" height={160}>
@@ -226,7 +229,7 @@ export default function AdminAnalyticsPage() {
           </div>
 
           {weekTrend.length > 0 && (
-            <ChartCard title="Weekly Activity Trend">
+            <ChartCard title={t('analytics.requestTrend')}>
               <ResponsiveContainer width="100%" height={200}>
                 <AreaChart data={weekTrend}>
                   <defs>
@@ -244,8 +247,8 @@ export default function AdminAnalyticsPage() {
                   <YAxis tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
                   <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8 }} />
                   <Legend wrapperStyle={{ fontSize: 12 }} />
-                  <Area type="monotone" dataKey="Requests" stroke="#6366f1" fill="url(#gReq)" strokeWidth={2} dot={false} />
-                  <Area type="monotone" dataKey="Tickets"  stroke="#ef4444" fill="url(#gTkt)" strokeWidth={2} dot={false} />
+                  <Area type="monotone" dataKey="Requests" name={t('analytics.tabRequests')} stroke="#6366f1" fill="url(#gReq)" strokeWidth={2} dot={false} />
+                  <Area type="monotone" dataKey="Tickets"  name={t('analytics.tabTickets')}  stroke="#ef4444" fill="url(#gTkt)" strokeWidth={2} dot={false} />
                 </AreaChart>
               </ResponsiveContainer>
             </ChartCard>
@@ -257,14 +260,14 @@ export default function AdminAnalyticsPage() {
       {tab === 'requests' && (
         <>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <KpiCard label="Total"     value={(d.totalRequests  ?? 0).toLocaleString()} icon={<FileText   className="size-4" />} />
-            <KpiCard label="Open"      value={d.openRequests    ?? 0} icon={<Activity   className="size-4" />} accent={(d.openRequests ?? 0) > 0 ? 'text-amber-600' : undefined} />
-            <KpiCard label="Overdue"   value={d.overdueRequests ?? 0} icon={<TrendingUp  className="size-4" />} accent={(d.overdueRequests ?? 0) > 0 ? 'text-red-600' : undefined} />
-            <KpiCard label="Avg. Resolution" value={d.avgResolutionDays != null ? `${d.avgResolutionDays}d` : '—'} sub="days to close" icon={<Clock className="size-4" />} />
+            <KpiCard label={t('analytics.totalRequests')}     value={(d.totalRequests  ?? 0).toLocaleString()} icon={<FileText   className="size-4" />} />
+            <KpiCard label={t('analytics.openRequests')}      value={d.openRequests    ?? 0} icon={<Activity   className="size-4" />} accent={(d.openRequests ?? 0) > 0 ? 'text-amber-600' : undefined} />
+            <KpiCard label={t('analytics.pendingApproval')}   value={d.overdueRequests ?? 0} icon={<TrendingUp  className="size-4" />} accent={(d.overdueRequests ?? 0) > 0 ? 'text-red-600' : undefined} />
+            <KpiCard label={t('analytics.avgResolutionTime')} value={d.avgResolutionDays != null ? `${d.avgResolutionDays}d` : '—'} sub={t('analytics.hours')} icon={<Clock className="size-4" />} />
           </div>
 
           <div className="grid lg:grid-cols-2 gap-5">
-            <ChartCard title="By Status — Bar">
+            <ChartCard title={t('analytics.requestsByStatus')}>
               {requestsByStatus.length > 0 ? (
                 <ResponsiveContainer width="100%" height={230}>
                   <BarChart data={requestsByStatus} layout="vertical" barSize={14} margin={{ left: 80 }}>
@@ -280,7 +283,7 @@ export default function AdminAnalyticsPage() {
               ) : <EmptyChart />}
             </ChartCard>
 
-            <ChartCard title="By Type — Distribution">
+            <ChartCard title={t('analytics.requestsByType')}>
               {typePieData.length > 0 ? (
                 <>
                   <ResponsiveContainer width="100%" height={160}>
@@ -298,7 +301,7 @@ export default function AdminAnalyticsPage() {
           </div>
 
           {requestsByType.length > 0 && (
-            <ChartCard title="Requests by Type — Volume">
+            <ChartCard title={t('analytics.requestsByType')}>
               <ResponsiveContainer width="100%" height={230}>
                 <BarChart data={requestsByType.slice(0, 10)} barSize={20}>
                   <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.88 0.01 264 / 0.6)" />
@@ -306,7 +309,7 @@ export default function AdminAnalyticsPage() {
                     tickFormatter={(v) => v.slice(0, 14)} />
                   <YAxis tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
                   <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8 }} />
-                  <Bar dataKey="count" name="Requests" radius={[4, 4, 0, 0]}>
+                  <Bar dataKey="count" name={t('analytics.tabRequests')} radius={[4, 4, 0, 0]}>
                     {requestsByType.slice(0, 10).map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
                   </Bar>
                 </BarChart>
@@ -320,13 +323,13 @@ export default function AdminAnalyticsPage() {
       {tab === 'tickets' && (
         <>
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-            <KpiCard label="Total Tickets"   value={(d.totalTickets ?? 0).toLocaleString()} icon={<Ticket className="size-4" />} />
-            <KpiCard label="Open Tickets"    value={d.openTickets   ?? 0} icon={<Activity className="size-4" />} accent={(d.openTickets ?? 0) > 0 ? 'text-red-600' : undefined} />
-            <KpiCard label="Resolved"        value={Math.max(0, (d.totalTickets ?? 0) - (d.openTickets ?? 0))} icon={<CheckSquare className="size-4" />} accent="text-emerald-600" />
+            <KpiCard label={t('analytics.totalTickets')}    value={(d.totalTickets ?? 0).toLocaleString()} icon={<Ticket className="size-4" />} />
+            <KpiCard label={t('analytics.openTickets')}     value={d.openTickets   ?? 0} icon={<Activity className="size-4" />} accent={(d.openTickets ?? 0) > 0 ? 'text-red-600' : undefined} />
+            <KpiCard label={t('analytics.resolvedTickets')} value={Math.max(0, (d.totalTickets ?? 0) - (d.openTickets ?? 0))} icon={<CheckSquare className="size-4" />} accent="text-emerald-600" />
           </div>
 
           <div className="grid lg:grid-cols-2 gap-5">
-            <ChartCard title="Ticket Status — Bar">
+            <ChartCard title={t('analytics.ticketsByStatus')}>
               {ticketsByStatus.length > 0 ? (
                 <ResponsiveContainer width="100%" height={230}>
                   <BarChart data={ticketsByStatus} barSize={20}>
@@ -334,7 +337,7 @@ export default function AdminAnalyticsPage() {
                     <XAxis dataKey="status" tick={{ fontSize: 10 }} axisLine={false} tickLine={false}
                       tickFormatter={(v) => v.replace(/_/g, ' ')} />
                     <YAxis tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
-                    <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8 }} formatter={(v) => [v, 'Tickets']} />
+                    <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8 }} formatter={(v) => [v, t('analytics.tabTickets')]} />
                     <Bar dataKey="count" radius={[4, 4, 0, 0]}>
                       {ticketsByStatus.map((e, i) => <Cell key={i} fill={STATUS_COLORS[e.status] ?? PIE_COLORS[i % PIE_COLORS.length]} />)}
                     </Bar>
@@ -343,7 +346,7 @@ export default function AdminAnalyticsPage() {
               ) : <EmptyChart />}
             </ChartCard>
 
-            <ChartCard title="Ticket Status — Breakdown">
+            <ChartCard title={t('analytics.ticketsByStatus')}>
               {tktPieData.length > 0 ? (
                 <>
                   <ResponsiveContainer width="100%" height={160}>
@@ -366,14 +369,14 @@ export default function AdminAnalyticsPage() {
       {tab === 'operations' && (
         <>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <KpiCard label="Reservations"  value={(d.totalReservations  ?? 0).toLocaleString()} icon={<BookMarked   className="size-4" />} />
-            <KpiCard label="Appointments"  value={(d.totalAppointments  ?? 0).toLocaleString()} icon={<CalendarDays  className="size-4" />} />
-            <KpiCard label="Today's Res."  value={d.todayReservations   ?? 0} icon={<BookMarked  className="size-4" />} />
-            <KpiCard label="Today's Appt." value={d.todayAppointments   ?? 0} icon={<CalendarDays className="size-4" />} />
+            <KpiCard label={t('analytics.totalReservations')}  value={(d.totalReservations  ?? 0).toLocaleString()} icon={<BookMarked   className="size-4" />} />
+            <KpiCard label={t('analytics.totalAppointments')}  value={(d.totalAppointments  ?? 0).toLocaleString()} icon={<CalendarDays  className="size-4" />} />
+            <KpiCard label={t('analytics.requestsThisMonth')}  value={d.todayReservations   ?? 0} icon={<BookMarked  className="size-4" />} />
+            <KpiCard label={t('analytics.totalAppointments')}  value={d.todayAppointments   ?? 0} icon={<CalendarDays className="size-4" />} />
           </div>
 
           <div className="grid lg:grid-cols-2 gap-5">
-            <ChartCard title="Operations Summary">
+            <ChartCard title={t('analytics.totalRequests')}>
               <ResponsiveContainer width="100%" height={230}>
                 <BarChart
                   data={[
@@ -397,13 +400,13 @@ export default function AdminAnalyticsPage() {
               </ResponsiveContainer>
             </ChartCard>
 
-            <ChartCard title="User Activity">
+            <ChartCard title={t('analytics.activeUsers')}>
               <div className="space-y-4 mt-2">
                 {[
-                  { label: 'Total Users',   value: d.totalUsers  ?? 0, max: d.totalUsers  ?? 1, color: 'bg-primary' },
-                  { label: 'Active Users',  value: d.activeUsers ?? 0, max: d.totalUsers  ?? 1, color: 'bg-emerald-500' },
-                  { label: 'Open Requests', value: d.openRequests ?? 0, max: d.totalRequests ?? 1, color: 'bg-amber-500' },
-                  { label: 'Overdue',       value: d.overdueRequests ?? 0, max: d.totalRequests ?? 1, color: 'bg-red-500' },
+                  { label: t('analytics.registeredUsers'), value: d.totalUsers  ?? 0, max: d.totalUsers  ?? 1, color: 'bg-primary' },
+                  { label: t('analytics.activeUsers'),     value: d.activeUsers ?? 0, max: d.totalUsers  ?? 1, color: 'bg-emerald-500' },
+                  { label: t('analytics.openRequests'),    value: d.openRequests ?? 0, max: d.totalRequests ?? 1, color: 'bg-amber-500' },
+                  { label: t('analytics.pendingApproval'), value: d.overdueRequests ?? 0, max: d.totalRequests ?? 1, color: 'bg-red-500' },
                 ].map((item) => (
                   <div key={item.label} className="space-y-1.5">
                     <div className="flex justify-between text-xs">

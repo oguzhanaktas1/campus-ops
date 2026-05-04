@@ -12,11 +12,13 @@ import {
   getCurrentDateInputValue,
   validateDateWindow,
 } from '@/lib/date-time'
+import { useI18n } from '@/lib/i18n'
 
 const ACCESS_TYPES = ['System / Portal', 'Lab Access', 'Network Resource', 'Software License', 'Campus Area', 'Other']
 
 export default function OrganizerNewAccessRequestPage() {
   const router = useRouter()
+  const { t } = useI18n()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [dateError, setDateError] = useState<string | null>(null)
   const minDate = getCurrentDateInputValue()
@@ -47,7 +49,7 @@ export default function OrganizerNewAccessRequestPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!form.targetResource.trim() || !form.justification.trim()) {
-      toast.error('Target resource and justification are required.')
+      toast.error(t('pages.accessRequired'))
       return
     }
     const validationError = validateDateWindow({
@@ -76,10 +78,10 @@ export default function OrganizerNewAccessRequestPage() {
       })
       if (!res.ok) throw new Error()
       const data = await res.json()
-      toast.success(`Access request ${data.requestNo} submitted.`)
+      toast.success(t('pages.accessSubmitted', { requestNo: data.requestNo }))
       router.push('/organizer/access-requests')
     } catch {
-      toast.error('Failed to submit access request.')
+      toast.error(t('pages.accessSubmitFail'))
     } finally {
       setIsSubmitting(false)
     }
@@ -88,53 +90,53 @@ export default function OrganizerNewAccessRequestPage() {
   return (
     <div className="p-6 max-w-2xl mx-auto pb-20">
       <div className="mb-6">
-        <h1 className="text-xl font-bold flex items-center gap-2"><ShieldCheck className="size-5 text-primary" /> New Access Request</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">Request access to a system, lab, or campus resource.</p>
+        <h1 className="text-xl font-bold flex items-center gap-2"><ShieldCheck className="size-5 text-primary" /> {t('pages.newAccessRequest')}</h1>
+        <p className="text-sm text-muted-foreground mt-0.5">{t('pages.newAccessSubtitle')}</p>
       </div>
 
       <form onSubmit={handleSubmit} className="bg-card border border-border rounded-xl shadow-sm p-6 space-y-5">
         <div className="grid sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">
-            <Label>Access Type</Label>
+            <Label>{t('pages.accessType')}</Label>
             <select value={form.accessType} onChange={(e) => set('accessType', e.target.value)}
               className="w-full bg-background border border-input rounded-md px-3 h-9 text-sm outline-none focus:ring-2 focus:ring-ring">
               {ACCESS_TYPES.map((t) => <option key={t}>{t}</option>)}
             </select>
           </div>
           <div className="space-y-1.5">
-            <Label>Target Resource / System <span className="text-destructive">*</span></Label>
-            <Input placeholder="e.g. Research Lab 301, MATLAB Portal" value={form.targetResource} onChange={(e) => set('targetResource', e.target.value)} />
+            <Label>{t('pages.targetResource')} <span className="text-destructive">*</span></Label>
+            <Input placeholder={t('pages.targetResourcePlaceholder')} value={form.targetResource} onChange={(e) => set('targetResource', e.target.value)} />
           </div>
         </div>
 
         <div className="space-y-1.5">
-          <Label>Requested Role / Permission (optional)</Label>
-          <Input placeholder="e.g. Read-only, Student access" value={form.requestedRoleOrPermission} onChange={(e) => set('requestedRoleOrPermission', e.target.value)} />
+          <Label>{t('pages.requestedRole')}</Label>
+          <Input placeholder={t('pages.requestedRolePlaceholder')} value={form.requestedRoleOrPermission} onChange={(e) => set('requestedRoleOrPermission', e.target.value)} />
         </div>
 
         <div className="grid sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">
-            <Label>Access Start Date (optional)</Label>
+            <Label>{t('pages.accessStartDate')}</Label>
             <Input type="date" min={minDate} value={form.startAt} onChange={(e) => setDateField('startAt', e.target.value)} />
           </div>
           <div className="space-y-1.5">
-            <Label>Access End Date (optional)</Label>
+            <Label>{t('pages.accessEndDate')}</Label>
             <Input type="date" min={form.startAt || minDate} value={form.endAt} onChange={(e) => setDateField('endAt', e.target.value)} />
           </div>
         </div>
         {dateError && <p className="text-sm text-destructive">{dateError}</p>}
 
         <div className="space-y-1.5">
-          <Label>Justification <span className="text-destructive">*</span></Label>
+          <Label>{t('pages.justification')} <span className="text-destructive">*</span></Label>
           <textarea value={form.justification} onChange={(e) => set('justification', e.target.value)} rows={4}
-            placeholder="Explain why you need this access..."
+            placeholder={t('pages.justificationPlaceholder')}
             className="w-full bg-background border border-input rounded-md px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring resize-none" />
         </div>
 
         <div className="flex justify-end gap-3 pt-2">
-          <Button type="button" variant="outline" onClick={() => router.back()}>Cancel</Button>
+          <Button type="button" variant="outline" onClick={() => router.back()}>{t('common.cancel')}</Button>
           <Button type="submit" disabled={isSubmitting} className="gap-2">
-            {isSubmitting && <Loader2 className="size-4 animate-spin" />} Submit Request
+            {isSubmitting && <Loader2 className="size-4 animate-spin" />} {t('common.newRequest')}
           </Button>
         </div>
       </form>

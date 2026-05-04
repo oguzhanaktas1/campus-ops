@@ -17,6 +17,7 @@ import {
   Clock,
 } from 'lucide-react'
 import { getToken } from '@/lib/auth'
+import { useI18n } from '@/lib/i18n'
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000'
 
@@ -25,15 +26,16 @@ function formatDate(d: string | null) {
   return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
-const STOCK_STATUS_CONFIG: Record<string, { label: string; className: string }> = {
-  IN_STOCK:        { label: 'In Stock',       className: 'text-emerald-600 bg-emerald-50 border-emerald-200' },
-  LOW_STOCK:       { label: 'Low Stock',       className: 'text-amber-600 bg-amber-50 border-amber-200' },
-  OUT_OF_STOCK:    { label: 'Out of Stock',    className: 'text-destructive bg-destructive/5 border-destructive/20' },
-  PROCUREMENT_REQ: { label: 'Needs Procurement', className: 'text-blue-600 bg-blue-50 border-blue-200' },
+const STOCK_STATUS_CONFIG: Record<string, { labelKey: string; className: string }> = {
+  IN_STOCK:        { labelKey: 'pages.inStock',       className: 'text-emerald-600 bg-emerald-50 border-emerald-200' },
+  LOW_STOCK:       { labelKey: 'pages.lowStock',       className: 'text-amber-600 bg-amber-50 border-amber-200' },
+  OUT_OF_STOCK:    { labelKey: 'pages.outOfStock',    className: 'text-destructive bg-destructive/5 border-destructive/20' },
+  PROCUREMENT_REQ: { labelKey: 'pages.needsProcurement', className: 'text-blue-600 bg-blue-50 border-blue-200' },
 }
 
 export default function StaffEquipmentPage() {
   const router = useRouter()
+  const { t } = useI18n()
   const [requests, setRequests] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -80,9 +82,9 @@ export default function StaffEquipmentPage() {
     <div className="p-6 space-y-5 max-w-6xl mx-auto">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold text-foreground">Equipment Requests</h1>
+          <h1 className="text-xl font-bold text-foreground">{t('pages.equipmentRequests')}</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {requests.length} open equipment requests in queue.
+            {t('pages.equipmentSubtitle', { count: requests.length })}
           </p>
         </div>
       </div>
@@ -90,10 +92,10 @@ export default function StaffEquipmentPage() {
       {/* Quick stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {[
-          { label: 'Total Open', value: counts.total, icon: <Package className="size-4" />, className: '' },
-          { label: 'In Stock', value: counts.withStock, icon: <CheckCircle2 className="size-4" />, className: 'text-emerald-600' },
-          { label: 'Needs Procurement', value: counts.needsProcurement, icon: <AlertCircle className="size-4" />, className: 'text-amber-600' },
-          { label: 'High Priority', value: counts.urgent, icon: <Clock className="size-4" />, className: counts.urgent > 0 ? 'text-destructive' : '' },
+          { label: t('pages.totalOpen'), value: counts.total, icon: <Package className="size-4" />, className: '' },
+          { label: t('pages.inStock'), value: counts.withStock, icon: <CheckCircle2 className="size-4" />, className: 'text-emerald-600' },
+          { label: t('pages.needsProcurement'), value: counts.needsProcurement, icon: <AlertCircle className="size-4" />, className: 'text-amber-600' },
+          { label: t('pages.highPriority'), value: counts.urgent, icon: <Clock className="size-4" />, className: counts.urgent > 0 ? 'text-destructive' : '' },
         ].map((s) => (
           <div key={s.label} className="bg-card border border-border rounded-lg p-4">
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1">{s.icon}{s.label}</div>
@@ -106,7 +108,7 @@ export default function StaffEquipmentPage() {
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
         <Input
-          placeholder="Search by equipment, category, or requester..."
+          placeholder={t('pages.equipmentSearchPlaceholder')}
           className="pl-9"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -119,7 +121,7 @@ export default function StaffEquipmentPage() {
           <div className="text-center py-12">
             <Boxes className="size-8 text-muted-foreground/40 mx-auto mb-3" />
             <p className="text-sm text-muted-foreground">
-              {search ? 'No matching equipment requests.' : 'No open equipment requests.'}
+              {search ? t('pages.noMatchingEquipment') : t('pages.noOpenEquipment')}
             </p>
           </div>
         ) : (
@@ -127,7 +129,16 @@ export default function StaffEquipmentPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border bg-muted/40">
-                  {['Equipment', 'Category', 'Qty', 'Requester', 'Needed From', 'Stock', 'Status', ''].map((h) => (
+                  {[
+                    t('pages.equipment'),
+                    t('common.category'),
+                    t('pages.qty'),
+                    t('common.requester'),
+                    t('pages.neededFrom'),
+                    t('pages.stock'),
+                    t('common.status'),
+                    '',
+                  ].map((h) => (
                     <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground">{h}</th>
                   ))}
                 </tr>
@@ -165,13 +176,13 @@ export default function StaffEquipmentPage() {
                       <td className="px-4 py-3.5">
                         {stockCfg ? (
                           <span className={cn('text-[10px] font-bold px-2 py-0.5 rounded border', stockCfg.className)}>
-                            {stockCfg.label}
+                            {t(stockCfg.labelKey)}
                           </span>
                         ) : (
                           <span className="text-xs text-muted-foreground">—</span>
                         )}
                         {req.procurementRequired && (
-                          <p className="text-[10px] text-amber-600 mt-0.5 font-medium">Procurement req.</p>
+                          <p className="text-[10px] text-amber-600 mt-0.5 font-medium">{t('pages.procurementReq')}</p>
                         )}
                       </td>
                       <td className="px-4 py-3.5">

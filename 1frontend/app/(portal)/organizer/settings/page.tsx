@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Loader2, Lock, User, Shield } from 'lucide-react'
 import { toast } from 'sonner'
 import { fetchProfile, getStoredUser, getToken } from '@/lib/auth'
+import { useI18n } from '@/lib/i18n'
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
 
@@ -16,16 +17,18 @@ function ProfileField({
   label,
   value,
   wide = false,
+  multiline = false,
 }: {
   label: string
   value: string
   wide?: boolean
+  multiline?: boolean
 }) {
   const isEmpty = !value
   return (
     <div className={`space-y-1.5 ${wide ? 'sm:col-span-2' : ''}`}>
       <Label className="text-xs text-muted-foreground">{label}</Label>
-      {label === 'Bio' || label === 'Address' ? (
+      {multiline ? (
         <Textarea
           value={isEmpty ? '—' : value}
           readOnly
@@ -43,6 +46,7 @@ function ProfileField({
 }
 
 export default function OrganizerSettingsPage() {
+  const { t } = useI18n()
   const [user, setUser] = useState<any>(null)
   const [preferences, setPreferences] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -71,14 +75,14 @@ export default function OrganizerSettingsPage() {
         setUser(profile)
         if (prefsRes.ok) setPreferences(await prefsRes.json())
       } catch {
-        toast.error('Failed to load settings.')
+        toast.error(t('pages.settingsLoadFail'))
       } finally {
         setIsLoading(false)
       }
     }
 
     void fetchSettings()
-  }, [])
+  }, [t])
 
   const handlePreferenceChange = async (key: string, checked: boolean) => {
     setPreferences((prev: any) => ({ ...prev, [key]: checked }))
@@ -93,9 +97,9 @@ export default function OrganizerSettingsPage() {
         body: JSON.stringify({ [key]: checked }),
       })
       if (!res.ok) throw new Error()
-      toast.success('Preference updated.')
+      toast.success(t('pages.preferenceUpdated'))
     } catch {
-      toast.error('Failed to update preference.')
+      toast.error(t('pages.preferenceUpdateFail'))
       setPreferences((prev: any) => ({ ...prev, [key]: !checked }))
     }
   }
@@ -103,7 +107,7 @@ export default function OrganizerSettingsPage() {
   const handlePasswordChange = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!passwords.currentPassword || !passwords.newPassword) {
-      toast.error('Please fill in all fields.')
+      toast.error(t('pages.fillAllFields'))
       return
     }
 
@@ -122,10 +126,10 @@ export default function OrganizerSettingsPage() {
         const error = await res.json()
         throw new Error(error.message)
       }
-      toast.success('Password changed!')
+      toast.success(t('pages.passwordChanged'))
       setPasswords({ currentPassword: '', newPassword: '' })
     } catch (err: any) {
-      toast.error(err.message || 'Failed.')
+      toast.error(err.message || t('common.failed'))
     } finally {
       setIsChangingPassword(false)
     }
@@ -144,9 +148,9 @@ export default function OrganizerSettingsPage() {
   return (
     <div className="p-6 max-w-2xl mx-auto space-y-6">
       <div>
-        <h1 className="text-xl font-bold text-foreground">Settings</h1>
+        <h1 className="text-xl font-bold text-foreground">{t('common.settings')}</h1>
         <p className="text-sm text-muted-foreground mt-0.5">
-          Your profile and account preferences
+          {t('pages.settingsSubtitle')}
         </p>
       </div>
 
@@ -154,10 +158,10 @@ export default function OrganizerSettingsPage() {
         <div className="p-5 space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
-              <User className="size-4 text-primary" /> Profile Information
+              <User className="size-4 text-primary" /> {t('pages.profileInformation')}
             </h2>
             <span className="text-[10px] text-muted-foreground flex items-center gap-1 bg-muted px-2 py-1 rounded">
-              <Lock className="size-3" /> Managed by University
+              <Lock className="size-3" /> {t('pages.managedByUniversity')}
             </span>
           </div>
 
@@ -176,39 +180,39 @@ export default function OrganizerSettingsPage() {
           )}
 
           <div className="grid sm:grid-cols-2 gap-4">
-            <ProfileField label="First Name" value={user.firstName} />
-            <ProfileField label="Last Name" value={user.lastName} />
-            <ProfileField label="Email" value={user.email} />
-            <ProfileField label="Staff Number" value={user.staffNumber || user.staffId} />
-            <ProfileField label="Faculty" value={user.faculty} />
-            <ProfileField label="Department" value={user.department} />
-            <ProfileField label="Title" value={user.title} />
-            <ProfileField label="Phone Number" value={user.phoneNumber} />
-            <ProfileField label="Address" value={user.address} wide />
-            <ProfileField label="Bio" value={user.bio} wide />
+            <ProfileField label={t('pages.firstName')} value={user.firstName} />
+            <ProfileField label={t('pages.lastName')} value={user.lastName} />
+            <ProfileField label={t('pages.email')} value={user.email} />
+            <ProfileField label={t('pages.staffNumber')} value={user.staffNumber || user.staffId} />
+            <ProfileField label={t('pages.faculty')} value={user.faculty} />
+            <ProfileField label={t('pages.department')} value={user.department} />
+            <ProfileField label={t('pages.titleLabel')} value={user.title} />
+            <ProfileField label={t('pages.phoneNumber')} value={user.phoneNumber} />
+            <ProfileField label={t('pages.address')} value={user.address} wide multiline />
+            <ProfileField label={t('pages.bio')} value={user.bio} wide multiline />
           </div>
         </div>
 
         <div className="p-5 space-y-4">
           <h2 className="text-sm font-semibold text-foreground">
-            Notification Preferences
+            {t('pages.notificationPreferences')}
           </h2>
           <div className="space-y-4">
             {[
               {
                 key: 'emailEnabled',
-                label: 'Email Notifications',
-                desc: 'Receive updates via email',
+                label: t('pages.emailNotifications'),
+                desc: t('pages.emailNotificationsDesc'),
               },
               {
                 key: 'inAppEnabled',
-                label: 'In-App Notifications',
-                desc: 'Notifications inside the portal',
+                label: t('pages.inAppNotifications'),
+                desc: t('pages.inAppNotificationsDesc'),
               },
               {
                 key: 'reminderEmailEnabled',
-                label: 'Event Reminders',
-                desc: 'Email reminder before events',
+                label: t('pages.eventReminders'),
+                desc: t('pages.eventRemindersDesc'),
               },
             ].map(({ key, label, desc }) => (
               <div key={key} className="flex items-center justify-between">
@@ -227,12 +231,12 @@ export default function OrganizerSettingsPage() {
 
         <div className="p-5 space-y-4">
           <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
-            <Shield className="size-4" /> Change Password
+            <Shield className="size-4" /> {t('pages.changePassword')}
           </h2>
           <form onSubmit={handlePasswordChange} className="space-y-4">
             <div className="grid sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <Label>Current Password</Label>
+                <Label>{t('pages.currentPassword')}</Label>
                 <Input
                   type="password"
                   placeholder="********"
@@ -246,7 +250,7 @@ export default function OrganizerSettingsPage() {
                 />
               </div>
               <div className="space-y-1.5">
-                <Label>New Password</Label>
+                <Label>{t('pages.newPassword')}</Label>
                 <Input
                   type="password"
                   placeholder="********"
@@ -269,7 +273,7 @@ export default function OrganizerSettingsPage() {
               {isChangingPassword && (
                 <Loader2 className="size-4 animate-spin mr-2" />
               )}
-              Update Password
+              {t('pages.updatePassword')}
             </Button>
           </form>
         </div>

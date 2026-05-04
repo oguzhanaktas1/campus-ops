@@ -5,11 +5,12 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { CalendarRange, Clock, Users, MapPin, CheckCircle2, Clock3, XCircle, Plus } from 'lucide-react'
 import { useReservations } from '@/lib/hooks'
+import { useI18n } from '@/lib/i18n'
 
 const statusConfig = {
-  confirmed: { label: 'Confirmed', icon: CheckCircle2, className: 'text-emerald-600 bg-emerald-50 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400' },
-  pending: { label: 'Pending', icon: Clock3, className: 'text-amber-600 bg-amber-50 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400' },
-  cancelled: { label: 'Cancelled', icon: XCircle, className: 'text-red-600 bg-red-50 border-red-200 dark:bg-red-950/30 dark:text-red-400' },
+  confirmed: { icon: CheckCircle2, className: 'text-emerald-600 bg-emerald-50 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400' },
+  pending: { icon: Clock3, className: 'text-amber-600 bg-amber-50 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400' },
+  cancelled: { icon: XCircle, className: 'text-red-600 bg-red-50 border-red-200 dark:bg-red-950/30 dark:text-red-400' },
 }
 
 function formatDate(d: string) {
@@ -19,6 +20,7 @@ function formatDate(d: string) {
 }
 
 export default function StaffRoomsPage() {
+  const { t } = useI18n()
   const { reservations, confirmed, pending } = useReservations('staff')
   const [activeTab, setActiveTab] = useState<'all' | 'confirmed' | 'pending'>('all')
 
@@ -28,14 +30,14 @@ export default function StaffRoomsPage() {
     <div className="p-6 space-y-5 max-w-5xl mx-auto">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold text-foreground">Room Management</h1>
+          <h1 className="text-xl font-bold text-foreground">{t('pages.roomManagement')}</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Review and manage room reservation requests.
+            {t('pages.roomsSubtitle')}
           </p>
         </div>
         <Button size="sm" className="gap-1.5">
           <Plus className="size-3.5" />
-          New Reservation
+          {t('pages.newReservation')}
         </Button>
       </div>
 
@@ -43,32 +45,32 @@ export default function StaffRoomsPage() {
       <div className="grid grid-cols-3 gap-4">
         <div className="bg-card border border-border rounded-lg p-4 text-center">
           <p className="text-2xl font-bold text-foreground">{reservations.length}</p>
-          <p className="text-xs text-muted-foreground mt-1">Total This Week</p>
+          <p className="text-xs text-muted-foreground mt-1">{t('pages.totalThisWeek')}</p>
         </div>
         <div className="bg-card border border-border rounded-lg p-4 text-center">
           <p className="text-2xl font-bold text-emerald-600">{confirmed.length}</p>
-          <p className="text-xs text-muted-foreground mt-1">Confirmed</p>
+          <p className="text-xs text-muted-foreground mt-1">{t('pages.confirmed')}</p>
         </div>
         <div className="bg-card border border-border rounded-lg p-4 text-center">
           <p className="text-2xl font-bold text-amber-600">{pending.length}</p>
-          <p className="text-xs text-muted-foreground mt-1">Pending Approval</p>
+          <p className="text-xs text-muted-foreground mt-1">{t('pages.pendingApproval')}</p>
         </div>
       </div>
 
       {/* Tabs */}
       <div className="flex items-center gap-1 border-b border-border">
-        {(['all', 'confirmed', 'pending'] as const).map((t) => (
+        {(['all', 'confirmed', 'pending'] as const).map((tab) => (
           <button
-            key={t}
-            onClick={() => setActiveTab(t)}
+            key={tab}
+            onClick={() => setActiveTab(tab)}
             className={cn(
               'px-4 py-2.5 text-sm font-medium capitalize transition-colors border-b-2 -mb-px',
-              activeTab === t
+              activeTab === tab
                 ? 'border-primary text-primary'
                 : 'border-transparent text-muted-foreground hover:text-foreground'
             )}
           >
-            {t === 'all' ? 'All' : statusConfig[t].label}
+            {tab === 'all' ? t('common.all') : tab === 'confirmed' ? t('pages.confirmed') : t('common.pending')}
           </button>
         ))}
       </div>
@@ -87,7 +89,7 @@ export default function StaffRoomsPage() {
                 </div>
                 <span className={cn('flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-md border', cfg.className)}>
                   <StatusIcon className="size-3" />
-                  {cfg.label}
+                  {res.status === 'confirmed' ? t('pages.confirmed') : res.status === 'pending' ? t('common.pending') : t('common.cancelled')}
                 </span>
               </div>
               <div className="space-y-1.5 text-xs text-muted-foreground">
@@ -101,7 +103,7 @@ export default function StaffRoomsPage() {
                 </div>
                 <div className="flex items-center gap-1.5">
                   <Users className="size-3.5 flex-shrink-0" />
-                  <span>Capacity: {res.capacity}</span>
+                  <span>{t('pages.capacity', { count: res.capacity })}</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <MapPin className="size-3.5 flex-shrink-0" />
@@ -114,10 +116,10 @@ export default function StaffRoomsPage() {
               {res.status === 'pending' && (
                 <div className="flex items-center gap-2 pt-1">
                   <Button size="sm" variant="outline" className="flex-1 h-7 text-xs border-destructive/30 text-destructive hover:bg-destructive/10">
-                    Decline
+                    {t('pages.decline')}
                   </Button>
                   <Button size="sm" className="flex-1 h-7 text-xs">
-                    Approve
+                    {t('common.approve')}
                   </Button>
                 </div>
               )}

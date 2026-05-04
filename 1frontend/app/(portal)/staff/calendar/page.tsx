@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
+import { useI18n } from '@/lib/i18n'
 
 interface CalendarEvent {
   id: string
@@ -37,6 +38,7 @@ const MONTH_NAMES = [
 ]
 
 export default function StaffCalendarPage() {
+  const { t } = useI18n()
   const [events, setEvents] = useState<CalendarEvent[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [currentDate, setCurrentDate] = useState(new Date())
@@ -54,11 +56,11 @@ export default function StaffCalendarPage() {
       const data = await res.json()
       setEvents(Array.isArray(data) ? data : [])
     } catch {
-      toast.error('Failed to load calendar data.')
+      toast.error(t('pages.calendarLoadFail'))
     } finally {
       setIsLoading(false)
     }
-  }, [backendUrl])
+  }, [backendUrl, t])
 
   useEffect(() => { fetchEvents() }, [fetchEvents])
 
@@ -109,7 +111,7 @@ export default function StaffCalendarPage() {
       link.click()
       URL.revokeObjectURL(url)
     } catch {
-      toast.error('Failed to export ICS.')
+      toast.error(t('pages.calendarExportFail'))
     }
   }
 
@@ -126,20 +128,20 @@ export default function StaffCalendarPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
-            <CalendarIcon className="size-5 text-primary" /> Calendar
+            <CalendarIcon className="size-5 text-primary" /> {t('nav.calendar')}
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Appointments and reservations in one operational view.
+            {t('pages.calendarSubtitle')}
           </p>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" className="gap-2" onClick={downloadIcs}>
             <Download className="size-4" />
-            Export ICS
+            {t('pages.exportIcs')}
           </Button>
           <div className="flex items-center gap-2 bg-card border border-border p-1.5 rounded-lg shadow-sm">
             <Button variant="ghost" size="sm" onClick={() => setCurrentDate(new Date())} className="text-xs font-semibold">
-              Today
+              {t('pages.today')}
             </Button>
             <div className="w-px h-4 bg-border" />
             <Button variant="ghost" size="icon" onClick={() => setCurrentDate(new Date(year, month - 1, 1))} className="size-8">
@@ -205,12 +207,12 @@ export default function StaffCalendarPage() {
         <div className="flex flex-col gap-6">
           <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
             <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-4">
-              Event Details
+              {t('pages.eventDetails')}
             </h2>
             {!selectedEvent ? (
               <div className="flex flex-col items-center justify-center text-center gap-2 opacity-40 py-8">
                 <CalendarIcon className="size-8" />
-                <p className="text-xs">Click an item to see details</p>
+                <p className="text-xs">{t('pages.clickItemDetails')}</p>
               </div>
             ) : (
               <div className="space-y-3">
@@ -238,7 +240,7 @@ export default function StaffCalendarPage() {
           <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                Upcoming
+                {t('pages.upcoming')}
               </h2>
               <span className="bg-primary/10 text-primary px-2 py-0.5 rounded-full text-[10px] font-medium">
                 {upcoming.length}
@@ -246,7 +248,7 @@ export default function StaffCalendarPage() {
             </div>
             <div className="space-y-2 max-h-[300px] overflow-y-auto">
               {upcoming.length === 0 ? (
-                <p className="text-xs text-muted-foreground text-center py-6">No upcoming events</p>
+                <p className="text-xs text-muted-foreground text-center py-6">{t('pages.noUpcomingEvents')}</p>
               ) : (
                 upcoming.map((event) => (
                   <button

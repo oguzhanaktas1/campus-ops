@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/dialog'
 import { Search, Plus, Pencil, Trash2, Loader2, Building2 } from 'lucide-react'
 import { toast } from 'sonner'
+import { useI18n } from '@/lib/i18n'
 
 interface Campus {
   id: string
@@ -25,6 +26,7 @@ interface Campus {
 const EMPTY_FORM = { name: '', code: '', address: '', isActive: true }
 
 export default function CampusesPage() {
+  const { t } = useI18n()
   const [campuses, setCampuses] = useState<Campus[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -42,14 +44,14 @@ export default function CampusesPage() {
         headers: { Authorization: `Bearer ${token}` },
       })
       if (res.ok) setCampuses(await res.json())
-      else toast.error('Failed to load campuses')
+      else toast.error(t('organization.saveFail'))
     } catch (error) {
       console.error('API Error:', error)
-      toast.error('Failed to load campuses')
+      toast.error(t('organization.saveFail'))
     } finally {
       setIsLoading(false)
     }
-  }, [backendUrl])
+  }, [backendUrl, t])
 
   useEffect(() => { fetchCampuses() }, [fetchCampuses])
 
@@ -67,7 +69,7 @@ export default function CampusesPage() {
 
   const handleSave = async () => {
     if (!form.name.trim() || !form.code.trim()) {
-      toast.error('Name and code are required')
+      toast.error(t('common.required'))
       return
     }
     setIsSaving(true)
@@ -83,23 +85,23 @@ export default function CampusesPage() {
         body: JSON.stringify(form),
       })
       if (res.ok) {
-        toast.success(editingItem ? 'Campus updated!' : 'Campus created!')
+        toast.success(t('organization.saveSuccess'))
         setDialogOpen(false)
         fetchCampuses()
       } else {
         const err = await res.json().catch(() => ({}))
-        toast.error((err as { message?: string }).message || 'Failed to save campus')
+        toast.error((err as { message?: string }).message || t('organization.saveFail'))
       }
     } catch (error) {
       console.error('Save error:', error)
-      toast.error('Failed to save campus')
+      toast.error(t('organization.saveFail'))
     } finally {
       setIsSaving(false)
     }
   }
 
   const handleDelete = async (campus: Campus) => {
-    if (!window.confirm(`Are you sure you want to delete "${campus.name}"? This cannot be undone.`)) return
+    if (!window.confirm(t('organization.confirmDelete', { name: campus.name }))) return
     try {
       const token = localStorage.getItem('access_token')
       const res = await fetch(`${backendUrl}/admin/campuses/${campus.id}`, {
@@ -107,14 +109,14 @@ export default function CampusesPage() {
         headers: { Authorization: `Bearer ${token}` },
       })
       if (res.ok) {
-        toast.success('Campus deleted!')
+        toast.success(t('organization.deleteSuccess'))
         fetchCampuses()
       } else {
-        toast.error('Failed to delete campus')
+        toast.error(t('organization.deleteFail'))
       }
     } catch (error) {
       console.error('Delete error:', error)
-      toast.error('Failed to delete campus')
+      toast.error(t('organization.deleteFail'))
     }
   }
 
@@ -135,46 +137,43 @@ export default function CampusesPage() {
 
   return (
     <div className="p-6 space-y-5 max-w-6xl mx-auto pb-20">
-      {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold text-foreground">Campus Management</h1>
+          <h1 className="text-xl font-bold text-foreground">{t('organization.campusesTitle')}</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {campuses.length} campus{campuses.length !== 1 ? 'es' : ''} registered in the system.
+            {t('organization.campusesSubtitle', { count: campuses.length })}
           </p>
         </div>
         <Button size="sm" className="gap-1.5" onClick={openAdd}>
-          <Plus className="size-3.5" /> Add Campus
+          <Plus className="size-3.5" /> {t('organization.addCampus')}
         </Button>
       </div>
 
-      {/* Search + Stats bar */}
       <div className="flex items-center gap-4 bg-card border border-border p-3 rounded-lg shadow-sm">
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
           <Input
-            placeholder="Search campuses by name, code or address..."
+            placeholder={t('common.search')}
             className="pl-9 h-9"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
         <div className="flex items-center gap-4 text-sm ml-auto">
-          <span className="font-medium text-emerald-600">{campuses.filter((c) => c.isActive).length} Active</span>
-          <span className="font-medium text-muted-foreground">{campuses.filter((c) => !c.isActive).length} Inactive</span>
+          <span className="font-medium text-emerald-600">{campuses.filter((c) => c.isActive).length} {t('common.active')}</span>
+          <span className="font-medium text-muted-foreground">{campuses.filter((c) => !c.isActive).length} {t('common.inactive')}</span>
         </div>
       </div>
 
-      {/* Table */}
       <div className="bg-card border border-border rounded-lg shadow-sm overflow-hidden">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border bg-muted/40">
-              <th className="px-5 py-3 text-left font-semibold text-muted-foreground">Campus</th>
-              <th className="px-5 py-3 text-left font-semibold text-muted-foreground hidden md:table-cell">Code</th>
-              <th className="px-5 py-3 text-left font-semibold text-muted-foreground hidden lg:table-cell">Address</th>
-              <th className="px-5 py-3 text-left font-semibold text-muted-foreground">Status</th>
-              <th className="px-5 py-3 text-right font-semibold text-muted-foreground">Actions</th>
+              <th className="px-5 py-3 text-left font-semibold text-muted-foreground">{t('organization.campusName')}</th>
+              <th className="px-5 py-3 text-left font-semibold text-muted-foreground hidden md:table-cell">{t('organization.campusCode')}</th>
+              <th className="px-5 py-3 text-left font-semibold text-muted-foreground hidden lg:table-cell">{t('organization.campusLocation')}</th>
+              <th className="px-5 py-3 text-left font-semibold text-muted-foreground">{t('common.status')}</th>
+              <th className="px-5 py-3 text-right font-semibold text-muted-foreground">{t('common.actions')}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
@@ -199,11 +198,11 @@ export default function CampusesPage() {
                 <td className="px-5 py-3.5">
                   {campus.isActive ? (
                     <span className="px-2 py-1 rounded-md bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 text-[10px] font-bold tracking-wider">
-                      ACTIVE
+                      {t('common.active').toUpperCase()}
                     </span>
                   ) : (
                     <span className="px-2 py-1 rounded-md bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300 border border-gray-200 dark:border-gray-700 text-[10px] font-bold tracking-wider">
-                      INACTIVE
+                      {t('common.inactive').toUpperCase()}
                     </span>
                   )}
                 </td>
@@ -229,45 +228,41 @@ export default function CampusesPage() {
         {filtered.length === 0 && (
           <div className="text-center py-12">
             <Building2 className="size-8 text-muted-foreground/40 mx-auto mb-3" />
-            <p className="text-sm text-muted-foreground">No campuses found.</p>
+            <p className="text-sm text-muted-foreground">{t('organization.noCampuses')}</p>
           </div>
         )}
       </div>
 
-      {/* Add / Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>{editingItem ? 'Edit Campus' : 'Add Campus'}</DialogTitle>
+            <DialogTitle>{editingItem ? t('organization.editCampus') : t('organization.addCampus')}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-1.5">
               <Label htmlFor="campus-name">
-                Name <span className="text-destructive">*</span>
+                {t('organization.campusName')} <span className="text-destructive">*</span>
               </Label>
               <Input
                 id="campus-name"
-                placeholder="e.g. North Campus"
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
               />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="campus-code">
-                Code <span className="text-destructive">*</span>
+                {t('organization.campusCode')} <span className="text-destructive">*</span>
               </Label>
               <Input
                 id="campus-code"
-                placeholder="e.g. NC"
                 value={form.code}
                 onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })}
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="campus-address">Address</Label>
+              <Label htmlFor="campus-address">{t('organization.campusLocation')}</Label>
               <Input
                 id="campus-address"
-                placeholder="e.g. 123 University Ave"
                 value={form.address}
                 onChange={(e) => setForm({ ...form, address: e.target.value })}
               />
@@ -292,17 +287,17 @@ export default function CampusesPage() {
                 className="cursor-pointer select-none"
                 onClick={() => setForm({ ...form, isActive: !form.isActive })}
               >
-                {form.isActive ? 'Active' : 'Inactive'}
+                {form.isActive ? t('common.active') : t('common.inactive')}
               </Label>
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={isSaving}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button onClick={handleSave} disabled={isSaving}>
               {isSaving && <Loader2 className="mr-2 size-4 animate-spin" />}
-              {editingItem ? 'Save Changes' : 'Create Campus'}
+              {editingItem ? t('common.save') : t('organization.addCampus')}
             </Button>
           </DialogFooter>
         </DialogContent>

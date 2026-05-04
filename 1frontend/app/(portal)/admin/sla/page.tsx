@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { getToken } from '@/lib/auth'
+import { useI18n } from '@/lib/i18n'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -115,6 +116,7 @@ function Pagination({ page, totalPages, isLoading, onChange }: {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function AdminSLAPage() {
+  const { t } = useI18n()
   const [activeTab, setActiveTab] = useState<'policies' | 'events'>('policies')
 
   // Metrics
@@ -167,7 +169,7 @@ export default function AdminSLAPage() {
       if (polRes.ok) setPoliciesResult(await polRes.json())
       if (rtRes.ok) setRequestTypes(await rtRes.json())
     } catch {
-      toast.error('Failed to load SLA policies.')
+      toast.error(t('sla.saveFail'))
     } finally {
       setPoliciesLoading(false)
     }
@@ -180,7 +182,7 @@ export default function AdminSLAPage() {
       const res = await fetch(`${BACKEND}/admin/sla/events?${params}`, { headers: { Authorization: `Bearer ${getToken()}` } })
       if (res.ok) setEventsResult(await res.json())
     } catch {
-      toast.error('Failed to load SLA events.')
+      toast.error(t('sla.saveFail'))
     } finally {
       setEventsLoading(false)
       setEventsFetched(true)
@@ -233,7 +235,7 @@ export default function AdminSLAPage() {
   }
 
   const handleSave = async () => {
-    if (!form.name.trim()) { toast.error('Policy name is required.'); return }
+    if (!form.name.trim()) { toast.error(t('sla.saveFail')); return }
     setIsSaving(true)
     try {
       const payload = {
@@ -253,12 +255,12 @@ export default function AdminSLAPage() {
         body: JSON.stringify(payload),
       })
       if (!res.ok) throw new Error()
-      toast.success(editTarget ? 'SLA policy updated.' : 'SLA policy created.')
+      toast.success(t('sla.saveSuccess'))
       setShowDialog(false)
       fetchPolicies(policiesPage)
       fetchMetrics()
     } catch {
-      toast.error('Failed to save SLA policy.')
+      toast.error(t('sla.saveFail'))
     } finally {
       setIsSaving(false)
     }
@@ -272,11 +274,11 @@ export default function AdminSLAPage() {
         headers: { Authorization: `Bearer ${getToken()}` },
       })
       if (!res.ok) throw new Error()
-      toast.success('SLA policy deleted.')
+      toast.success(t('sla.deleteSuccess'))
       fetchPolicies(policiesPage)
       fetchMetrics()
     } catch {
-      toast.error('Failed to delete SLA policy.')
+      toast.error(t('sla.deleteFail'))
     } finally {
       setDeletingId(null)
     }
@@ -299,62 +301,62 @@ export default function AdminSLAPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
           <div className="bg-background border border-border rounded-xl p-6 max-w-md w-full shadow-2xl space-y-4">
             <h2 className="text-base font-bold text-foreground">
-              {editTarget ? 'Edit SLA Policy' : 'Add SLA Policy'}
+              {editTarget ? t('sla.editPolicy') : t('sla.addPolicy')}
             </h2>
             <div className="space-y-3">
               <div>
-                <label className="text-xs font-semibold text-muted-foreground mb-1 block">Policy Name *</label>
-                <Input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="e.g. Critical Response SLA" />
+                <label className="text-xs font-semibold text-muted-foreground mb-1 block">{t('sla.policyName')} *</label>
+                <Input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder={t('sla.policyNamePlaceholder')} />
               </div>
               <div>
-                <label className="text-xs font-semibold text-muted-foreground mb-1 block">Request Type</label>
+                <label className="text-xs font-semibold text-muted-foreground mb-1 block">{t('sla.requestType')}</label>
                 <select value={form.requestTypeId} onChange={(e) => setForm((f) => ({ ...f, requestTypeId: e.target.value }))}
                   className="w-full bg-background border border-input rounded-md px-3 h-10 text-sm focus:ring-2 focus:ring-primary outline-none">
-                  <option value="">Any request type</option>
+                  <option value="">{t('sla.anyRequestType')}</option>
                   {requestTypes.map((rt) => <option key={rt.id} value={rt.id}>{rt.name}</option>)}
                 </select>
               </div>
               <div>
-                <label className="text-xs font-semibold text-muted-foreground mb-1 block">Priority</label>
+                <label className="text-xs font-semibold text-muted-foreground mb-1 block">{t('sla.priority')}</label>
                 <select value={form.priority} onChange={(e) => setForm((f) => ({ ...f, priority: e.target.value }))}
                   className="w-full bg-background border border-input rounded-md px-3 h-10 text-sm focus:ring-2 focus:ring-primary outline-none">
-                  <option value="">Any priority</option>
-                  <option value="LOW">Low</option>
-                  <option value="MEDIUM">Medium</option>
-                  <option value="HIGH">High</option>
-                  <option value="URGENT">Urgent</option>
+                  <option value="">{t('sla.anyPriority')}</option>
+                  <option value="LOW">{t('sla.low')}</option>
+                  <option value="MEDIUM">{t('sla.medium')}</option>
+                  <option value="HIGH">{t('sla.high')}</option>
+                  <option value="URGENT">{t('sla.urgent')}</option>
                 </select>
               </div>
               <div className="grid grid-cols-3 gap-3">
                 {[
-                  { label: 'First Response (min)', key: 'firstResponseMinutes' as const },
-                  { label: 'Resolution (min)',     key: 'resolutionMinutes' as const },
-                  { label: 'Escalation (min)',     key: 'escalationMinutes' as const },
+                  { label: t('sla.firstResponseMin'), key: 'firstResponseMinutes' as const },
+                  { label: t('sla.resolutionMin'),     key: 'resolutionMinutes' as const },
+                  { label: t('sla.escalationMin'),     key: 'escalationMinutes' as const },
                 ].map(({ label, key }) => (
                   <div key={key}>
                     <label className="text-xs font-semibold text-muted-foreground mb-1 block">{label}</label>
                     <Input type="number" min="1" value={form[key]}
                       onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
-                      placeholder="e.g. 60" />
+                      placeholder={t('sla.minutesPlaceholder')} />
                   </div>
                 ))}
               </div>
               {(form.firstResponseMinutes || form.resolutionMinutes || form.escalationMinutes) && (
                 <div className="bg-muted/40 rounded-lg px-3 py-2 text-xs text-muted-foreground space-y-1">
-                  {form.firstResponseMinutes && <p>First response: <span className="font-semibold text-foreground">{minutesToHuman(parseInt(form.firstResponseMinutes))}</span></p>}
-                  {form.resolutionMinutes    && <p>Resolution: <span className="font-semibold text-foreground">{minutesToHuman(parseInt(form.resolutionMinutes))}</span></p>}
-                  {form.escalationMinutes    && <p>Escalation: <span className="font-semibold text-foreground">{minutesToHuman(parseInt(form.escalationMinutes))}</span></p>}
+                  {form.firstResponseMinutes && <p>{t('sla.firstResponse')}: <span className="font-semibold text-foreground">{minutesToHuman(parseInt(form.firstResponseMinutes))}</span></p>}
+                  {form.resolutionMinutes    && <p>{t('sla.resolution')}: <span className="font-semibold text-foreground">{minutesToHuman(parseInt(form.resolutionMinutes))}</span></p>}
+                  {form.escalationMinutes    && <p>{t('sla.escalation')}: <span className="font-semibold text-foreground">{minutesToHuman(parseInt(form.escalationMinutes))}</span></p>}
                 </div>
               )}
               <div className="flex items-center gap-2">
                 <input type="checkbox" id="isActive" checked={form.isActive} onChange={(e) => setForm((f) => ({ ...f, isActive: e.target.checked }))} className="rounded" />
-                <label htmlFor="isActive" className="text-sm text-foreground">Active</label>
+                <label htmlFor="isActive" className="text-sm text-foreground">{t('common.active')}</label>
               </div>
             </div>
             <div className="flex gap-3 pt-2">
-              <Button variant="outline" className="flex-1" onClick={() => setShowDialog(false)} disabled={isSaving}>Cancel</Button>
+              <Button variant="outline" className="flex-1" onClick={() => setShowDialog(false)} disabled={isSaving}>{t('common.cancel')}</Button>
               <Button className="flex-1" onClick={handleSave} disabled={isSaving}>
-                {isSaving ? <Loader2 className="size-4 animate-spin" /> : editTarget ? 'Update' : 'Create Policy'}
+                {isSaving ? <Loader2 className="size-4 animate-spin" /> : t('common.save')}
               </Button>
             </div>
           </div>
@@ -364,12 +366,12 @@ export default function AdminSLAPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold text-foreground">SLA Management</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Define response targets and monitor SLA events.</p>
+          <h1 className="text-xl font-bold text-foreground">{t('sla.title')}</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">{t('sla.subtitle', { count: policiesTotal })}</p>
         </div>
         {activeTab === 'policies' && (
           <Button onClick={openAdd} className="gap-2 self-start">
-            <Plus className="size-4" /> Add Policy
+            <Plus className="size-4" /> {t('sla.addPolicy')}
           </Button>
         )}
       </div>
@@ -384,11 +386,11 @@ export default function AdminSLAPage() {
       ) : metrics && (
         <div className="grid gap-4 md:grid-cols-5">
           {([
-            ['Active Policies',          metrics.activePolicies,          ''],
-            ['First Response Breaches',  metrics.firstResponseBreaches,   metrics.firstResponseBreaches > 0 ? 'text-red-600' : ''],
-            ['Resolution Breaches',      metrics.resolutionBreaches,      metrics.resolutionBreaches > 0 ? 'text-red-600' : ''],
-            ['Escalations',              metrics.escalations,             metrics.escalations > 0 ? 'text-amber-600' : ''],
-            ['Step Overdues',            metrics.stepOverdues,            metrics.stepOverdues > 0 ? 'text-orange-600' : ''],
+            [t('sla.activePolicies'),          metrics.activePolicies,          ''],
+            [t('sla.firstResponseBreaches'),  metrics.firstResponseBreaches,   metrics.firstResponseBreaches > 0 ? 'text-red-600' : ''],
+            [t('sla.resolutionBreaches'),      metrics.resolutionBreaches,      metrics.resolutionBreaches > 0 ? 'text-red-600' : ''],
+            [t('sla.escalations'),              metrics.escalations,             metrics.escalations > 0 ? 'text-amber-600' : ''],
+            [t('sla.stepOverdues'),            metrics.stepOverdues,            metrics.stepOverdues > 0 ? 'text-orange-600' : ''],
           ] as [string, number, string][]).map(([label, value, valClass]) => (
             <div key={label} className="rounded-xl border border-border bg-card p-4 shadow-sm">
               <p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
@@ -401,8 +403,8 @@ export default function AdminSLAPage() {
       {/* Tabs */}
       <div className="flex items-center gap-1 border-b border-border">
         {([
-          { key: 'policies', label: 'SLA Policies',    icon: <ShieldCheck className="size-3.5" />, count: policiesTotal },
-          { key: 'events',   label: 'Recent SLA Events', icon: <Zap className="size-3.5" />,        count: eventsTotal },
+          { key: 'policies', label: t('sla.title'),    icon: <ShieldCheck className="size-3.5" />, count: policiesTotal },
+          { key: 'events',   label: t('sla.eventsTab'), icon: <Zap className="size-3.5" />,        count: eventsTotal },
         ] as const).map((tab) => (
           <button
             key={tab.key}
@@ -429,7 +431,7 @@ export default function AdminSLAPage() {
         <div className="space-y-4">
           {policiesTotal > 0 && (
             <p className="text-sm text-muted-foreground">
-              Showing {policiesStart}–{policiesEnd} of {policiesTotal} policies
+              {t('sla.showingPolicies', { start: policiesStart, end: policiesEnd, total: policiesTotal })}
             </p>
           )}
           <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
@@ -442,14 +444,14 @@ export default function AdminSLAPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border bg-muted/40">
-                    <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Policy Name</th>
-                    <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden sm:table-cell">Request Type</th>
-                    <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Priority</th>
-                    <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden md:table-cell">First Response</th>
-                    <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden md:table-cell">Resolution</th>
-                    <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden lg:table-cell">Escalation</th>
-                    <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden lg:table-cell">Status</th>
-                    <th className="px-5 py-3 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide">Actions</th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">{t('sla.colName')}</th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden sm:table-cell">{t('sla.colAppliesTo')}</th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">{t('sla.colTarget')}</th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden md:table-cell">{t('sla.colTarget')}</th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden md:table-cell">{t('sla.colTarget')}</th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden lg:table-cell">{t('sla.colEscalation')}</th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden lg:table-cell">{t('sla.colTarget')}</th>
+                    <th className="px-5 py-3 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide">{t('common.actions')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
@@ -466,7 +468,7 @@ export default function AdminSLAPage() {
                         {p.priority ? (
                           <span className={cn('text-xs font-semibold px-2.5 py-1 rounded-full border', PRIORITY_BADGE[p.priority] ?? PRIORITY_BADGE.LOW)}>{p.priority}</span>
                         ) : (
-                          <span className="text-xs text-muted-foreground">Any</span>
+                          <span className="text-xs text-muted-foreground">{t('sla.any')}</span>
                         )}
                       </td>
                       <td className="px-5 py-3.5 hidden md:table-cell">
@@ -489,7 +491,7 @@ export default function AdminSLAPage() {
                           p.isActive
                             ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800'
                             : 'bg-slate-50 text-slate-600 border-slate-200 dark:bg-slate-800/30 dark:text-slate-400 dark:border-slate-700')}>
-                          {p.isActive ? 'Active' : 'Inactive'}
+                          {p.isActive ? t('common.active') : t('common.inactive')}
                         </span>
                       </td>
                       <td className="px-5 py-3.5 text-right">
@@ -511,8 +513,7 @@ export default function AdminSLAPage() {
               {!policiesLoading && policies.length === 0 && (
                 <div className="text-center py-16">
                   <ShieldCheck className="size-10 text-muted-foreground/30 mx-auto mb-3" />
-                  <p className="text-sm font-medium text-foreground">No SLA policies defined.</p>
-                  <p className="text-xs text-muted-foreground mt-1">Add a policy to set response time targets.</p>
+                  <p className="text-sm font-medium text-foreground">{t('sla.noSla')}</p>
                 </div>
               )}
             </div>
@@ -526,7 +527,7 @@ export default function AdminSLAPage() {
         <div className="space-y-4">
           {eventsTotal > 0 && (
             <p className="text-sm text-muted-foreground">
-              Showing {eventsStart}–{eventsEnd} of {eventsTotal} events
+              {t('sla.showingEvents', { start: eventsStart, end: eventsEnd, total: eventsTotal })}
             </p>
           )}
           <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
@@ -539,12 +540,12 @@ export default function AdminSLAPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border bg-muted/40">
-                    <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Event</th>
-                    <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden sm:table-cell">Request</th>
-                    <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden md:table-cell">Policy</th>
-                    <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden lg:table-cell">Priority</th>
-                    <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Occurred</th>
-                    <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden lg:table-cell">Resolved</th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">{t('sla.event')}</th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden sm:table-cell">{t('sla.request')}</th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden md:table-cell">{t('sla.policy')}</th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden lg:table-cell">{t('sla.priority')}</th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">{t('sla.occurred')}</th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden lg:table-cell">{t('sla.resolved')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
@@ -587,7 +588,7 @@ export default function AdminSLAPage() {
               {!eventsLoading && eventsFetched && events.length === 0 && (
                 <div className="text-center py-16">
                   <Zap className="size-10 text-muted-foreground/30 mx-auto mb-3" />
-                  <p className="text-sm font-medium text-foreground">No SLA events recorded yet.</p>
+                  <p className="text-sm font-medium text-foreground">{t('sla.noEvents')}</p>
                 </div>
               )}
             </div>

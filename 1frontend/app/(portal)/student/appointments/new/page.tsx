@@ -15,6 +15,7 @@ import {
   getCurrentDateTimeInputValue,
   validateDateWindow,
 } from '@/lib/date-time'
+import { useI18n } from '@/lib/i18n'
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000'
 const APPOINTMENT_TYPES = ['ACADEMIC', 'ADVISING', 'CONSULTATION', 'OFFICE_HOURS', 'OTHER']
@@ -22,6 +23,7 @@ const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
 export default function NewAppointmentPage() {
   const router = useRouter()
+  const { t } = useI18n()
   const [facultyUsers, setFacultyUsers] = useState<any[]>([])
   const [availability, setAvailability] = useState<any[]>([])
   const [isLoadingUsers, setIsLoadingUsers] = useState(true)
@@ -82,9 +84,9 @@ export default function NewAppointmentPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!form.targetUserId) { toast.error('Please select a person.'); return }
-    if (!form.appointmentType) { toast.error('Please select appointment type.'); return }
-    if (!form.topic.trim()) { toast.error('Please enter a topic.'); return }
+    if (!form.targetUserId) { toast.error(t('messages.selectPerson')); return }
+    if (!form.appointmentType) { toast.error(t('messages.selectAppointmentType')); return }
+    if (!form.topic.trim()) { toast.error(t('messages.enterTopic')); return }
     const validationError = validateDateWindow({
       start: form.preferredStartAt,
       end: form.preferredEndAt,
@@ -116,8 +118,8 @@ export default function NewAppointmentPage() {
         }),
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.message || 'Failed to submit.')
-      toast.success('Appointment request submitted!')
+      if (!res.ok) throw new Error(data.message || t('messages.failed'))
+      toast.success(t('messages.appointmentSubmitted'))
       router.push('/student/appointments')
     } catch (err: any) {
       toast.error(err.message)
@@ -137,8 +139,8 @@ export default function NewAppointmentPage() {
           </Button>
         </Link>
         <div>
-          <h1 className="text-xl font-bold text-foreground">Book an Appointment</h1>
-          <p className="text-sm text-muted-foreground">Request a meeting with faculty or staff</p>
+          <h1 className="text-xl font-bold text-foreground">{t('pages.bookAppointmentTitle')}</h1>
+          <p className="text-sm text-muted-foreground">{t('pages.bookAppointmentSubtitle')}</p>
         </div>
       </div>
 
@@ -146,14 +148,14 @@ export default function NewAppointmentPage() {
 
         {/* Target user */}
         <div className="space-y-1.5">
-          <Label>Person <span className="text-destructive">*</span></Label>
+          <Label>{t('forms.person')} <span className="text-destructive">*</span></Label>
           {isLoadingUsers ? (
             <div className="flex items-center gap-2 h-10 text-sm text-muted-foreground">
-              <Loader2 className="size-4 animate-spin" /> Loading...
+              <Loader2 className="size-4 animate-spin" /> {t('common.loading')}
             </div>
           ) : (
             <Select value={form.targetUserId} onValueChange={handleTargetChange}>
-              <SelectTrigger><SelectValue placeholder="Select faculty or staff..." /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder={t('forms.personPlaceholder')} /></SelectTrigger>
               <SelectContent>
                 {facultyUsers.map((u) => (
                   <SelectItem key={u.id} value={u.id}>
@@ -181,7 +183,7 @@ export default function NewAppointmentPage() {
         {availability.length > 0 && (
           <div className="bg-muted/30 border border-border rounded-lg p-3">
             <p className="text-xs font-semibold text-muted-foreground mb-2 flex items-center gap-1.5">
-              <Clock className="size-3.5" /> Availability
+              <Clock className="size-3.5" /> {t('forms.availability')}
             </p>
             <div className="flex flex-wrap gap-2">
               {availability.filter((s) => s.isActive).map((s: any) => (
@@ -199,9 +201,9 @@ export default function NewAppointmentPage() {
         {/* Type + topic */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">
-            <Label>Type <span className="text-destructive">*</span></Label>
+            <Label>{t('forms.type')} <span className="text-destructive">*</span></Label>
             <Select value={form.appointmentType} onValueChange={(v) => set('appointmentType', v)}>
-              <SelectTrigger><SelectValue placeholder="Select type..." /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder={t('forms.typePlaceholder')} /></SelectTrigger>
               <SelectContent>
                 {APPOINTMENT_TYPES.map((t) => (
                   <SelectItem key={t} value={t}>{t.replace('_', ' ')}</SelectItem>
@@ -210,10 +212,10 @@ export default function NewAppointmentPage() {
             </Select>
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="topic">Topic <span className="text-destructive">*</span></Label>
+            <Label htmlFor="topic">{t('forms.topic')} <span className="text-destructive">*</span></Label>
             <Input
               id="topic"
-              placeholder="e.g. Thesis review..."
+              placeholder={t('forms.topicPlaceholder')}
               required
               value={form.topic}
               onChange={(e) => set('topic', e.target.value)}
@@ -224,7 +226,7 @@ export default function NewAppointmentPage() {
         {/* Preferred times */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">
-            <Label htmlFor="preferredStartAt">Preferred Start</Label>
+            <Label htmlFor="preferredStartAt">{t('forms.preferredStart')}</Label>
             <Input
               id="preferredStartAt"
               type="datetime-local"
@@ -234,7 +236,7 @@ export default function NewAppointmentPage() {
             />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="preferredEndAt">Preferred End</Label>
+            <Label htmlFor="preferredEndAt">{t('forms.preferredEnd')}</Label>
             <Input
               id="preferredEndAt"
               type="datetime-local"
@@ -248,10 +250,10 @@ export default function NewAppointmentPage() {
 
         {/* Details */}
         <div className="space-y-1.5">
-          <Label htmlFor="details">Details (optional)</Label>
+          <Label htmlFor="details">{t('forms.detailsOptional')}</Label>
           <Textarea
             id="details"
-            placeholder="Additional context or questions..."
+            placeholder={t('forms.detailsPlaceholder')}
             className="resize-none min-h-[80px]"
             value={form.details}
             onChange={(e) => set('details', e.target.value)}
@@ -261,10 +263,10 @@ export default function NewAppointmentPage() {
         <div className="flex items-center gap-3 pt-4 border-t border-border">
           <Button type="submit" className="flex-1 sm:flex-none gap-2" disabled={isSubmitting}>
             {isSubmitting ? <Loader2 className="size-4 animate-spin" /> : <Calendar className="size-4" />}
-            Submit Request
+            {t('common.submitRequest')}
           </Button>
           <Link href="/student/appointments">
-            <Button type="button" variant="outline">Cancel</Button>
+            <Button type="button" variant="outline">{t('common.cancel')}</Button>
           </Link>
         </div>
       </form>

@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, AlignLeft, Download, Loader2, MapPin } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
+import { useI18n } from '@/lib/i18n'
 
 interface CalendarEvent {
   id: string
@@ -24,6 +25,7 @@ const TYPE_CLASS: Record<string, string> = {
 }
 
 export default function FacultyCalendarPage() {
+  const { t } = useI18n()
   const [events, setEvents] = useState<CalendarEvent[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [currentDate, setCurrentDate] = useState(new Date())
@@ -41,11 +43,11 @@ export default function FacultyCalendarPage() {
       const data = await res.json()
       setEvents(Array.isArray(data) ? data : [])
     } catch {
-      toast.error('Failed to load calendar events')
+      toast.error(t('common.loading'))
     } finally {
       setIsLoading(false)
     }
-  }, [backendUrl])
+  }, [backendUrl, t])
 
   useEffect(() => { fetchEvents() }, [fetchEvents])
 
@@ -60,7 +62,20 @@ export default function FacultyCalendarPage() {
   for (let i = 0; i < offset; i++) daysArray.push(null)
   for (let i = 1; i <= daysInMonth; i++) daysArray.push(new Date(year, month, i))
 
-  const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
+  const monthNames = [
+    t('calendar.months.0'),
+    t('calendar.months.1'),
+    t('calendar.months.2'),
+    t('calendar.months.3'),
+    t('calendar.months.4'),
+    t('calendar.months.5'),
+    t('calendar.months.6'),
+    t('calendar.months.7'),
+    t('calendar.months.8'),
+    t('calendar.months.9'),
+    t('calendar.months.10'),
+    t('calendar.months.11'),
+  ]
 
   const nextMonth = () => setCurrentDate(new Date(year, month + 1, 1))
   const prevMonth = () => setCurrentDate(new Date(year, month - 1, 1))
@@ -103,7 +118,7 @@ export default function FacultyCalendarPage() {
       link.click()
       URL.revokeObjectURL(url)
     } catch {
-      toast.error('Failed to export ICS.')
+      toast.error(t('calendar.exportFail'))
     }
   }
 
@@ -114,18 +129,18 @@ export default function FacultyCalendarPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 shrink-0">
         <div>
           <h1 className="text-2xl font-black tracking-tight text-foreground flex items-center gap-3">
-            <CalendarIcon className="size-7 text-primary" /> My Calendar
+            <CalendarIcon className="size-7 text-primary" /> {t('calendar.title')}
           </h1>
-          <p className="text-sm text-muted-foreground">Appointments and reservations in one timeline.</p>
+          <p className="text-sm text-muted-foreground">{t('calendar.subtitle')}</p>
         </div>
 
         <div className="flex items-center gap-3">
           <Button variant="outline" size="sm" className="gap-2" onClick={downloadIcs}>
             <Download className="size-4" />
-            Export ICS
+            {t('calendar.exportIcs')}
           </Button>
           <div className="flex items-center gap-3 bg-card border border-border p-1.5 rounded-lg shadow-sm">
-            <Button variant="ghost" size="sm" onClick={goToday} className="text-xs font-semibold">Today</Button>
+            <Button variant="ghost" size="sm" onClick={goToday} className="text-xs font-semibold">{t('calendar.today')}</Button>
             <div className="w-px h-4 bg-border mx-1"></div>
             <Button variant="ghost" size="icon" onClick={prevMonth} className="size-8"><ChevronLeft className="size-4" /></Button>
             <span className="text-sm font-bold w-36 text-center">{monthNames[month]} {year}</span>
@@ -137,7 +152,15 @@ export default function FacultyCalendarPage() {
       <div className="grid lg:grid-cols-4 gap-6 items-start">
         <div className="lg:col-span-3 bg-card border border-border rounded-xl shadow-lg overflow-hidden flex flex-col h-fit">
           <div className="grid grid-cols-7 bg-muted/50 border-b border-border">
-            {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => (
+            {[
+              t('calendar.weekdays.mon'),
+              t('calendar.weekdays.tue'),
+              t('calendar.weekdays.wed'),
+              t('calendar.weekdays.thu'),
+              t('calendar.weekdays.fri'),
+              t('calendar.weekdays.sat'),
+              t('calendar.weekdays.sun'),
+            ].map(day => (
               <div key={day} className="py-3 text-center text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
                 {day}
               </div>
@@ -190,12 +213,12 @@ export default function FacultyCalendarPage() {
 
         <div className="flex flex-col gap-6 sticky top-6">
           <div className="bg-card border border-border rounded-xl p-5 shadow-lg flex flex-col max-h-[500px]">
-            <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-4 shrink-0">Event Details</h2>
+            <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-4 shrink-0">{t('calendar.eventDetails')}</h2>
 
             {!selectedEvent ? (
               <div className="flex-1 flex flex-col items-center justify-center text-center gap-2 opacity-50 py-10">
                 <CalendarIcon className="size-8" />
-                <p className="text-sm">Select an event from the calendar to see details.</p>
+                <p className="text-sm">{t('calendar.noEvents')}</p>
               </div>
             ) : (
               <div className="flex flex-col gap-4 overflow-y-auto pr-2 no-scrollbar">
@@ -215,7 +238,7 @@ export default function FacultyCalendarPage() {
 
                 {selectedEvent.description && (
                   <div className="space-y-2">
-                    <p className="text-xs font-semibold flex items-center gap-1.5 text-muted-foreground"><AlignLeft className="size-3.5" /> Description</p>
+                    <p className="text-xs font-semibold flex items-center gap-1.5 text-muted-foreground"><AlignLeft className="size-3.5" /> {t('calendar.description')}</p>
                     <p className="text-sm text-foreground bg-muted/40 p-3 rounded-lg border border-border whitespace-pre-wrap leading-relaxed">
                       {selectedEvent.description}
                     </p>
@@ -227,7 +250,7 @@ export default function FacultyCalendarPage() {
 
           <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
             <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-4 flex justify-between items-center">
-              Upcoming
+              {t('calendar.upcoming')}
               <span className="bg-primary/10 text-primary px-2 py-0.5 rounded-full text-[10px]">{upcoming.length}</span>
             </h2>
             <div className="space-y-3 max-h-[250px] overflow-y-auto pr-1 no-scrollbar">
@@ -244,7 +267,7 @@ export default function FacultyCalendarPage() {
                 </button>
               ))}
               {upcoming.length === 0 && (
-                <p className="text-xs text-muted-foreground text-center py-4">No upcoming events.</p>
+                <p className="text-xs text-muted-foreground text-center py-4">{t('calendar.noEvents')}</p>
               )}
             </div>
           </div>

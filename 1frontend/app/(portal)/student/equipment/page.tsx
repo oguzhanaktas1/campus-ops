@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { getToken } from '@/lib/auth'
+import { useI18n } from '@/lib/i18n'
+import { formatStudentDate, formatStudentTimeAgo, translateStatus } from '@/lib/student-i18n-utils'
 
 const STATUS_BADGE: Record<string, string> = {
   SUBMITTED:         'bg-blue-50 text-blue-700 border-blue-200',
@@ -18,16 +20,10 @@ const STATUS_BADGE: Record<string, string> = {
   CLOSED:            'bg-gray-50 text-gray-500 border-gray-200',
 }
 
-function timeAgo(d: string) {
-  const diff = (Date.now() - new Date(d).getTime()) / 1000
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`
-  return `${Math.floor(diff / 86400)}d ago`
-}
-
 export default function StudentEquipmentPage() {
   const [requests, setRequests] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const { locale, t } = useI18n()
 
   useEffect(() => {
     const fetchRequests = async () => {
@@ -38,7 +34,7 @@ export default function StudentEquipmentPage() {
         })
         if (res.ok) setRequests(await res.json())
       } catch {
-        toast.error('Failed to load equipment requests.')
+        toast.error(t('messages.loadEquipmentFail'))
       } finally {
         setIsLoading(false)
       }
@@ -57,15 +53,15 @@ export default function StudentEquipmentPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
-            <Package className="size-5 text-primary" /> Equipment Requests
+            <Package className="size-5 text-primary" /> {t('pages.equipmentTitle')}
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Request campus equipment such as projectors, laptops and cameras.
+            {t('pages.equipmentSubtitle')}
           </p>
         </div>
         <Link href="/student/equipment/new">
           <Button size="sm" className="gap-2">
-            <Plus className="size-4" /> New Request
+            <Plus className="size-4" /> {t('common.newRequest')}
           </Button>
         </Link>
       </div>
@@ -74,9 +70,9 @@ export default function StudentEquipmentPage() {
         {requests.length === 0 ? (
           <div className="py-16 flex flex-col items-center text-center opacity-50">
             <AlertCircle className="size-10 mb-3" />
-            <p className="text-sm font-medium">No equipment requests yet.</p>
+            <p className="text-sm font-medium">{t('pages.noEquipment')}</p>
             <p className="text-xs text-muted-foreground mt-1">
-              Submit a request to borrow campus equipment.
+              {t('pages.noEquipmentDesc')}
             </p>
           </div>
         ) : (
@@ -93,15 +89,15 @@ export default function StudentEquipmentPage() {
                   </p>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     {r.requestNo} · {r.equipmentCategory} · qty {r.quantity}
-                    {r.neededFrom && ` · from ${new Date(r.neededFrom).toLocaleDateString()}`}
-                    {r.createdAt && ` · ${timeAgo(r.createdAt)}`}
+                    {r.neededFrom && ` · ${formatStudentDate(r.neededFrom, locale)}`}
+                    {r.createdAt && ` · ${formatStudentTimeAgo(r.createdAt, t)}`}
                   </p>
                 </div>
                 <span className={cn(
                   'text-xs font-semibold px-2 py-0.5 rounded-full border ml-4 shrink-0',
                   STATUS_BADGE[r.status] ?? STATUS_BADGE.SUBMITTED
                 )}>
-                  {r.status?.replace(/_/g, ' ')}
+                  {translateStatus(r.status, t)}
                 </span>
               </Link>
             ))}

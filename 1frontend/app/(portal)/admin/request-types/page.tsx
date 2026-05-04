@@ -17,6 +17,7 @@ import { Search, Plus, Trash2, Loader2, FileCheck2, Settings2, Pencil } from 'lu
 import { toast } from 'sonner'
 import { AddRequestTypeModal } from '@/components/admin/add-request-type-modal'
 import { getToken } from '@/lib/auth'
+import { useI18n } from '@/lib/i18n'
 
 interface RequestType {
   id: string
@@ -34,6 +35,7 @@ function authHeaders() {
 }
 
 export default function RequestTypesPage() {
+  const { t } = useI18n()
   const [types, setTypes] = useState<RequestType[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -50,9 +52,9 @@ export default function RequestTypesPage() {
     try {
       const res = await fetch(`${BACKEND}/admin/request-types`, { headers: authHeaders() })
       if (res.ok) setTypes(await res.json())
-      else toast.error('Failed to load Request Types')
+      else toast.error(t('requestTypes.saveFail'))
     } catch {
-      toast.error('Failed to load Request Types')
+      toast.error(t('requestTypes.saveFail'))
     } finally {
       setIsLoading(false)
     }
@@ -71,7 +73,7 @@ export default function RequestTypesPage() {
   }
 
   const handleBulkDelete = async () => {
-    if (!window.confirm(`Delete ${selectedIds.length} request types? This cannot be undone.`)) return
+    if (!window.confirm(t('requestTypes.deleteConfirm', { count: selectedIds.length }))) return
     setIsDeleting(true)
     try {
       const res = await fetch(`${BACKEND}/admin/request-types/bulk-delete`, {
@@ -80,14 +82,14 @@ export default function RequestTypesPage() {
         body: JSON.stringify({ ids: selectedIds }),
       })
       if (res.ok) {
-        toast.success(`${selectedIds.length} items deleted.`)
+        toast.success(t('requestTypes.deleteSuccess'))
         setSelectedIds([])
         void fetchTypes()
       } else {
-        toast.error('Failed to delete. Check if any requests still use these types.')
+        toast.error(t('requestTypes.deleteFail'))
       }
     } catch {
-      toast.error('Network error.')
+      toast.error(t('requestTypes.saveFail'))
     } finally {
       setIsDeleting(false)
     }
@@ -118,15 +120,15 @@ export default function RequestTypesPage() {
         }),
       })
       if (res.ok) {
-        toast.success('Request type updated.')
+        toast.success(t('requestTypes.saveSuccess'))
         setEditItem(null)
         void fetchTypes()
       } else {
         const err = await res.json().catch(() => ({})) as { message?: string }
-        toast.error(err.message ?? 'Failed to update.')
+        toast.error(err.message ?? t('requestTypes.saveFail'))
       }
     } catch {
-      toast.error('Network error.')
+      toast.error(t('requestTypes.saveFail'))
     } finally {
       setIsSaving(false)
     }
@@ -150,13 +152,13 @@ export default function RequestTypesPage() {
     <div className="p-6 space-y-5 max-w-6xl mx-auto pb-20">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold text-foreground">Request Types</h1>
+          <h1 className="text-xl font-bold text-foreground">{t('requestTypes.title')}</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Manage the types of requests available in CampusFlow.
+            {t('requestTypes.subtitle', { count: types.length })}
           </p>
         </div>
         <Button size="sm" className="gap-1.5" onClick={() => setIsModalOpen(true)}>
-          <Plus className="size-3.5" /> Add New Type
+          <Plus className="size-3.5" /> {t('requestTypes.addNewType')}
         </Button>
       </div>
 
@@ -165,7 +167,7 @@ export default function RequestTypesPage() {
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
           <Input
-            placeholder="Search by name or category..."
+            placeholder={t('requestTypes.searchByNameCategory')}
             className="pl-9 h-9"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -173,7 +175,7 @@ export default function RequestTypesPage() {
         </div>
         {selectedIds.length > 0 && (
           <div className="flex items-center gap-3 animate-in fade-in zoom-in duration-200">
-            <span className="text-sm font-medium text-muted-foreground">{selectedIds.length} selected</span>
+            <span className="text-sm font-medium text-muted-foreground">{t('requestTypes.selected', { count: selectedIds.length })}</span>
             <Button
               variant="destructive"
               size="sm"
@@ -182,7 +184,7 @@ export default function RequestTypesPage() {
               className="gap-1.5"
             >
               {isDeleting ? <Loader2 className="size-3.5 animate-spin" /> : <Trash2 className="size-3.5" />}
-              Delete Selected
+              {t('requestTypes.deleteSelected')}
             </Button>
           </div>
         )}
@@ -201,12 +203,12 @@ export default function RequestTypesPage() {
                   onChange={toggleSelectAll}
                 />
               </th>
-              <th className="px-5 py-3 text-left font-semibold text-muted-foreground">Type Name &amp; Key</th>
+              <th className="px-5 py-3 text-left font-semibold text-muted-foreground">{t('requestTypes.colTypeKey')}</th>
               <th className="px-5 py-3 text-left font-semibold text-muted-foreground hidden md:table-cell">
-                Category
+                {t('requestTypes.colCategory')}
               </th>
-              <th className="px-5 py-3 text-left font-semibold text-muted-foreground">Status</th>
-              <th className="px-5 py-3 text-right font-semibold text-muted-foreground">Actions</th>
+              <th className="px-5 py-3 text-left font-semibold text-muted-foreground">{t('requestTypes.colStatus')}</th>
+              <th className="px-5 py-3 text-right font-semibold text-muted-foreground">{t('requestTypes.colActions')}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
@@ -245,11 +247,11 @@ export default function RequestTypesPage() {
                 <td className="px-5 py-3.5">
                   {type.isActive ? (
                     <span className="px-2 py-1 rounded-md bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 text-[10px] font-bold tracking-wider">
-                      ACTIVE
+                      {t('requestTypes.active')}
                     </span>
                   ) : (
                     <span className="px-2 py-1 rounded-md bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300 border border-gray-200 dark:border-gray-700 text-[10px] font-bold tracking-wider">
-                      INACTIVE
+                      {t('requestTypes.inactive')}
                     </span>
                   )}
                 </td>
@@ -265,7 +267,7 @@ export default function RequestTypesPage() {
         {filtered.length === 0 && (
           <div className="text-center py-12">
             <FileCheck2 className="size-8 text-muted-foreground/40 mx-auto mb-3" />
-            <p className="text-sm text-muted-foreground">No request types found.</p>
+            <p className="text-sm text-muted-foreground">{t('requestTypes.noTypes')}</p>
           </div>
         )}
       </div>
@@ -277,27 +279,27 @@ export default function RequestTypesPage() {
       <Dialog open={!!editItem} onOpenChange={(open) => { if (!open) setEditItem(null) }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Edit Request Type</DialogTitle>
+            <DialogTitle>{t('requestTypes.editType')}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-1.5">
-              <Label>Name <span className="text-destructive">*</span></Label>
+              <Label>{t('requestTypes.name')} <span className="text-destructive">*</span></Label>
               <Input
                 value={editForm.name}
                 onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                placeholder="e.g. IT Support"
+                placeholder={t('requestTypes.namePlaceholder')}
               />
             </div>
             <div className="space-y-1.5">
-              <Label>Category</Label>
+              <Label>{t('requestTypes.category')}</Label>
               <Input
                 value={editForm.category}
                 onChange={(e) => setEditForm({ ...editForm, category: e.target.value })}
-                placeholder="e.g. IT_SUPPORT"
+                placeholder={t('requestTypes.categoryPlaceholder')}
               />
             </div>
             <div className="space-y-1.5">
-              <Label>Description</Label>
+              <Label>{t('requestTypes.description')}</Label>
               <Textarea
                 value={editForm.description}
                 onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
@@ -318,15 +320,15 @@ export default function RequestTypesPage() {
                 className="cursor-pointer"
                 onClick={() => setEditForm({ ...editForm, isActive: !editForm.isActive })}
               >
-                {editForm.isActive ? 'Active' : 'Inactive'}
+                {editForm.isActive ? t('common.active') : t('common.inactive')}
               </Label>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditItem(null)} disabled={isSaving}>Cancel</Button>
+            <Button variant="outline" onClick={() => setEditItem(null)} disabled={isSaving}>{t('common.cancel')}</Button>
             <Button onClick={handleSaveEdit} disabled={isSaving}>
               {isSaving && <Loader2 className="mr-2 size-4 animate-spin" />}
-              Save Changes
+              {t('requestTypes.saveChanges')}
             </Button>
           </DialogFooter>
         </DialogContent>

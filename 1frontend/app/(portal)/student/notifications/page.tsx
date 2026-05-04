@@ -7,18 +7,12 @@ import { Bell, Loader2, CheckCheck, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 import { getToken } from '@/lib/auth'
+import { useI18n } from '@/lib/i18n'
+import { formatStudentTimeAgo } from '@/lib/student-i18n-utils'
 
 const typeColors: Record<string, string> = {
   IN_APP: 'bg-blue-500',
   SYSTEM: 'bg-amber-500',
-}
-
-function timeAgo(ts: string) {
-  const diff = (Date.now() - new Date(ts).getTime()) / 1000
-  if (diff < 60) return 'just now'
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`
-  return `${Math.floor(diff / 86400)}d ago`
 }
 
 export default function StudentNotificationsPage() {
@@ -26,6 +20,7 @@ export default function StudentNotificationsPage() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]) // 🔥 Seçili bildirimlerin state'i
   const [isLoading, setIsLoading] = useState(true)
   const router = useRouter()
+  const { t } = useI18n()
 
   const fetchNotifications = async () => {
     try {
@@ -35,7 +30,7 @@ export default function StudentNotificationsPage() {
       })
       if (res.ok) { const d = await res.json(); setNotifications(Array.isArray(d) ? d : (d.notifications ?? [])); }
     } catch (err) {
-      toast.error('Failed to load notifications')
+      toast.error(t('messages.loadNotificationsFail'))
     } finally {
       setIsLoading(false)
     }
@@ -81,12 +76,12 @@ export default function StudentNotificationsPage() {
         // Silinenleri ekrandan uçur ve seçimi temizle
         setNotifications(prev => prev.filter(n => !selectedIds.includes(n.id)))
         setSelectedIds([])
-        toast.success(`${selectedIds.length} notifications deleted`)
+        toast.success(t('messages.notificationsDeleted', { count: selectedIds.length }))
       } else {
         throw new Error('Failed')
       }
     } catch (err) {
-      toast.error('Failed to delete notifications')
+      toast.error(t('messages.deleteNotificationsFail'))
     }
   }
 
@@ -120,10 +115,10 @@ export default function StudentNotificationsPage() {
       
       if (res.ok) {
         setNotifications(prev => prev.map(n => ({ ...n, isRead: true })))
-        toast.success('All notifications marked as read')
+        toast.success(t('messages.allNotificationsRead'))
       }
     } catch (err) {
-      toast.error('Failed to mark all as read')
+      toast.error(t('messages.markAllReadFail'))
     }
   }
 
@@ -137,21 +132,21 @@ export default function StudentNotificationsPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
-             Notifications
+             {t('pages.notificationsTitle')}
           </h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Stay up to date with your requests</p>
+          <p className="text-sm text-muted-foreground mt-0.5">{t('pages.notificationsSubtitle')}</p>
         </div>
         
         {/* 🔥 ÜST AKSİYON BUTONLARI 🔥 */}
         <div className="flex items-center gap-2">
           {selectedIds.length > 0 && (
             <Button variant="destructive" size="sm" onClick={handleDeleteSelected} className="gap-2 shadow-sm animate-in fade-in zoom-in duration-200">
-              <Trash2 className="size-4" /> Delete ({selectedIds.length})
+              <Trash2 className="size-4" /> {t('common.delete')} ({selectedIds.length})
             </Button>
           )}
           {unreadCount > 0 && (
             <Button variant="outline" size="sm" onClick={handleMarkAllRead} className="gap-2">
-              <CheckCheck className="size-4" /> Mark all read
+              <CheckCheck className="size-4" /> {t('messages.allNotificationsRead')}
             </Button>
           )}
         </div>
@@ -169,7 +164,7 @@ export default function StudentNotificationsPage() {
               className="size-4 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer"
             />
             <span className="text-sm font-medium text-muted-foreground cursor-pointer select-none" onClick={toggleSelectAll}>
-              {isAllSelected ? 'Deselect All' : 'Select All'}
+              {isAllSelected ? (t('common.all') === 'All' ? 'Deselect All' : 'Secimi Kaldir') : (t('common.all') === 'All' ? 'Select All' : 'Tumunu Sec')}
             </span>
           </div>
         )}
@@ -204,7 +199,7 @@ export default function StudentNotificationsPage() {
                     {n.title}
                   </p>
                   <p className="text-sm text-muted-foreground mt-0.5 leading-relaxed whitespace-pre-wrap">{n.message}</p>
-                  <p className="text-xs text-muted-foreground/70 mt-1 uppercase tracking-wider font-medium">{timeAgo(n.createdAt)}</p>
+                  <p className="text-xs text-muted-foreground/70 mt-1 uppercase tracking-wider font-medium">{formatStudentTimeAgo(n.createdAt, t)}</p>
                 </div>
                 {!n.isRead && <div className="size-2 rounded-full bg-primary flex-shrink-0 mt-2 animate-pulse" />}
               </div>
@@ -214,8 +209,8 @@ export default function StudentNotificationsPage() {
           {notifications.length === 0 && (
             <div className="py-12 flex flex-col items-center justify-center text-center opacity-50">
               <Bell className="size-10 mb-3" />
-              <p className="text-sm font-medium">All Caught Up!</p>
-              <p className="text-xs">No notifications to display.</p>
+              <p className="text-sm font-medium">{t('pages.allCaughtUpTitle')}</p>
+              <p className="text-xs">{t('pages.noNotifications')}</p>
             </div>
           )}
         </div>

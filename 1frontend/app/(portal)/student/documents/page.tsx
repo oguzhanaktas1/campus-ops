@@ -6,17 +6,19 @@ import { Button } from '@/components/ui/button'
 import { StatusBadge } from '@/components/status-badge'
 import { FileText, PlusCircle, Clock, Loader2 } from 'lucide-react'
 import { getToken } from '@/lib/auth'
+import { useI18n } from '@/lib/i18n'
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000'
 
-function formatDate(d: string) {
+function formatDate(d: string, locale: string) {
   if (!d) return ''
-  return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  return new Date(d).toLocaleDateString(locale === 'tr' ? 'tr-TR' : 'en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
 export default function StudentDocumentsPage() {
   const [requests, setRequests] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const { locale, t } = useI18n()
 
   useEffect(() => {
     const load = async () => {
@@ -46,13 +48,13 @@ export default function StudentDocumentsPage() {
     <div className="p-6 space-y-6 max-w-4xl mx-auto">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold text-foreground">Documents</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Request official documents and transcripts.</p>
+          <h1 className="text-xl font-bold text-foreground">{t('documents.title')}</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">{t('documents.subtitle')}</p>
         </div>
         <Link href="/student/documents/new">
           <Button size="sm" className="gap-1.5">
             <PlusCircle className="size-3.5" />
-            New Request
+            {t('documents.newRequest')}
           </Button>
         </Link>
       </div>
@@ -74,12 +76,12 @@ export default function StudentDocumentsPage() {
       {/* Document requests list */}
       <div className="bg-card border border-border rounded-lg shadow-sm overflow-hidden">
         <div className="px-5 py-4 border-b border-border">
-          <h2 className="text-sm font-semibold text-foreground">My Document Requests</h2>
+          <h2 className="text-sm font-semibold text-foreground">{t('documents.myRequests')}</h2>
         </div>
         {requests.length === 0 ? (
           <div className="flex flex-col items-center py-12 text-center">
             <FileText className="size-7 text-muted-foreground/40 mb-2" />
-            <p className="text-sm text-muted-foreground">No document requests yet.</p>
+            <p className="text-sm text-muted-foreground">{t('documents.noRequests')}</p>
           </div>
         ) : (
           <div className="divide-y divide-border">
@@ -92,7 +94,7 @@ export default function StudentDocumentsPage() {
                       <p className="text-sm font-medium text-foreground truncate">{req.title}</p>
                       <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
                         <Clock className="size-3" />
-                        {formatDate(req.createdAt)}
+                        {formatDate(req.createdAt, locale)}
                       </p>
                     </div>
                   </div>

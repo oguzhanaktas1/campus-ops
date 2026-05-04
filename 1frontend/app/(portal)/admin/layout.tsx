@@ -6,6 +6,9 @@ import { PortalLayout, type NavItem } from "@/components/portal-layout";
 import { NotificationBell } from "@/components/notification-bell";
 import { ProfileDropdown } from "@/components/profile-dropdown";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { LanguageSwitcher } from "@/components/language-switcher";
+import { AdminI18nProvider } from "@/components/admin/admin-i18n-provider";
+import { useI18n } from "@/lib/i18n";
 import {
   LayoutDashboard,
   Users,
@@ -24,82 +27,79 @@ import AuthGuard from "@/components/AuthGuard/auth-guard";
 import { PortalAssistant } from "@/components/ai/portal-assistant";
 import { fetchProfile, getStoredUser } from "@/lib/auth";
 
-const navItems: NavItem[] = [
-  { label: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
-  {
-    label: "Users & Access",
-    href: "#",
-    icon: Users,
-    children: [
-      { label: "Users", href: "/admin/users" },
-      { label: "Roles", href: "/admin/roles" },
-      { label: "Permissions", href: "/admin/permissions" },
-    ],
-  },
-  {
-    label: "Organization",
-    href: "#",
-    icon: Building2,
-    children: [
-      { label: "Campuses", href: "/admin/campuses" },
-      { label: "Faculties", href: "/admin/faculties" },
-      { label: "Departments", href: "/admin/departments" },
-      { label: "Units", href: "/admin/units" },
-    ],
-  },
-  {
-    label: "Requests",
-    href: "#",
-    icon: FileText,
-    children: [
-      { label: "All Requests", href: "/admin/requests" },
-      { label: "Request Types", href: "/admin/request-types" },
-    ],
-  },
-  {
-    label: "Workflows",
-    href: "#",
-    icon: ClipboardList,
-    children: [
-      { label: "Workflows", href: "/admin/workflows" },
-      { label: "Workflow Instances", href: "/admin/workflow-instances" },
-    ],
-  },
-  {
-    label: "Operations",
-    href: "#",
-    icon: Activity,
-    children: [
-      { label: "Resources", href: "/admin/resources" },
-      { label: "SLA Policies", href: "/admin/sla" },
-    ],
-  },
-  {
-    label: "System",
-    href: "#",
-    icon: ClipboardList,
-    children: [
-      { label: "Monitoring", href: "/admin/monitoring" },
-      { label: "Integrations", href: "/admin/integrations" },
-      { label: "Webhook Logs", href: "/admin/webhook-logs" },
-      { label: "System Events", href: "/admin/system-events" },
-      { label: "Audit Logs", href: "/admin/audit-logs" },
-    ],
-  },
-  { label: "Analytics", href: "/admin/analytics", icon: BarChart3 },
-  { label: "Reports", href: "/admin/reports", icon: BarChart3 },
-  { label: "Notifications", href: "/admin/notifications", icon: Bell },
-  { label: "Settings", href: "/admin/settings", icon: Settings },
-];
-
-export default function AdminLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+function AdminLayoutInner({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
+  const { t } = useI18n();
+
+  const navItems: NavItem[] = [
+    { label: t('nav.dashboard'), href: "/admin/dashboard", icon: LayoutDashboard },
+    {
+      label: t('nav.usersAccess'),
+      href: "#",
+      icon: Users,
+      children: [
+        { label: t('nav.users'), href: "/admin/users" },
+        { label: t('nav.roles'), href: "/admin/roles" },
+        { label: t('nav.permissions'), href: "/admin/permissions" },
+      ],
+    },
+    {
+      label: t('nav.organization'),
+      href: "#",
+      icon: Building2,
+      children: [
+        { label: t('nav.campuses'), href: "/admin/campuses" },
+        { label: t('nav.faculties'), href: "/admin/faculties" },
+        { label: t('nav.departments'), href: "/admin/departments" },
+        { label: t('nav.units'), href: "/admin/units" },
+      ],
+    },
+    {
+      label: t('nav.requests'),
+      href: "#",
+      icon: FileText,
+      children: [
+        { label: t('nav.allRequests'), href: "/admin/requests" },
+        { label: t('nav.requestTypes'), href: "/admin/request-types" },
+      ],
+    },
+    {
+      label: t('nav.workflows'),
+      href: "#",
+      icon: ClipboardList,
+      children: [
+        { label: t('nav.workflows'), href: "/admin/workflows" },
+        { label: t('nav.workflowInstances'), href: "/admin/workflow-instances" },
+      ],
+    },
+    {
+      label: t('nav.operations'),
+      href: "#",
+      icon: Activity,
+      children: [
+        { label: t('nav.resources'), href: "/admin/resources" },
+        { label: t('nav.slaPolicies'), href: "/admin/sla" },
+      ],
+    },
+    {
+      label: t('nav.systemMenu'),
+      href: "#",
+      icon: ClipboardList,
+      children: [
+        { label: t('nav.monitoring'), href: "/admin/monitoring" },
+        { label: t('nav.integrations'), href: "/admin/integrations" },
+        { label: t('nav.webhookLogs'), href: "/admin/webhook-logs" },
+        { label: t('nav.systemEvents'), href: "/admin/system-events" },
+        { label: t('nav.auditLogs'), href: "/admin/audit-logs" },
+      ],
+    },
+    { label: t('nav.analytics'), href: "/admin/analytics", icon: BarChart3 },
+    { label: t('nav.reports'), href: "/admin/reports", icon: BarChart3 },
+    { label: t('nav.notifications'), href: "/admin/notifications", icon: Bell },
+    { label: t('nav.settings'), href: "/admin/settings", icon: Settings },
+  ];
 
   useEffect(() => {
     const fetchUserProfile = async () => {
@@ -137,13 +137,14 @@ export default function AdminLayout({
       <div className="hidden sm:flex items-center gap-2">
         <ShieldCheck className="size-4 text-primary" />
         <div>
-          <h1 className="text-sm font-semibold text-foreground">Admin Portal</h1>
+          <h1 className="text-sm font-semibold text-foreground">{t('nav.adminPortal')}</h1>
           <p className="text-xs text-muted-foreground">
             {user.title} · {user.department}
           </p>
         </div>
       </div>
       <div className="flex items-center gap-1 ml-auto">
+        <LanguageSwitcher />
         <ThemeToggle />
         <NotificationBell role="admin" />
         <ProfileDropdown user={user} settingsHref="/admin/settings" />
@@ -155,22 +156,34 @@ export default function AdminLayout({
     <AuthGuard allowedRoles={["ADMIN"]}>
       <PortalLayout
         navItems={navItems}
-        portalName="Admin Portal"
+        portalName={t('nav.adminPortal')}
         portalColor="indigo"
         topbar={topbar}
       >
         {children}
         <PortalAssistant
           portal="admin"
-          title="Admin AI Assistant"
-          description="Analytics narration, admin navigation help, and workflow or log guidance for authorized admin areas."
+          title={t('assistant.title')}
+          description={t('assistant.description')}
           prompts={[
-            "Take me to the Analytics screen.",
-            "Where can I track webhook errors?",
-            "What is the difference between Workflow and Request Type screens?",
+            t('assistant.analyticsPrompt'),
+            t('assistant.webhookPrompt'),
+            t('assistant.workflowPrompt'),
           ]}
         />
       </PortalLayout>
     </AuthGuard>
+  );
+}
+
+export default function AdminLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <AdminI18nProvider>
+      <AdminLayoutInner>{children}</AdminLayoutInner>
+    </AdminI18nProvider>
   );
 }

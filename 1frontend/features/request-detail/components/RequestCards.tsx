@@ -14,6 +14,7 @@ import {
 } from '@/features/request-detail/utils'
 import type { Step } from '@/components/workflow-step-indicator'
 import { cn } from '@/lib/utils'
+import { useOptionalT } from '@/lib/optional-t'
 
 function KeyValueList({
   items,
@@ -44,24 +45,25 @@ function KeyValueList({
 }
 
 export function RequestMetaCard({ detail }: { detail: RequestDetailViewModel }) {
+  const tt = useOptionalT()
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Request Meta</CardTitle>
+        <CardTitle>{tt('detail.requestMeta', 'Request Meta')}</CardTitle>
       </CardHeader>
       <CardContent>
         <KeyValueList
           items={[
-            { label: 'Type', value: detail.requestType.name },
-            { label: 'Category', value: detail.requestType.category ?? null },
-            { label: 'Status', value: titleize(detail.status) },
-            { label: 'Priority', value: titleize(detail.priority) },
+            { label: tt('detail.type', 'Type'), value: detail.requestType.name },
+            { label: tt('detail.category', 'Category'), value: detail.requestType.category ?? null },
+            { label: tt('detail.status', 'Status'), value: titleize(detail.status) },
+            { label: tt('detail.priority', 'Priority'), value: titleize(detail.priority) },
             {
-              label: 'Submitted',
+              label: tt('detail.submitted', 'Submitted'),
               value: formatDate(detail.submittedAt ?? detail.createdAt),
             },
             {
-              label: 'Due At',
+              label: tt('detail.dueAt', 'Due At'),
               value: detail.dueAt ? formatDate(detail.dueAt) : null,
             },
           ]}
@@ -76,6 +78,7 @@ export function WorkflowCurrentStepCard({
 }: {
   detail: RequestDetailViewModel
 }) {
+  const tt = useOptionalT()
   const steps =
     detail.workflow.steps && detail.workflow.steps.length > 0
       ? detail.workflow.steps
@@ -85,6 +88,7 @@ export function WorkflowCurrentStepCard({
     <WorkflowProgressCard
       currentStep={detail.workflow.currentStep ?? 'Workflow progression'}
       steps={steps}
+      title={tt('detail.workflow', 'Workflow')}
     />
   )
 }
@@ -98,12 +102,13 @@ export function WorkflowProgressCard({
   steps: Step[]
   title?: string
 }) {
+  const tt = useOptionalT()
   const currentWorkflowStep =
     steps.find((step) => step.isCurrent) ??
     steps.find((step) => step.status === 'active' || step.status === 'warning' || step.status === 'failed') ??
     null
   const currentOwner = currentWorkflowStep ? workflowStepOwner(currentWorkflowStep) : null
-  const currentTiming = currentWorkflowStep ? workflowStepTiming(currentWorkflowStep) : null
+  const currentTiming = currentWorkflowStep ? workflowStepTiming(currentWorkflowStep, tt) : null
   const [showStepRows, setShowStepRows] = useState(false)
 
   return (
@@ -113,7 +118,7 @@ export function WorkflowProgressCard({
           <CardTitle>{title}</CardTitle>
           <button
             type="button"
-            aria-label={showStepRows ? 'Hide workflow steps' : 'Show workflow steps'}
+            aria-label={showStepRows ? tt('detail.hideWorkflowSteps', 'Hide workflow steps') : tt('detail.showWorkflowSteps', 'Show workflow steps')}
             aria-expanded={showStepRows}
             className="flex size-7 shrink-0 items-center justify-center rounded-md border bg-background text-muted-foreground transition hover:bg-muted hover:text-foreground"
             onClick={() => setShowStepRows((value) => !value)}
@@ -126,14 +131,14 @@ export function WorkflowProgressCard({
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex items-center justify-between gap-3 rounded-lg border bg-muted/30 px-3 py-2">
-          <span className="shrink-0 text-sm text-muted-foreground">Current Step</span>
+          <span className="shrink-0 text-sm text-muted-foreground">{tt('detail.currentStep', 'Current Step')}</span>
           <div className="min-w-0 text-right">
             <span className="block truncate text-sm font-medium text-foreground">
-              {currentStep ?? 'Workflow progression'}
+              {currentStep ?? tt('detail.workflow', 'Workflow progression')}
             </span>
             {currentWorkflowStep ? (
               <span className="block truncate text-xs text-muted-foreground">
-                {currentOwner ? `Owner: ${currentOwner}` : null}
+                {currentOwner ? `${tt('detail.owner', 'Owner')}: ${currentOwner}` : null}
                 {currentOwner && currentTiming ? ' | ' : null}
                 {currentTiming ?? null}
               </span>
@@ -183,6 +188,7 @@ function WorkflowStepRow({
   step: Step
   index: number
 }) {
+  const tt = useOptionalT()
   return (
     <div
       className={cn(
@@ -212,9 +218,9 @@ function WorkflowStepRow({
       </div>
 
       <div className="mt-3 grid gap-3 border-t pt-3 sm:grid-cols-3">
-        <WorkflowStepField label="Owner" value={workflowStepOwner(step)} />
-        <WorkflowStepField label="Where" value={workflowStepLocation(step)} />
-        <WorkflowStepField label="Time" value={workflowStepTiming(step)} />
+        <WorkflowStepField label={tt('detail.owner', 'Owner')} value={workflowStepOwner(step)} />
+        <WorkflowStepField label={tt('detail.where', 'Where')} value={workflowStepLocation(step)} />
+        <WorkflowStepField label={tt('detail.time', 'Time')} value={workflowStepTiming(step, tt)} />
       </div>
     </div>
   )
@@ -268,13 +274,16 @@ function workflowStepLocation(step: Step) {
   )
 }
 
-function workflowStepTiming(step: Step) {
+function workflowStepTiming(
+  step: Step,
+  tt: (key: string, fallback: string, params?: Record<string, string | number>) => string,
+) {
   if (step.completedAt || step.actedAt) {
-    return `Done ${formatWorkflowDate(step.completedAt ?? step.actedAt)}`
+    return tt('detail.doneAt', 'Done {{date}}', { date: formatWorkflowDate(step.completedAt ?? step.actedAt) })
   }
 
   if (step.dueAt) {
-    const remaining = formatRemaining(step.dueAt)
+    const remaining = formatRemaining(step.dueAt, tt)
     if (remaining) return remaining
   }
 
@@ -289,7 +298,10 @@ function formatWorkflowDate(value?: string | null) {
   })
 }
 
-function formatRemaining(value?: string | null) {
+function formatRemaining(
+  value: string | null | undefined,
+  tt: (key: string, fallback: string, params?: Record<string, string | number>) => string,
+) {
   if (!value) return null
   const due = new Date(value).getTime()
   if (Number.isNaN(due)) return null
@@ -307,7 +319,9 @@ function formatRemaining(value?: string | null) {
         ? `${hours}h ${minutes}m`
         : `${minutes}m`
 
-  return diff < 0 ? `Overdue ${duration}` : `${duration} left`
+  return diff < 0
+    ? tt('detail.overdueDuration', 'Overdue {{duration}}', { duration })
+    : tt('detail.durationLeft', '{{duration}} left', { duration })
 }
 
 export function RequestQuickFactsCard({
@@ -315,21 +329,22 @@ export function RequestQuickFactsCard({
 }: {
   detail: RequestDetailViewModel
 }) {
+  const tt = useOptionalT()
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Quick Facts</CardTitle>
+        <CardTitle>{tt('detail.quickFacts', 'Quick Facts')}</CardTitle>
       </CardHeader>
       <CardContent>
         <KeyValueList
           items={[
-            { label: 'Requester',        value: detail.requester?.fullName ?? null },
-            { label: 'Current Assignee', value: detail.currentAssignee?.fullName ?? null },
+            { label: tt('detail.requester', 'Requester'),        value: detail.requester?.fullName ?? null },
+            { label: tt('detail.currentAssignee', 'Current Assignee'), value: detail.currentAssignee?.fullName ?? null },
             {
-              label: 'Assigned People',
+              label: tt('detail.assignedPeople', 'Assigned People'),
               value: detail.assignedPeople.length > 0 ? detail.assignedPeople.join(', ') : null,
             },
-            { label: 'Activity Count',   value: String(detail.timeline.length) },
+            { label: tt('detail.activityCount', 'Activity Count'),   value: String(detail.timeline.length) },
           ]}
         />
       </CardContent>
@@ -342,6 +357,7 @@ export function RelatedEntitiesCard({
 }: {
   detail: RequestDetailViewModel
 }) {
+  const tt = useOptionalT()
   const requester = detail.requester
   const requesterNumber =
     requester?.role?.toUpperCase().includes('STUDENT')
@@ -352,31 +368,31 @@ export function RelatedEntitiesCard({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Requester Details</CardTitle>
+        <CardTitle>{tt('detail.requesterDetails', 'Requester Details')}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <KeyValueList
           items={[
-            { label: 'Full Name',        value: requester?.fullName ?? null },
-            { label: 'Email',            value: requester?.email ?? null, fullWidth: true },
-            { label: 'Role',             value: requesterRole },
-            { label: 'Department',       value: requester?.department ?? null },
-            { label: 'Faculty',          value: requester?.faculty ?? null },
-            { label: 'Academic Title',   value: requester?.title ?? null },
+            { label: tt('detail.fullName', 'Full Name'),        value: requester?.fullName ?? null },
+            { label: tt('forms.email', 'Email'),            value: requester?.email ?? null, fullWidth: true },
+            { label: tt('detail.role', 'Role'),             value: requesterRole },
+            { label: tt('forms.department', 'Department'),       value: requester?.department ?? null },
+            { label: tt('forms.faculty', 'Faculty'),          value: requester?.faculty ?? null },
+            { label: tt('detail.academicTitle', 'Academic Title'),   value: requester?.title ?? null },
             {
-              label: requester?.role?.toUpperCase().includes('STUDENT') ? 'Student Number' : 'Staff Number',
+              label: requester?.role?.toUpperCase().includes('STUDENT') ? tt('forms.studentNumber', 'Student Number') : tt('detail.staffNumber', 'Staff Number'),
               value: requesterNumber ?? null,
             },
-            { label: 'Current Assignee', value: detail.currentAssignee?.fullName ?? null },
+            { label: tt('detail.currentAssignee', 'Current Assignee'), value: detail.currentAssignee?.fullName ?? null },
             {
-              label: 'Assigned People',
+              label: tt('detail.assignedPeople', 'Assigned People'),
               value: detail.assignedPeople.length > 0 ? detail.assignedPeople.join(', ') : null,
             },
-            { label: 'Domain Key',       value: humanize(detail.requestType.key) },
+            { label: tt('detail.domainKey', 'Domain Key'),       value: humanize(detail.requestType.key) },
           ]}
         />
         <div className="flex items-center justify-between gap-4 border-t pt-4 text-sm">
-          <span className="text-muted-foreground">Workflow Status</span>
+          <span className="text-muted-foreground">{tt('detail.workflowStatus', 'Workflow Status')}</span>
           <StatusBadge status={detail.workflow.status ?? detail.status} />
         </div>
       </CardContent>

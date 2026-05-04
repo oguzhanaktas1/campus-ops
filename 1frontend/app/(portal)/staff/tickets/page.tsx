@@ -19,6 +19,7 @@ import {
 import { getStoredUser, getToken } from '@/lib/auth'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
+import { useI18n } from '@/lib/i18n'
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000'
 
@@ -64,6 +65,7 @@ function getAssignee(ticket: any) {
 }
 
 export default function StaffTicketsPage() {
+  const { t } = useI18n()
   const [activeTickets, setActiveTickets] = useState<any[]>([])
   const [completedTickets, setCompletedTickets] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -83,7 +85,7 @@ export default function StaffTicketsPage() {
 
       if (!activeRes.ok) {
         const err = await activeRes.json().catch(() => ({}))
-        toast.error(`Inbox error ${activeRes.status}: ${err.message ?? 'Failed to load tickets'}`)
+        toast.error(t('tickets.inboxFail', { status: activeRes.status, message: err.message ?? t('tickets.loadFail') }))
         setActiveTickets([])
       } else {
         setActiveTickets(await activeRes.json())
@@ -91,13 +93,13 @@ export default function StaffTicketsPage() {
 
       setCompletedTickets(completedRes.ok ? await completedRes.json() : [])
     } catch (e) {
-      toast.error('Network error loading tickets')
+      toast.error(t('tickets.networkFail'))
       setActiveTickets([])
       setCompletedTickets([])
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [t])
 
   useEffect(() => { void fetchTickets() }, [fetchTickets])
 
@@ -143,15 +145,15 @@ export default function StaffTicketsPage() {
     <div className="p-6 space-y-5 max-w-5xl mx-auto">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold text-foreground">Ticket Queue</h1>
+          <h1 className="text-xl font-bold text-foreground">{t('tickets.title')}</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {allTickets.length} IT tickets visible to your team.
+            {t('tickets.subtitle', { count: allTickets.length })}
           </p>
         </div>
         {!isItStaff && (
           <Button asChild size="sm">
             <Link href="/staff/tickets/new">
-              <Plus className="size-4 mr-1" /> New Ticket
+              <Plus className="size-4 mr-1" /> {t('tickets.newTicket')}
             </Link>
           </Button>
         )}
@@ -169,7 +171,7 @@ export default function StaffTicketsPage() {
                 : 'border-transparent text-muted-foreground hover:text-foreground',
             )}
           >
-            {f}
+            {f === 'all' ? t('common.all') : f === 'unassigned' ? t('common.unassigned') : f === 'urgent' ? t('common.urgent') : f === 'mine' ? t('common.mine') : t('common.completed')}
             <span className={cn(
               'ml-1.5 text-xs rounded-full px-1.5 py-0.5 font-medium',
               activeFilter === f ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground',
@@ -183,7 +185,7 @@ export default function StaffTicketsPage() {
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
         <Input
-          placeholder="Search by title, ID, requester, or category..."
+          placeholder={t('tickets.searchPlaceholder')}
           className="pl-9"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -194,16 +196,16 @@ export default function StaffTicketsPage() {
         {filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center">
             <TicketIcon className="size-8 text-muted-foreground/40 mb-3" />
-            <p className="text-sm font-medium text-foreground">No tickets found</p>
+            <p className="text-sm font-medium text-foreground">{t('tickets.noTickets')}</p>
             <p className="text-xs text-muted-foreground mt-1">
-              {search ? 'Try adjusting your search.' : 'The queue is empty.'}
+              {search ? t('tickets.searchHint') : t('tickets.emptyHint')}
             </p>
           </div>
         ) : (
           <div className="divide-y divide-border">
             {filtered.map((ticket) => {
               const isCompleted = ['RESOLVED', 'CLOSED'].includes(ticket.ticketStatus)
-              const dateLabel = isCompleted ? 'Completed' : 'Opened'
+              const dateLabel = isCompleted ? t('tickets.completed') : t('tickets.opened')
               const dateValue = ticket.completedAt ?? ticket.createdAt
               const assignee = getAssignee(ticket)
 
@@ -222,7 +224,7 @@ export default function StaffTicketsPage() {
                           )}
                           {isCompleted ? (
                             <span className="inline-flex items-center gap-1 text-[10px] border border-border rounded px-1.5 py-0.5 text-muted-foreground">
-                              <Archive className="size-3" /> Completed
+                              <Archive className="size-3" /> {t('common.completed')}
                             </span>
                           ) : null}
                         </div>
@@ -243,7 +245,7 @@ export default function StaffTicketsPage() {
                           ) : (
                             <span className="flex items-center gap-1 text-amber-600 font-medium">
                               <AlertTriangle className="size-3" />
-                              Unassigned
+                              {t('common.unassigned')}
                             </span>
                           )}
                         </div>

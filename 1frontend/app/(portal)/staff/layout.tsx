@@ -6,6 +6,7 @@ import { PortalLayout, type NavItem } from "@/components/portal-layout";
 import { NotificationBell } from "@/components/notification-bell";
 import { ProfileDropdown } from "@/components/profile-dropdown";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { LanguageSwitcher } from "@/components/language-switcher";
 import {
   LayoutDashboard,
   Ticket,
@@ -27,30 +28,15 @@ import {
 import AuthGuard from "@/components/AuthGuard/auth-guard";
 import { PortalAssistant } from "@/components/ai/portal-assistant";
 import { fetchProfile, getStoredUser } from "@/lib/auth";
+import { StaffI18nProvider } from "@/components/staff/staff-i18n-provider";
+import { useI18n } from "@/lib/i18n";
 
-const navItems: NavItem[] = [
-  { label: "Dashboard", href: "/staff/dashboard", icon: LayoutDashboard },
-  { label: "Inbox", href: "/staff/requests", icon: Inbox },
-  { label: "IT Tickets", href: "/staff/tickets", icon: Ticket },
-  { label: "Equipment", href: "/staff/equipment", icon: Package },
-  { label: "Reservations", href: "/staff/reservations", icon: BookMarked },
-  { label: "Documents", href: "/staff/documents", icon: Files },
-  { label: "Procurement", href: "/staff/procurement", icon: ShoppingCart },
-  { label: "Events", href: "/staff/events", icon: PartyPopper },
-  { label: "Internships", href: "/staff/internships", icon: Briefcase },
-  { label: "Appointments", href: "/staff/appointments", icon: CalendarDays },
-  { label: "Access Requests", href: "/staff/access-requests", icon: ShieldCheck },
-  { label: "Reports", href: "/staff/reports", icon: BarChart3 },
-  { label: "Calendar", href: "/staff/calendar", icon: Calendar },
-  { label: "Notifications", href: "/staff/notifications", icon: Bell },
-  { label: "Settings", href: "/staff/settings", icon: Settings },
-];
-
-export default function StaffLayout({
+function StaffLayoutInner({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const { t } = useI18n();
   const [user, setUser] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
@@ -86,15 +72,34 @@ export default function StaffLayout({
 
   if (!user) return null;
 
+  const navItems: NavItem[] = [
+    { label: t('nav.dashboard'), href: "/staff/dashboard", icon: LayoutDashboard },
+    { label: t('nav.inbox'), href: "/staff/requests", icon: Inbox },
+    { label: t('nav.tickets'), href: "/staff/tickets", icon: Ticket },
+    { label: t('nav.equipment'), href: "/staff/equipment", icon: Package },
+    { label: t('nav.reservations'), href: "/staff/reservations", icon: BookMarked },
+    { label: t('nav.documents'), href: "/staff/documents", icon: Files },
+    { label: t('nav.procurement'), href: "/staff/procurement", icon: ShoppingCart },
+    { label: t('nav.events'), href: "/staff/events", icon: PartyPopper },
+    { label: t('nav.internships'), href: "/staff/internships", icon: Briefcase },
+    { label: t('nav.appointments'), href: "/staff/appointments", icon: CalendarDays },
+    { label: t('nav.accessRequests'), href: "/staff/access-requests", icon: ShieldCheck },
+    { label: t('nav.reports'), href: "/staff/reports", icon: BarChart3 },
+    { label: t('nav.calendar'), href: "/staff/calendar", icon: Calendar },
+    { label: t('nav.notifications'), href: "/staff/notifications", icon: Bell },
+    { label: t('nav.settings'), href: "/staff/settings", icon: Settings },
+  ];
+
   const topbar = (
     <div className="flex items-center justify-between flex-1">
       <div className="hidden sm:block">
-        <h1 className="text-sm font-semibold text-foreground">Staff Portal</h1>
+        <h1 className="text-sm font-semibold text-foreground">{t('nav.staffPortal')}</h1>
         <p className="text-xs text-muted-foreground">
           {user.title} · {user.department}
         </p>
       </div>
       <div className="flex items-center gap-1 ml-auto">
+        <LanguageSwitcher />
         <ThemeToggle />
         <NotificationBell role="staff" />
         <ProfileDropdown user={user} settingsHref="/staff/settings" />
@@ -106,22 +111,30 @@ export default function StaffLayout({
     <AuthGuard allowedRoles={["STAFF"]}>
       <PortalLayout
         navItems={navItems}
-        portalName="Staff Portal"
+        portalName={t('nav.staffPortal')}
         portalColor="amber"
         topbar={topbar}
       >
         {children}
         <PortalAssistant
           portal="staff"
-          title="Staff AI Assistant"
-          description="Queue navigation, ticket guidance, and role-aware help for staff operations."
+          title={t('assistant.title')}
+          description={t('assistant.description')}
           prompts={[
-            "Where can I see open tickets?",
-            "How do I get to my approval queue?",
-            "Which page is right for document operations?",
+            t('assistant.openTicketsPrompt'),
+            t('assistant.approvalsPrompt'),
+            t('assistant.documentsPrompt'),
           ]}
         />
       </PortalLayout>
     </AuthGuard>
+  );
+}
+
+export default function StaffLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <StaffI18nProvider>
+      <StaffLayoutInner>{children}</StaffLayoutInner>
+    </StaffI18nProvider>
   );
 }

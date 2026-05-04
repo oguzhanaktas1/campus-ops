@@ -33,6 +33,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { getToken } from '@/lib/auth'
+import { useI18n } from '@/lib/i18n'
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000'
 
@@ -49,6 +50,7 @@ export default function AdminUserDetailPage() {
   const params = useParams()
   const router = useRouter()
   const id = params?.id as string
+  const { t } = useI18n()
 
   const [user, setUser] = useState<any>(null)
   const [allRoles, setAllRoles] = useState<any[]>([])
@@ -65,9 +67,9 @@ export default function AdminUserDetailPage() {
     try {
       const res = await fetch(`${BACKEND}/admin/users/${id}`, { headers: authHeaders() })
       if (res.ok) setUser(await res.json())
-      else toast.error('Failed to load user.')
+      else toast.error(t('users.detailFailLoad'))
     } catch {
-      toast.error('Network error.')
+      toast.error(t('users.detailNetworkError'))
     } finally {
       setIsLoading(false)
     }
@@ -100,17 +102,17 @@ export default function AdminUserDetailPage() {
       })
       if (res.ok) {
         setUser((u: any) => ({ ...u, status: newStatus }))
-        toast.success(`User ${newStatus === 'ACTIVE' ? 'activated' : 'suspended'}.`)
+        toast.success(newStatus === 'ACTIVE' ? t('users.detailUserActivated') : t('users.detailUserSuspended'))
       } else {
-        toast.error('Failed to update status.')
+        toast.error(t('users.detailFailStatus'))
       }
     } catch {
-      toast.error('Network error.')
+      toast.error(t('users.detailNetworkError'))
     }
   }
 
   const handleAssignRole = async () => {
-    if (!assignForm.roleId) { toast.error('Select a role.'); return }
+    if (!assignForm.roleId) { toast.error(t('users.detailSelectRole')); return }
     setIsSavingRole(true)
     try {
       const res = await fetch(`${BACKEND}/admin/users/${id}/roles`, {
@@ -124,36 +126,36 @@ export default function AdminUserDetailPage() {
         }),
       })
       if (res.ok) {
-        toast.success('Role assigned.')
+        toast.success(t('users.detailRoleAssigned'))
         setRoleDialog(false)
         setAssignForm({ roleId: '', facultyId: '', departmentId: '', isPrimary: false })
         await fetchUser()
       } else {
         const err = await res.json().catch(() => ({}))
-        toast.error((err as any).message ?? 'Failed to assign role.')
+        toast.error((err as any).message ?? t('users.detailFailAssignRole'))
       }
     } catch {
-      toast.error('Network error.')
+      toast.error(t('users.detailNetworkError'))
     } finally {
       setIsSavingRole(false)
     }
   }
 
   const handleRemoveRole = async (roleId: string) => {
-    if (!window.confirm('Remove this role assignment?')) return
+    if (!window.confirm(t('users.detailConfirmRemoveRole'))) return
     try {
       const res = await fetch(`${BACKEND}/admin/users/${id}/roles/${roleId}`, {
         method: 'DELETE',
         headers: authHeaders(),
       })
       if (res.ok) {
-        toast.success('Role removed.')
+        toast.success(t('users.detailRoleRemoved'))
         await fetchUser()
       } else {
-        toast.error('Failed to remove role.')
+        toast.error(t('users.detailFailRemoveRole'))
       }
     } catch {
-      toast.error('Network error.')
+      toast.error(t('users.detailNetworkError'))
     }
   }
 
@@ -170,9 +172,9 @@ export default function AdminUserDetailPage() {
       <div className="p-6 max-w-3xl mx-auto">
         <div className="flex flex-col items-center py-16 text-center">
           <AlertTriangle className="size-8 text-muted-foreground/40 mb-3" />
-          <p className="text-sm font-medium text-foreground">User not found</p>
+          <p className="text-sm font-medium text-foreground">{t('users.detailNotFound')}</p>
           <Link href="/admin/users">
-            <Button variant="outline" size="sm" className="mt-3">Back to users</Button>
+            <Button variant="outline" size="sm" className="mt-3">{t('users.detailBackToUsers')}</Button>
           </Link>
         </div>
       </div>
@@ -187,7 +189,7 @@ export default function AdminUserDetailPage() {
       <div className="flex items-center gap-3">
         <Link href="/admin/users">
           <Button variant="ghost" size="sm" className="gap-1.5">
-            <ArrowLeft className="size-4" /> Back
+            <ArrowLeft className="size-4" /> {t('users.detailBack')}
           </Button>
         </Link>
       </div>
@@ -220,28 +222,28 @@ export default function AdminUserDetailPage() {
       {/* Details */}
       <div className="bg-card border border-border rounded-lg p-5 grid sm:grid-cols-2 gap-4">
         <div className="space-y-0.5">
-          <p className="text-xs text-muted-foreground">Email</p>
+          <p className="text-xs text-muted-foreground">{t('users.detailEmail')}</p>
           <p className="text-sm font-medium flex items-center gap-1.5">
             <Mail className="size-3.5 text-muted-foreground" /> {user.email}
           </p>
         </div>
         {user.phoneNumber && (
           <div className="space-y-0.5">
-            <p className="text-xs text-muted-foreground">Phone</p>
+            <p className="text-xs text-muted-foreground">{t('users.detailPhone')}</p>
             <p className="text-sm font-medium flex items-center gap-1.5">
               <Phone className="size-3.5 text-muted-foreground" /> {user.phoneNumber}
             </p>
           </div>
         )}
         <div className="space-y-0.5">
-          <p className="text-xs text-muted-foreground">Joined</p>
+          <p className="text-xs text-muted-foreground">{t('users.detailJoined')}</p>
           <p className="text-sm font-medium flex items-center gap-1.5">
             <Calendar className="size-3.5 text-muted-foreground" /> {fmt(user.createdAt)}
           </p>
         </div>
         {user.lastLoginAt && (
           <div className="space-y-0.5">
-            <p className="text-xs text-muted-foreground">Last Login</p>
+            <p className="text-xs text-muted-foreground">{t('users.detailLastLogin')}</p>
             <p className="text-sm font-medium flex items-center gap-1.5">
               <Shield className="size-3.5 text-muted-foreground" /> {fmt(user.lastLoginAt)}
             </p>
@@ -249,19 +251,19 @@ export default function AdminUserDetailPage() {
         )}
         {user.profile?.title && (
           <div className="space-y-0.5">
-            <p className="text-xs text-muted-foreground">Title</p>
+            <p className="text-xs text-muted-foreground">{t('users.detailTitle')}</p>
             <p className="text-sm font-medium">{user.profile.title}</p>
           </div>
         )}
         {user.profile?.studentNumber && (
           <div className="space-y-0.5">
-            <p className="text-xs text-muted-foreground">Student No</p>
+            <p className="text-xs text-muted-foreground">{t('users.detailStudentNo')}</p>
             <p className="text-sm font-medium">{user.profile.studentNumber}</p>
           </div>
         )}
         {user.profile?.staffNumber && (
           <div className="space-y-0.5">
-            <p className="text-xs text-muted-foreground">Staff No</p>
+            <p className="text-xs text-muted-foreground">{t('users.detailStaffNo')}</p>
             <p className="text-sm font-medium">{user.profile.staffNumber}</p>
           </div>
         )}
@@ -271,15 +273,15 @@ export default function AdminUserDetailPage() {
       <div className="bg-card border border-border rounded-lg p-5 space-y-3">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
-            <Shield className="size-4 text-muted-foreground" /> Role Assignments
+            <Shield className="size-4 text-muted-foreground" /> {t('users.detailRoleAssignments')}
           </h2>
           <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setRoleDialog(true)}>
-            <Plus className="size-3.5" /> Assign Role
+            <Plus className="size-3.5" /> {t('users.detailAssignRole')}
           </Button>
         </div>
 
         {(user.roles ?? []).length === 0 ? (
-          <p className="text-sm text-muted-foreground">No roles assigned.</p>
+          <p className="text-sm text-muted-foreground">{t('users.detailNoRoles')}</p>
         ) : (
           <div className="divide-y divide-border">
             {(user.roles ?? []).map((r: any) => (
@@ -288,14 +290,14 @@ export default function AdminUserDetailPage() {
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-medium text-foreground">{r.name}</span>
                     {r.isPrimary && (
-                      <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded font-bold">PRIMARY</span>
+                      <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded font-bold">{t('users.detailPrimary')}</span>
                     )}
                   </div>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    {r.facultyName ? `Faculty: ${r.facultyName}` : ''}
-                    {r.departmentName ? ` · Dept: ${r.departmentName}` : ''}
-                    {r.unitName ? ` · Unit: ${r.unitName}` : ''}
-                    {!r.facultyName && !r.departmentName && !r.unitName ? 'Global scope' : ''}
+                    {r.facultyName ? `${t('users.detailFacultyLabel')}: ${r.facultyName}` : ''}
+                    {r.departmentName ? ` · ${t('users.detailDeptLabel')}: ${r.departmentName}` : ''}
+                    {r.unitName ? ` · ${t('users.detailUnitLabel')}: ${r.unitName}` : ''}
+                    {!r.facultyName && !r.departmentName && !r.unitName ? t('users.detailGlobalScope') : ''}
                   </p>
                 </div>
                 <Button
@@ -319,7 +321,7 @@ export default function AdminUserDetailPage() {
           size="sm"
           onClick={handleToggleStatus}
         >
-          {user.status === 'ACTIVE' ? 'Suspend User' : 'Activate User'}
+          {user.status === 'ACTIVE' ? t('users.detailSuspend') : t('users.detailActivate')}
         </Button>
       </div>
 
@@ -327,14 +329,14 @@ export default function AdminUserDetailPage() {
       <Dialog open={roleDialog} onOpenChange={setRoleDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Assign Role</DialogTitle>
+            <DialogTitle>{t('users.detailDialogTitle')}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-1.5">
-              <Label>Role <span className="text-destructive">*</span></Label>
+              <Label>{t('users.detailRoleField')} <span className="text-destructive">*</span></Label>
               <Select value={assignForm.roleId} onValueChange={(v) => setAssignForm({ ...assignForm, roleId: v })}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select role..." />
+                  <SelectValue placeholder={t('users.detailSelectRolePlaceholder')} />
                 </SelectTrigger>
                 <SelectContent>
                   {allRoles.map((r: any) => (
@@ -344,13 +346,13 @@ export default function AdminUserDetailPage() {
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label>Faculty (optional)</Label>
+              <Label>{t('users.detailFacultyOptional')}</Label>
               <Select value={assignForm.facultyId} onValueChange={(v) => setAssignForm({ ...assignForm, facultyId: v, departmentId: '' })}>
                 <SelectTrigger>
-                  <SelectValue placeholder="No faculty scope" />
+                  <SelectValue placeholder={t('users.detailNoFacultyScope')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">— No scope —</SelectItem>
+                  <SelectItem value="">{t('users.detailNoScope')}</SelectItem>
                   {allFaculties.map((f: any) => (
                     <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
                   ))}
@@ -359,13 +361,13 @@ export default function AdminUserDetailPage() {
             </div>
             {assignForm.facultyId && (
               <div className="space-y-1.5">
-                <Label>Department (optional)</Label>
+                <Label>{t('users.detailDeptOptional')}</Label>
                 <Select value={assignForm.departmentId} onValueChange={(v) => setAssignForm({ ...assignForm, departmentId: v })}>
                   <SelectTrigger>
-                    <SelectValue placeholder="No department scope" />
+                    <SelectValue placeholder={t('users.detailNoScope')} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">— No scope —</SelectItem>
+                    <SelectItem value="">{t('users.detailNoScope')}</SelectItem>
                     {allDepartments
                       .filter((d: any) => d.facultyId === assignForm.facultyId)
                       .map((d: any) => (
@@ -388,15 +390,15 @@ export default function AdminUserDetailPage() {
                 <span className={`inline-block size-3.5 rounded-full bg-white shadow transition-transform ${assignForm.isPrimary ? 'translate-x-4' : 'translate-x-0.5'}`} />
               </button>
               <Label className="cursor-pointer" onClick={() => setAssignForm({ ...assignForm, isPrimary: !assignForm.isPrimary })}>
-                Set as primary role
+                {t('users.detailSetPrimary')}
               </Label>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setRoleDialog(false)} disabled={isSavingRole}>Cancel</Button>
+            <Button variant="outline" onClick={() => setRoleDialog(false)} disabled={isSavingRole}>{t('users.detailCancel')}</Button>
             <Button onClick={handleAssignRole} disabled={isSavingRole}>
               {isSavingRole && <Loader2 className="mr-2 size-4 animate-spin" />}
-              Assign
+              {t('users.detailAssign')}
             </Button>
           </DialogFooter>
         </DialogContent>

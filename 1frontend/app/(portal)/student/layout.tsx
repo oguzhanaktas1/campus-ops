@@ -6,6 +6,9 @@ import { PortalLayout, type NavItem } from "@/components/portal-layout";
 import { NotificationBell } from "@/components/notification-bell";
 import { ProfileDropdown } from "@/components/profile-dropdown";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { LanguageSwitcher } from "@/components/language-switcher";
+import { StudentI18nProvider } from "@/components/student/student-i18n-provider";
+import { useI18n } from "@/lib/i18n";
 import {
   LayoutDashboard,
   FileText,
@@ -27,32 +30,29 @@ import AuthGuard from "@/components/AuthGuard/auth-guard";
 import { PortalAssistant } from "@/components/ai/portal-assistant";
 import { fetchProfile, getStoredUser, getToken } from "@/lib/auth";
 
-const navItems: NavItem[] = [
-  { label: "Dashboard", href: "/student/dashboard", icon: LayoutDashboard },
-  { label: "My Requests", href: "/student/requests", icon: FileText },
-  { label: "Documents", href: "/student/documents", icon: GraduationCap },
-  { label: "Reservations", href: "/student/reservations", icon: Building2 },
-  { label: "Appointments", href: "/student/appointments", icon: CalendarDays },
-  { label: "Internships", href: "/student/internships", icon: Briefcase },
-  { label: "Equipment", href: "/student/equipment", icon: Package },
-  { label: "Procurement", href: "/student/procurement", icon: ShoppingCart },
-  { label: "Events", href: "/student/events", icon: PartyPopper },
-  { label: "Access Requests", href: "/student/access-requests", icon: ShieldCheck },
-  { label: "Calendar", href: "/student/calendar", icon: Calendar },
-  { label: "Notifications", href: "/student/notifications", icon: Bell },
-  { label: "My Files", href: "/student/files", icon: FolderOpen },
-  { label: "Settings", href: "/student/settings", icon: Settings },
-];
-
-export default function StudentLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+function StudentLayoutInner({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<any>(null);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
+  const { t } = useI18n();
+
+  const navItems: NavItem[] = [
+    { label: t("nav.dashboard"), href: "/student/dashboard", icon: LayoutDashboard },
+    { label: t("nav.requests"), href: "/student/requests", icon: FileText },
+    { label: t("nav.documents"), href: "/student/documents", icon: GraduationCap },
+    { label: t("nav.reservations"), href: "/student/reservations", icon: Building2 },
+    { label: t("nav.appointments"), href: "/student/appointments", icon: CalendarDays },
+    { label: t("nav.internships"), href: "/student/internships", icon: Briefcase },
+    { label: t("nav.equipment"), href: "/student/equipment", icon: Package },
+    { label: t("nav.procurement"), href: "/student/procurement", icon: ShoppingCart },
+    { label: t("nav.events"), href: "/student/events", icon: PartyPopper },
+    { label: t("nav.accessRequests"), href: "/student/access-requests", icon: ShieldCheck },
+    { label: t("nav.calendar"), href: "/student/calendar", icon: Calendar },
+    { label: t("nav.notifications"), href: "/student/notifications", icon: Bell },
+    { label: t("nav.files"), href: "/student/files", icon: FolderOpen },
+    { label: t("nav.settings"), href: "/student/settings", icon: Settings },
+  ];
 
   useEffect(() => {
     const fetchData = async () => {
@@ -107,20 +107,21 @@ export default function StudentLayout({
   if (!user) return null;
 
   const dynamicNavItems = navItems.map((item) =>
-    item.label === "Notifications" ? { ...item, badge: unreadCount } : item,
+    item.href === "/student/notifications" ? { ...item, badge: unreadCount } : item,
   );
 
   const topbar = (
     <div className="flex items-center justify-between flex-1">
       <div className="hidden sm:block">
         <h1 className="text-sm font-semibold text-foreground">
-          Student Portal
+          {t("nav.studentPortal")}
         </h1>
         <p className="text-xs text-muted-foreground">
           {user.department} · {user.studentId}
         </p>
       </div>
       <div className="flex items-center gap-1 ml-auto">
+        <LanguageSwitcher />
         <ThemeToggle />
         <NotificationBell role="student" />
         <ProfileDropdown user={user} settingsHref="/student/settings" />
@@ -132,22 +133,34 @@ export default function StudentLayout({
     <AuthGuard allowedRoles={["STUDENT"]}>
       <PortalLayout
         navItems={dynamicNavItems}
-        portalName="Student Portal"
+        portalName={t("nav.studentPortal")}
         portalColor="indigo"
         topbar={topbar}
       >
         {children}
         <PortalAssistant
           portal="student"
-          title="Student AI Assistant"
-          description="Route guidance, request status explanations, and next-step help within your own student scope."
+          title={t("assistant.title")}
+          description={t("assistant.description")}
           prompts={[
-            "How do I submit an internship application?",
-            "How do I track my open requests?",
-            "Which page should I go to for a reservation?",
+            t("assistant.internshipPrompt"),
+            t("assistant.requestsPrompt"),
+            t("assistant.reservationPrompt"),
           ]}
         />
       </PortalLayout>
     </AuthGuard>
+  );
+}
+
+export default function StudentLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <StudentI18nProvider>
+      <StudentLayoutInner>{children}</StudentLayoutInner>
+    </StudentI18nProvider>
   );
 }

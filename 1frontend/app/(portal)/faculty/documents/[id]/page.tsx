@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { getToken } from '@/lib/auth'
+import { useI18n } from '@/lib/i18n'
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000'
 const TERMINAL = ['APPROVED', 'REJECTED', 'CANCELLED', 'COMPLETED', 'ISSUED']
@@ -34,6 +35,7 @@ function InfoRow({ label, value }: { label: string; value?: string | null }) {
 
 export default function FacultyDocumentDetailPage() {
   const { id } = useParams() as { id: string }
+  const { t } = useI18n()
   const [data, setData] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isProcessing, setIsProcessing] = useState(false)
@@ -52,7 +54,7 @@ export default function FacultyDocumentDetailPage() {
 
   const handleProcess = async (action: 'approve' | 'reject') => {
     if (action === 'reject' && !rejectReason.trim()) {
-      toast.error('Rejection reason required.')
+      toast.error(t('detail.rejectionReasonRequired'))
       return
     }
     setIsProcessing(true)
@@ -66,7 +68,7 @@ export default function FacultyDocumentDetailPage() {
         }),
       })
       if (res.ok) {
-        toast.success(action === 'approve' ? 'Document request approved.' : 'Document request rejected.')
+        toast.success(action === 'approve' ? t('detail.documentApproved') : t('detail.documentRejected'))
         setData((prev: any) => ({
           ...prev,
           status: action === 'approve' ? 'APPROVED' : 'REJECTED',
@@ -74,10 +76,10 @@ export default function FacultyDocumentDetailPage() {
         setShowReject(false)
       } else {
         const err = await res.json().catch(() => ({})) as { message?: string }
-        toast.error(err.message ?? 'Failed.')
+        toast.error(err.message ?? t('detail.failed'))
       }
     } catch {
-      toast.error('Network error.')
+      toast.error(t('detail.networkError'))
     } finally {
       setIsProcessing(false)
     }
@@ -87,8 +89,8 @@ export default function FacultyDocumentDetailPage() {
   if (!data) return (
     <div className="p-6 max-w-3xl mx-auto flex flex-col items-center py-16">
       <AlertTriangle className="size-8 text-muted-foreground/40 mb-3" />
-      <p className="text-sm font-medium">Request not found</p>
-      <Link href="/faculty/documents"><Button variant="outline" size="sm" className="mt-3">Back</Button></Link>
+      <p className="text-sm font-medium">{t('detail.requestNotFound')}</p>
+      <Link href="/faculty/documents"><Button variant="outline" size="sm" className="mt-3">{t('common.back')}</Button></Link>
     </div>
   )
 
@@ -97,7 +99,7 @@ export default function FacultyDocumentDetailPage() {
 
   return (
     <div className="p-6 space-y-5 max-w-4xl mx-auto pb-20">
-      <Link href="/faculty/documents"><Button variant="ghost" size="sm" className="gap-1.5"><ArrowLeft className="size-4" /> Back</Button></Link>
+      <Link href="/faculty/documents"><Button variant="ghost" size="sm" className="gap-1.5"><ArrowLeft className="size-4" /> {t('common.back')}</Button></Link>
 
       <div className="bg-card border border-border rounded-lg p-5 flex items-start justify-between gap-4">
         <div className="flex items-start gap-3">
@@ -106,7 +108,7 @@ export default function FacultyDocumentDetailPage() {
           </div>
           <div>
             <h1 className="text-lg font-bold">{data.title || documentData.documentType}</h1>
-            <p className="text-xs text-muted-foreground mt-0.5">{data.requestNo} · Submitted {fmt(data.createdAt)}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">{data.requestNo} · {t('detail.submitted')} {fmt(data.createdAt)}</p>
           </div>
         </div>
         <StatusBadge status={data.status} />
@@ -116,7 +118,7 @@ export default function FacultyDocumentDetailPage() {
         <div className="lg:col-span-3 space-y-5">
           {data.requester && (
             <div className="bg-card border border-border rounded-lg p-5 space-y-3">
-              <p className="text-sm font-semibold flex items-center gap-2"><User className="size-4 text-muted-foreground" /> Requester</p>
+              <p className="text-sm font-semibold flex items-center gap-2"><User className="size-4 text-muted-foreground" /> {t('detail.requester')}</p>
               <div className="flex items-center gap-3">
                 <div className="size-9 rounded-full bg-primary/10 flex items-center justify-center text-primary text-sm font-bold">
                   {data.requester?.fullName?.charAt(0) ?? 'R'}
@@ -130,26 +132,26 @@ export default function FacultyDocumentDetailPage() {
           )}
 
           <div className="bg-card border border-border rounded-lg p-5 space-y-4">
-            <p className="text-sm font-semibold">Document Details</p>
+            <p className="text-sm font-semibold">{t('detail.documentDetails')}</p>
             <div className="grid grid-cols-2 gap-4">
-              <InfoRow label="Document Type" value={documentData.documentType} />
-              <InfoRow label="Language" value={documentData.language} />
-              <InfoRow label="Copies" value={documentData.copiesCount?.toString()} />
-              <InfoRow label="Delivery Method" value={documentData.deliveryMethod} />
-              {documentData.deliveryAddress && <InfoRow label="Delivery Address" value={documentData.deliveryAddress} />}
+              <InfoRow label={t('detail.documentType')} value={documentData.documentType} />
+              <InfoRow label={t('detail.language')} value={documentData.language} />
+              <InfoRow label={t('detail.copies')} value={documentData.copiesCount?.toString()} />
+              <InfoRow label={t('detail.deliveryMethod')} value={documentData.deliveryMethod} />
+              {documentData.deliveryAddress && <InfoRow label={t('detail.deliveryAddress')} value={documentData.deliveryAddress} />}
             </div>
           </div>
 
           {data.description && (
             <div className="bg-card border border-border rounded-lg p-5">
-              <p className="text-sm font-semibold mb-2">Notes</p>
+              <p className="text-sm font-semibold mb-2">{t('detail.notes')}</p>
               <p className="text-sm text-muted-foreground">{data.description}</p>
             </div>
           )}
 
           {data.timeline?.length > 0 && (
             <div className="bg-card border border-border rounded-lg p-5">
-              <p className="text-sm font-semibold mb-4">Status History</p>
+              <p className="text-sm font-semibold mb-4">{t('detail.statusHistory')}</p>
               <RequestTimeline events={data.timeline} />
             </div>
           )}
@@ -159,32 +161,32 @@ export default function FacultyDocumentDetailPage() {
           <div className="lg:col-span-2">
             {!showReject ? (
               <div className="bg-card border border-border rounded-lg p-5 space-y-4">
-                <p className="text-sm font-semibold">Process Request</p>
+                <p className="text-sm font-semibold">{t('detail.processRequest')}</p>
                 <div className="space-y-1.5">
-                  <Label>Note (optional)</Label>
-                  <Textarea className="resize-none min-h-[80px]" placeholder="Add a processing note..." value={note} onChange={(e) => setNote(e.target.value)} disabled={isProcessing} />
+                  <Label>{t('detail.noteOptional')}</Label>
+                  <Textarea className="resize-none min-h-[80px]" placeholder={t('detail.processingNotePlaceholder')} value={note} onChange={(e) => setNote(e.target.value)} disabled={isProcessing} />
                 </div>
                 <div className="flex gap-3">
                   <Button className="flex-1 gap-2 bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => handleProcess('approve')} disabled={isProcessing}>
-                    {isProcessing ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />} Approve
+                    {isProcessing ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />} {t('common.approve')}
                   </Button>
                   <Button variant="outline" className="flex-1 gap-2 border-destructive text-destructive hover:bg-destructive/10" onClick={() => setShowReject(true)} disabled={isProcessing}>
-                    <XCircle className="size-4" /> Reject
+                    <XCircle className="size-4" /> {t('common.reject')}
                   </Button>
                 </div>
               </div>
             ) : (
               <div className="bg-card border border-border rounded-lg p-5 space-y-4">
-                <p className="text-sm font-semibold">Reject Request</p>
+                <p className="text-sm font-semibold">{t('detail.rejectRequest')}</p>
                 <div className="space-y-1.5">
-                  <Label>Reason <span className="text-destructive">*</span></Label>
-                  <Textarea className="resize-none min-h-[80px]" placeholder="Explain why..." value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} disabled={isProcessing} />
+                  <Label>{t('detail.reasonRequired')} <span className="text-destructive">*</span></Label>
+                  <Textarea className="resize-none min-h-[80px]" placeholder={t('detail.explainWhyPlaceholder')} value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} disabled={isProcessing} />
                 </div>
                 <div className="flex gap-3">
                   <Button className="flex-1 gap-2 bg-destructive hover:bg-destructive/90 text-white" onClick={() => handleProcess('reject')} disabled={isProcessing}>
-                    {isProcessing ? <Loader2 className="size-4 animate-spin" /> : <XCircle className="size-4" />} Confirm
+                    {isProcessing ? <Loader2 className="size-4 animate-spin" /> : <XCircle className="size-4" />} {t('common.confirm')}
                   </Button>
-                  <Button variant="outline" onClick={() => setShowReject(false)} disabled={isProcessing}>Cancel</Button>
+                  <Button variant="outline" onClick={() => setShowReject(false)} disabled={isProcessing}>{t('common.cancel')}</Button>
                 </div>
               </div>
             )}

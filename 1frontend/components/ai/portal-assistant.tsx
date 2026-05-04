@@ -8,6 +8,7 @@ import { getToken, getStoredUser, resolvePrimaryRole } from '@/lib/auth'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
+import { useOptionalT } from '@/lib/optional-t'
 
 type AssistantMessage = {
   role: 'user' | 'assistant'
@@ -49,6 +50,7 @@ export function PortalAssistant({
   const [input, setInput] = useState('')
   const [messages, setMessages] = useState<AssistantMessage[]>([])
   const messagesRef = useRef<HTMLDivElement | null>(null)
+  const tt = useOptionalT()
 
   const backendUrl =
     process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
@@ -123,7 +125,7 @@ export function PortalAssistant({
         ...current,
         {
           role: 'assistant',
-          content: data.answer || 'AI assistant is currently unavailable.',
+          content: data.answer || tt('assistant.unavailable', 'AI assistant is currently unavailable.'),
           links: Array.isArray(data.links) ? data.links : [],
           cards: Array.isArray(data.cards) ? data.cards : [],
         },
@@ -133,7 +135,7 @@ export function PortalAssistant({
         ...current,
         {
           role: 'assistant',
-          content: 'AI assistant is currently unavailable.',
+          content: tt('assistant.unavailable', 'AI assistant is currently unavailable.'),
         },
       ])
     } finally {
@@ -147,7 +149,7 @@ export function PortalAssistant({
         <button
           type="button"
           className="flex h-14 w-14 items-center justify-center rounded-full border border-border bg-background text-muted-foreground shadow-lg"
-          aria-label="Checking AI assistant availability"
+          aria-label={tt('assistant.checkingAvailability', 'Checking AI assistant availability')}
           disabled
         >
           <Loader2 className="size-5 animate-spin" />
@@ -174,7 +176,7 @@ export function PortalAssistant({
                   </div>
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-foreground">{title}</p>
-                    <p className="text-[11px] text-muted-foreground">AI helper only. Final action stays with you.</p>
+                    <p className="text-[11px] text-muted-foreground">{tt('assistant.helperOnly', 'AI helper only. Final action stays with you.')}</p>
                   </div>
                 </div>
                 <p className="mt-2.5 text-xs leading-5 text-muted-foreground sm:mt-3">{description}</p>
@@ -188,7 +190,7 @@ export function PortalAssistant({
                   type="button"
                   className="inline-flex size-8 items-center justify-center rounded-full border border-border bg-background text-muted-foreground transition-colors hover:text-foreground"
                   onClick={() => setIsOpen(false)}
-                  aria-label="Close AI assistant"
+                  aria-label={tt('assistant.close', 'Close AI assistant')}
                 >
                   <X className="size-4" />
                 </button>
@@ -222,8 +224,8 @@ export function PortalAssistant({
             >
               {messages.length === 0 ? (
                 <div className="space-y-2 rounded-2xl border border-dashed border-border bg-background/90 p-3 text-sm text-muted-foreground">
-                  <p>This session starts empty every time. Previous chats are not reloaded into the UI.</p>
-                  <p>Ask about routes, request status, approvals, analytics, or next steps.</p>
+                  <p>{tt('assistant.emptySession', 'This session starts empty every time. Previous chats are not reloaded into the UI.')}</p>
+                  <p>{tt('assistant.askAbout', 'Ask about routes, request status, approvals, analytics, or next steps.')}</p>
                 </div>
               ) : (
                 messages.map((message, index) => (
@@ -281,7 +283,7 @@ export function PortalAssistant({
               {isSending && (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Loader2 className="size-4 animate-spin" />
-                  Generating reply…
+                  {tt('assistant.generatingReply', 'Generating reply...')}
                 </div>
               )}
             </div>
@@ -297,12 +299,12 @@ export function PortalAssistant({
                     void submitMessage(input)
                   }
                 }}
-                placeholder="Type your question here. (Enter to send, Shift+Enter for newline)"
+                placeholder={tt('assistant.inputPlaceholder', 'Type your question here. (Enter to send, Shift+Enter for newline)')}
                 className="min-h-16 resize-none rounded-2xl border-border/80 bg-background text-sm sm:min-h-20"
               />
               <div className="flex items-center justify-between gap-2">
                 <p className="text-[11px] text-muted-foreground">
-                  Advisory only. Review before acting.
+                  {tt('assistant.advisoryOnly', 'Advisory only. Review before acting.')}
                 </p>
                 <Button
                   type="button"
@@ -312,7 +314,7 @@ export function PortalAssistant({
                   disabled={isSending || !input.trim()}
                 >
                   <SendHorizonal className="size-3.5 sm:size-4" />
-                  Send
+                  {tt('assistant.send', 'Send')}
                 </Button>
               </div>
             </div>
@@ -329,7 +331,7 @@ export function PortalAssistant({
         )}
         onClick={() => setIsOpen((current) => !current)}
         aria-expanded={isOpen}
-        aria-label={isOpen ? 'Collapse AI assistant' : 'Open AI assistant'}
+        aria-label={isOpen ? tt('assistant.collapse', 'Collapse AI assistant') : tt('assistant.open', 'Open AI assistant')}
       >
         <span className="flex size-8 items-center justify-center rounded-full bg-white/15 sm:size-10">
           {isOpen ? (
@@ -339,9 +341,9 @@ export function PortalAssistant({
           )}
         </span>
         <span className="text-left">
-          <span className="block text-sm font-semibold">AI Assistant</span>
+          <span className="block text-sm font-semibold">{tt('assistant.triggerTitle', 'AI Assistant')}</span>
           <span className="block text-[11px] opacity-85">
-            {isOpen ? 'Hide chat' : 'Ask a quick question'}
+            {isOpen ? tt('assistant.hideChat', 'Hide chat') : tt('assistant.askQuickQuestion', 'Ask a quick question')}
           </span>
         </span>
       </button>

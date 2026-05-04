@@ -8,10 +8,12 @@ import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
 import { User, Bell, Shield, Save, Loader2, Camera, UserCircle } from 'lucide-react'
 import { toast } from 'sonner'
+import { useI18n } from '@/lib/i18n'
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
 
 export default function AdminSettingsPage() {
+  const { t } = useI18n()
   const [activeSection, setActiveSection] = useState('profile')
   const [isSaving, setIsSaving] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
@@ -31,9 +33,9 @@ export default function AdminSettingsPage() {
   })
 
   const sections = [
-    { id: 'profile', label: 'Profile', icon: User },
-    { id: 'notifications', label: 'Notifications', icon: Bell },
-    { id: 'security', label: 'Security', icon: Shield },
+    { id: 'profile', label: t('settings.profile'), icon: User },
+    { id: 'notifications', label: t('settings.notifications'), icon: Bell },
+    { id: 'security', label: t('settings.security'), icon: Shield },
   ]
 
   useEffect(() => {
@@ -66,7 +68,7 @@ export default function AdminSettingsPage() {
           const p = await resPrefs.json()
           setPrefs({ emailEnabled: p.emailEnabled, inAppEnabled: p.inAppEnabled, marketingEmailEnabled: p.marketingEmailEnabled, reminderEmailEnabled: p.reminderEmailEnabled })
         }
-      } catch { toast.error('Settings could not be loaded.') }
+      } catch { toast.error(t('settings.loadFail')) }
       finally { setIsLoading(false) }
     }
     fetch_()
@@ -93,7 +95,7 @@ export default function AdminSettingsPage() {
             ...profile,
           }),
         })
-        if (res.ok) toast.success('Profile updated!')
+        if (res.ok) toast.success(t('settings.saveSuccess'))
         else throw new Error()
       }
 
@@ -103,20 +105,20 @@ export default function AdminSettingsPage() {
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
           body: JSON.stringify(prefs),
         })
-        toast.success('Preferences saved!')
+        toast.success(t('settings.prefsSaved'))
       }
 
       if (activeSection === 'security' && (passwords.currentPassword || passwords.newPassword)) {
-        if (passwords.newPassword !== passwords.confirmPassword) { toast.error('Passwords do not match!'); setIsSaving(false); return }
+        if (passwords.newPassword !== passwords.confirmPassword) { toast.error(t('settings.passwordMismatch')); setIsSaving(false); return }
         const res = await fetch(`${BACKEND}/admin/settings/change-password`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
           body: JSON.stringify({ currentPassword: passwords.currentPassword, newPassword: passwords.newPassword }),
         })
-        if (res.ok) { toast.success('Password updated!'); setPasswords({ currentPassword: '', newPassword: '', confirmPassword: '' }) }
-        else { const e = await res.json(); toast.error(e.message || 'Failed.') }
+        if (res.ok) { toast.success(t('settings.passwordUpdated')); setPasswords({ currentPassword: '', newPassword: '', confirmPassword: '' }) }
+        else { const e = await res.json(); toast.error(e.message || t('settings.saveFail')) }
       }
-    } catch { toast.error('An error occurred while saving.') }
+    } catch { toast.error(t('settings.saveFail')) }
     finally { setIsSaving(false) }
   }
 
@@ -127,8 +129,8 @@ export default function AdminSettingsPage() {
   return (
     <div className="p-6 max-w-4xl mx-auto pb-20">
       <div className="mb-6">
-        <h1 className="text-xl font-bold text-foreground">Admin Settings</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">Manage your personal profile, notifications and security.</p>
+        <h1 className="text-xl font-bold text-foreground">{t('settings.title')}</h1>
+        <p className="text-sm text-muted-foreground mt-0.5">{t('settings.subtitle')}</p>
       </div>
 
       <div className="flex flex-col md:flex-row gap-6">
@@ -155,7 +157,7 @@ export default function AdminSettingsPage() {
             <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
               <div className="flex items-center gap-2 px-5 py-4 border-b border-border bg-muted/20">
                 <User className="size-4 text-primary" />
-                <h2 className="text-sm font-semibold text-foreground">Edit Profile</h2>
+                <h2 className="text-sm font-semibold text-foreground">{t('settings.editProfile')}</h2>
               </div>
               <div className="p-5 space-y-5">
 
@@ -180,54 +182,54 @@ export default function AdminSettingsPage() {
                     <p className="text-sm font-medium text-foreground">{`${profile.firstName} ${profile.lastName}`.trim() || 'Admin'}</p>
                     <p className="text-xs text-muted-foreground">{profile.email}</p>
                     {profile.avatarUrl && (
-                      <button type="button" className="text-xs text-destructive hover:underline mt-1" onClick={() => setProfile(p => ({ ...p, avatarUrl: '' }))}>Remove photo</button>
+                      <button type="button" className="text-xs text-destructive hover:underline mt-1" onClick={() => setProfile(p => ({ ...p, avatarUrl: '' }))}>{t('settings.removePhoto')}</button>
                     )}
                   </div>
                 </div>
 
                 <div className="grid sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <Label>First Name</Label>
-                    <Input value={profile.firstName} onChange={e => setProfile({ ...profile, firstName: e.target.value })} placeholder="First name" />
+                    <Label>{t('settings.firstName')}</Label>
+                    <Input value={profile.firstName} onChange={e => setProfile({ ...profile, firstName: e.target.value })} placeholder={t('settings.firstNamePlaceholder')} />
                   </div>
                   <div className="space-y-1.5">
-                    <Label>Last Name</Label>
-                    <Input value={profile.lastName} onChange={e => setProfile({ ...profile, lastName: e.target.value })} placeholder="Last name" />
+                    <Label>{t('settings.lastName')}</Label>
+                    <Input value={profile.lastName} onChange={e => setProfile({ ...profile, lastName: e.target.value })} placeholder={t('settings.lastNamePlaceholder')} />
                   </div>
                   <div className="space-y-1.5">
-                    <Label>Email</Label>
+                    <Label>{t('settings.email')}</Label>
                     <Input type="email" value={profile.email} onChange={e => setProfile({ ...profile, email: e.target.value })} />
                   </div>
                   <div className="space-y-1.5">
-                    <Label>Phone Number</Label>
-                    <Input value={profile.phoneNumber} onChange={e => setProfile({ ...profile, phoneNumber: e.target.value })} placeholder="+90..." />
+                    <Label>{t('settings.phone')}</Label>
+                    <Input value={profile.phoneNumber} onChange={e => setProfile({ ...profile, phoneNumber: e.target.value })} placeholder={t('settings.phonePlaceholder')} />
                   </div>
                   <div className="space-y-1.5">
-                    <Label>Title</Label>
-                    <Input value={profile.title} onChange={e => setProfile({ ...profile, title: e.target.value })} placeholder="e.g. System Administrator" />
+                    <Label>{t('settings.title')}</Label>
+                    <Input value={profile.title} onChange={e => setProfile({ ...profile, title: e.target.value })} placeholder={t('settings.titlePlaceholder')} />
                   </div>
                   <div className="space-y-1.5">
-                    <Label>Gender</Label>
+                    <Label>{t('settings.gender')}</Label>
                     <select value={profile.gender} onChange={e => setProfile({ ...profile, gender: e.target.value })}
                       className="w-full h-10 bg-background border border-input rounded-md px-3 text-sm focus:ring-2 focus:ring-primary outline-none">
-                      <option value="">Select...</option>
-                      <option value="MALE">Male</option>
-                      <option value="FEMALE">Female</option>
-                      <option value="OTHER">Other</option>
-                      <option value="PREFER_NOT_TO_SAY">Prefer not to say</option>
+                      <option value="">{t('settings.genderSelect')}</option>
+                      <option value="MALE">{t('settings.genderMale')}</option>
+                      <option value="FEMALE">{t('settings.genderFemale')}</option>
+                      <option value="OTHER">{t('settings.genderOther')}</option>
+                      <option value="PREFER_NOT_TO_SAY">{t('settings.genderPreferNot')}</option>
                     </select>
                   </div>
                   <div className="space-y-1.5">
-                    <Label>Birth Date</Label>
+                    <Label>{t('settings.birthDate')}</Label>
                     <Input type="date" value={profile.birthDate} onChange={e => setProfile({ ...profile, birthDate: e.target.value })} />
                   </div>
                   <div className="space-y-1.5 sm:col-span-2">
-                    <Label>Address</Label>
-                    <Textarea value={profile.address} onChange={e => setProfile({ ...profile, address: e.target.value })} placeholder="Full address..." className="min-h-[70px] resize-none" />
+                    <Label>{t('settings.address')}</Label>
+                    <Textarea value={profile.address} onChange={e => setProfile({ ...profile, address: e.target.value })} placeholder={t('settings.addressPlaceholder')} className="min-h-[70px] resize-none" />
                   </div>
                   <div className="space-y-1.5 sm:col-span-2">
-                    <Label>Bio</Label>
-                    <Textarea value={profile.bio} onChange={e => setProfile({ ...profile, bio: e.target.value })} placeholder="Short bio..." className="min-h-[70px] resize-none" />
+                    <Label>{t('settings.bio')}</Label>
+                    <Textarea value={profile.bio} onChange={e => setProfile({ ...profile, bio: e.target.value })} placeholder={t('settings.bioPlaceholder')} className="min-h-[70px] resize-none" />
                   </div>
                 </div>
               </div>
@@ -239,7 +241,7 @@ export default function AdminSettingsPage() {
             <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
               <div className="flex items-center gap-2 px-5 py-4 border-b border-border bg-muted/20">
                 <Bell className="size-4 text-primary" />
-                <h2 className="text-sm font-semibold text-foreground">Notification Preferences</h2>
+                <h2 className="text-sm font-semibold text-foreground">{t('settings.notificationPreferences')}</h2>
               </div>
               <div className="p-5 space-y-4">
                 {Object.entries(prefs).map(([key, value]) => (
@@ -257,12 +259,12 @@ export default function AdminSettingsPage() {
             <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
               <div className="flex items-center gap-2 px-5 py-4 border-b border-border bg-muted/20">
                 <Shield className="size-4 text-primary" />
-                <h2 className="text-sm font-semibold text-foreground">Change Password</h2>
+                <h2 className="text-sm font-semibold text-foreground">{t('settings.changePassword')}</h2>
               </div>
               <div className="p-5 space-y-4">
-                <div className="space-y-1.5"><Label>Current Password</Label><Input type="password" value={passwords.currentPassword} onChange={e => setPasswords({ ...passwords, currentPassword: e.target.value })} /></div>
-                <div className="space-y-1.5"><Label>New Password</Label><Input type="password" value={passwords.newPassword} onChange={e => setPasswords({ ...passwords, newPassword: e.target.value })} /></div>
-                <div className="space-y-1.5"><Label>Confirm New Password</Label><Input type="password" value={passwords.confirmPassword} onChange={e => setPasswords({ ...passwords, confirmPassword: e.target.value })} /></div>
+                <div className="space-y-1.5"><Label>{t('settings.currentPassword')}</Label><Input type="password" value={passwords.currentPassword} onChange={e => setPasswords({ ...passwords, currentPassword: e.target.value })} /></div>
+                <div className="space-y-1.5"><Label>{t('settings.newPassword')}</Label><Input type="password" value={passwords.newPassword} onChange={e => setPasswords({ ...passwords, newPassword: e.target.value })} /></div>
+                <div className="space-y-1.5"><Label>{t('settings.confirmPassword')}</Label><Input type="password" value={passwords.confirmPassword} onChange={e => setPasswords({ ...passwords, confirmPassword: e.target.value })} /></div>
               </div>
             </div>
           )}
@@ -270,7 +272,7 @@ export default function AdminSettingsPage() {
           <div className="flex justify-end pt-2">
             <Button onClick={handleSave} disabled={isSaving} className="px-8 shadow-lg shadow-primary/20">
               {isSaving ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Save className="mr-2 size-4" />}
-              {isSaving ? 'Saving...' : 'Save Changes'}
+              {isSaving ? t('common.saving') : t('common.save')}
             </Button>
           </div>
         </div>

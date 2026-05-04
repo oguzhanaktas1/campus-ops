@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { getToken } from '@/lib/auth'
+import { useI18n } from '@/lib/i18n'
 
 const STATUS_BADGE: Record<string, string> = {
   DRAFT:              'bg-gray-50 text-gray-600 border-gray-200',
@@ -19,6 +20,7 @@ const STATUS_BADGE: Record<string, string> = {
 }
 
 export default function OrganizerEventsPage() {
+  const { t } = useI18n()
   const [events, setEvents] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const backend = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
@@ -31,13 +33,13 @@ export default function OrganizerEventsPage() {
         })
         if (res.ok) setEvents(await res.json())
       } catch {
-        toast.error('Failed to load events.')
+        toast.error(t('pages.eventsLoadFail'))
       } finally {
         setIsLoading(false)
       }
     }
     fetchEvents()
-  }, [])
+  }, [backend, t])
 
   async function publishEvent(id: string) {
     try {
@@ -46,10 +48,10 @@ export default function OrganizerEventsPage() {
         headers: { Authorization: `Bearer ${getToken()}` },
       })
       if (!res.ok) throw new Error()
-      toast.success('Event published.')
+      toast.success(t('pages.eventPublished'))
       setEvents((prev) => prev.map((e) => e.id === id ? { ...e, status: 'REGISTRATION_OPEN' } : e))
     } catch {
-      toast.error('Failed to publish event.')
+      toast.error(t('pages.eventPublishFail'))
     }
   }
 
@@ -60,10 +62,10 @@ export default function OrganizerEventsPage() {
         headers: { Authorization: `Bearer ${getToken()}` },
       })
       if (!res.ok) throw new Error()
-      toast.success('Event confirmed.')
+      toast.success(t('pages.eventConfirmed'))
       setEvents((prev) => prev.map((e) => e.id === id ? { ...e, status: 'CONFIRMED' } : e))
     } catch {
-      toast.error('Failed to confirm event.')
+      toast.error(t('pages.eventConfirmFail'))
     }
   }
 
@@ -77,17 +79,17 @@ export default function OrganizerEventsPage() {
     <div className="p-6 max-w-4xl mx-auto space-y-6 pb-20">
       <div>
         <h1 className="text-xl font-bold flex items-center gap-2">
-          <PartyPopper className="size-5 text-primary" /> My Events
+          <PartyPopper className="size-5 text-primary" /> {t('pages.myEvents')}
         </h1>
-        <p className="text-sm text-muted-foreground mt-0.5">Events created from your approved event creation requests.</p>
+        <p className="text-sm text-muted-foreground mt-0.5">{t('pages.eventsSubtitle')}</p>
       </div>
 
       <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
         {events.length === 0 ? (
           <div className="py-16 flex flex-col items-center text-center opacity-50">
             <AlertCircle className="size-10 mb-3" />
-            <p className="text-sm font-medium">No events yet.</p>
-            <p className="text-xs text-muted-foreground mt-1">Events appear here once an event creation request is approved.</p>
+            <p className="text-sm font-medium">{t('pages.noEvents')}</p>
+            <p className="text-xs text-muted-foreground mt-1">{t('pages.noEventsDesc')}</p>
           </div>
         ) : (
           <div className="divide-y divide-border">
@@ -98,7 +100,7 @@ export default function OrganizerEventsPage() {
                   <p className="text-xs text-muted-foreground mt-0.5">
                     {ev.eventType}
                     {ev.startAt && ` · ${new Date(ev.startAt).toLocaleDateString()}`}
-                    {' · '}Registrations: {ev.registrationCount}
+                    {' · '}{t('pages.registrations', { count: ev.registrationCount })}
                     {ev.locationText && ` · ${ev.locationText}`}
                   </p>
                 </div>
@@ -108,12 +110,12 @@ export default function OrganizerEventsPage() {
                   </span>
                   {ev.status === 'DRAFT' && (
                     <Button size="sm" variant="outline" className="text-xs" onClick={() => publishEvent(ev.id)}>
-                      Publish
+                      {t('pages.publish')}
                     </Button>
                   )}
                   {ev.status === 'REGISTRATION_CLOSED' && (
                     <Button size="sm" variant="outline" className="text-xs" onClick={() => confirmEvent(ev.id)}>
-                      Confirm
+                      {t('pages.confirm')}
                     </Button>
                   )}
                 </div>

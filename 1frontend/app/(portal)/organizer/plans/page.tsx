@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { getToken } from '@/lib/auth'
+import { useI18n } from '@/lib/i18n'
 
 const STATUS_BADGE: Record<string, string> = {
   DRAFT:                           'bg-gray-50 text-gray-600 border-gray-200',
@@ -21,15 +22,16 @@ const STATUS_BADGE: Record<string, string> = {
 }
 
 const FILTERS = [
-  { label: 'All', value: '' },
-  { label: 'Draft', value: 'DRAFT' },
-  { label: 'In Preparation', value: 'IN_PREPARATION' },
-  { label: 'Registration Open', value: 'REGISTRATION_OPEN' },
-  { label: 'Ready', value: 'READY_FOR_EVENT_CREATION' },
-  { label: 'Cancelled', value: 'CANCELLED' },
+  { labelKey: 'common.all', value: '' },
+  { labelKey: 'pages.draft', value: 'DRAFT' },
+  { labelKey: 'pages.inPreparation', value: 'IN_PREPARATION' },
+  { labelKey: 'pages.registrationOpen', value: 'REGISTRATION_OPEN' },
+  { labelKey: 'pages.ready', value: 'READY_FOR_EVENT_CREATION' },
+  { labelKey: 'common.cancelled', value: 'CANCELLED' },
 ]
 
 export default function OrganizerPlansPage() {
+  const { t } = useI18n()
   const [plans, setPlans] = useState<any[]>([])
   const [filtered, setFiltered] = useState<any[]>([])
   const [activeFilter, setActiveFilter] = useState('')
@@ -48,13 +50,13 @@ export default function OrganizerPlansPage() {
           setFiltered(data)
         }
       } catch {
-        toast.error('Failed to load event plans.')
+        toast.error(t('pages.plansLoadFail'))
       } finally {
         setIsLoading(false)
       }
     }
     fetchPlans()
-  }, [])
+  }, [t])
 
   useEffect(() => {
     if (!activeFilter) {
@@ -75,12 +77,12 @@ export default function OrganizerPlansPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold flex items-center gap-2">
-            <ClipboardList className="size-5 text-primary" /> Event Plans
+            <ClipboardList className="size-5 text-primary" /> {t('nav.eventPlans')}
           </h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Manage your event preparation plans and prerequisites.</p>
+          <p className="text-sm text-muted-foreground mt-0.5">{t('pages.plansSubtitle')}</p>
         </div>
         <Link href="/organizer/plans/new">
-          <Button size="sm" className="gap-2"><Plus className="size-4" /> New Plan</Button>
+          <Button size="sm" className="gap-2"><Plus className="size-4" /> {t('common.newPlan')}</Button>
         </Link>
       </div>
 
@@ -97,7 +99,7 @@ export default function OrganizerPlansPage() {
                 : 'bg-background border-border text-muted-foreground hover:bg-muted/50',
             )}
           >
-            {f.label}
+            {t(f.labelKey)}
           </button>
         ))}
       </div>
@@ -106,8 +108,8 @@ export default function OrganizerPlansPage() {
         {filtered.length === 0 ? (
           <div className="py-16 flex flex-col items-center text-center opacity-50">
             <AlertCircle className="size-10 mb-3" />
-            <p className="text-sm font-medium">No event plans found.</p>
-            <p className="text-xs text-muted-foreground mt-1">Create a new plan to get started.</p>
+            <p className="text-sm font-medium">{t('pages.noPlans')}</p>
+            <p className="text-xs text-muted-foreground mt-1">{t('pages.noPlansDesc')}</p>
           </div>
         ) : (
           <div className="divide-y divide-border">
@@ -122,7 +124,7 @@ export default function OrganizerPlansPage() {
                   <p className="text-xs text-muted-foreground mt-0.5">
                     {plan.eventType}
                     {plan.tentativeStartAt && ` · ${new Date(plan.tentativeStartAt).toLocaleDateString()}`}
-                    {' · '}Pre-reg: {plan.preRegistrationCount}/{plan.minimumAttendance}
+                    {' · '}{t('pages.preregShort', { count: plan.preRegistrationCount, minimum: plan.minimumAttendance })}
                   </p>
                 </div>
                 <span className={cn(

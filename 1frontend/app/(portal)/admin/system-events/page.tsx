@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { getToken } from '@/lib/auth'
+import { useI18n } from '@/lib/i18n'
 
 interface SystemEvent {
   id: string
@@ -54,6 +55,7 @@ function relativeTime(d: string): string {
 const SEVERITIES = ['INFO', 'WARNING', 'ERROR', 'CRITICAL'] as const
 
 export default function AdminSystemEventsPage() {
+  const { t } = useI18n()
   const [events, setEvents] = useState<SystemEvent[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [severityFilter, setSeverityFilter] = useState('all')
@@ -71,11 +73,11 @@ export default function AdminSystemEventsPage() {
       if (!res.ok) throw new Error()
       setEvents(await res.json())
     } catch {
-      toast.error('Failed to load system events.')
+      toast.error(t('systemEvents.noEvents'))
     } finally {
       setIsLoading(false)
     }
-  }, [backendUrl, severityFilter])
+  }, [backendUrl, severityFilter, t])
 
   useEffect(() => {
     fetchEvents()
@@ -98,7 +100,7 @@ export default function AdminSystemEventsPage() {
       <div className="flex h-[60vh] items-center justify-center">
         <div className="flex flex-col items-center gap-3">
           <Loader2 className="size-8 animate-spin text-primary" />
-          <p className="text-sm text-muted-foreground animate-pulse">Loading system events...</p>
+          <p className="text-sm text-muted-foreground animate-pulse">{t('systemEvents.loading')}</p>
         </div>
       </div>
     )
@@ -108,11 +110,11 @@ export default function AdminSystemEventsPage() {
     <div className="p-6 space-y-6 max-w-6xl mx-auto pb-20">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold text-foreground">System Events</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Platform event log — auto-refreshes every 30 seconds.</p>
+          <h1 className="text-xl font-bold text-foreground">{t('systemEvents.title')}</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">{t('systemEvents.subtitle')}</p>
         </div>
         <Button variant="outline" size="sm" onClick={fetchEvents} className="gap-2 self-start">
-          <RefreshCw className="size-4" /> Refresh
+          <RefreshCw className="size-4" /> {t('common.refresh')}
         </Button>
       </div>
 
@@ -127,7 +129,7 @@ export default function AdminSystemEventsPage() {
               : 'bg-background text-muted-foreground border-border hover:border-foreground'
           )}
         >
-          All
+          {t('systemEvents.all')}
         </button>
         {SEVERITIES.map(s => (
           <button
@@ -145,7 +147,7 @@ export default function AdminSystemEventsPage() {
         ))}
       </div>
 
-      <p className="text-xs text-muted-foreground font-medium">{filtered.length} events</p>
+      <p className="text-xs text-muted-foreground font-medium">{t('systemEvents.eventsCount', { count: filtered.length })}</p>
 
       {/* Table */}
       <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
@@ -153,11 +155,11 @@ export default function AdminSystemEventsPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border bg-muted/40">
-                <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Severity</th>
-                <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Event</th>
-                <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden md:table-cell">Message</th>
-                <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden lg:table-cell">Source</th>
-                <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden sm:table-cell">Time</th>
+                <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">{t('systemEvents.severity')}</th>
+                <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">{t('systemEvents.colEvent')}</th>
+                <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden md:table-cell">{t('systemEvents.colActor')}</th>
+                <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden lg:table-cell">{t('systemEvents.colTarget')}</th>
+                <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden sm:table-cell">{t('systemEvents.colTime')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -217,7 +219,7 @@ export default function AdminSystemEventsPage() {
                         )}
                         {e.metadata && (
                           <div>
-                            <p className="text-xs font-semibold text-muted-foreground mb-1">Metadata</p>
+                            <p className="text-xs font-semibold text-muted-foreground mb-1">{t('systemEvents.metadata')}</p>
                             <pre className="text-xs font-mono bg-background border border-border rounded p-3 overflow-x-auto max-h-40 text-foreground">
                               {JSON.stringify(e.metadata, null, 2)}
                             </pre>
@@ -233,8 +235,8 @@ export default function AdminSystemEventsPage() {
           {filtered.length === 0 && (
             <div className="text-center py-16">
               <AlertCircle className="size-10 text-muted-foreground/30 mx-auto mb-3" />
-              <p className="text-sm font-medium text-foreground">No events found.</p>
-              <p className="text-xs text-muted-foreground mt-1">Try selecting a different severity level.</p>
+              <p className="text-sm font-medium text-foreground">{t('systemEvents.noEvents')}</p>
+              <p className="text-xs text-muted-foreground mt-1">{t('systemEvents.emptyHint')}</p>
             </div>
           )}
         </div>

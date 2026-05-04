@@ -6,23 +6,16 @@ import { Button } from '@/components/ui/button'
 import { StatusBadge } from '@/components/status-badge'
 import { ShoppingCart, PlusCircle, Loader2, ReceiptText } from 'lucide-react'
 import { getToken } from '@/lib/auth'
+import { useI18n } from '@/lib/i18n'
+import { formatStudentDate } from '@/lib/student-i18n-utils'
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000'
 
-function formatDate(d: string) {
-  if (!d) return ''
-  return new Date(d).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  })
-}
-
-function formatCurrency(value: number | string | null | undefined) {
+function formatCurrency(value: number | string | null | undefined, locale: 'tr' | 'en') {
   if (value === null || value === undefined) return '-'
   const amount = typeof value === 'string' ? Number(value) : value
   if (Number.isNaN(amount)) return '-'
-  return new Intl.NumberFormat('en-US', {
+  return new Intl.NumberFormat(locale === 'tr' ? 'tr-TR' : 'en-US', {
     style: 'currency',
     currency: 'USD',
     maximumFractionDigits: 0,
@@ -32,6 +25,7 @@ function formatCurrency(value: number | string | null | undefined) {
 export default function StudentProcurementPage() {
   const [requests, setRequests] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const { locale, t } = useI18n()
 
   useEffect(() => {
     const load = async () => {
@@ -62,15 +56,15 @@ export default function StudentProcurementPage() {
     <div className="p-6 space-y-6 max-w-5xl mx-auto pb-20">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold text-foreground">Procurement</h1>
+          <h1 className="text-xl font-bold text-foreground">{t('pages.procurementTitle')}</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Submit and track purchasing requests for goods and services.
+            {t('pages.procurementSubtitle')}
           </p>
         </div>
         <Link href="/student/procurement/new">
           <Button size="sm" className="gap-1.5">
             <PlusCircle className="size-3.5" />
-            New Request
+            {t('common.newRequest')}
           </Button>
         </Link>
       </div>
@@ -80,10 +74,10 @@ export default function StudentProcurementPage() {
           <div className="flex flex-col items-center py-14 text-center">
             <ReceiptText className="size-8 text-muted-foreground/40 mb-3" />
             <p className="text-sm font-medium text-foreground">
-              No procurement requests yet
+              {t('pages.noProcurement')}
             </p>
             <p className="text-xs text-muted-foreground mt-1">
-              Create your first procurement request to start a purchase flow.
+              {t('pages.noProcurementDesc')}
             </p>
           </div>
         ) : (
@@ -106,9 +100,9 @@ export default function StudentProcurementPage() {
                       {request.requestNo} · {request.itemCategory || 'General'}
                       {request.quantity ? ` · Qty ${request.quantity}` : ''}
                       {request.totalEstimate != null
-                        ? ` · ${formatCurrency(request.totalEstimate)}`
+                        ? ` · ${formatCurrency(request.totalEstimate, locale)}`
                         : ''}
-                      {request.createdAt ? ` · ${formatDate(request.createdAt)}` : ''}
+                      {request.createdAt ? ` · ${formatStudentDate(request.createdAt, locale)}` : ''}
                     </p>
                   </div>
                 </div>

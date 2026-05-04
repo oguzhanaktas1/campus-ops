@@ -7,6 +7,7 @@ import { StatusBadge } from '@/components/status-badge'
 import { Search, Filter, Loader2, ArrowRight, UserPlus, Server } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+import { useI18n } from '@/lib/i18n'
 
 function formatDate(d: string) {
   if (!d) return ''
@@ -25,6 +26,7 @@ const categoryMap: Record<string, { dbValue: string, title: string, desc: string
 export default function CategoryRequestsPage() {
   const params = useParams()
   const router = useRouter() // 🔥 YÖNLENDİRME İÇİN EKLENDİ
+  const { t } = useI18n()
   const slug = params.category as string 
 
   const [requests, setRequests] = useState<any[]>([])
@@ -52,17 +54,17 @@ export default function CategoryRequestsPage() {
           setRequests(await res.json())
         }
       } catch (err) {
-        toast.error('Talepler yüklenemedi.')
+        toast.error(t('requests.loadFail'))
       } finally {
         setIsLoading(false)
       }
     }
 
     fetchRequests()
-  }, [activeTab, categoryInfo])
+  }, [activeTab, categoryInfo, t])
 
   if (!categoryInfo) {
-    return <div className="p-10 text-center text-muted-foreground">Kategori bulunamadı.</div>
+    return <div className="p-10 text-center text-muted-foreground">{t('pages.categoryNotFound')}</div>
   }
 
   const filteredRequests = requests.filter(r => 
@@ -85,7 +87,7 @@ export default function CategoryRequestsPage() {
           <div className="relative w-full sm:w-64">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input 
-              placeholder="Search ID, title, or name..." 
+              placeholder={t('requests.searchPlaceholder')} 
               className="pl-9 h-9" 
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -96,10 +98,10 @@ export default function CategoryRequestsPage() {
 
       <div className="flex space-x-1 bg-muted/50 p-1 rounded-lg w-fit border border-border">
         {[
-          { id: 'unassigned', label: 'Needs Assignment' },
-          { id: 'active', label: 'Active Tickets' },
-          { id: 'all', label: 'All Requests' },
-          { id: 'closed', label: 'Closed' }
+          { id: 'unassigned', label: t('requests.needsAssignment') },
+          { id: 'active', label: t('requests.active') },
+          { id: 'all', label: t('requests.allRequests') },
+          { id: 'closed', label: t('requests.closed') }
         ].map((tab) => (
           <button
             key={tab.id}
@@ -151,25 +153,25 @@ export default function CategoryRequestsPage() {
                       {req.title}
                     </h3>
                     <p className="text-sm text-muted-foreground mt-0.5 truncate">
-                      From: <span className="font-medium text-foreground">{req.requesterName}</span> · {req.typeName}
+                      {t('requests.from')} <span className="font-medium text-foreground">{req.requesterName}</span> · {req.typeName}
                     </p>
                   </div>
                 </div>
 
                 <div className="flex items-center justify-between sm:justify-end gap-6 sm:w-auto w-full">
                   <div className="text-left sm:text-right">
-                    <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Assignee</p>
+                    <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium">{t('pages.assignee')}</p>
                     {req.assignedTo ? (
                       <p className="text-sm font-medium text-foreground mt-0.5">{req.assignedTo}</p>
                     ) : (
                       <p className="text-sm font-medium text-amber-600 flex items-center gap-1 mt-0.5">
-                        <UserPlus className="size-3" /> Unassigned
+                        <UserPlus className="size-3" /> {t('common.unassigned')}
                       </p>
                     )}
                   </div>
                   
                   <div className="text-right hidden sm:block">
-                    <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Created</p>
+                    <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium">{t('pages.created')}</p>
                     <p className="text-sm text-foreground mt-0.5">{formatDate(req.createdAt)}</p>
                   </div>
 
@@ -183,7 +185,7 @@ export default function CategoryRequestsPage() {
 
             {filteredRequests.length === 0 && (
               <div className="py-16 text-center">
-                <p className="text-sm font-medium text-foreground">No tickets found.</p>
+                <p className="text-sm font-medium text-foreground">{t('pages.noTicketsFound')}</p>
                 <p className="text-xs text-muted-foreground mt-1">There are no {categoryInfo.title.toLowerCase()} matching this criteria.</p>
               </div>
             )}

@@ -28,6 +28,7 @@ import {
   getCurrentDateTimeInputValue,
   validateDateWindow,
 } from '@/lib/date-time'
+import { useI18n } from '@/lib/i18n'
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000'
 
@@ -42,6 +43,7 @@ const RESOURCE_TYPE_LABEL: Record<string, string> = {
 
 export default function OrganizerNewReservationPage() {
   const router = useRouter()
+  const { t } = useI18n()
   const [resources, setResources] = useState<any[]>([])
   const [isLoadingResources, setIsLoadingResources] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -100,8 +102,8 @@ export default function OrganizerNewReservationPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!form.resourceId) { toast.error('Please select a resource.'); return }
-    if (!form.startAt || !form.endAt) { toast.error('Please set start and end time.'); return }
+    if (!form.resourceId) { toast.error(t('pages.resourceRequired')); return }
+    if (!form.startAt || !form.endAt) { toast.error(t('pages.timeRequired')); return }
     const validationError = validateDateWindow({
       start: form.startAt,
       end: form.endAt,
@@ -145,9 +147,9 @@ export default function OrganizerNewReservationPage() {
 
       if (data.hasConflicts) {
         setConflicts(data.conflicts)
-        toast.warning(`Submitted with ${data.conflicts.length} scheduling conflict(s). Staff will review.`)
+        toast.warning(t('pages.reservationConflict', { count: data.conflicts.length }))
       } else {
-        toast.success('Reservation request submitted successfully!')
+        toast.success(t('pages.reservationSubmitted'))
       }
       router.push('/organizer/reservations')
     } catch (err: any) {
@@ -166,8 +168,8 @@ export default function OrganizerNewReservationPage() {
           </Button>
         </Link>
         <div>
-          <h1 className="text-xl font-bold text-foreground">Reserve a Room</h1>
-          <p className="text-sm text-muted-foreground">Submit a room or resource reservation request</p>
+          <h1 className="text-xl font-bold text-foreground">{t('pages.reserveRoomTitle')}</h1>
+          <p className="text-sm text-muted-foreground">{t('pages.reserveRoomSubtitle')}</p>
         </div>
       </div>
 
@@ -190,14 +192,14 @@ export default function OrganizerNewReservationPage() {
       <form onSubmit={handleSubmit} className="bg-card border border-border rounded-lg p-6 space-y-5 shadow-sm">
 
         <div className="space-y-1.5">
-          <Label>Resource <span className="text-destructive">*</span></Label>
+          <Label>{t('pages.resource')} <span className="text-destructive">*</span></Label>
           {isLoadingResources ? (
             <div className="flex items-center gap-2 h-10 text-sm text-muted-foreground">
-              <Loader2 className="size-4 animate-spin" /> Loading resources...
+              <Loader2 className="size-4 animate-spin" /> {t('common.loading')}
             </div>
           ) : (
             <Select value={form.resourceId} onValueChange={(v) => set('resourceId', v)}>
-              <SelectTrigger><SelectValue placeholder="Select a room or resource..." /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder={t('pages.selectResource')} /></SelectTrigger>
               <SelectContent>
                 {resources.map((r) => (
                   <SelectItem key={r.id} value={r.id}>
@@ -229,17 +231,17 @@ export default function OrganizerNewReservationPage() {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">
-            <Label htmlFor="eventName">Event Name <span className="text-destructive">*</span></Label>
+            <Label htmlFor="eventName">{t('pages.eventName')} <span className="text-destructive">*</span></Label>
             <Input
               id="eventName"
-              placeholder="e.g. Study Group, Lecture..."
+              placeholder={t('pages.eventNamePlaceholder')}
               required
               value={form.eventName}
               onChange={(e) => set('eventName', e.target.value)}
             />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="attendeeCount">Expected Attendees <span className="text-destructive">*</span></Label>
+            <Label htmlFor="attendeeCount">{t('pages.expectedAttendees')} <span className="text-destructive">*</span></Label>
             <Input
               id="attendeeCount"
               type="number"
@@ -253,7 +255,7 @@ export default function OrganizerNewReservationPage() {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">
-            <Label htmlFor="startAt">Start <span className="text-destructive">*</span></Label>
+            <Label htmlFor="startAt">{t('pages.start')} <span className="text-destructive">*</span></Label>
             <Input
               id="startAt"
               type="datetime-local"
@@ -264,7 +266,7 @@ export default function OrganizerNewReservationPage() {
             />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="endAt">End <span className="text-destructive">*</span></Label>
+            <Label htmlFor="endAt">{t('pages.end')} <span className="text-destructive">*</span></Label>
             <Input
               id="endAt"
               type="datetime-local"
@@ -278,10 +280,10 @@ export default function OrganizerNewReservationPage() {
         {dateError && <p className="text-sm text-destructive">{dateError}</p>}
 
         <div className="space-y-1.5">
-          <Label htmlFor="reservationPurpose">Purpose <span className="text-destructive">*</span></Label>
+          <Label htmlFor="reservationPurpose">{t('pages.purpose')} <span className="text-destructive">*</span></Label>
           <Textarea
             id="reservationPurpose"
-            placeholder="Describe the purpose of this reservation..."
+            placeholder={t('pages.reservationPurposePlaceholder')}
             required
             className="resize-none min-h-[80px]"
             value={form.reservationPurpose}
@@ -291,8 +293,8 @@ export default function OrganizerNewReservationPage() {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {[
-            { key: 'requiresSecurityApproval', label: 'Requires Security Approval' },
-            { key: 'requiresTechnicalSupport', label: 'Requires Technical Support' },
+            { key: 'requiresSecurityApproval', label: t('pages.requiresSecurityApproval') },
+            { key: 'requiresTechnicalSupport', label: t('pages.requiresTechnicalSupport') },
           ].map(({ key, label }) => (
             <label key={key} className="flex items-center gap-2.5 cursor-pointer p-3 border border-border rounded-lg hover:bg-muted/30 transition-colors">
               <input
@@ -307,10 +309,10 @@ export default function OrganizerNewReservationPage() {
         </div>
 
         <div className="space-y-1.5">
-          <Label htmlFor="setupNotes">Setup Notes (optional)</Label>
+          <Label htmlFor="setupNotes">{t('pages.setupNotes')}</Label>
           <Input
             id="setupNotes"
-            placeholder="Special setup requirements..."
+            placeholder={t('pages.setupNotesPlaceholder')}
             value={form.setupNotes}
             onChange={(e) => set('setupNotes', e.target.value)}
           />
@@ -319,10 +321,10 @@ export default function OrganizerNewReservationPage() {
         <div className="flex items-center gap-3 pt-4 border-t border-border">
           <Button type="submit" className="flex-1 sm:flex-none gap-2" disabled={isSubmitting}>
             {isSubmitting ? <Loader2 className="size-4 animate-spin" /> : <Calendar className="size-4" />}
-            Submit Reservation Request
+            {t('common.submit')}
           </Button>
           <Link href="/organizer/reservations">
-            <Button type="button" variant="outline">Cancel</Button>
+            <Button type="button" variant="outline">{t('common.cancel')}</Button>
           </Link>
         </div>
       </form>

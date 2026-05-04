@@ -6,6 +6,7 @@ import { CalendarDays, Loader2, AlertCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { getToken } from '@/lib/auth'
+import { useI18n } from '@/lib/i18n'
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000'
 
@@ -28,6 +29,7 @@ function fmtDT(d: any) {
 }
 
 export default function StaffAppointmentsPage() {
+  const { t } = useI18n()
   const [appointments, setAppointments] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [filter, setFilter] = useState('all')
@@ -39,11 +41,11 @@ export default function StaffAppointmentsPage() {
       })
       if (res.ok) setAppointments(await res.json())
     } catch {
-      toast.error('Failed to load appointment requests.')
+      toast.error(t('pages.appointmentLoadFail'))
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [t])
 
   useEffect(() => { fetchAppointments() }, [fetchAppointments])
 
@@ -66,15 +68,15 @@ export default function StaffAppointmentsPage() {
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-xl font-bold flex items-center gap-2">
-            <CalendarDays className="size-5 text-primary" /> Appointment Requests
+            <CalendarDays className="size-5 text-primary" /> {t('pages.appointmentRequests')}
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Manage incoming appointment requests assigned to you or your unit.
+            {t('pages.appointmentSubtitle')}
           </p>
         </div>
         {pending.length > 0 && (
           <span className="text-xs bg-amber-50 text-amber-700 border border-amber-200 font-semibold px-2.5 py-1 rounded-full">
-            {pending.length} pending
+            {t('pages.pendingCount', { count: pending.length })}
           </span>
         )}
       </div>
@@ -91,7 +93,7 @@ export default function StaffAppointmentsPage() {
                 : 'bg-background text-muted-foreground border-border hover:border-foreground'
             )}
           >
-            {s === 'all' ? 'All' : s.replace(/_/g, ' ')}
+            {s === 'all' ? t('common.all') : s.replace(/_/g, ' ')}
           </button>
         ))}
       </div>
@@ -100,7 +102,7 @@ export default function StaffAppointmentsPage() {
         {filtered.length === 0 ? (
           <div className="py-16 flex flex-col items-center text-center opacity-50">
             <AlertCircle className="size-10 mb-3" />
-            <p className="text-sm font-medium">No appointment requests found.</p>
+            <p className="text-sm font-medium">{t('pages.appointmentEmpty')}</p>
           </div>
         ) : (
           filtered.map((a) => (

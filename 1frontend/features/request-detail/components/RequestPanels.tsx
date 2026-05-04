@@ -27,20 +27,22 @@ import { Textarea } from '@/components/ui/textarea'
 import { getStoredUser, getToken } from '@/lib/auth'
 import { mapRequestDetailToViewModel } from '@/features/request-detail/mappers/mapRequestDetailToViewModel'
 import type { RequestDetailViewModel } from '@/features/request-detail/types'
+import { useOptionalT } from '@/lib/optional-t'
 
 export function RequestAttachmentsPanel({
   detail,
 }: {
   detail: RequestDetailViewModel
 }) {
+  const tt = useOptionalT()
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Attachments</CardTitle>
+        <CardTitle>{tt('detail.attachments', 'Attachments')}</CardTitle>
       </CardHeader>
       <CardContent>
         {detail.attachments.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No attachments uploaded.</p>
+          <p className="text-sm text-muted-foreground">{tt('detail.noAttachments', 'No attachments uploaded.')}</p>
         ) : (
           <div className="space-y-3">
             {detail.attachments.map((file) => (
@@ -81,6 +83,7 @@ export function RequestCommentsPanel({
   onCommentAdded: (nextComments: RequestDetailViewModel['comments']) => void
 }) {
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const tt = useOptionalT()
 
   const handleAddComment = async (text: string) => {
     const token = getToken()
@@ -124,7 +127,7 @@ export function RequestCommentsPanel({
         },
       ])
     } catch {
-      toast.error('Could not post comment')
+      toast.error(tt('detail.commentPostFail', 'Could not post comment'))
     } finally {
       setIsSubmitting(false)
     }
@@ -133,7 +136,7 @@ export function RequestCommentsPanel({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{isSubmitting ? 'Comments - Sending...' : 'Comments'}</CardTitle>
+        <CardTitle>{isSubmitting ? tt('detail.commentsSending', 'Comments - Sending...') : tt('detail.comments', 'Comments')}</CardTitle>
       </CardHeader>
       <CardContent>
         <CommentThread
@@ -150,6 +153,7 @@ export function RequestTimelineTabs({
 }: {
   detail: RequestDetailViewModel
 }) {
+  const tt = useOptionalT()
   const assignments = Array.isArray((detail.raw as any).assignments)
     ? ((detail.raw as any).assignments as any[])
     : []
@@ -173,15 +177,15 @@ export function RequestTimelineTabs({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Timeline & Activity</CardTitle>
+        <CardTitle>{tt('detail.timelineActivity', 'Timeline & Activity')}</CardTitle>
       </CardHeader>
       <CardContent>
         <Tabs defaultValue="status">
           <TabsList className="mb-4 grid w-full grid-cols-4">
-            <TabsTrigger value="status">Status</TabsTrigger>
-            <TabsTrigger value="assignments">Assignments</TabsTrigger>
-            <TabsTrigger value="approvals">Approvals</TabsTrigger>
-            <TabsTrigger value="audit">Audit</TabsTrigger>
+            <TabsTrigger value="status">{tt('detail.status', 'Status')}</TabsTrigger>
+            <TabsTrigger value="assignments">{tt('detail.assignments', 'Assignments')}</TabsTrigger>
+            <TabsTrigger value="approvals">{tt('detail.approvals', 'Approvals')}</TabsTrigger>
+            <TabsTrigger value="audit">{tt('detail.audit', 'Audit')}</TabsTrigger>
           </TabsList>
           <TabsContent value="status">
             <RequestTimeline events={detail.statusHistory as any} />
@@ -196,15 +200,15 @@ export function RequestTimelineTabs({
                   >
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <span className="font-medium text-foreground">
-                          {assignment.assignedTo?.fullName ?? 'Unknown assignee'}
+                          {assignment.assignedTo?.fullName ?? tt('detail.unknownAssignee', 'Unknown assignee')}
                       </span>
                       <span className="text-xs text-muted-foreground">
-                        {assignment.isActive ? 'Active' : 'Completed'}
+                        {assignment.isActive ? tt('common.active', 'Active') : tt('status.COMPLETED', 'Completed')}
                       </span>
                     </div>
                     <div className="mt-2 space-y-1 text-muted-foreground">
                       <p>
-                        Assigned:{' '}
+                        {tt('detail.assigned', 'Assigned')}:{' '}
                         {assignment.assignedAt
                           ? new Date(String(assignment.assignedAt)).toLocaleString(
                               'en-US',
@@ -212,24 +216,24 @@ export function RequestTimelineTabs({
                           : '-'}
                       </p>
                       {assignment.assignedBy?.fullName ? (
-                        <p>Assigned by: {assignment.assignedBy.fullName}</p>
+                        <p>{tt('detail.assignedBy', 'Assigned by')}: {assignment.assignedBy.fullName}</p>
                       ) : null}
                       {assignment.unassignedAt ? (
                         <p>
-                          Closed:{' '}
+                          {tt('status.CLOSED', 'Closed')}:{' '}
                           {new Date(String(assignment.unassignedAt)).toLocaleString(
                             'en-US',
                           )}
                         </p>
                       ) : null}
-                      {assignment.note ? <p>Note: {assignment.note}</p> : null}
+                      {assignment.note ? <p>{tt('detail.note', 'Note')}: {assignment.note}</p> : null}
                     </div>
                   </div>
                 ))}
               </div>
             ) : (
               <p className="text-sm text-muted-foreground">
-                No assignment history available.
+                {tt('detail.noAssignmentHistory', 'No assignment history available.')}
               </p>
             )}
           </TabsContent>
@@ -255,13 +259,13 @@ export function RequestTimelineTabs({
                     </div>
                     <div className="mt-2 space-y-1 text-muted-foreground">
                       {action.actor?.fullName ? (
-                        <p>Actor: {action.actor.fullName}</p>
+                        <p>{tt('detail.actor', 'Actor')}: {action.actor.fullName}</p>
                       ) : null}
                       {action.workflowStep?.name ? (
-                        <p>Step: {action.workflowStep.name}</p>
+                        <p>{tt('detail.step', 'Step')}: {action.workflowStep.name}</p>
                       ) : null}
                       {action.decisionNote ? (
-                        <p>Note: {action.decisionNote}</p>
+                        <p>{tt('detail.note', 'Note')}: {action.decisionNote}</p>
                       ) : null}
                     </div>
                   </div>
@@ -269,7 +273,7 @@ export function RequestTimelineTabs({
               </div>
             ) : (
               <p className="text-sm text-muted-foreground">
-                No approval history available.
+                {tt('detail.noApprovalHistory', 'No approval history available.')}
               </p>
             )}
           </TabsContent>
@@ -291,6 +295,7 @@ export function RequestActionPanel({
   detail: RequestDetailViewModel
   onDetailChange: (detail: RequestDetailViewModel) => void
 }) {
+  const tt = useOptionalT()
   const canDecide = canCurrentUserDecide(detail)
   const isTerminal = isTerminalRequest(detail)
   const currentUser = getStoredUser()
@@ -300,7 +305,7 @@ export function RequestActionPanel({
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Actions</CardTitle>
+          <CardTitle>{tt('detail.actions', 'Actions')}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           {detail.status === 'REVISION_REQUESTED' ? (
@@ -308,13 +313,12 @@ export function RequestActionPanel({
               <Link
                 href={`/student/requests/${detail.id}/edit?type=${detail.requestType.key}`}
               >
-                Revise Submission
+                {tt('detail.reviseSubmission', 'Revise Submission')}
               </Link>
             </Button>
           ) : null}
           <p className="text-sm text-muted-foreground">
-            Student actions stay scoped to comments, file uploads, revision, and
-            request visibility.
+            {tt('detail.studentActionHelp', 'Student actions stay scoped to comments, file uploads, revision, and request visibility.')}
           </p>
         </CardContent>
       </Card>
@@ -325,7 +329,7 @@ export function RequestActionPanel({
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Actions</CardTitle>
+          <CardTitle>{tt('detail.actions', 'Actions')}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           {detail.status === 'REVISION_REQUESTED' ? (
@@ -333,12 +337,12 @@ export function RequestActionPanel({
               <Link
                 href={`/organizer/requests/${detail.id}/edit?type=${detail.requestType.key}`}
               >
-                Revise Submission
+                {tt('detail.reviseSubmission', 'Revise Submission')}
               </Link>
             </Button>
           ) : null}
           <p className="text-sm text-muted-foreground">
-            Track the status of your submitted request. You can add comments or revise if requested.
+            {tt('detail.requesterActionHelp', 'Track the status of your submitted request. You can add comments or revise if requested.')}
           </p>
         </CardContent>
       </Card>
@@ -350,16 +354,16 @@ export function RequestActionPanel({
       return (
         <Card>
           <CardHeader>
-            <CardTitle>Actions</CardTitle>
+            <CardTitle>{tt('detail.actions', 'Actions')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <Button asChild className="w-full">
               <Link href={`/faculty/requests/${detail.id}/edit`}>
-                Revise Submission
+                {tt('detail.reviseSubmission', 'Revise Submission')}
               </Link>
             </Button>
             <p className="text-sm text-muted-foreground">
-              The reviewer has requested changes. Edit and resubmit your request.
+              {tt('detail.revisionRequestedHelp', 'The reviewer has requested changes. Edit and resubmit your request.')}
             </p>
           </CardContent>
         </Card>
@@ -377,15 +381,14 @@ export function RequestActionPanel({
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Actions</CardTitle>
+          <CardTitle>{tt('detail.actions', 'Actions')}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           <Button asChild className="w-full">
-            <Link href="/faculty/approvals">Open Decision Queue</Link>
+            <Link href="/faculty/approvals">{tt('detail.openDecisionQueue', 'Open Decision Queue')}</Link>
           </Button>
           <p className="text-sm text-muted-foreground">
-            Approval and revision decisions remain centralized in the faculty
-            approval flow.
+            {tt('detail.facultyDecisionHelp', 'Approval and revision decisions remain centralized in the faculty approval flow.')}
           </p>
         </CardContent>
       </Card>
@@ -402,16 +405,16 @@ export function RequestActionPanel({
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Actions</CardTitle>
+          <CardTitle>{tt('detail.actions', 'Actions')}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           <Button asChild className="w-full">
             <Link href={`/staff/requests/${categorySlug}/${detail.id}/edit`}>
-              Revise Submission
+              {tt('detail.reviseSubmission', 'Revise Submission')}
             </Link>
           </Button>
           <p className="text-sm text-muted-foreground">
-            The reviewer has requested changes. Edit and resubmit your request.
+            {tt('detail.revisionRequestedHelp', 'The reviewer has requested changes. Edit and resubmit your request.')}
           </p>
         </CardContent>
       </Card>
@@ -510,22 +513,23 @@ function canCurrentUserDecide(detail: RequestDetailViewModel) {
 }
 
 function TerminalActionPanel({ detail }: { detail: RequestDetailViewModel }) {
+  const tt = useOptionalT()
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Actions</CardTitle>
+        <CardTitle>{tt('detail.actions', 'Actions')}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
         <div className="rounded-lg border bg-muted/30 p-3">
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Workflow Completed
+            {tt('detail.workflowCompleted', 'Workflow Completed')}
           </p>
           <p className="mt-1 text-sm font-semibold text-foreground">
             {detail.status.replace(/_/g, ' ')}
           </p>
         </div>
         <p className="text-sm text-muted-foreground">
-          This request has reached a terminal workflow step. It cannot be reassigned or processed further.
+          {tt('detail.terminalWorkflowHelp', 'This request has reached a terminal workflow step. It cannot be reassigned or processed further.')}
         </p>
       </CardContent>
     </Card>
@@ -539,6 +543,7 @@ function DecisionActionPanel({
   detail: RequestDetailViewModel
   onDetailChange: (detail: RequestDetailViewModel) => void
 }) {
+  const tt = useOptionalT()
   const [comment, setComment] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
 
@@ -559,7 +564,7 @@ function DecisionActionPanel({
   const handleDecision = async (action: DecisionAction) => {
     const trimmedComment = comment.trim()
     if ((action === 'reject' || action === 'revision') && !trimmedComment) {
-      toast.error('Reject or revision requires a comment.')
+      toast.error(tt('detail.rejectRevisionRequiresComment', 'Reject or revision requires a comment.'))
       return
     }
 
@@ -583,16 +588,16 @@ function DecisionActionPanel({
 
       if (!response.ok) {
         const err = await response.json().catch(() => ({}))
-        throw new Error(err?.message ?? 'Action failed')
+        throw new Error(err?.message ?? tt('detail.actionFailed', 'Action failed'))
       }
 
       const result = await response.json().catch(() => ({}))
       toast.success(
         action === 'approve'
-          ? 'Request approved.'
+          ? tt('detail.requestApproved', 'Request approved.')
           : action === 'reject'
-            ? 'Request rejected.'
-            : 'Revision requested.',
+            ? tt('detail.requestRejected', 'Request rejected.')
+            : tt('detail.revisionRequested', 'Revision requested.'),
       )
       setComment('')
 
@@ -610,7 +615,7 @@ function DecisionActionPanel({
         })
       }
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Action failed')
+      toast.error(error instanceof Error ? error.message : tt('detail.actionFailed', 'Action failed'))
     } finally {
       setIsProcessing(false)
     }
@@ -619,20 +624,20 @@ function DecisionActionPanel({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Actions</CardTitle>
+        <CardTitle>{tt('detail.actions', 'Actions')}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="rounded-lg border bg-muted/30 p-3">
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Current Decision Step
+            {tt('detail.currentDecisionStep', 'Current Decision Step')}
           </p>
           <p className="mt-1 text-sm font-semibold text-foreground">
-            {detail.workflow.currentStep ?? activeWorkflowStep(detail)?.label ?? 'Workflow step'}
+            {detail.workflow.currentStep ?? activeWorkflowStep(detail)?.label ?? tt('detail.workflowStep', 'Workflow step')}
           </p>
         </div>
 
         <Textarea
-          placeholder="Add a decision note. Required for reject or revision."
+          placeholder={tt('detail.decisionNotePlaceholder', 'Add a decision note. Required for reject or revision.')}
           value={comment}
           onChange={(event) => setComment(event.target.value)}
           disabled={isProcessing}
@@ -646,7 +651,7 @@ function DecisionActionPanel({
             onClick={() => handleDecision('approve')}
           >
             {isProcessing ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
-            Approve
+            {tt('detail.approve', 'Approve')}
           </Button>
           <Button
             variant="destructive"
@@ -655,7 +660,7 @@ function DecisionActionPanel({
             onClick={() => handleDecision('reject')}
           >
             {isProcessing ? <Loader2 className="size-4 animate-spin" /> : <XCircle className="size-4" />}
-            Reject
+            {tt('detail.reject', 'Reject')}
           </Button>
           <Button
             variant="outline"
@@ -664,7 +669,7 @@ function DecisionActionPanel({
             onClick={() => handleDecision('revision')}
           >
             {isProcessing ? <Loader2 className="size-4 animate-spin" /> : <RotateCcw className="size-4" />}
-            Request Revision
+            {tt('detail.requestRevision', 'Request Revision')}
           </Button>
         </div>
       </CardContent>
@@ -675,6 +680,7 @@ function DecisionActionPanel({
 function AdminActionPanel({ detail }: { detail: RequestDetailViewModel }) {
   const router = useRouter()
   const [isClosing, setIsClosing] = useState(false)
+  const tt = useOptionalT()
 
   const handleForceClose = async () => {
     const token = getToken()
@@ -690,10 +696,10 @@ function AdminActionPanel({ detail }: { detail: RequestDetailViewModel }) {
 
       if (!response.ok) throw new Error('delete failed')
 
-      toast.success('Request closed')
+      toast.success(tt('detail.requestClosed', 'Request closed'))
       router.push('/admin/requests')
     } catch {
-      toast.error('Failed to close request')
+      toast.error(tt('detail.closeRequestFail', 'Failed to close request'))
     } finally {
       setIsClosing(false)
     }
@@ -702,7 +708,7 @@ function AdminActionPanel({ detail }: { detail: RequestDetailViewModel }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Actions</CardTitle>
+        <CardTitle>{tt('detail.actions', 'Actions')}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
         <Button
@@ -716,10 +722,10 @@ function AdminActionPanel({ detail }: { detail: RequestDetailViewModel }) {
           ) : (
             <ShieldX className="size-4" />
           )}
-          Force Close
+          {tt('detail.forceClose', 'Force Close')}
         </Button>
         <p className="text-sm text-muted-foreground">
-          Admin actions retain override behavior inside the shared shell.
+          {tt('detail.adminActionHelp', 'Admin actions retain override behavior inside the shared shell.')}
         </p>
       </CardContent>
     </Card>
@@ -733,6 +739,7 @@ function StaffActionPanel({
   detail: RequestDetailViewModel
   onDetailChange: (detail: RequestDetailViewModel) => void
 }) {
+  const tt = useOptionalT()
   const [people, setPeople] = useState<any[]>([])
   const [isOpen, setIsOpen] = useState(false)
   const [selected, setSelected] = useState<any | null>(null)
@@ -767,7 +774,7 @@ function StaffActionPanel({
         if (!response.ok) throw new Error('people failed')
         setPeople(await response.json())
       } catch {
-        toast.error('Assignable people could not be loaded')
+        toast.error(tt('detail.assignablePeopleLoadFail', 'Assignable people could not be loaded'))
       }
     }
 
@@ -803,19 +810,19 @@ function StaffActionPanel({
 
       if (!response.ok) throw new Error('assign failed')
 
-      toast.success('Request assigned')
+      toast.success(tt('detail.requestAssigned', 'Request assigned'))
       onDetailChange({
         ...detail,
         status: 'IN_REVIEW',
         currentAssignee: {
           id: selected.id,
-          fullName: selected.profile?.fullName ?? selected.fullName ?? 'Assigned user',
+          fullName: selected.profile?.fullName ?? selected.fullName ?? tt('detail.assignedUser', 'Assigned user'),
           email: selected.email ?? null,
         },
       })
       setSelected(null)
     } catch {
-      toast.error('Assignment failed')
+      toast.error(tt('detail.assignmentFailed', 'Assignment failed'))
     } finally {
       setIsAssigning(false)
     }
@@ -824,7 +831,7 @@ function StaffActionPanel({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Actions</CardTitle>
+        <CardTitle>{tt('detail.actions', 'Actions')}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4" ref={dropdownRef}>
         {detail.currentAssignee ? (
@@ -832,7 +839,7 @@ function StaffActionPanel({
             <UserCheck className="size-5 text-emerald-700" />
             <div>
               <p className="text-xs font-medium uppercase tracking-wide text-emerald-700">
-                Current Assignee
+                {tt('detail.currentAssignee', 'Current Assignee')}
               </p>
               <p className="text-sm font-semibold text-foreground">
                 {detail.currentAssignee.fullName}
@@ -844,7 +851,7 @@ function StaffActionPanel({
             <div className="flex items-center justify-between gap-3">
               <div>
                 <p className="text-xs font-medium uppercase tracking-wide text-amber-700">
-                  Ready to Assign
+                  {tt('detail.readyToAssign', 'Ready to Assign')}
                 </p>
                 <p className="text-sm font-semibold text-foreground">
                   {selected.profile?.fullName ?? selected.fullName}
@@ -869,12 +876,12 @@ function StaffActionPanel({
               ) : (
                 <CheckCircle2 className="size-4" />
               )}
-              Confirm Assignment
+              {tt('detail.confirmAssignment', 'Confirm Assignment')}
             </Button>
           </div>
         ) : (
           <div className="rounded-lg border border-dashed p-3 text-sm text-muted-foreground">
-            No assignee yet. Select a person to assign this request directly.
+            {tt('detail.noAssigneeHelp', 'No assignee yet. Select a person to assign this request directly.')}
           </div>
         )}
 
@@ -887,7 +894,7 @@ function StaffActionPanel({
             >
               <span className="flex items-center gap-2">
                 <UserPlus className="size-4" />
-                Select Person
+                {tt('detail.selectPerson', 'Select Person')}
               </span>
               <ChevronDown className="size-4" />
             </Button>
@@ -899,7 +906,7 @@ function StaffActionPanel({
                     <Search className="absolute left-2 top-2.5 size-4 text-muted-foreground" />
                     <input
                       className="w-full rounded-md border bg-muted/40 py-2 pl-8 pr-3 text-sm outline-none"
-                      placeholder="Search people..."
+                      placeholder={tt('detail.searchPeople', 'Search people...')}
                       value={search}
                       onChange={(event) => setSearch(event.target.value)}
                     />
@@ -921,7 +928,7 @@ function StaffActionPanel({
                         </div>
                         <div className="min-w-0">
                           <p className="truncate text-sm font-medium text-foreground">
-                            {item.profile?.fullName ?? item.fullName ?? 'Unknown'}
+                            {item.profile?.fullName ?? item.fullName ?? tt('common.unknown', 'Unknown')}
                           </p>
                           {item.profile?.department?.name ? (
                             <p className="truncate text-xs text-muted-foreground">
@@ -933,7 +940,7 @@ function StaffActionPanel({
                     ))
                   ) : (
                     <p className="p-3 text-sm text-muted-foreground">
-                      No people found.
+                      {tt('detail.noPeopleFound', 'No people found.')}
                     </p>
                   )}
                 </div>

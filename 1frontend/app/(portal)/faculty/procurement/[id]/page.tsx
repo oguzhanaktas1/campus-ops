@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { getToken } from '@/lib/auth'
+import { useI18n } from '@/lib/i18n'
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000'
 
@@ -35,6 +36,7 @@ function InfoRow({ label, value }: { label: string; value?: string | null }) {
 
 export default function FacultyProcurementDetailPage() {
   const { id } = useParams() as { id: string }
+  const { t } = useI18n()
   const [data, setData] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isProcessing, setIsProcessing] = useState(false)
@@ -52,7 +54,7 @@ export default function FacultyProcurementDetailPage() {
 
   const handleAction = async (action: ActionType) => {
     if ((action === 'reject' || action === 'revision') && !comment.trim()) {
-      toast.error(`Comment required to ${action}.`)
+      toast.error(t('detail.commentRequiredToAction', { action }))
       return
     }
     setIsProcessing(true)
@@ -63,7 +65,7 @@ export default function FacultyProcurementDetailPage() {
         body: JSON.stringify({ action, comment: comment.trim() || undefined }),
       })
       if (res.ok) {
-        toast.success(action === 'approve' ? 'Approved.' : action === 'reject' ? 'Rejected.' : 'Revision requested.')
+        toast.success(action === 'approve' ? t('detail.approvedToast') : action === 'reject' ? t('detail.rejectedToast') : t('detail.revisionRequested'))
         setDoneAction(action)
         setData((prev: any) => ({
           ...prev,
@@ -72,9 +74,9 @@ export default function FacultyProcurementDetailPage() {
         setComment('')
       } else {
         const err = await res.json().catch(() => ({})) as { message?: string }
-        toast.error(err.message ?? 'Failed.')
+        toast.error(err.message ?? t('detail.failed'))
       }
-    } catch { toast.error('Network error.') }
+    } catch { toast.error(t('detail.networkError')) }
     finally { setIsProcessing(false) }
   }
 
@@ -82,8 +84,8 @@ export default function FacultyProcurementDetailPage() {
   if (!data) return (
     <div className="p-6 max-w-3xl mx-auto flex flex-col items-center py-16">
       <AlertTriangle className="size-8 text-muted-foreground/40 mb-3" />
-      <p className="text-sm font-medium">Request not found</p>
-      <Link href="/faculty/procurement"><Button variant="outline" size="sm" className="mt-3">Back</Button></Link>
+      <p className="text-sm font-medium">{t('detail.requestNotFound')}</p>
+      <Link href="/faculty/procurement"><Button variant="outline" size="sm" className="mt-3">{t('common.back')}</Button></Link>
     </div>
   )
 
@@ -92,7 +94,7 @@ export default function FacultyProcurementDetailPage() {
 
   return (
     <div className="p-6 space-y-5 max-w-3xl mx-auto pb-20">
-      <Link href="/faculty/procurement"><Button variant="ghost" size="sm" className="gap-1.5"><ArrowLeft className="size-4" /> Back</Button></Link>
+      <Link href="/faculty/procurement"><Button variant="ghost" size="sm" className="gap-1.5"><ArrowLeft className="size-4" /> {t('common.back')}</Button></Link>
 
       <div className="bg-card border border-border rounded-lg p-5 flex items-start justify-between gap-4">
         <div className="flex items-start gap-3">
@@ -101,7 +103,7 @@ export default function FacultyProcurementDetailPage() {
           </div>
           <div>
             <h1 className="text-lg font-bold">{data.title}</h1>
-            <p className="text-xs text-muted-foreground mt-0.5">{data.requestNo} · Submitted {fmt(data.createdAt)}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">{data.requestNo} · {t('detail.submitted')} {fmt(data.createdAt)}</p>
           </div>
         </div>
         <StatusBadge status={data.status} />
@@ -109,7 +111,7 @@ export default function FacultyProcurementDetailPage() {
 
       {data.requester && (
         <div className="bg-card border border-border rounded-lg p-5 space-y-3">
-          <p className="text-sm font-semibold flex items-center gap-2"><User className="size-4 text-muted-foreground" /> Requester</p>
+          <p className="text-sm font-semibold flex items-center gap-2"><User className="size-4 text-muted-foreground" /> {t('detail.requester')}</p>
           <div className="flex items-center gap-3">
             <div className="size-9 rounded-full bg-primary/10 flex items-center justify-center text-primary text-sm font-bold">
               {data.requester?.fullName?.charAt(0) ?? 'R'}
@@ -123,30 +125,30 @@ export default function FacultyProcurementDetailPage() {
       )}
 
       <div className="bg-card border border-border rounded-lg p-5 space-y-4">
-        <p className="text-sm font-semibold">Procurement Details</p>
+        <p className="text-sm font-semibold">{t('detail.procurementDetails')}</p>
         <div className="grid grid-cols-2 gap-4">
-          <InfoRow label="Item Name" value={pr.itemName} />
-          <InfoRow label="Category" value={pr.category} />
-          <InfoRow label="Quantity" value={pr.quantity?.toString()} />
-          <InfoRow label="Unit Price" value={pr.unitPrice ? `$${pr.unitPrice}` : null} />
-          <InfoRow label="Total Budget" value={pr.totalBudget ? `$${pr.totalBudget}` : null} />
-          <InfoRow label="Vendor" value={pr.preferredVendor} />
-          <InfoRow label="Required By" value={fmt(pr.requiredByDate)} />
-          <InfoRow label="Priority" value={data.priority} />
+          <InfoRow label={t('detail.itemName')} value={pr.itemName} />
+          <InfoRow label={t('detail.category')} value={pr.category} />
+          <InfoRow label={t('detail.quantity')} value={pr.quantity?.toString()} />
+          <InfoRow label={t('detail.unitPrice')} value={pr.unitPrice ? `$${pr.unitPrice}` : null} />
+          <InfoRow label={t('detail.totalBudget')} value={pr.totalBudget ? `$${pr.totalBudget}` : null} />
+          <InfoRow label={t('detail.vendor')} value={pr.preferredVendor} />
+          <InfoRow label={t('detail.requiredBy')} value={fmt(pr.requiredByDate)} />
+          <InfoRow label={t('detail.priority')} value={data.priority} />
         </div>
-        {pr.justification && <div><p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Justification</p><p className="text-sm text-muted-foreground">{pr.justification}</p></div>}
+        {pr.justification && <div><p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-1">{t('detail.justification')}</p><p className="text-sm text-muted-foreground">{pr.justification}</p></div>}
       </div>
 
       {isTerminal ? (
         <div className="bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900 p-6 rounded-lg flex flex-col items-center text-center gap-3">
           <Lock className="size-7 text-emerald-600" />
-          <p className="text-sm font-bold text-emerald-800 dark:text-emerald-400 uppercase tracking-wider">Action Recorded</p>
+          <p className="text-sm font-bold text-emerald-800 dark:text-emerald-400 uppercase tracking-wider">{t('detail.actionRecorded')}</p>
         </div>
       ) : (
         <div className="bg-card border border-border rounded-lg p-5 shadow-sm space-y-4">
-          <p className="text-sm font-semibold">Faculty Decision</p>
+          <p className="text-sm font-semibold">{t('detail.facultyDecision')}</p>
           <Textarea
-            placeholder="Reasoning (required for Reject/Revision)..."
+            placeholder={t('detail.reasoningPlaceholder')}
             value={comment}
             onChange={(e) => setComment(e.target.value)}
             className="resize-none min-h-[100px]"
@@ -154,13 +156,13 @@ export default function FacultyProcurementDetailPage() {
           />
           <div className="flex gap-3 flex-wrap">
             <Button className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white flex-1 sm:flex-none" disabled={isProcessing} onClick={() => handleAction('approve')}>
-              {isProcessing ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />} Approve
+              {isProcessing ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />} {t('common.approve')}
             </Button>
             <Button variant="destructive" className="gap-2 flex-1 sm:flex-none" disabled={isProcessing} onClick={() => handleAction('reject')}>
-              {isProcessing ? <Loader2 className="size-4 animate-spin" /> : <XCircle className="size-4" />} Reject
+              {isProcessing ? <Loader2 className="size-4 animate-spin" /> : <XCircle className="size-4" />} {t('common.reject')}
             </Button>
             <Button variant="outline" className="gap-2 flex-1 sm:flex-none border-amber-200 text-amber-700 hover:bg-amber-50" disabled={isProcessing} onClick={() => handleAction('revision')}>
-              {isProcessing ? <Loader2 className="size-4 animate-spin" /> : <RotateCcw className="size-4" />} Request Revision
+              {isProcessing ? <Loader2 className="size-4 animate-spin" /> : <RotateCcw className="size-4" />} {t('approvals.revisionBtn')}
             </Button>
           </div>
         </div>
@@ -168,7 +170,7 @@ export default function FacultyProcurementDetailPage() {
 
       {data.statusHistory?.length > 0 && (
         <div className="bg-card border border-border rounded-lg p-5">
-          <p className="text-sm font-semibold mb-4">Status History</p>
+          <p className="text-sm font-semibold mb-4">{t('detail.statusHistory')}</p>
           <RequestTimeline events={data.statusHistory} />
         </div>
       )}

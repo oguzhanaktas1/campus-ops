@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
+import { useI18n } from '@/lib/i18n'
 import {
   ExternalLink,
   Filter,
@@ -66,6 +67,7 @@ function getTimelineStepState(record: WorkflowInstanceRecord, stepId: string) {
 }
 
 export default function AdminWorkflowInstancesPage() {
+  const { t } = useI18n()
   const [workflowDetails, setWorkflowDetails] = useState<WorkflowDetail[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -180,9 +182,9 @@ export default function AdminWorkflowInstancesPage() {
     <div className="mx-auto max-w-7xl space-y-6 p-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <h1 className="text-xl font-bold text-foreground">Workflow Instances</h1>
+          <h1 className="text-xl font-bold text-foreground">{t('workflows.instancesTitle')}</h1>
           <p className="mt-0.5 text-sm text-muted-foreground">
-            Request bazli arama, request type filtreleme ve adim timeline detaylari tek ekranda.
+            {t('workflows.instancesSubtitle', { count: records.length })}
           </p>
         </div>
         <Button asChild variant="outline" className="gap-1.5">
@@ -219,7 +221,7 @@ export default function AdminWorkflowInstancesPage() {
             <Input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search by request no, title, requester, assignee..."
+              placeholder={t('common.search')}
               className="pl-9"
             />
           </div>
@@ -242,7 +244,7 @@ export default function AdminWorkflowInstancesPage() {
             onChange={(event) => setStatusFilter(event.target.value)}
             className="h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground"
           >
-            <option value="all">All statuses</option>
+            <option value="all">{t('common.status')}</option>
             <option value="ACTIVE">Active</option>
             <option value="COMPLETED">Completed</option>
             <option value="overdue">Overdue</option>
@@ -284,7 +286,7 @@ export default function AdminWorkflowInstancesPage() {
             className="inline-flex items-center gap-1 text-foreground transition hover:text-primary"
           >
             <TimerReset className="size-3.5" />
-            Reset filters
+            {t('common.refresh')}
           </button>
         </div>
       </section>
@@ -293,9 +295,9 @@ export default function AdminWorkflowInstancesPage() {
         {filteredRecords.length === 0 ? (
           <div className="rounded-xl border border-dashed border-border bg-card p-12 text-center shadow-sm">
             <Workflow className="mx-auto mb-3 size-10 text-muted-foreground/30" />
-            <p className="text-sm font-medium text-foreground">No workflow instances found</p>
+            <p className="text-sm font-medium text-foreground">{t('workflows.noInstances')}</p>
             <p className="mt-1 text-xs text-muted-foreground">
-              Mevcut filtrelerle eslesen request kaydi bulunamadi.
+              {t('workflows.instancesSubtitle', { count: 0 })}
             </p>
           </div>
         ) : (
@@ -349,10 +351,10 @@ export default function AdminWorkflowInstancesPage() {
                       </div>
 
                       <div className="mt-3 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2 xl:grid-cols-4">
-                        <p>Requester: <span className="text-foreground">{instance.request.requesterName}</span></p>
+                        <p>{t('workflows.colRequest')}: <span className="text-foreground">{instance.request.requesterName}</span></p>
                         <p>Assignee: <span className="text-foreground">{instance.request.currentAssigneeName ?? 'Unassigned'}</span></p>
-                        <p>Current Step: <span className="text-foreground">{instance.currentStep?.stepName ?? 'Terminal'}</span></p>
-                        <p>Started: <span className="text-foreground">{formatDate(instance.startedAt)}</span></p>
+                        <p>{t('workflows.colCurrentStep')}: <span className="text-foreground">{instance.currentStep?.stepName ?? 'Terminal'}</span></p>
+                        <p>{t('workflows.colStarted')}: <span className="text-foreground">{formatDate(instance.startedAt)}</span></p>
                       </div>
                     </div>
 

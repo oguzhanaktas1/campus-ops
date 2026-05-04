@@ -18,6 +18,7 @@ import {
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import { cn } from '@/lib/utils'
 import { fetchProfile, getStoredUser } from '@/lib/auth'
+import { useI18n } from '@/lib/i18n'
 
 const STAFF_AI_SUMMARY_CACHE_KEY = 'campusops-ai-summary:staff-dashboard'
 
@@ -33,10 +34,10 @@ const requestTypeLabels: Record<string, string> = {
 }
 
 const slaData = [
-  { label: 'IT Support', sla: 4, actual: 3.2 },
-  { label: 'Maintenance', sla: 24, actual: 18.5 },
-  { label: 'Equipment', sla: 48, actual: 52 },
-  { label: 'Room Res.', sla: 8, actual: 6.1 },
+  { labelKey: 'dashboard.itSupport', sla: 4, actual: 3.2 },
+  { labelKey: 'dashboard.maintenance', sla: 24, actual: 18.5 },
+  { labelKey: 'dashboard.equipment', sla: 48, actual: 52 },
+  { labelKey: 'dashboard.roomReservationsShort', sla: 8, actual: 6.1 },
 ]
 
 function formatDate(d: string) {
@@ -45,6 +46,7 @@ function formatDate(d: string) {
 }
 
 export default function StaffDashboard() {
+  const { t } = useI18n()
   const [user, setUser] = useState<any>(null)
   const [aiNarration, setAiNarration] = useState<any>(null)
   const [aiLoading, setAiLoading] = useState(false)
@@ -180,10 +182,10 @@ export default function StaffDashboard() {
     <div className="p-6 space-y-6 max-w-5xl mx-auto pb-20">
       <div>
         <h1 className="text-xl font-bold text-foreground">
-          Welcome, {user?.name?.split(' ')[0] || 'Staff'}
+          {t('dashboard.welcome', { name: user?.name?.split(' ')[0] || t('nav.staffPortal') })}
         </h1>
         <p className="text-sm text-muted-foreground mt-0.5">
-          Here&apos;s your operations queue and SLA status.
+          {t('dashboard.subtitle')}
         </p>
       </div>
 
@@ -191,7 +193,7 @@ export default function StaffDashboard() {
         <div className="rounded-xl border border-amber-500/20 bg-gradient-to-r from-amber-500/8 via-background to-background p-4 shadow-sm">
           <div className="flex items-center gap-2">
             <Activity className="size-4 text-amber-600" />
-            <h2 className="text-sm font-semibold text-foreground">AI IT Summary</h2>
+            <h2 className="text-sm font-semibold text-foreground">{t('dashboard.aiSummary')}</h2>
           </div>
           {aiNarration?.summary ? (
             <>
@@ -209,18 +211,18 @@ export default function StaffDashboard() {
           ) : (
             <div className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
               <Loader2 className="size-4 animate-spin" />
-              AI summary is loading in the background.
+              {t('dashboard.aiLoading')}
             </div>
           )}
         </div>
       )}
 
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-        <MetricCard title="Assigned Tickets" value={metrics.assignedCount} description="In your queue" icon={<Ticket className="size-4" />} />
-        <MetricCard title="Overdue" value={metrics.overdueCount} description="Past SLA" icon={<AlertTriangle className="size-4" />} valueClassName="text-destructive" />
-        <MetricCard title="Completed Today" value={metrics.completedToday} icon={<CheckCircle2 className="size-4" />} trend={12} trendLabel="vs yesterday" />
-        <MetricCard title="SLA Breaches" value={metrics.slaBreaches} description="This week" icon={<Zap className="size-4" />} valueClassName={metrics.slaBreaches > 0 ? 'text-amber-600' : undefined} />
-        <MetricCard title="Avg Response" value={`${metrics.avgResponseHours}h`} description="Time to first action" icon={<Clock className="size-4" />} trend={-5} trendLabel="vs last week" />
+        <MetricCard title={t('dashboard.assignedTickets')} value={metrics.assignedCount} description={t('dashboard.inYourQueue')} icon={<Ticket className="size-4" />} />
+        <MetricCard title={t('dashboard.overdue')} value={metrics.overdueCount} description={t('dashboard.pastSla')} icon={<AlertTriangle className="size-4" />} valueClassName="text-destructive" />
+        <MetricCard title={t('dashboard.completedToday')} value={metrics.completedToday} icon={<CheckCircle2 className="size-4" />} trend={12} trendLabel="vs yesterday" />
+        <MetricCard title={t('dashboard.slaBreaches')} value={metrics.slaBreaches} description={t('dashboard.thisWeek')} icon={<Zap className="size-4" />} valueClassName={metrics.slaBreaches > 0 ? 'text-amber-600' : undefined} />
+        <MetricCard title={t('dashboard.avgResponse')} value={`${metrics.avgResponseHours}h`} description={t('dashboard.timeToFirstAction')} icon={<Clock className="size-4" />} trend={-5} trendLabel="vs last week" />
       </div>
 
       {overdue.length > 0 && (
@@ -228,15 +230,15 @@ export default function StaffDashboard() {
           <AlertTriangle className="size-4 text-destructive mt-0.5 flex-shrink-0" />
           <div>
             <p className="text-sm font-semibold text-destructive">
-              {overdue.length} overdue ticket{overdue.length > 1 ? 's' : ''} requiring immediate attention
+              {t('dashboard.overdueWarning', { count: overdue.length, suffix: overdue.length > 1 ? 's' : '' })}
             </p>
             <p className="text-xs text-muted-foreground mt-0.5">
-              These tickets have exceeded their SLA deadline.
+              {t('dashboard.overdueDesc')}
             </p>
           </div>
           <Link href="/staff/tickets?filter=overdue" className="ml-auto">
             <Button variant="outline" size="sm" className="text-xs border-destructive/30 text-destructive hover:bg-destructive/10">
-              View Overdue
+              {t('dashboard.viewOverdue')}
             </Button>
           </Link>
         </div>
@@ -246,12 +248,12 @@ export default function StaffDashboard() {
         <div className="lg:col-span-2 bg-card border border-border rounded-lg shadow-sm">
           <div className="flex items-center justify-between px-5 py-4 border-b border-border">
             <div>
-              <h2 className="text-sm font-semibold text-foreground">My Ticket Queue</h2>
-              <p className="text-xs text-muted-foreground mt-0.5">{assigned.length} active tickets</p>
+              <h2 className="text-sm font-semibold text-foreground">{t('dashboard.myTicketQueue')}</h2>
+              <p className="text-xs text-muted-foreground mt-0.5">{t('dashboard.activeTickets', { count: assigned.length })}</p>
             </div>
             <Link href="/staff/requests">
               <Button variant="ghost" size="sm" className="text-xs gap-1">
-                View all <ArrowRight className="size-3" />
+                {t('common.viewAll')} <ArrowRight className="size-3" />
               </Button>
             </Link>
           </div>
@@ -267,7 +269,7 @@ export default function StaffDashboard() {
                         <p className="text-sm font-medium text-foreground truncate">{req.title}</p>
                         {isNew && (
                           <span className="px-1.5 py-0.5 rounded bg-blue-500/10 border border-blue-500/20 text-blue-600 dark:text-blue-400 text-[9px] font-bold uppercase tracking-wider flex-shrink-0">
-                            New
+                            {t('common.new')}
                           </span>
                         )}
                       </div>
@@ -285,7 +287,7 @@ export default function StaffDashboard() {
             })}
             {assigned.length === 0 && (
               <p className="text-sm text-muted-foreground text-center py-8">
-                No tickets assigned to you.
+                {t('dashboard.noAssigned')}
               </p>
             )}
           </div>
@@ -296,9 +298,9 @@ export default function StaffDashboard() {
             <div className="flex items-center justify-between px-4 py-3 border-b border-border">
               <div className="flex items-center gap-2">
                 <Zap className="size-3.5 text-destructive" />
-                <h2 className="text-sm font-semibold text-foreground">Urgent</h2>
+                <h2 className="text-sm font-semibold text-foreground">{t('dashboard.urgent')}</h2>
               </div>
-              <span className="text-xs text-muted-foreground">{urgent.length} tickets</span>
+              <span className="text-xs text-muted-foreground">{t('dashboard.ticketCount', { count: urgent.length })}</span>
             </div>
             <div className="divide-y divide-border max-h-[200px] overflow-y-auto">
               {urgent.map((req) => {
@@ -311,7 +313,7 @@ export default function StaffDashboard() {
                         <p className="text-sm font-medium text-foreground truncate">{req.title}</p>
                         {isNew && (
                           <span className="px-1.5 py-0.5 rounded bg-blue-500/10 border border-blue-500/20 text-blue-600 dark:text-blue-400 text-[8px] font-bold uppercase tracking-wider flex-shrink-0">
-                            New
+                            {t('common.new')}
                           </span>
                         )}
                       </div>
@@ -324,7 +326,7 @@ export default function StaffDashboard() {
               })}
               {urgent.length === 0 && (
                 <p className="text-xs text-muted-foreground text-center py-4">
-                  No urgent tickets.
+                  {t('dashboard.noUrgent')}
                 </p>
               )}
             </div>
@@ -333,16 +335,16 @@ export default function StaffDashboard() {
           <div className="bg-card border border-border rounded-lg shadow-sm p-4">
             <div className="flex items-center gap-2 mb-3">
               <Activity className="size-3.5 text-muted-foreground" />
-              <h2 className="text-sm font-semibold text-foreground">SLA Summary</h2>
+              <h2 className="text-sm font-semibold text-foreground">{t('dashboard.slaSummary')}</h2>
             </div>
             <div className="space-y-2.5">
               {slaData.map((item) => {
                 const breached = item.actual > item.sla
                 const pct = Math.min((item.actual / item.sla) * 100, 100)
                 return (
-                  <div key={item.label}>
+                  <div key={item.labelKey}>
                     <div className="flex items-center justify-between text-xs mb-1">
-                      <span className="text-muted-foreground">{item.label}</span>
+                      <span className="text-muted-foreground">{t(item.labelKey)}</span>
                       <span className={cn('font-medium', breached ? 'text-destructive' : 'text-emerald-600')}>
                         {item.actual}h / {item.sla}h
                       </span>
@@ -362,7 +364,7 @@ export default function StaffDashboard() {
       </div>
 
       <div className="bg-card border border-border rounded-lg shadow-sm p-5">
-        <h2 className="text-sm font-semibold text-foreground mb-4">Weekly Throughput</h2>
+        <h2 className="text-sm font-semibold text-foreground mb-4">{t('dashboard.weeklyThroughput')}</h2>
         <ResponsiveContainer width="100%" height={200}>
           <BarChart
             data={[
@@ -383,8 +385,8 @@ export default function StaffDashboard() {
               contentStyle={{ fontSize: 12, borderRadius: 8 }}
               cursor={{ fill: 'oklch(0.94 0.01 264 / 0.4)' }}
             />
-            <Bar dataKey="created" name="Created" fill="oklch(0.769 0.188 70.08)" radius={[4, 4, 0, 0]} />
-            <Bar dataKey="resolved" name="Resolved" fill="oklch(0.53 0.14 162)" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="created" name={t('dashboard.created')} fill="oklch(0.769 0.188 70.08)" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="resolved" name={t('dashboard.resolved')} fill="oklch(0.53 0.14 162)" radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </div>

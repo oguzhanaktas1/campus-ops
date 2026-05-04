@@ -7,6 +7,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Progress } from "@/components/ui/progress"
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
+import { useI18n } from '@/lib/i18n'
 
 interface FileItem {
   id: string; name: string; size: string; rawSize: number; type: string; uploadedAt: string; relatedTo: string; url: string;
@@ -26,6 +27,7 @@ export default function StudentFilesPage() {
   
   const fileInputRef = useRef<HTMLInputElement>(null)
   const MAX_LIMIT_BYTES = 50 * 1024 * 1024; // 50MB
+  const { t } = useI18n()
 
   const fetchFiles = async () => {
     try {
@@ -54,7 +56,7 @@ export default function StudentFilesPage() {
     if (!file) return
 
     if (totalUsedBytes + file.size > MAX_LIMIT_BYTES) {
-      toast.error("Storage limit reached! You cannot upload more than 50MB.")
+      toast.error(t('messages.storageLimit'))
       return
     }
 
@@ -72,13 +74,13 @@ export default function StudentFilesPage() {
       })
 
       if (res.ok) {
-        toast.success("Uploaded successfully")
+        toast.success(t('messages.uploadSuccess'))
         fetchFiles()
       } else {
         const err = await res.json()
-        toast.error(err.message || "Upload failed")
+        toast.error(err.message || t('messages.uploadFail'))
       }
-    } catch (err) { toast.error("Network error") } finally {
+    } catch (err) { toast.error(t('messages.networkError')) } finally {
       setIsUploading(false)
       if (fileInputRef.current) fileInputRef.current.value = ''
     }
@@ -98,13 +100,13 @@ export default function StudentFilesPage() {
       })
 
       if (res.ok) {
-        toast.success("File deleted securely")
+        toast.success(t('messages.fileDeleted'))
         fetchFiles() // Listeyi ve storage barı güncelle
       } else {
-        toast.error("Failed to delete file")
+        toast.error(t('messages.deleteFileFail'))
       }
     } catch (err) {
-      toast.error("Network error")
+      toast.error(t('messages.networkError'))
     } finally {
       setIsDeleting(false)
       setFileToDelete(null) // Modalı kapat
@@ -138,16 +140,16 @@ export default function StudentFilesPage() {
           <div className="bg-background border border-border p-6 rounded-lg shadow-xl max-w-sm w-full space-y-4">
             <div className="flex items-center gap-3 text-destructive">
               <AlertTriangle className="size-6" />
-              <h2 className="text-lg font-bold">Delete File?</h2>
+              <h2 className="text-lg font-bold">{t('common.delete')}?</h2>
             </div>
             <p className="text-sm text-muted-foreground">
-              Are you sure you want to delete <strong>{fileToDelete.name}</strong>? This will remove it permanently from your storage.
+              {t('common.delete')} <strong>{fileToDelete.name}</strong>?
             </p>
             <div className="flex justify-end gap-3 pt-2">
-              <Button variant="outline" disabled={isDeleting} onClick={() => setFileToDelete(null)}>Cancel</Button>
+              <Button variant="outline" disabled={isDeleting} onClick={() => setFileToDelete(null)}>{t('common.cancel')}</Button>
               <Button variant="destructive" disabled={isDeleting} onClick={handleDelete}>
                 {isDeleting ? <Loader2 className="size-4 animate-spin mr-2" /> : <Trash2 className="size-4 mr-2" />}
-                Delete
+                {t('common.delete')}
               </Button>
             </div>
           </div>
@@ -157,13 +159,13 @@ export default function StudentFilesPage() {
       {/* BAŞLIK VE UPLOAD */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-foreground">My Files</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Manage your request attachments</p>
+          <h1 className="text-xl font-bold text-foreground">{t('pages.filesTitle')}</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">{t('pages.filesSubtitle')}</p>
         </div>
         <input type="file" hidden ref={fileInputRef} onChange={handleFileUpload} />
         <Button size="sm" className="gap-1.5" disabled={isUploading} onClick={() => fileInputRef.current?.click()}>
           {isUploading ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
-          {isUploading ? 'Uploading...' : 'Upload File'}
+          {isUploading ? t('common.loading') : t('common.upload')}
         </Button>
       </div>
 
@@ -172,7 +174,7 @@ export default function StudentFilesPage() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <ShieldCheck className="size-4 text-primary" />
-            <span className="text-xs font-bold uppercase tracking-wider text-foreground">Storage Quota</span>
+            <span className="text-xs font-bold uppercase tracking-wider text-foreground">{t('pages.storageQuota')}</span>
           </div>
           <span className={cn("text-xs font-medium", usagePercent > 90 ? "text-red-500" : "text-muted-foreground")}>
             {usedMB} MB / 50 MB ({usagePercent.toFixed(0)}%)
@@ -187,7 +189,7 @@ export default function StudentFilesPage() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
           <input 
             type="text" 
-            placeholder="Search by name or request..." 
+            placeholder={t('forms.searchFilesPlaceholder')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-9 pr-3 py-2 text-sm bg-background border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
@@ -199,7 +201,7 @@ export default function StudentFilesPage() {
             onChange={(e) => setTypeFilter(e.target.value)}
             className="w-full sm:w-[150px] px-3 py-2 text-sm bg-background border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
           >
-            <option value="ALL">All Types</option>
+            <option value="ALL">{t('pages.allTypes')}</option>
             {uniqueTypes.map(type => (
               <option key={type} value={type}>{type}</option>
             ))}
@@ -210,7 +212,7 @@ export default function StudentFilesPage() {
       {/* LİSTELEME */}
       <div className="bg-card border border-border rounded-lg shadow-sm overflow-hidden">
         <div className="px-5 py-3 border-b border-border bg-muted/20 flex justify-between">
-          <p className="text-xs font-medium text-muted-foreground">{filteredFiles.length} Files Found</p>
+          <p className="text-xs font-medium text-muted-foreground">{t('pages.filesFound', { count: filteredFiles.length })}</p>
         </div>
         <div className="divide-y divide-border">
           {filteredFiles.map((file) => (
@@ -234,12 +236,12 @@ export default function StudentFilesPage() {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem asChild><a href={file.url} target="_blank" rel="noreferrer"><ExternalLink className="size-4 mr-2" />View</a></DropdownMenuItem>
-                  <DropdownMenuItem asChild><a href={file.url} download={file.name} className="font-medium"><Download className="size-4 mr-2" />Download</a></DropdownMenuItem>
+                  <DropdownMenuItem asChild><a href={file.url} target="_blank" rel="noreferrer"><ExternalLink className="size-4 mr-2" />{t('common.view')}</a></DropdownMenuItem>
+                  <DropdownMenuItem asChild><a href={file.url} download={file.name} className="font-medium"><Download className="size-4 mr-2" />{t('common.download')}</a></DropdownMenuItem>
                   <DropdownMenuSeparator />
                   {/* 🔥 SİL BUTONU 🔥 */}
                   <DropdownMenuItem onClick={() => setFileToDelete(file)} className="text-destructive focus:bg-destructive/10 focus:text-destructive cursor-pointer">
-                    <Trash2 className="size-4 mr-2" />Delete
+                    <Trash2 className="size-4 mr-2" />{t('common.delete')}
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -249,8 +251,8 @@ export default function StudentFilesPage() {
           {filteredFiles.length === 0 && (
             <div className="py-20 flex flex-col items-center justify-center text-center px-5">
               <FolderOpen className="size-12 text-muted-foreground/20 mb-4" />
-              <h3 className="text-sm font-semibold text-foreground">No matches found</h3>
-              <p className="text-xs text-muted-foreground mt-1">Try adjusting your search or filters.</p>
+              <h3 className="text-sm font-semibold text-foreground">{t('pages.noMatches')}</h3>
+              <p className="text-xs text-muted-foreground mt-1">{t('requests.adjustSearch')}</p>
             </div>
           )}
         </div>

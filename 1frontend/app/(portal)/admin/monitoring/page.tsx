@@ -20,6 +20,7 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { useI18n } from '@/lib/i18n'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -110,8 +111,14 @@ function StatusDot({ ok }: { ok: boolean }) {
 }
 
 function StatusBadge({ status }: { status: string }) {
+  const { t } = useI18n()
   const ok = status === 'ok' || status === 'ready'
   const warn = status === 'not_ready' || status === 'degraded' || status === 'disabled'
+  const label = ok
+    ? t('monitoring.healthy')
+    : warn
+      ? t('monitoring.degraded')
+      : t('monitoring.down')
   return (
     <span
       className={cn(
@@ -124,7 +131,7 @@ function StatusBadge({ status }: { status: string }) {
       )}
     >
       {ok ? <CheckCircle2 className="size-3" /> : warn ? <AlertCircle className="size-3" /> : <XCircle className="size-3" />}
-      {status}
+      {label}
     </span>
   )
 }
@@ -177,6 +184,7 @@ function parsePrometheusMetrics(raw: string): { name: string; value: string; hel
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function MonitoringPage() {
+  const { t } = useI18n()
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null)
   const [queues, setQueues] = useState<QueueStats[]>([])
   const [metricsRaw, setMetricsRaw] = useState<string>('')
@@ -242,10 +250,10 @@ export default function MonitoringPage() {
         <div>
           <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
             <Activity className="size-5 text-primary" />
-            System Monitoring
+            {t('monitoring.title')}
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Backend, workers, AI runtime VM, RabbitMQ ve Prometheus her 30 saniyede yenilenir.
+            {t('monitoring.subtitle')}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -263,7 +271,7 @@ export default function MonitoringPage() {
             disabled={refreshing}
           >
             <RefreshCw className={cn('size-3.5', refreshing && 'animate-spin')} />
-            Yenile
+            {t('common.refresh')}
           </Button>
         </div>
       </div>
@@ -274,7 +282,7 @@ export default function MonitoringPage() {
         {/* Backend Health */}
         <ServiceCard
           icon={<Server className="size-4" />}
-          title="Backend"
+          title={t('monitoring.serverStatus')}
           subtitle="NestJS · port 5000"
           status={snapshot?.backend}
           extraLinks={
@@ -290,7 +298,7 @@ export default function MonitoringPage() {
         {/* Python Workers */}
         <ServiceCard
           icon={<Cpu className="size-4" />}
-          title="Python Workers"
+          title={t('monitoring.queueStatus')}
           subtitle="FastAPI · port 8001"
           status={snapshot?.workers}
           extraLinks={
@@ -305,7 +313,7 @@ export default function MonitoringPage() {
 
         <ServiceCard
           icon={<Server className="size-4" />}
-          title="AI Service"
+          title={t('monitoring.cacheStatus')}
           subtitle="FastAPI · port 8010"
           status={snapshot?.ai}
           details={snapshot?.ai && <AiRuntimeDetails ai={snapshot.ai} />}
@@ -321,8 +329,8 @@ export default function MonitoringPage() {
         {/* RabbitMQ */}
         <ServiceCard
           icon={<Radio className="size-4" />}
-          title="RabbitMQ"
-          subtitle="AMQP broker · Management UI"
+          title={t('monitoring.dbStatus')}
+          subtitle={t('monitoring.amqpBroker')}
           status={
             snapshot?.rabbitmq
               ? { status: snapshot.rabbitmq.error ? 'error' : 'ok', ...snapshot.rabbitmq }
@@ -330,7 +338,7 @@ export default function MonitoringPage() {
           }
           extraLinks={
             snapshot?.urls && (
-              <ExternalUrl label="Management UI" href={snapshot.urls.rabbitmqMgmt} />
+              <ExternalUrl label={t('monitoring.managementUi')} href={snapshot.urls.rabbitmqMgmt} />
             )
           }
         />
@@ -342,18 +350,18 @@ export default function MonitoringPage() {
               <Database className="size-4" />
             </div>
             <div>
-              <p className="text-sm font-semibold text-foreground">Outbox</p>
-              <p className="text-xs text-muted-foreground">Transactional message queue</p>
+              <p className="text-sm font-semibold text-foreground">{t('monitoring.outbox')}</p>
+              <p className="text-xs text-muted-foreground">{t('monitoring.outboxSubtitle')}</p>
             </div>
           </div>
           {snapshot?.outbox ? (
             <div className="grid grid-cols-3 gap-2">
-              <OutboxStat label="Pending" value={snapshot.outbox.pending} warn={snapshot.outbox.pending > 0} />
-              <OutboxStat label="Failed" value={snapshot.outbox.failed} danger={snapshot.outbox.failed > 0} />
-              <OutboxStat label="Processed" value={snapshot.outbox.processed} />
+              <OutboxStat label={t('monitoring.pending')} value={snapshot.outbox.pending} warn={snapshot.outbox.pending > 0} />
+              <OutboxStat label={t('monitoring.failed')} value={snapshot.outbox.failed} danger={snapshot.outbox.failed > 0} />
+              <OutboxStat label={t('monitoring.processed')} value={snapshot.outbox.processed} />
             </div>
           ) : (
-            <p className="text-xs text-muted-foreground">Veri yok</p>
+            <p className="text-xs text-muted-foreground">{t('monitoring.noData')}</p>
           )}
         </div>
       </div>
@@ -361,17 +369,17 @@ export default function MonitoringPage() {
       {/* RabbitMQ Queues */}
       {queues.length > 0 && (
         <section>
-          <h2 className="text-sm font-semibold text-foreground mb-3">RabbitMQ Queues</h2>
+          <h2 className="text-sm font-semibold text-foreground mb-3">{t('monitoring.rabbitmqQueues')}</h2>
           <div className="bg-card border border-border rounded-lg overflow-hidden shadow-sm">
             <table className="w-full text-xs">
               <thead>
                 <tr className="border-b border-border bg-muted/40">
-                  <th className="text-left py-2 px-4 font-medium text-muted-foreground">Queue</th>
-                  <th className="text-right py-2 px-3 font-medium text-muted-foreground">Ready</th>
-                  <th className="text-right py-2 px-3 font-medium text-muted-foreground">Unacked</th>
-                  <th className="text-right py-2 px-3 font-medium text-muted-foreground">Total</th>
-                  <th className="text-right py-2 px-3 font-medium text-muted-foreground">Consumers</th>
-                  <th className="text-right py-2 px-3 font-medium text-muted-foreground">Pub/s</th>
+                  <th className="text-left py-2 px-4 font-medium text-muted-foreground">{t('monitoring.queue')}</th>
+                  <th className="text-right py-2 px-3 font-medium text-muted-foreground">{t('monitoring.ready')}</th>
+                  <th className="text-right py-2 px-3 font-medium text-muted-foreground">{t('monitoring.unacked')}</th>
+                  <th className="text-right py-2 px-3 font-medium text-muted-foreground">{t('monitoring.total')}</th>
+                  <th className="text-right py-2 px-3 font-medium text-muted-foreground">{t('monitoring.consumers')}</th>
+                  <th className="text-right py-2 px-3 font-medium text-muted-foreground">{t('monitoring.publishRate')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -402,7 +410,7 @@ export default function MonitoringPage() {
             className="flex items-center gap-2 text-sm font-semibold text-foreground mb-3 hover:text-primary transition-colors"
             onClick={() => setShowMetrics((v) => !v)}
           >
-            Prometheus Metrics ({metrics.length})
+            {t('monitoring.prometheusMetrics')} ({metrics.length})
             {showMetrics ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
           </button>
 
@@ -411,8 +419,8 @@ export default function MonitoringPage() {
               <table className="w-full text-xs font-mono">
                 <thead>
                   <tr className="border-b border-border bg-muted/40">
-                    <th className="text-left py-2 px-4 font-medium text-muted-foreground">Metric</th>
-                    <th className="text-right py-2 px-4 font-medium text-muted-foreground">Value</th>
+                    <th className="text-left py-2 px-4 font-medium text-muted-foreground">{t('monitoring.metric')}</th>
+                    <th className="text-right py-2 px-4 font-medium text-muted-foreground">{t('monitoring.value')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -435,7 +443,7 @@ export default function MonitoringPage() {
       {/* Direct URLs box */}
       {snapshot?.urls && (
         <section className="bg-muted/30 border border-border rounded-lg p-4 space-y-2">
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Monitoring Endpoints (backend proxy)</p>
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{t('monitoring.endpoints')}</p>
           <div className="grid sm:grid-cols-2 gap-1.5">
             {Object.entries(snapshot.urls).map(([key, url]) => (
               <div key={key} className="flex items-center justify-between gap-2 text-xs">
@@ -539,7 +547,7 @@ function AiRuntimeDetails({ ai }: { ai: ServiceStatus }) {
         <div className="flex min-w-0 items-center gap-2">
           <Bot className={cn('size-3.5 flex-shrink-0', runtimeOk ? 'text-emerald-500' : runtimeUnreachable ? 'text-red-500 animate-pulse' : 'text-amber-500')} />
           <div className="min-w-0">
-            <p className="text-xs font-semibold text-foreground">Qwen2.5 runtime VM</p>
+            <p className="text-xs font-semibold text-foreground">{t('monitoring.qwenRuntime')}</p>
             <p className="truncate text-[11px] text-muted-foreground">{runtime?.baseUrl ?? 'Runtime URL yok'}</p>
           </div>
         </div>

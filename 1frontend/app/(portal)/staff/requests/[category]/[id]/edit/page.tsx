@@ -9,12 +9,14 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { getToken } from '@/lib/auth'
+import { useI18n } from '@/lib/i18n'
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000'
 
 export default function StaffRequestEditPage() {
   const params = useParams()
   const router = useRouter()
+  const { t } = useI18n()
   const requestId = params.id as string
   const category = params.category as string
 
@@ -42,13 +44,13 @@ export default function StaffRequestEditPage() {
         )
         setRevisionNote(revisionAction?.decisionNote ?? null)
       } catch {
-        toast.error('Failed to load request.')
+        toast.error(t('pages.requestLoadFail'))
       } finally {
         setIsLoading(false)
       }
     }
     void load()
-  }, [requestId])
+  }, [requestId, t])
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -66,10 +68,10 @@ export default function StaffRequestEditPage() {
         const err = await res.json().catch(() => ({}))
         throw new Error(err.message ?? 'Failed')
       }
-      toast.success('Request revised and resubmitted.')
+      toast.success(t('pages.requestResubmitted'))
       router.push(`/staff/requests/${category}/${requestId}`)
     } catch (err: any) {
-      toast.error(err.message ?? 'Could not submit revision.')
+      toast.error(err.message ?? t('pages.revisionSubmitFail'))
     } finally {
       setIsSubmitting(false)
     }
@@ -87,27 +89,27 @@ export default function StaffRequestEditPage() {
     <div className="mx-auto max-w-3xl space-y-5 p-6 pb-20">
       <Button variant="ghost" size="sm" asChild className="gap-1.5">
         <Link href={`/staff/requests/${category}/${requestId}`}>
-          <ArrowLeft className="size-4" /> Back
+          <ArrowLeft className="size-4" /> {t('common.back')}
         </Link>
       </Button>
 
       <div>
-        <h1 className="text-xl font-bold">Revise Request</h1>
+        <h1 className="text-xl font-bold">{t('pages.reviseRequest')}</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Update the details below and resubmit for review.
+          {t('pages.reviseSubtitle')}
         </p>
       </div>
 
       {revisionNote && (
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-800 dark:bg-amber-950/30">
-          <p className="text-sm font-medium text-amber-800 dark:text-amber-300">Reviewer note</p>
+          <p className="text-sm font-medium text-amber-800 dark:text-amber-300">{t('pages.reviewerNote')}</p>
           <p className="mt-1 text-sm text-amber-700 dark:text-amber-400">{revisionNote}</p>
         </div>
       )}
 
       <form onSubmit={onSubmit} className="space-y-4 rounded-xl border border-border bg-card p-5">
         <div className="space-y-2">
-          <label className="text-sm font-medium">Title</label>
+          <label className="text-sm font-medium">{t('common.title')}</label>
           <Input
             value={form.title}
             onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))}
@@ -116,7 +118,7 @@ export default function StaffRequestEditPage() {
         </div>
 
         <div className="space-y-2">
-          <label className="text-sm font-medium">Description</label>
+          <label className="text-sm font-medium">{t('common.description')}</label>
           <Textarea
             value={form.description}
             onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))}
@@ -126,11 +128,11 @@ export default function StaffRequestEditPage() {
 
         <div className="flex justify-end gap-3">
           <Button variant="outline" type="button" asChild>
-            <Link href={`/staff/requests/${category}/${requestId}`}>Cancel</Link>
+            <Link href={`/staff/requests/${category}/${requestId}`}>{t('common.cancel')}</Link>
           </Button>
           <Button type="submit" disabled={isSubmitting}>
             {isSubmitting ? <Loader2 className="size-4 animate-spin mr-1" /> : null}
-            Resubmit
+            {t('pages.resubmit')}
           </Button>
         </div>
       </form>

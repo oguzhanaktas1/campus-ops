@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { getToken } from '@/lib/auth'
+import { useI18n } from '@/lib/i18n'
 
 const STATUS_BADGE: Record<string, string> = {
   SUBMITTED:         'bg-blue-50 text-blue-700 border-blue-200',
@@ -26,6 +27,7 @@ function timeAgo(d: string) {
 }
 
 export default function OrganizerEquipmentPage() {
+  const { t } = useI18n()
   const [requests, setRequests] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
@@ -38,13 +40,13 @@ export default function OrganizerEquipmentPage() {
         })
         if (res.ok) setRequests(await res.json())
       } catch {
-        toast.error('Failed to load equipment requests.')
+        toast.error(t('pages.equipmentLoadFail'))
       } finally {
         setIsLoading(false)
       }
     }
     fetchRequests()
-  }, [])
+  }, [t])
 
   if (isLoading) return (
     <div className="flex h-[60vh] items-center justify-center">
@@ -57,15 +59,15 @@ export default function OrganizerEquipmentPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
-            <Package className="size-5 text-primary" /> Equipment Requests
+            <Package className="size-5 text-primary" /> {t('pages.equipmentRequests')}
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Request campus equipment such as projectors, laptops and cameras.
+            {t('pages.equipmentSubtitle')}
           </p>
         </div>
         <Link href="/organizer/equipment/new">
           <Button size="sm" className="gap-2">
-            <Plus className="size-4" /> New Request
+            <Plus className="size-4" /> {t('common.newRequest')}
           </Button>
         </Link>
       </div>
@@ -74,9 +76,9 @@ export default function OrganizerEquipmentPage() {
         {requests.length === 0 ? (
           <div className="py-16 flex flex-col items-center text-center opacity-50">
             <AlertCircle className="size-10 mb-3" />
-            <p className="text-sm font-medium">No equipment requests yet.</p>
+            <p className="text-sm font-medium">{t('pages.noEquipmentRequests')}</p>
             <p className="text-xs text-muted-foreground mt-1">
-              Submit a request to borrow campus equipment.
+              {t('pages.noEquipmentRequestsDesc')}
             </p>
           </div>
         ) : (

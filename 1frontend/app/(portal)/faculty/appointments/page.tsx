@@ -19,6 +19,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
+import { useI18n } from '@/lib/i18n'
 
 interface Appointment {
   id: string
@@ -38,29 +39,6 @@ interface Appointment {
 }
 
 type TabKey = 'requests' | 'confirmed' | 'past'
-
-const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
-  PENDING: {
-    label: 'Pending',
-    className: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-800',
-  },
-  APPROVED: {
-    label: 'Confirmed',
-    className: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800',
-  },
-  CONFIRMED: {
-    label: 'Confirmed',
-    className: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800',
-  },
-  REJECTED: {
-    label: 'Declined',
-    className: 'bg-red-50 text-red-700 border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-800',
-  },
-  COMPLETED: {
-    label: 'Completed',
-    className: 'bg-muted text-muted-foreground border-border',
-  },
-}
 
 function formatDateTime(d: string) {
   if (!d) return '—'
@@ -85,6 +63,31 @@ function formatDate(d: string) {
 }
 
 function AppointmentStatusBadge({ status }: { status: string }) {
+  const { t } = useI18n()
+
+  const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
+    PENDING: {
+      label: t('appointments.pending'),
+      className: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-800',
+    },
+    APPROVED: {
+      label: t('appointments.confirmed'),
+      className: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800',
+    },
+    CONFIRMED: {
+      label: t('appointments.confirmed'),
+      className: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800',
+    },
+    REJECTED: {
+      label: t('appointments.declined'),
+      className: 'bg-red-50 text-red-700 border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-800',
+    },
+    COMPLETED: {
+      label: t('appointments.confirmed'),
+      className: 'bg-muted text-muted-foreground border-border',
+    },
+  }
+
   const cfg = STATUS_CONFIG[status?.toUpperCase()] || null
   if (!cfg)
     return (
@@ -100,6 +103,7 @@ function AppointmentStatusBadge({ status }: { status: string }) {
 }
 
 export default function FacultyAppointmentsPage() {
+  const { t } = useI18n()
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [processingId, setProcessingId] = useState<string | null>(null)
@@ -141,7 +145,7 @@ export default function FacultyAppointmentsPage() {
         body: JSON.stringify({}),
       })
       if (res.ok) {
-        toast.success(action === 'CONFIRM' ? 'Appointment confirmed.' : 'Appointment declined.')
+        toast.success(action === 'CONFIRM' ? t('appointments.confirmSuccess') : t('appointments.declineSuccess'))
         setAppointments((prev) =>
           prev.map((a) =>
             a.id === id ? { ...a, status: action === 'CONFIRM' ? 'APPROVED' : 'REJECTED' } : a
@@ -149,10 +153,10 @@ export default function FacultyAppointmentsPage() {
         )
       } else {
         const err = await res.json().catch(() => ({}))
-        toast.error(err?.message || 'Failed to process appointment.')
+        toast.error(err?.message || t('appointments.actionFail'))
       }
     } catch {
-      toast.error('Network error. Please try again.')
+      toast.error(t('appointments.actionFail'))
     } finally {
       setProcessingId(null)
     }
@@ -186,9 +190,9 @@ export default function FacultyAppointmentsPage() {
   }
 
   const tabs: { key: TabKey; label: string; count: number }[] = [
-    { key: 'requests', label: 'Requests', count: pending.length },
-    { key: 'confirmed', label: 'Confirmed', count: confirmed.length },
-    { key: 'past', label: 'Past', count: past.length },
+    { key: 'requests', label: t('appointments.tabRequests'), count: pending.length },
+    { key: 'confirmed', label: t('appointments.tabConfirmed'), count: confirmed.length },
+    { key: 'past', label: t('appointments.tabPast'), count: past.length },
   ]
 
   if (isLoading) {
@@ -206,32 +210,32 @@ export default function FacultyAppointmentsPage() {
       {/* Header */}
       <div>
         <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
-          <Calendar className="size-5 text-primary" /> My Appointments
+          <Calendar className="size-5 text-primary" /> {t('appointments.title')}
         </h1>
         <p className="text-sm text-muted-foreground mt-0.5">
-          Manage student appointment requests and scheduled meetings
+          {t('appointments.subtitle')}
         </p>
       </div>
 
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
         <MetricCard
-          title="Total Appointments"
+          title={t('appointments.totalRequests')}
           value={appointments.length}
-          description="All time"
+          description={t('appointments.allTime')}
           icon={<Users className="size-4" />}
         />
         <MetricCard
-          title="Pending Requests"
+          title={t('appointments.pending')}
           value={pending.length}
-          description="Awaiting your decision"
+          description={t('appointments.subtitle')}
           icon={<Clock className="size-4" />}
           valueClassName={pending.length > 0 ? 'text-amber-600' : undefined}
         />
         <MetricCard
-          title="Confirmed Today"
+          title={t('appointments.confirmed')}
           value={todayConfirmed.length}
-          description="Scheduled for today"
+          description={t('appointments.lastMonth')}
           icon={<CalendarCheck className="size-4" />}
         />
       </div>
@@ -271,17 +275,17 @@ export default function FacultyAppointmentsPage() {
           <EmptyState
             title={
               activeTab === 'requests'
-                ? 'No pending requests'
+                ? t('appointments.noRequests')
                 : activeTab === 'confirmed'
-                ? 'No confirmed appointments'
-                : 'No past appointments'
+                ? t('appointments.noConfirmed')
+                : t('appointments.noPast')
             }
             description={
               activeTab === 'requests'
-                ? 'When students request appointments, they will appear here.'
+                ? t('appointments.noRequests')
                 : activeTab === 'confirmed'
-                ? 'Accepted appointments will appear here.'
-                : 'Completed and past appointments will appear here.'
+                ? t('appointments.noConfirmed')
+                : t('appointments.noPast')
             }
             icon={<Calendar className="size-6" />}
           />
@@ -291,22 +295,22 @@ export default function FacultyAppointmentsPage() {
               <thead>
                 <tr className="bg-muted/40 border-b border-border">
                   <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                    Requester
+                    {t('appointments.requestedBy')}
                   </th>
                   <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                    Topic
+                    {t('appointments.scheduledWith')}
                   </th>
                   <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                    Preferred Time
+                    {t('appointments.preferredTime')}
                   </th>
                   <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                    Duration
+                    {t('appointments.duration')}
                   </th>
                   <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                    Status
+                    {t('common.status')}
                   </th>
                   <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                    Actions
+                    {t('common.actions')}
                   </th>
                 </tr>
               </thead>
@@ -345,7 +349,7 @@ export default function FacultyAppointmentsPage() {
                         <div className="flex items-center gap-2">
                           <Button asChild size="sm" variant="outline" className="h-7 gap-1 text-xs">
                             <Link href={`/faculty/requests/${apt.id}?from=/faculty/appointments`}>
-                              View
+                              {t('common.view')}
                             </Link>
                           </Button>
                           {activeTab === 'requests' && (
@@ -361,7 +365,7 @@ export default function FacultyAppointmentsPage() {
                               ) : (
                                 <CheckCircle2 className="size-3" />
                               )}
-                              Confirm
+                              {t('appointments.confirmBtn')}
                             </Button>
                             <Button
                               size="sm"
@@ -375,7 +379,7 @@ export default function FacultyAppointmentsPage() {
                               ) : (
                                 <XCircle className="size-3" />
                               )}
-                              Decline
+                              {t('appointments.declineBtn')}
                             </Button>
                             </>
                           )}

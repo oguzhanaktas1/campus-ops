@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Loader2, Bell, CheckCheck, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { getToken } from '@/lib/auth'
+import { useI18n } from '@/lib/i18n'
 
 function timeAgo(ts: string) {
   if (!ts) return ''
@@ -18,8 +19,9 @@ function timeAgo(ts: string) {
 }
 
 export default function FacultyNotificationsPage() {
+  const { t } = useI18n()
   const [notifications, setNotifications] = useState<any[]>([])
-  const [selectedIds, setSelectedIds] = useState<string[]>([]) // 🔥 Seçili bildirimlerin state'i
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const router = useRouter()
 
@@ -31,7 +33,7 @@ export default function FacultyNotificationsPage() {
       })
       if (res.ok) { const d = await res.json(); setNotifications(Array.isArray(d) ? d : (d.notifications ?? [])); }
     } catch (err) {
-      toast.error('Failed to load notifications')
+      toast.error(t('common.loading'))
     } finally {
       setIsLoading(false)
     }
@@ -41,14 +43,12 @@ export default function FacultyNotificationsPage() {
     fetchNotifications()
   }, [])
 
-  // 🔥 CHECKBOX SEÇİM MANTIĞI 🔥
   const toggleSelection = (id: string) => {
-    setSelectedIds(prev => 
+    setSelectedIds(prev =>
       prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
     )
   }
 
-  // 🔥 TÜMÜNÜ SEÇ / BIRAK MANTIĞI 🔥
   const toggleSelectAll = () => {
     if (selectedIds.length === notifications.length) {
       setSelectedIds([])
@@ -71,20 +71,19 @@ export default function FacultyNotificationsPage() {
         },
         body: JSON.stringify({ ids: selectedIds })
       })
-      
+
       if (res.ok) {
         setNotifications(prev => prev.filter(n => !selectedIds.includes(n.id)))
         setSelectedIds([])
-        toast.success(`${selectedIds.length} notifications deleted`)
+        toast.success(t('notifications.deleted', { count: selectedIds.length }))
       } else {
-        throw new Error('Failed to delete')
+        throw new Error(t('notifications.deleteFail'))
       }
     } catch (err) {
-      toast.error('Failed to delete notifications')
+      toast.error(t('notifications.deleteFail'))
     }
   }
 
-  // TEK BİR BİLDİRİMİ OKUNDU İŞARETLE VE YÖNLENDİR
   const handleNotificationClick = async (notif: any) => {
     try {
       if (!notif.isRead) {
@@ -93,7 +92,7 @@ export default function FacultyNotificationsPage() {
           method: 'PATCH',
           headers: { Authorization: `Bearer ${getToken()}` }
         })
-        
+
         setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, isRead: true } : n))
       }
 
@@ -105,7 +104,6 @@ export default function FacultyNotificationsPage() {
     }
   }
 
-  // TÜMÜNÜ OKUNDU İŞARETLE
   const handleMarkAllRead = async () => {
     try {
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
@@ -113,13 +111,13 @@ export default function FacultyNotificationsPage() {
         method: 'PATCH',
         headers: { Authorization: `Bearer ${getToken()}` }
       })
-      
+
       if (res.ok) {
         setNotifications(prev => prev.map(n => ({ ...n, isRead: true })))
-        toast.success('All notifications marked as read')
+        toast.success(t('notifications.allRead'))
       }
     } catch (err) {
-      toast.error('Failed to mark all as read')
+      toast.error(t('notifications.markAllReadFail'))
     }
   }
 
@@ -133,14 +131,13 @@ export default function FacultyNotificationsPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-            <Bell className="size-6 text-primary" /> Notifications
+            <Bell className="size-6 text-primary" /> {t('notifications.title')}
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            You have <span className="font-bold text-foreground">{unreadCount}</span> unread messages.
+            {t('notifications.subtitle', { count: unreadCount })}
           </p>
         </div>
-        
-        {/* 🔥 ÜST AKSİYON BUTONLARI 🔥 */}
+
         <div className="flex items-center gap-2">
           {selectedIds.length > 0 && (
             <Button variant="destructive" size="sm" onClick={handleDeleteSelected} className="gap-2 shadow-sm animate-in fade-in zoom-in duration-200">
@@ -149,19 +146,18 @@ export default function FacultyNotificationsPage() {
           )}
           {unreadCount > 0 && (
             <Button variant="outline" size="sm" onClick={handleMarkAllRead} className="gap-2 shrink-0 shadow-sm">
-              <CheckCheck className="size-4" /> Mark all as read
+              <CheckCheck className="size-4" /> {t('notifications.markAllRead')}
             </Button>
           )}
         </div>
       </div>
 
       <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
-        
-        {/* 🔥 TÜMÜNÜ SEÇ BAR'I 🔥 */}
+
         {notifications.length > 0 && (
           <div className="flex items-center gap-3 px-5 py-3 border-b border-border bg-muted/20">
-            <input 
-              type="checkbox" 
+            <input
+              type="checkbox"
               checked={isAllSelected}
               onChange={toggleSelectAll}
               className="size-4 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer"
@@ -181,7 +177,6 @@ export default function FacultyNotificationsPage() {
                 !n.isRead ? 'bg-primary/5 hover:bg-primary/10' : 'hover:bg-muted/50'
               )}
             >
-              {/* 🔥 KUTUCUK ALANI (Tıklama yayılmasını engelliyoruz) 🔥 */}
               <div className="pl-5 py-4 flex items-start justify-center cursor-default">
                 <input
                   type="checkbox"
@@ -191,19 +186,17 @@ export default function FacultyNotificationsPage() {
                 />
               </div>
 
-              {/* BİLDİRİMİN İÇERİĞİ VE TIKLANABİLİR ALANI */}
-              <div 
+              <div
                 onClick={() => handleNotificationClick(n)}
                 className="flex-1 flex gap-4 pr-5 py-4 cursor-pointer min-w-0"
               >
-                {/* Bildirim İkonu/Noktası */}
                 <div className="mt-1 shrink-0">
                   <div className={cn(
                     "size-2.5 rounded-full",
                     !n.isRead ? "bg-primary shadow-[0_0_8px_rgba(var(--primary),0.6)] animate-pulse" : "bg-muted-foreground/30"
                   )} />
                 </div>
-                
+
                 <div className="flex-1 min-w-0">
                   <div className="flex justify-between items-start gap-2">
                     <p className={cn('text-sm font-semibold truncate', !n.isRead ? 'text-foreground' : 'text-muted-foreground')}>
@@ -224,8 +217,8 @@ export default function FacultyNotificationsPage() {
           {notifications.length === 0 && (
             <div className="py-12 flex flex-col items-center justify-center text-center opacity-50">
               <Bell className="size-10 mb-3" />
-              <p className="text-sm font-medium">All Caught Up!</p>
-              <p className="text-xs">No notifications to display.</p>
+              <p className="text-sm font-medium">{t('notifications.noNotifications')}</p>
+              <p className="text-xs">{t('notifications.noNotifications')}</p>
             </div>
           )}
         </div>

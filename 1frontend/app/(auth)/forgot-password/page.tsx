@@ -7,8 +7,12 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { GraduationCap, ArrowLeft, Loader2, CheckCircle2 } from 'lucide-react'
 import { toast } from 'sonner'
+import { AuthI18nProvider } from '@/components/auth/auth-i18n-provider'
+import { LanguageSwitcher } from '@/components/language-switcher'
+import { useI18n } from '@/lib/i18n'
 
-export default function ForgotPasswordPage() {
+function ForgotPasswordPageInner() {
+  const { t } = useI18n()
   const [email, setEmail] = useState('')
   const [loading, setLoading] = useState(false)
   const [submitted, setSubmitted] = useState(false)
@@ -28,10 +32,10 @@ export default function ForgotPasswordPage() {
       if (res.ok) {
         setSubmitted(true)
       } else {
-        toast.error('Could not send reset email. Please try again.')
+        toast.error(t('forgot.sendFail'))
       }
     } catch {
-      toast.error('Network error. Please try again.')
+      toast.error(t('forgot.networkError'))
     } finally {
       setLoading(false)
     }
@@ -39,31 +43,34 @@ export default function ForgotPasswordPage() {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-background px-4">
+      <div className="absolute right-4 top-4">
+        <LanguageSwitcher />
+      </div>
       <div className="w-full max-w-sm space-y-6">
         <div className="flex flex-col items-center gap-2 text-center">
           <div className="size-10 rounded-xl bg-primary flex items-center justify-center">
             <GraduationCap className="size-5 text-primary-foreground" />
           </div>
-          <h1 className="text-xl font-bold text-foreground">Forgot Password</h1>
+          <h1 className="text-xl font-bold text-foreground">{t('forgot.title')}</h1>
           <p className="text-sm text-muted-foreground">
-            Enter your email and we'll send you a reset link.
+            {t('forgot.subtitle')}
           </p>
         </div>
 
         {submitted ? (
           <div className="flex flex-col items-center gap-3 p-6 bg-emerald-50 dark:bg-emerald-950/20 rounded-lg border border-emerald-200 dark:border-emerald-800 text-center">
             <CheckCircle2 className="size-8 text-emerald-600" />
-            <p className="text-sm font-medium text-emerald-700 dark:text-emerald-400">Reset link sent!</p>
-            <p className="text-xs text-muted-foreground">Check your inbox for the password reset email.</p>
+            <p className="text-sm font-medium text-emerald-700 dark:text-emerald-400">{t('forgot.sentTitle')}</p>
+            <p className="text-xs text-muted-foreground">{t('forgot.sentDescription')}</p>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-1.5">
-              <Label htmlFor="email">Email address</Label>
+              <Label htmlFor="email">{t('common.emailAddress')}</Label>
               <Input
                 id="email"
                 type="email"
-                placeholder="you@university.edu"
+                placeholder={t('forgot.emailPlaceholder')}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -72,16 +79,24 @@ export default function ForgotPasswordPage() {
             </div>
             <Button type="submit" className="w-full" disabled={loading}>
               {loading && <Loader2 className="size-4 animate-spin mr-2" />}
-              Send Reset Link
+              {t('forgot.submit')}
             </Button>
           </form>
         )}
 
         <Link href="/login" className="flex items-center justify-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
           <ArrowLeft className="size-3.5" />
-          Back to login
+          {t('common.backToLogin')}
         </Link>
       </div>
     </div>
+  )
+}
+
+export default function ForgotPasswordPage() {
+  return (
+    <AuthI18nProvider>
+      <ForgotPasswordPageInner />
+    </AuthI18nProvider>
   )
 }

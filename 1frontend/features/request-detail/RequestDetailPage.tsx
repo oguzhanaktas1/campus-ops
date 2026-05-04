@@ -17,6 +17,7 @@ import {
 import { DomainDetailPanel } from '@/features/request-detail/domain-panels/DomainDetailPanel'
 import { useRequestDetail } from '@/features/request-detail/hooks/useRequestDetail'
 import type { RequestPortal } from '@/features/request-detail/types'
+import { useOptionalT } from '@/lib/optional-t'
 
 export function RequestDetailPage({
   portal,
@@ -26,6 +27,7 @@ export function RequestDetailPage({
   requestId: string
 }) {
   const { detail, isLoading, setDetail } = useRequestDetail(requestId, portal)
+  const tt = useOptionalT()
 
   if (isLoading) {
     return (
@@ -38,7 +40,7 @@ export function RequestDetailPage({
   if (!detail) {
     return (
       <div className="p-6 text-center text-muted-foreground">
-        Request not found.
+        {tt('detail.notFound', 'Request not found.')}
       </div>
     )
   }

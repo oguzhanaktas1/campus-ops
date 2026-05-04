@@ -6,6 +6,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import type { Comment } from '@/lib/mock-data'
+import { useOptionalT } from '@/lib/optional-t'
 
 function formatTimestamp(ts: string) {
   return new Date(ts).toLocaleString('en-US', {
@@ -33,6 +34,7 @@ interface CommentThreadProps {
 
 export function CommentThread({ comments, className, onAddComment }: CommentThreadProps) {
   const [newComment, setNewComment] = useState('')
+  const tt = useOptionalT()
 
   const handleSubmit = () => {
     if (!newComment.trim()) return
@@ -43,7 +45,7 @@ export function CommentThread({ comments, className, onAddComment }: CommentThre
   return (
     <div className={cn('space-y-4', className)}>
       {comments.length === 0 ? (
-        <p className="text-sm text-muted-foreground text-center py-4">No comments yet.</p>
+        <p className="text-sm text-muted-foreground text-center py-4">{tt('detail.noCommentsYet', 'No comments yet.')}</p>
       ) : (
         comments.map((comment) => (
           <div key={comment.id} className="flex gap-3">
@@ -68,13 +70,13 @@ export function CommentThread({ comments, className, onAddComment }: CommentThre
       {onAddComment && (
         <div className="border-t border-border pt-4 space-y-2">
           <Textarea
-            placeholder="Add a comment..."
+            placeholder={tt('detail.addCommentPlaceholder', 'Add a comment...')}
             value={newComment}
             onChange={(e) => setNewComment(e.target.value)}
             className="min-h-[80px] resize-none"
           />
           <Button size="sm" onClick={handleSubmit} disabled={!newComment.trim()}>
-            Add Comment
+            {tt('detail.addComment', 'Add Comment')}
           </Button>
         </div>
       )}

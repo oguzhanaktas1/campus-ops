@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Loader2, Search, Filter, ArrowUpRight } from "lucide-react";
 import Link from "next/link";
+import { useI18n } from "@/lib/i18n";
 
 function formatDate(d: string) {
   return new Date(d).toLocaleDateString("en-US", {
@@ -16,6 +17,7 @@ function formatDate(d: string) {
 }
 
 export default function FacultyRequestsPage() {
+  const { t } = useI18n();
   const [requests, setRequests] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -43,7 +45,6 @@ export default function FacultyRequestsPage() {
     fetchAllRequests();
   }, []);
 
-  // ARAMA VE FİLTRELEME
   const filteredRequests = useMemo(() => {
     return requests.filter((req) => {
       const matchesSearch =
@@ -68,20 +69,19 @@ export default function FacultyRequestsPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-foreground">
-            All Student Requests
+            {t('requests.title')}
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Archive of all requests you have been involved in
+            {t('requests.subtitle', { count: requests.length })}
           </p>
         </div>
       </div>
 
-      {/* FİLTRELEME ÇUBUĞU */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
           <Input
-            placeholder="Search by title or student name..."
+            placeholder={t('common.search')}
             className="pl-9"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -92,25 +92,24 @@ export default function FacultyRequestsPage() {
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
         >
-          <option value="ALL">All Statuses</option>
-          <option value="APPROVED">Approved</option>
-          <option value="REJECTED">Rejected</option>
-          <option value="SUBMITTED">Submitted</option>
-          <option value="REVISION_REQUESTED">Revision Req.</option>
+          <option value="ALL">{t('common.all')}</option>
+          <option value="APPROVED">{t('common.approved')}</option>
+          <option value="REJECTED">{t('common.rejected')}</option>
+          <option value="SUBMITTED">{t('requests.submitted')}</option>
+          <option value="REVISION_REQUESTED">{t('requests.revisionRequestedShort')}</option>
         </select>
       </div>
 
-      {/* LİSTE */}
       <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden text-card-foreground">
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left">
             <thead className="bg-muted/50 text-muted-foreground font-medium border-b border-border">
               <tr>
-                <th className="px-6 py-4">Request</th>
-                <th className="px-6 py-4">Student</th>
-                <th className="px-6 py-4">Date</th>
-                <th className="px-6 py-4">Status</th>
-                <th className="px-6 py-4 text-right">Action</th>
+                <th className="px-6 py-4">{t('requests.colTitle')}</th>
+                <th className="px-6 py-4">{t('internships.colStudent')}</th>
+                <th className="px-6 py-4">{t('common.date')}</th>
+                <th className="px-6 py-4">{t('common.status')}</th>
+                <th className="px-6 py-4 text-right">{t('common.actions')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -141,7 +140,7 @@ export default function FacultyRequestsPage() {
                         size="sm"
                         className="gap-1 group-hover:bg-primary group-hover:text-primary-foreground"
                       >
-                        View Detail <ArrowUpRight className="size-3" />
+                        {t('requests.viewDetail')} <ArrowUpRight className="size-3" />
                       </Button>
                     </Link>
                   </td>
@@ -153,7 +152,7 @@ export default function FacultyRequestsPage() {
           {filteredRequests.length === 0 && (
             <div className="py-20 text-center">
               <p className="text-muted-foreground">
-                No requests found matching your criteria.
+                {t('requests.noRequests')}
               </p>
             </div>
           )}

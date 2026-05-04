@@ -6,6 +6,7 @@ import { Briefcase, Loader2, AlertCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { getToken } from '@/lib/auth'
+import { useI18n } from '@/lib/i18n'
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000'
 
@@ -27,6 +28,7 @@ function fmt(d: any) {
 }
 
 export default function StaffInternshipsPage() {
+  const { t } = useI18n()
   const [internships, setInternships] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [filter, setFilter] = useState('all')
@@ -38,11 +40,11 @@ export default function StaffInternshipsPage() {
       })
       if (res.ok) setInternships(await res.json())
     } catch {
-      toast.error('Failed to load internship requests.')
+      toast.error(t('pages.internshipLoadFail'))
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [t])
 
   useEffect(() => { fetchInternships() }, [fetchInternships])
 
@@ -63,15 +65,15 @@ export default function StaffInternshipsPage() {
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-xl font-bold flex items-center gap-2">
-            <Briefcase className="size-5 text-primary" /> Internship Requests
+            <Briefcase className="size-5 text-primary" /> {t('pages.internshipRequests')}
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Process and manage student internship applications.
+            {t('pages.internshipSubtitle')}
           </p>
         </div>
         {pending.length > 0 && (
           <span className="text-xs bg-amber-50 text-amber-700 border border-amber-200 font-semibold px-2.5 py-1 rounded-full">
-            {pending.length} pending
+            {t('pages.pendingCount', { count: pending.length })}
           </span>
         )}
       </div>
@@ -88,7 +90,7 @@ export default function StaffInternshipsPage() {
                 : 'bg-background text-muted-foreground border-border hover:border-foreground'
             )}
           >
-            {s === 'all' ? 'All' : s.replace(/_/g, ' ')}
+            {s === 'all' ? t('common.all') : s.replace(/_/g, ' ')}
           </button>
         ))}
       </div>
@@ -97,7 +99,7 @@ export default function StaffInternshipsPage() {
         {filtered.length === 0 ? (
           <div className="py-16 flex flex-col items-center text-center opacity-50">
             <AlertCircle className="size-10 mb-3" />
-            <p className="text-sm font-medium">No internship requests found.</p>
+            <p className="text-sm font-medium">{t('pages.noInternships')}</p>
           </div>
         ) : (
           filtered.map((r) => (

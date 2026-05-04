@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { StatusBadge } from '@/components/status-badge'
 import { BookMarked, PlusCircle, Clock, MapPin, Loader2, ChevronRight } from 'lucide-react'
 import { getToken } from '@/lib/auth'
+import { useI18n } from '@/lib/i18n'
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000'
 
@@ -20,6 +21,7 @@ function formatTime(d: string) {
 }
 
 export default function OrganizerReservationsPage() {
+  const { t } = useI18n()
   const [reservations, setReservations] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
@@ -58,25 +60,25 @@ export default function OrganizerReservationsPage() {
     <div className="p-6 space-y-6 max-w-4xl mx-auto">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold text-foreground">Reservations</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Room and resource reservation requests.</p>
+          <h1 className="text-xl font-bold text-foreground">{t('pages.reservations')}</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">{t('pages.reservationsSubtitle')}</p>
         </div>
         <Link href="/organizer/reservations/new">
           <Button size="sm" className="gap-1.5">
             <PlusCircle className="size-3.5" />
-            Reserve Room
+            {t('pages.reserveRoom')}
           </Button>
         </Link>
       </div>
 
       <div>
-        <h2 className="text-sm font-semibold text-foreground mb-3">Active ({active.length})</h2>
+        <h2 className="text-sm font-semibold text-foreground mb-3">{t('pages.active')} ({active.length})</h2>
         {active.length === 0 ? (
           <div className="flex flex-col items-center py-10 bg-card border border-border rounded-lg text-center">
             <BookMarked className="size-7 text-muted-foreground/40 mb-2" />
-            <p className="text-sm text-muted-foreground">No active reservations.</p>
+            <p className="text-sm text-muted-foreground">{t('pages.noActiveReservations')}</p>
             <Link href="/organizer/reservations/new" className="mt-3">
-              <Button variant="outline" size="sm">Reserve a room</Button>
+              <Button variant="outline" size="sm">{t('pages.reserveARoom')}</Button>
             </Link>
           </div>
         ) : (
@@ -117,7 +119,7 @@ export default function OrganizerReservationsPage() {
 
       {past.length > 0 && (
         <div>
-          <h2 className="text-sm font-semibold text-foreground mb-3">Past Reservations</h2>
+          <h2 className="text-sm font-semibold text-foreground mb-3">{t('pages.pastReservations')}</h2>
           <div className="space-y-2">
             {past.map((r) => (
               <Link key={r.id} href={`/organizer/requests/${r.id}`}>

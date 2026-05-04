@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { getToken } from '@/lib/auth'
+import { useI18n } from '@/lib/i18n'
 
 const STATUS_BADGE: Record<string, string> = {
   SUBMITTED:  'bg-blue-50 text-blue-700 border-blue-200',
@@ -18,6 +19,7 @@ const STATUS_BADGE: Record<string, string> = {
 
 export default function StaffEventsPage() {
   const router = useRouter()
+  const { t } = useI18n()
   const [events, setEvents] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [actionId, setActionId] = useState<string | null>(null)
@@ -32,11 +34,11 @@ export default function StaffEventsPage() {
       })
       if (res.ok) setEvents(await res.json())
     } catch {
-      toast.error('Failed to load events.')
+      toast.error(t('pages.eventsLoadFail'))
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [t])
 
   useEffect(() => { fetchEvents() }, [fetchEvents])
 
@@ -49,12 +51,12 @@ export default function StaffEventsPage() {
         body: JSON.stringify({ status, note }),
       })
       if (!res.ok) throw new Error()
-      toast.success('Event request updated.')
+      toast.success(t('pages.eventUpdateSuccess'))
       setActionId(null)
       setNote('')
       fetchEvents()
     } catch {
-      toast.error('Failed to update status.')
+      toast.error(t('pages.eventUpdateFail'))
     }
   }
 
@@ -69,8 +71,8 @@ export default function StaffEventsPage() {
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6 pb-20">
       <div>
-        <h1 className="text-xl font-bold flex items-center gap-2"><PartyPopper className="size-5 text-primary" /> Event Requests</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">Review and manage campus event requests.</p>
+        <h1 className="text-xl font-bold flex items-center gap-2"><PartyPopper className="size-5 text-primary" /> {t('pages.eventRequests')}</h1>
+        <p className="text-sm text-muted-foreground mt-0.5">{t('pages.eventRequestsSubtitle')}</p>
       </div>
 
       <div className="flex gap-2 flex-wrap">
@@ -78,7 +80,7 @@ export default function StaffEventsPage() {
           <button key={s} onClick={() => setFilter(s)}
             className={cn('text-xs px-3 py-1.5 rounded-full border font-semibold transition-colors',
               filter === s ? 'bg-foreground text-background border-foreground' : 'bg-background text-muted-foreground border-border hover:border-foreground')}>
-            {s === 'all' ? 'All' : s.replace(/_/g, ' ')}
+            {s === 'all' ? t('common.all') : s.replace(/_/g, ' ')}
           </button>
         ))}
       </div>
@@ -87,7 +89,7 @@ export default function StaffEventsPage() {
         {filtered.length === 0 ? (
           <div className="py-16 flex flex-col items-center text-center opacity-50">
             <AlertCircle className="size-10 mb-3" />
-            <p className="text-sm font-medium">No event requests found.</p>
+            <p className="text-sm font-medium">{t('pages.noEventRequests')}</p>
           </div>
         ) : (
           filtered.map((ev) => (
@@ -113,20 +115,20 @@ export default function StaffEventsPage() {
               {['SUBMITTED', 'IN_REVIEW'].includes(ev.status) && (
                 actionId === ev.id ? (
                   <div className="space-y-2">
-                    <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} placeholder="Note (optional)..."
+                    <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} placeholder={t('common.noteOptional')}
                       className="w-full bg-background border border-input rounded-md px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring resize-none" />
                     <div className="flex gap-2 flex-wrap">
                       <Button size="sm" className="gap-1.5 bg-green-600 hover:bg-green-700" onClick={(event) => { event.stopPropagation(); void updateStatus(ev.id, 'APPROVED') }}>
-                        <CheckCircle className="size-3.5" /> Approve
+                        <CheckCircle className="size-3.5" /> {t('common.approve')}
                       </Button>
                       <Button size="sm" variant="destructive" className="gap-1.5" onClick={(event) => { event.stopPropagation(); void updateStatus(ev.id, 'REJECTED') }}>
-                        <XCircle className="size-3.5" /> Reject
+                        <XCircle className="size-3.5" /> {t('common.reject')}
                       </Button>
-                      <Button size="sm" variant="ghost" onClick={(event) => { event.stopPropagation(); setActionId(null); setNote('') }}>Cancel</Button>
+                      <Button size="sm" variant="ghost" onClick={(event) => { event.stopPropagation(); setActionId(null); setNote('') }}>{t('common.cancel')}</Button>
                     </div>
                   </div>
                 ) : (
-                  <Button size="sm" variant="outline" onClick={(event) => { event.stopPropagation(); setActionId(ev.id) }}>Process</Button>
+                  <Button size="sm" variant="outline" onClick={(event) => { event.stopPropagation(); setActionId(ev.id) }}>{t('common.process')}</Button>
                 )
               )}
             </div>

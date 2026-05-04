@@ -20,6 +20,7 @@ import {
 } from '@/components/ui/select'
 import { Search, Plus, Pencil, Trash2, Loader2, BookOpen } from 'lucide-react'
 import { toast } from 'sonner'
+import { useI18n } from '@/lib/i18n'
 
 interface Faculty {
   id: string
@@ -40,6 +41,7 @@ interface Department {
 const EMPTY_FORM = { name: '', code: '', facultyId: '', isActive: true }
 
 export default function DepartmentsPage() {
+  const { t } = useI18n()
   const [departments, setDepartments] = useState<Department[]>([])
   const [faculties, setFaculties] = useState<Faculty[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -58,10 +60,10 @@ export default function DepartmentsPage() {
         headers: { Authorization: `Bearer ${token}` },
       })
       if (res.ok) setDepartments(await res.json())
-      else toast.error('Failed to load departments')
+      else toast.error(t('organization.saveFail'))
     } catch (error) {
       console.error('API Error:', error)
-      toast.error('Failed to load departments')
+      toast.error(t('organization.saveFail'))
     } finally {
       setIsLoading(false)
     }
@@ -98,7 +100,7 @@ export default function DepartmentsPage() {
 
   const handleSave = async () => {
     if (!form.name.trim() || !form.code.trim() || !form.facultyId) {
-      toast.error('Name, code and faculty are required')
+      toast.error(t('common.required'))
       return
     }
     setIsSaving(true)
@@ -114,23 +116,23 @@ export default function DepartmentsPage() {
         body: JSON.stringify(form),
       })
       if (res.ok) {
-        toast.success(editingItem ? 'Department updated!' : 'Department created!')
+        toast.success(t('organization.saveSuccess'))
         setDialogOpen(false)
         fetchDepartments()
       } else {
         const err = await res.json().catch(() => ({}))
-        toast.error((err as { message?: string }).message || 'Failed to save department')
+        toast.error((err as { message?: string }).message || t('organization.saveFail'))
       }
     } catch (error) {
       console.error('Save error:', error)
-      toast.error('Failed to save department')
+      toast.error(t('organization.saveFail'))
     } finally {
       setIsSaving(false)
     }
   }
 
   const handleDelete = async (dept: Department) => {
-    if (!window.confirm(`Are you sure you want to delete "${dept.name}"? This cannot be undone.`)) return
+    if (!window.confirm(t('organization.confirmDelete', { name: dept.name }))) return
     try {
       const token = localStorage.getItem('access_token')
       const res = await fetch(`${backendUrl}/admin/departments/${dept.id}`, {
@@ -138,14 +140,14 @@ export default function DepartmentsPage() {
         headers: { Authorization: `Bearer ${token}` },
       })
       if (res.ok) {
-        toast.success('Department deleted!')
+        toast.success(t('organization.deleteSuccess'))
         fetchDepartments()
       } else {
-        toast.error('Failed to delete department')
+        toast.error(t('organization.deleteFail'))
       }
     } catch (error) {
       console.error('Delete error:', error)
-      toast.error('Failed to delete department')
+      toast.error(t('organization.deleteFail'))
     }
   }
 
@@ -169,13 +171,13 @@ export default function DepartmentsPage() {
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold text-foreground">Department Management</h1>
+          <h1 className="text-xl font-bold text-foreground">{t('organization.departmentsTitle')}</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {departments.length} department{departments.length !== 1 ? 's' : ''} registered in the system.
+            {t('organization.departmentsSubtitle', { count: departments.length })}
           </p>
         </div>
         <Button size="sm" className="gap-1.5" onClick={openAdd}>
-          <Plus className="size-3.5" /> Add Department
+          <Plus className="size-3.5" /> {t('organization.addDepartment')}
         </Button>
       </div>
 
@@ -184,15 +186,15 @@ export default function DepartmentsPage() {
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
           <Input
-            placeholder="Search departments by name, code or faculty..."
+            placeholder={t('common.search')}
             className="pl-9 h-9"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
         <div className="flex items-center gap-4 text-sm ml-auto">
-          <span className="font-medium text-emerald-600">{departments.filter((d) => d.isActive).length} Active</span>
-          <span className="font-medium text-muted-foreground">{departments.filter((d) => !d.isActive).length} Inactive</span>
+          <span className="font-medium text-emerald-600">{departments.filter((d) => d.isActive).length} {t('common.active')}</span>
+          <span className="font-medium text-muted-foreground">{departments.filter((d) => !d.isActive).length} {t('common.inactive')}</span>
         </div>
       </div>
 
@@ -201,11 +203,11 @@ export default function DepartmentsPage() {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border bg-muted/40">
-              <th className="px-5 py-3 text-left font-semibold text-muted-foreground">Department</th>
-              <th className="px-5 py-3 text-left font-semibold text-muted-foreground hidden md:table-cell">Code</th>
-              <th className="px-5 py-3 text-left font-semibold text-muted-foreground hidden lg:table-cell">Faculty</th>
-              <th className="px-5 py-3 text-left font-semibold text-muted-foreground">Status</th>
-              <th className="px-5 py-3 text-right font-semibold text-muted-foreground">Actions</th>
+              <th className="px-5 py-3 text-left font-semibold text-muted-foreground">{t('organization.departmentsTitle')}</th>
+              <th className="px-5 py-3 text-left font-semibold text-muted-foreground hidden md:table-cell">{t('organization.departmentName')}</th>
+              <th className="px-5 py-3 text-left font-semibold text-muted-foreground hidden lg:table-cell">{t('organization.facultiesTitle')}</th>
+              <th className="px-5 py-3 text-left font-semibold text-muted-foreground">{t('common.status')}</th>
+              <th className="px-5 py-3 text-right font-semibold text-muted-foreground">{t('common.actions')}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
@@ -230,11 +232,11 @@ export default function DepartmentsPage() {
                 <td className="px-5 py-3.5">
                   {dept.isActive ? (
                     <span className="px-2 py-1 rounded-md bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 text-[10px] font-bold tracking-wider">
-                      ACTIVE
+                      {t('common.active').toUpperCase()}
                     </span>
                   ) : (
                     <span className="px-2 py-1 rounded-md bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300 border border-gray-200 dark:border-gray-700 text-[10px] font-bold tracking-wider">
-                      INACTIVE
+                      {t('common.inactive').toUpperCase()}
                     </span>
                   )}
                 </td>
@@ -260,7 +262,7 @@ export default function DepartmentsPage() {
         {filtered.length === 0 && (
           <div className="text-center py-12">
             <BookOpen className="size-8 text-muted-foreground/40 mx-auto mb-3" />
-            <p className="text-sm text-muted-foreground">No departments found.</p>
+            <p className="text-sm text-muted-foreground">{t('organization.noDepartments')}</p>
           </div>
         )}
       </div>
@@ -269,38 +271,38 @@ export default function DepartmentsPage() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>{editingItem ? 'Edit Department' : 'Add Department'}</DialogTitle>
+            <DialogTitle>{editingItem ? t('organization.editDepartment') : t('organization.addDepartment')}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-1.5">
               <Label htmlFor="dept-name">
-                Name <span className="text-destructive">*</span>
+                {t('organization.departmentName')} <span className="text-destructive">*</span>
               </Label>
               <Input
                 id="dept-name"
-                placeholder="e.g. Computer Engineering"
+                placeholder={t('organization.departmentNamePlaceholder')}
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
               />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="dept-code">
-                Code <span className="text-destructive">*</span>
+                {t('organization.facultyCode')} <span className="text-destructive">*</span>
               </Label>
               <Input
                 id="dept-code"
-                placeholder="e.g. CE"
+                placeholder={t('organization.departmentCodePlaceholder')}
                 value={form.code}
                 onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })}
               />
             </div>
             <div className="space-y-1.5">
               <Label>
-                Faculty <span className="text-destructive">*</span>
+                {t('organization.facultiesTitle')} <span className="text-destructive">*</span>
               </Label>
               <Select value={form.facultyId} onValueChange={(v) => setForm({ ...form, facultyId: v })}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select a faculty" />
+                  <SelectValue placeholder={t('organization.selectFaculty')} />
                 </SelectTrigger>
                 <SelectContent>
                   {faculties.map((f) => (
@@ -331,17 +333,17 @@ export default function DepartmentsPage() {
                 className="cursor-pointer select-none"
                 onClick={() => setForm({ ...form, isActive: !form.isActive })}
               >
-                {form.isActive ? 'Active' : 'Inactive'}
+                {form.isActive ? t('common.active') : t('common.inactive')}
               </Label>
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={isSaving}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button onClick={handleSave} disabled={isSaving}>
               {isSaving && <Loader2 className="mr-2 size-4 animate-spin" />}
-              {editingItem ? 'Save Changes' : 'Create Department'}
+              {t('common.save')}
             </Button>
           </DialogFooter>
         </DialogContent>

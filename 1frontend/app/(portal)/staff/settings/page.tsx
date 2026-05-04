@@ -8,14 +8,15 @@ import { Button } from '@/components/ui/button'
 import { Loader2, Lock, User, Bell, Shield } from 'lucide-react'
 import { toast } from 'sonner'
 import { fetchProfile, getStoredUser } from '@/lib/auth'
+import { useI18n } from '@/lib/i18n'
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
 
-function ProfileField({ label, value, wide = false }: { label: string; value: string; wide?: boolean }) {
+function ProfileField({ label, value, wide = false, multiline = false }: { label: string; value: string; wide?: boolean; multiline?: boolean }) {
   return (
     <div className={`space-y-1.5 ${wide ? 'sm:col-span-2' : ''}`}>
       <Label className="text-xs text-muted-foreground">{label}</Label>
-      {label === 'Address' ? (
+      {multiline ? (
         <Textarea value={value || '-'} readOnly className="bg-muted/50 cursor-not-allowed text-muted-foreground resize-none min-h-[70px]" />
       ) : (
         <Input value={value || '-'} readOnly className="bg-muted/50 cursor-not-allowed text-muted-foreground" />
@@ -25,6 +26,7 @@ function ProfileField({ label, value, wide = false }: { label: string; value: st
 }
 
 export default function StaffSettingsPage() {
+  const { t } = useI18n()
   const [user, setUser] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [prefs, setPrefs] = useState({ notifyTicketAssigned: true, notifySlaDeadline: true, notifyStatusUpdates: true, notifyWeeklyDigest: false })
@@ -53,13 +55,13 @@ export default function StaffSettingsPage() {
           setPrefs((p) => ({ ...p, ...d }))
         }
       } catch {
-        toast.error('Failed to load settings.')
+        toast.error(t('pages.settingsLoadFail'))
       } finally {
         setIsLoading(false)
       }
     }
     void fetch_()
-  }, [])
+  }, [t])
 
   const handleSave = async () => {
     setIsSaving(true)
@@ -73,7 +75,7 @@ export default function StaffSettingsPage() {
 
       if (passwords.currentPassword || passwords.newPassword) {
         if (passwords.newPassword !== passwords.confirmPassword) {
-          toast.error('Passwords do not match!')
+          toast.error(t('pages.passwordsMismatch'))
           setIsSaving(false)
           return
         }
@@ -84,15 +86,15 @@ export default function StaffSettingsPage() {
         })
         if (!res.ok) {
           const e = await res.json()
-          toast.error(e.message || 'Failed.')
+          toast.error(e.message || t('common.failed'))
           setIsSaving(false)
           return
         }
         setPasswords({ currentPassword: '', newPassword: '', confirmPassword: '' })
       }
-      toast.success('Settings saved!')
+      toast.success(t('pages.settingsSaveSuccess'))
     } catch {
-      toast.error('Failed to save.')
+      toast.error(t('pages.settingsSaveFail'))
     } finally {
       setIsSaving(false)
     }
@@ -104,14 +106,14 @@ export default function StaffSettingsPage() {
   return (
     <div className="p-6 space-y-6 max-w-2xl mx-auto pb-20">
       <div>
-        <h1 className="text-xl font-bold text-foreground">Settings</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">Your profile and account preferences</p>
+        <h1 className="text-xl font-bold text-foreground">{t('pages.settings')}</h1>
+        <p className="text-sm text-muted-foreground mt-0.5">{t('pages.settingsSubtitle')}</p>
       </div>
 
       <div className="bg-card border border-border rounded-lg shadow-sm overflow-hidden">
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-          <h2 className="text-sm font-semibold text-foreground flex items-center gap-2"><User className="size-4 text-amber-600" /> Profile Information</h2>
-          <span className="text-[10px] text-muted-foreground flex items-center gap-1 bg-muted px-2 py-1 rounded"><Lock className="size-3" /> Managed by University</span>
+          <h2 className="text-sm font-semibold text-foreground flex items-center gap-2"><User className="size-4 text-amber-600" /> {t('pages.profileInformation')}</h2>
+          <span className="text-[10px] text-muted-foreground flex items-center gap-1 bg-muted px-2 py-1 rounded"><Lock className="size-3" /> {t('pages.managedByUniversity')}</span>
         </div>
         <div className="p-5 space-y-4">
           {user.avatarUrl && (
@@ -124,16 +126,16 @@ export default function StaffSettingsPage() {
             </div>
           )}
           <div className="grid sm:grid-cols-2 gap-4">
-            <ProfileField label="First Name" value={user.firstName} />
-            <ProfileField label="Last Name" value={user.lastName} />
-            <ProfileField label="Email" value={user.email} />
-            <ProfileField label="Phone" value={user.phoneNumber} />
-            <ProfileField label="Staff Number" value={user.staffNumber} />
-            <ProfileField label="Title" value={user.title} />
-            <ProfileField label="Department" value={user.department} />
-            <ProfileField label="Gender" value={user.gender} />
-            <ProfileField label="Birth Date" value={user.birthDate} />
-            <ProfileField label="Address" value={user.address} wide />
+            <ProfileField label={t('pages.firstName')} value={user.firstName} />
+            <ProfileField label={t('pages.lastName')} value={user.lastName} />
+            <ProfileField label={t('pages.email')} value={user.email} />
+            <ProfileField label={t('pages.phone')} value={user.phoneNumber} />
+            <ProfileField label={t('pages.staffNumber')} value={user.staffNumber} />
+            <ProfileField label={t('pages.titleLabel')} value={user.title} />
+            <ProfileField label={t('pages.department')} value={user.department} />
+            <ProfileField label={t('pages.gender')} value={user.gender} />
+            <ProfileField label={t('pages.birthDate')} value={user.birthDate} />
+            <ProfileField label={t('pages.address')} value={user.address} wide multiline />
           </div>
         </div>
       </div>
@@ -141,14 +143,14 @@ export default function StaffSettingsPage() {
       <div className="bg-card border border-border rounded-lg shadow-sm overflow-hidden">
         <div className="flex items-center gap-2 px-5 py-4 border-b border-border">
           <Bell className="size-4 text-muted-foreground" />
-          <h2 className="text-sm font-semibold text-foreground">Notification Preferences</h2>
+          <h2 className="text-sm font-semibold text-foreground">{t('pages.notificationPreferences')}</h2>
         </div>
         <div className="p-5 space-y-3">
           {[
-            { key: 'notifyTicketAssigned', label: 'New ticket assigned to me' },
-            { key: 'notifySlaDeadline', label: 'SLA deadline approaching' },
-            { key: 'notifyStatusUpdates', label: 'Ticket status updates' },
-            { key: 'notifyWeeklyDigest', label: 'Weekly digest email' },
+            { key: 'notifyTicketAssigned', label: t('pages.notifyTicketAssigned') },
+            { key: 'notifySlaDeadline', label: t('pages.notifySlaDeadline') },
+            { key: 'notifyStatusUpdates', label: t('pages.notifyStatusUpdates') },
+            { key: 'notifyWeeklyDigest', label: t('pages.notifyWeeklyDigest') },
           ].map(({ key, label }) => (
             <label key={key} className="flex items-center gap-3 cursor-pointer">
               <input type="checkbox" checked={(prefs as any)[key]} onChange={e => setPrefs({ ...prefs, [key]: e.target.checked })} className="rounded border-border size-4 text-primary" />
@@ -161,19 +163,19 @@ export default function StaffSettingsPage() {
       <div className="bg-card border border-border rounded-lg shadow-sm overflow-hidden">
         <div className="flex items-center gap-2 px-5 py-4 border-b border-border">
           <Shield className="size-4 text-muted-foreground" />
-          <h2 className="text-sm font-semibold text-foreground">Change Password</h2>
+          <h2 className="text-sm font-semibold text-foreground">{t('pages.changePassword')}</h2>
         </div>
         <div className="p-5 space-y-3">
-          <div className="space-y-1.5"><Label>Current Password</Label><Input type="password" placeholder="********" value={passwords.currentPassword} onChange={e => setPasswords({ ...passwords, currentPassword: e.target.value })} /></div>
-          <div className="space-y-1.5"><Label>New Password</Label><Input type="password" placeholder="********" value={passwords.newPassword} onChange={e => setPasswords({ ...passwords, newPassword: e.target.value })} /></div>
-          <div className="space-y-1.5"><Label>Confirm Password</Label><Input type="password" placeholder="********" value={passwords.confirmPassword} onChange={e => setPasswords({ ...passwords, confirmPassword: e.target.value })} /></div>
+          <div className="space-y-1.5"><Label>{t('pages.currentPassword')}</Label><Input type="password" placeholder="********" value={passwords.currentPassword} onChange={e => setPasswords({ ...passwords, currentPassword: e.target.value })} /></div>
+          <div className="space-y-1.5"><Label>{t('pages.newPassword')}</Label><Input type="password" placeholder="********" value={passwords.newPassword} onChange={e => setPasswords({ ...passwords, newPassword: e.target.value })} /></div>
+          <div className="space-y-1.5"><Label>{t('pages.confirmPassword')}</Label><Input type="password" placeholder="********" value={passwords.confirmPassword} onChange={e => setPasswords({ ...passwords, confirmPassword: e.target.value })} /></div>
         </div>
       </div>
 
       <div className="flex justify-end">
         <Button onClick={handleSave} disabled={isSaving} className="gap-1.5">
           {isSaving && <Loader2 className="size-3.5 animate-spin" />}
-          Save Changes
+          {t('common.saveChanges')}
         </Button>
       </div>
     </div>

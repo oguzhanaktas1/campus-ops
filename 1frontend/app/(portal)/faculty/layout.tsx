@@ -6,6 +6,7 @@ import { PortalLayout, type NavItem } from "@/components/portal-layout";
 import { NotificationBell } from "@/components/notification-bell";
 import { ProfileDropdown } from "@/components/profile-dropdown";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { LanguageSwitcher } from "@/components/language-switcher";
 import {
   LayoutDashboard,
   CheckSquare,
@@ -26,25 +27,11 @@ import {
 import AuthGuard from "@/components/AuthGuard/auth-guard";
 import { PortalAssistant } from "@/components/ai/portal-assistant";
 import { fetchProfile, getStoredUser, getToken } from "@/lib/auth";
+import { FacultyI18nProvider } from "@/components/faculty/faculty-i18n-provider";
+import { useI18n } from "@/lib/i18n";
 
-const baseNavItems: NavItem[] = [
-  { label: "Dashboard", href: "/faculty/dashboard", icon: LayoutDashboard },
-  { label: "Approvals", href: "/faculty/approvals", icon: CheckSquare },
-  { label: "Internships", href: "/faculty/internships", icon: Briefcase },
-  { label: "Appointments", href: "/faculty/appointments", icon: CalendarDays },
-  { label: "Events", href: "/faculty/events", icon: PartyPopper },
-  { label: "Documents", href: "/faculty/documents", icon: FileText },
-  { label: "Equipment", href: "/faculty/equipment", icon: Package },
-  { label: "Reservations", href: "/faculty/reservations", icon: MapPin },
-  { label: "Procurement", href: "/faculty/procurement", icon: ShoppingCart },
-  { label: "IT Tickets", href: "/faculty/tickets", icon: Ticket },
-  { label: "Access Requests", href: "/faculty/access-requests", icon: ShieldCheck },
-  { label: "My Calendar", href: "/faculty/calendar", icon: Calendar },
-  { label: "Notifications", href: "/faculty/notifications", icon: Bell },
-  { label: "Settings", href: "/faculty/settings", icon: Settings },
-];
-
-export default function FacultyLayout({ children }: { children: React.ReactNode }) {
+function FacultyLayoutInner({ children }: { children: React.ReactNode }) {
+  const { t } = useI18n();
   const [user, setUser] = useState<any>(null);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
@@ -95,17 +82,31 @@ export default function FacultyLayout({ children }: { children: React.ReactNode 
 
   if (!user) return null;
 
-  const dynamicNavItems = baseNavItems.map((item) =>
-    item.label === "Notifications" ? { ...item, badge: unreadCount } : item,
-  );
+  const navItems: NavItem[] = [
+    { label: t('nav.dashboard'), href: "/faculty/dashboard", icon: LayoutDashboard },
+    { label: t('nav.approvals'), href: "/faculty/approvals", icon: CheckSquare },
+    { label: t('nav.internships'), href: "/faculty/internships", icon: Briefcase },
+    { label: t('nav.appointments'), href: "/faculty/appointments", icon: CalendarDays },
+    { label: t('nav.events'), href: "/faculty/events", icon: PartyPopper },
+    { label: t('nav.documents'), href: "/faculty/documents", icon: FileText },
+    { label: t('nav.equipment'), href: "/faculty/equipment", icon: Package },
+    { label: t('nav.reservations'), href: "/faculty/reservations", icon: MapPin },
+    { label: t('nav.procurement'), href: "/faculty/procurement", icon: ShoppingCart },
+    { label: t('nav.tickets'), href: "/faculty/tickets", icon: Ticket },
+    { label: t('nav.accessRequests'), href: "/faculty/access-requests", icon: ShieldCheck },
+    { label: t('nav.calendar'), href: "/faculty/calendar", icon: Calendar },
+    { label: t('nav.notifications'), href: "/faculty/notifications", icon: Bell, badge: unreadCount },
+    { label: t('nav.settings'), href: "/faculty/settings", icon: Settings },
+  ];
 
   const topbar = (
     <div className="flex items-center justify-between flex-1">
       <div className="hidden sm:block">
-        <h1 className="text-sm font-semibold text-foreground">Faculty Portal</h1>
+        <h1 className="text-sm font-semibold text-foreground">{t('nav.facultyPortal')}</h1>
         <p className="text-xs text-muted-foreground">{user.title} · {user.department}</p>
       </div>
       <div className="flex items-center gap-1 ml-auto">
+        <LanguageSwitcher />
         <ThemeToggle />
         <NotificationBell role="faculty" />
         <ProfileDropdown user={user} settingsHref="/faculty/settings" />
@@ -116,23 +117,31 @@ export default function FacultyLayout({ children }: { children: React.ReactNode 
   return (
     <AuthGuard allowedRoles={["FACULTY"]}>
       <PortalLayout
-        navItems={dynamicNavItems}
-        portalName="Faculty Portal"
+        navItems={navItems}
+        portalName={t('nav.facultyPortal')}
         portalColor="emerald"
         topbar={topbar}
       >
         {children}
         <PortalAssistant
           portal="faculty"
-          title="Faculty AI Assistant"
-          description="Approval routing, internship flow help, and role-aware guidance for faculty workflows."
+          title={t('assistant.title')}
+          description={t('assistant.description')}
           prompts={[
-            "Where can I see my pending approvals?",
-            "How does the internship approval process work?",
-            "Which page do I use to manage my appointment requests?",
+            t('assistant.approvalsPrompt'),
+            t('assistant.internshipPrompt'),
+            t('assistant.appointmentsPrompt'),
           ]}
         />
       </PortalLayout>
     </AuthGuard>
+  );
+}
+
+export default function FacultyLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <FacultyI18nProvider>
+      <FacultyLayoutInner>{children}</FacultyLayoutInner>
+    </FacultyI18nProvider>
   );
 }

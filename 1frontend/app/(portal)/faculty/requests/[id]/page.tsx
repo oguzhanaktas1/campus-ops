@@ -19,6 +19,7 @@ import {
 import { DomainDetailPanel } from '@/features/request-detail/domain-panels/DomainDetailPanel'
 import { RequestHeader } from '@/features/request-detail/components/RequestHeader'
 import { useRequestDetail } from '@/features/request-detail/hooks/useRequestDetail'
+import { useI18n } from '@/lib/i18n'
 
 const FACULTY_BACK_PATHS = new Set([
   '/faculty/requests',
@@ -43,6 +44,7 @@ function getSafeBackHref(value: string | null) {
 export default function FacultyRequestDetailRoute() {
   const params = useParams()
   const searchParams = useSearchParams()
+  const { t } = useI18n()
   const requestId = params.id as string
   const backHref = getSafeBackHref(searchParams.get('from'))
   const { detail, isLoading, setDetail } = useRequestDetail(requestId, 'faculty')
@@ -60,12 +62,12 @@ export default function FacultyRequestDetailRoute() {
       <div className="flex h-[70vh] items-center justify-center p-6">
         <div className="max-w-sm rounded-xl border bg-card p-8 text-center shadow-sm">
           <FileText className="mx-auto mb-3 size-8 text-muted-foreground/50" />
-          <p className="text-sm font-semibold text-foreground">Request not found</p>
+          <p className="text-sm font-semibold text-foreground">{t('detail.requestNotFound')}</p>
           <p className="mt-1 text-xs text-muted-foreground">
-            The request may have been removed or you may not have permission to view it.
+            {t('detail.requestUnavailable')}
           </p>
           <Button asChild variant="outline" size="sm" className="mt-4">
-            <Link href={backHref}>Back</Link>
+            <Link href={backHref}>{t('common.back')}</Link>
           </Button>
         </div>
       </div>
@@ -77,7 +79,7 @@ export default function FacultyRequestDetailRoute() {
       <div className="mx-auto max-w-7xl space-y-6 p-6 pb-20">
         <div className="flex items-center justify-end gap-4">
           <p className="text-xs text-muted-foreground">
-            Faculty Request Detail
+            {t('detail.facultyRequestDetail')}
           </p>
         </div>
 

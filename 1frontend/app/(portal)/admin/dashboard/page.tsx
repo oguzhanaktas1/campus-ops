@@ -16,6 +16,7 @@ import { cn } from '@/lib/utils'
 import { getToken } from '@/lib/auth'
 import { MetricCard } from '@/components/metric-card'
 import { Button } from '@/components/ui/button'
+import { useI18n } from '@/lib/i18n'
 
 const ADMIN_AI_SUMMARY_CACHE_KEY = 'campusops-ai-summary:admin-dashboard'
 
@@ -50,19 +51,24 @@ const PRIORITY_DOT: Record<string, string> = {
   LOW:      'bg-slate-400',
 }
 
-function timeAgo(date: string) {
-  const diff = Date.now() - new Date(date).getTime()
-  const mins  = Math.floor(diff / 60_000)
-  const hours = Math.floor(diff / 3_600_000)
-  const days  = Math.floor(diff / 86_400_000)
-  if (mins  < 1)  return 'just now'
-  if (mins  < 60) return `${mins}m ago`
-  if (hours < 24) return `${hours}h ago`
-  return `${days}d ago`
+function useTimeAgo() {
+  const { t } = useI18n()
+  return (date: string) => {
+    const diff = Date.now() - new Date(date).getTime()
+    const mins  = Math.floor(diff / 60_000)
+    const hours = Math.floor(diff / 3_600_000)
+    const days  = Math.floor(diff / 86_400_000)
+    if (mins  < 1)  return t('dashboard.justNow')
+    if (mins  < 60) return t('dashboard.minutesAgo', { n: mins })
+    if (hours < 24) return t('dashboard.hoursAgo', { n: hours })
+    return t('dashboard.daysAgo', { n: days })
+  }
 }
 
 export default function AdminDashboard() {
   const router = useRouter()
+  const { t } = useI18n()
+  const timeAgo = useTimeAgo()
   const [metrics, setMetrics]   = useState<any>(null)
   const [recent,  setRecent]    = useState<any[]>([])
   const [reports, setReports]   = useState<any>(null)
@@ -176,17 +182,17 @@ export default function AdminDashboard() {
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold text-foreground">System Overview</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">{today} · Platform-wide health and request metrics.</p>
+          <h1 className="text-xl font-bold text-foreground">{t('dashboard.title')}</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">{today} · {t('dashboard.subtitle')}</p>
         </div>
         <div className="flex items-center gap-2">
           <span className="hidden sm:flex items-center gap-1.5 text-xs text-emerald-600 font-medium bg-emerald-50 dark:bg-emerald-950/30 px-3 py-1.5 rounded-full border border-emerald-200 dark:border-emerald-800">
             <CheckCircle2 className="size-3" />
-            System Healthy
+            {t('dashboard.systemHealthy')}
           </span>
           <Button size="sm" variant="outline" className="gap-1.5 h-8 text-xs" onClick={() => void fetchAll(true)} disabled={refreshing}>
             <RefreshCw className={cn('size-3.5', refreshing && 'animate-spin')} />
-            Refresh
+            {t('common.refresh')}
           </Button>
         </div>
       </div>
@@ -196,7 +202,7 @@ export default function AdminDashboard() {
         <div className="rounded-xl border border-primary/15 bg-gradient-to-r from-primary/5 via-background to-emerald-500/5 p-4 shadow-sm">
           <div className="flex items-center gap-2">
             <BarChart3 className="size-4 text-primary" />
-            <h2 className="text-sm font-semibold text-foreground">AI Executive Summary</h2>
+            <h2 className="text-sm font-semibold text-foreground">{t('dashboard.aiSummary')}</h2>
           </div>
           {aiNarration?.summary ? (
             <>
@@ -214,7 +220,7 @@ export default function AdminDashboard() {
           ) : (
             <div className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
               <Loader2 className="size-4 animate-spin" />
-              AI summary is loading in the background.
+              {t('dashboard.aiLoading')}
             </div>
           )}
         </div>
@@ -222,10 +228,10 @@ export default function AdminDashboard() {
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: "Today's Requests",     value: m.todayRequests     ?? 0, icon: FileText,     cls: 'text-primary' },
-          { label: "Today's Reservations", value: m.todayReservations ?? 0, icon: BookMarked,   cls: 'text-emerald-600' },
-          { label: "Today's Appointments", value: m.todayAppointments ?? 0, icon: CalendarDays, cls: 'text-blue-600' },
-          { label: 'Overdue',              value: m.overdueRequests   ?? 0, icon: AlertTriangle, cls: m.overdueRequests > 0 ? 'text-red-600' : 'text-muted-foreground' },
+          { label: t('dashboard.todayRequests'),     value: m.todayRequests     ?? 0, icon: FileText,     cls: 'text-primary' },
+          { label: t('dashboard.todayReservations'), value: m.todayReservations ?? 0, icon: BookMarked,   cls: 'text-emerald-600' },
+          { label: t('dashboard.todayAppointments'), value: m.todayAppointments ?? 0, icon: CalendarDays, cls: 'text-blue-600' },
+          { label: t('dashboard.overdue'),           value: m.overdueRequests   ?? 0, icon: AlertTriangle, cls: m.overdueRequests > 0 ? 'text-red-600' : 'text-muted-foreground' },
         ].map(({ label, value, icon: Icon, cls }) => (
           <div key={label} className="bg-card border border-border rounded-lg p-3.5 flex items-center gap-3 shadow-sm">
             <Icon className={cn('size-4 flex-shrink-0', cls)} />
@@ -240,28 +246,28 @@ export default function AdminDashboard() {
       {/* ── Main KPI row ───────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <MetricCard
-          title="Total Requests"
+          title={t('dashboard.totalRequests')}
           value={(m.totalRequests ?? 0).toLocaleString()}
-          description="All time"
+          description={t('dashboard.allTime')}
           icon={<FileText className="size-4" />}
         />
         <MetricCard
-          title="Open Requests"
+          title={t('dashboard.openRequests')}
           value={m.openRequests ?? 0}
-          description="Awaiting action"
+          description={t('dashboard.awaitingAction')}
           icon={<Activity className="size-4" />}
           valueClassName={m.openRequests > 0 ? 'text-amber-600' : undefined}
         />
         <MetricCard
-          title="Active Users"
+          title={t('dashboard.activeUsers')}
           value={(m.activeUsers ?? 0).toLocaleString()}
-          description={`of ${(m.totalUsers ?? 0).toLocaleString()} total`}
+          description={t('dashboard.ofTotal', { total: (m.totalUsers ?? 0).toLocaleString() })}
           icon={<Users className="size-4" />}
         />
         <MetricCard
-          title="Approval Rate"
+          title={t('dashboard.approvalRate')}
           value={`${m.approvalRate ?? 0}%`}
-          description="Approved / total decisions"
+          description={t('dashboard.approvedTotalDecisions')}
           icon={<CheckSquare className="size-4" />}
           valueClassName={
             (m.approvalRate ?? 0) >= 70 ? 'text-emerald-600'
@@ -277,9 +283,9 @@ export default function AdminDashboard() {
         {/* Requests by Status */}
         <div className="lg:col-span-2 bg-card border border-border rounded-lg shadow-sm p-5">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-semibold text-foreground">Requests by Status</h2>
+            <h2 className="text-sm font-semibold text-foreground">{t('dashboard.requestsByStatus')}</h2>
             <Link href="/admin/requests" className="text-xs text-primary hover:underline flex items-center gap-0.5">
-              View all <ArrowRight className="size-3" />
+              {t('common.viewAll')} <ArrowRight className="size-3" />
             </Link>
           </div>
           {rbs.length > 0 ? (
@@ -292,7 +298,7 @@ export default function AdminDashboard() {
                   contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid oklch(0.9 0.01 264)' }}
                   cursor={{ fill: 'oklch(0.94 0.01 264 / 0.4)' }}
                 />
-                <Bar dataKey="count" name="Requests" radius={[4, 4, 0, 0]}>
+                <Bar dataKey="count" name={t('dashboard.totalRequests')} radius={[4, 4, 0, 0]}>
                   {rbs.map((entry, i) => (
                     <Cell key={i} fill={STATUS_COLORS[entry.status] ?? '#6366f1'} />
                   ))}
@@ -300,7 +306,7 @@ export default function AdminDashboard() {
               </BarChart>
             </ResponsiveContainer>
           ) : (
-            <div className="flex items-center justify-center h-[220px] text-muted-foreground text-sm">No data yet.</div>
+            <div className="flex items-center justify-center h-[220px] text-muted-foreground text-sm">{t('dashboard.noData')}</div>
           )}
         </div>
 
@@ -308,7 +314,7 @@ export default function AdminDashboard() {
         <div className="space-y-4">
           {/* Approval Rate mini gauge */}
           <div className="bg-card border border-border rounded-lg shadow-sm p-5">
-            <h2 className="text-sm font-semibold text-foreground mb-3">Approval Rate</h2>
+            <h2 className="text-sm font-semibold text-foreground mb-3">{t('dashboard.approvalRate')}</h2>
             <div className="flex items-center gap-4">
               <div className="relative size-[72px] flex-shrink-0">
                 <ResponsiveContainer width="100%" height="100%">
@@ -321,7 +327,7 @@ export default function AdminDashboard() {
               </div>
               <div>
                 <p className="text-3xl font-bold text-foreground">{m.approvalRate ?? 0}<span className="text-base font-normal text-muted-foreground">%</span></p>
-                <p className="text-xs text-muted-foreground">of total decisions</p>
+                <p className="text-xs text-muted-foreground">{t('dashboard.ofTotalDecisions')}</p>
               </div>
             </div>
           </div>
@@ -329,16 +335,16 @@ export default function AdminDashboard() {
           {/* Open IT tickets */}
           <div className="bg-card border border-border rounded-lg shadow-sm p-5">
             <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-semibold text-foreground">IT Tickets</h2>
-              <Link href="/admin/requests" className="text-xs text-primary hover:underline">View</Link>
+              <h2 className="text-sm font-semibold text-foreground">{t('dashboard.itTickets')}</h2>
+              <Link href="/admin/requests" className="text-xs text-primary hover:underline">{t('common.view')}</Link>
             </div>
             <div className="flex items-end gap-3">
               <p className={cn('text-3xl font-bold', (m.openTickets ?? 0) > 0 ? 'text-red-600' : 'text-foreground')}>
                 {m.openTickets ?? 0}
               </p>
               <div className="pb-0.5">
-                <p className="text-xs text-muted-foreground">open tickets</p>
-                <p className="text-xs text-muted-foreground">of {r.totalTickets ?? 0} total</p>
+                <p className="text-xs text-muted-foreground">{t('dashboard.openTickets')}</p>
+                <p className="text-xs text-muted-foreground">{t('dashboard.ofTotalTickets', { total: r.totalTickets ?? 0 })}</p>
               </div>
             </div>
           </div>
@@ -348,7 +354,7 @@ export default function AdminDashboard() {
       {/* ── Request by Type ─────────────────────────────────────────────────── */}
       {rbt.length > 0 && (
         <div className="bg-card border border-border rounded-lg shadow-sm p-5">
-          <h2 className="text-sm font-semibold text-foreground mb-4">Requests by Type</h2>
+          <h2 className="text-sm font-semibold text-foreground mb-4">{t('dashboard.requestsByType')}</h2>
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
             {rbt.slice(0, 8).map((item, i) => {
               const max = rbt[0]?.count ?? 1
@@ -373,21 +379,21 @@ export default function AdminDashboard() {
       {/* ── Recent Requests ─────────────────────────────────────────────────── */}
       <div className="bg-card border border-border rounded-lg shadow-sm overflow-hidden">
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-          <h2 className="text-sm font-semibold text-foreground">Recent Requests</h2>
+          <h2 className="text-sm font-semibold text-foreground">{t('dashboard.recentRequests')}</h2>
           <Link href="/admin/requests" className="text-xs text-primary hover:underline flex items-center gap-0.5">
-            All requests <ArrowRight className="size-3" />
+            {t('dashboard.allRequests')} <ArrowRight className="size-3" />
           </Link>
         </div>
         {recent.length > 0 ? (
           <table className="w-full text-xs">
             <thead>
               <tr className="bg-muted/40 border-b border-border">
-                <th className="text-left py-2.5 px-5 font-medium text-muted-foreground">Request</th>
-                <th className="text-left py-2.5 px-3 font-medium text-muted-foreground hidden sm:table-cell">Type</th>
-                <th className="text-left py-2.5 px-3 font-medium text-muted-foreground hidden md:table-cell">Requester</th>
-                <th className="text-left py-2.5 px-3 font-medium text-muted-foreground">Status</th>
-                <th className="text-left py-2.5 px-3 font-medium text-muted-foreground hidden lg:table-cell">Assignee</th>
-                <th className="text-right py-2.5 px-5 font-medium text-muted-foreground">When</th>
+                <th className="text-left py-2.5 px-5 font-medium text-muted-foreground">{t('dashboard.colRequest')}</th>
+                <th className="text-left py-2.5 px-3 font-medium text-muted-foreground hidden sm:table-cell">{t('dashboard.colType')}</th>
+                <th className="text-left py-2.5 px-3 font-medium text-muted-foreground hidden md:table-cell">{t('dashboard.colRequester')}</th>
+                <th className="text-left py-2.5 px-3 font-medium text-muted-foreground">{t('dashboard.colStatus')}</th>
+                <th className="text-left py-2.5 px-3 font-medium text-muted-foreground hidden lg:table-cell">{t('dashboard.colAssignee')}</th>
+                <th className="text-right py-2.5 px-5 font-medium text-muted-foreground">{t('dashboard.colWhen')}</th>
               </tr>
             </thead>
             <tbody>
@@ -435,7 +441,7 @@ export default function AdminDashboard() {
         ) : (
           <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
             <FileText className="size-7 opacity-30 mb-2" />
-            <p className="text-sm">No requests yet.</p>
+            <p className="text-sm">{t('dashboard.noRequests')}</p>
           </div>
         )}
       </div>
@@ -443,17 +449,17 @@ export default function AdminDashboard() {
       {/* ── Quick links ─────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: 'Users',      href: '/admin/users',      icon: Users,       color: 'bg-blue-50 text-blue-600 dark:bg-blue-950/30' },
-          { label: 'Requests',   href: '/admin/requests',   icon: FileText,    color: 'bg-indigo-50 text-indigo-600 dark:bg-indigo-950/30' },
-          { label: 'Workflows',  href: '/admin/workflows',  icon: Workflow,    color: 'bg-purple-50 text-purple-600 dark:bg-purple-950/30' },
-          { label: 'Monitoring', href: '/admin/monitoring', icon: Monitor,     color: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30' },
-        ].map(({ label, href, icon: Icon, color }) => (
+          { labelKey: 'nav.users',      href: '/admin/users',      icon: Users,       color: 'bg-blue-50 text-blue-600 dark:bg-blue-950/30' },
+          { labelKey: 'nav.requests',   href: '/admin/requests',   icon: FileText,    color: 'bg-indigo-50 text-indigo-600 dark:bg-indigo-950/30' },
+          { labelKey: 'nav.workflows',  href: '/admin/workflows',  icon: Workflow,    color: 'bg-purple-50 text-purple-600 dark:bg-purple-950/30' },
+          { labelKey: 'nav.monitoring', href: '/admin/monitoring', icon: Monitor,     color: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30' },
+        ].map(({ labelKey, href, icon: Icon, color }) => (
           <Link key={href} href={href}>
             <div className="bg-card border border-border rounded-lg p-4 flex items-center gap-3 hover:shadow-md transition-all cursor-pointer group">
               <div className={cn('size-9 rounded-lg flex items-center justify-center flex-shrink-0', color)}>
                 <Icon className="size-4" />
               </div>
-              <span className="text-sm font-medium text-foreground group-hover:text-primary transition-colors">{label}</span>
+              <span className="text-sm font-medium text-foreground group-hover:text-primary transition-colors">{t(labelKey)}</span>
               <ArrowRight className="size-3.5 text-muted-foreground ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
             </div>
           </Link>

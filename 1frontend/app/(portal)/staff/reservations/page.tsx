@@ -8,6 +8,7 @@ import { CalendarDays, Filter, Loader2, BookOpen, ChevronRight, Clock, MapPin } 
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { getToken } from '@/lib/auth'
+import { useI18n } from '@/lib/i18n'
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000'
 
@@ -29,11 +30,11 @@ interface ReservationRequest {
 
 type FilterStatus = 'all' | 'pending' | 'approved' | 'rejected'
 
-const FILTER_TABS: { key: FilterStatus; label: string }[] = [
-  { key: 'all', label: 'All' },
-  { key: 'pending', label: 'Pending' },
-  { key: 'approved', label: 'Approved' },
-  { key: 'rejected', label: 'Rejected' },
+const FILTER_TABS: { key: FilterStatus }[] = [
+  { key: 'all' },
+  { key: 'pending' },
+  { key: 'approved' },
+  { key: 'rejected' },
 ]
 
 function formatDate(d: string) {
@@ -48,6 +49,7 @@ function formatTime(d: string) {
 
 export default function StaffReservationsPage() {
   const router = useRouter()
+  const { t } = useI18n()
   const [reservations, setReservations] = useState<ReservationRequest[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [activeFilter, setActiveFilter] = useState<FilterStatus>('all')
@@ -61,14 +63,14 @@ export default function StaffReservationsPage() {
         if (res.ok) setReservations(await res.json())
         else setReservations([])
       } catch {
-        toast.error('Failed to load reservations.')
+        toast.error(t('pages.reservationsLoadFail'))
         setReservations([])
       } finally {
         setIsLoading(false)
       }
     }
     void fetch_()
-  }, [])
+  }, [t])
 
   const filtered = reservations.filter((r) => {
     if (activeFilter === 'all') return true
@@ -91,9 +93,9 @@ export default function StaffReservationsPage() {
     <div className="p-6 space-y-6 max-w-6xl mx-auto pb-20">
       <div>
         <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
-          <CalendarDays className="size-5 text-primary" /> Reservations
+          <CalendarDays className="size-5 text-primary" /> {t('pages.reservations')}
         </h1>
-        <p className="text-sm text-muted-foreground mt-0.5">Manage room and resource reservation requests</p>
+        <p className="text-sm text-muted-foreground mt-0.5">{t('pages.reservationSubtitle')}</p>
       </div>
 
       <div className="bg-card border border-border rounded-lg shadow-sm overflow-hidden">
@@ -121,7 +123,7 @@ export default function StaffReservationsPage() {
                       : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
                   )}
                 >
-                  {tab.label}
+                  {tab.key === 'all' ? t('common.all') : tab.key === 'pending' ? t('common.pending') : tab.key === 'approved' ? t('common.approved') : t('common.rejected')}
                   {count > 0 && (
                     <span className={cn(
                       'text-[9px] font-bold px-1 rounded-full',
@@ -136,13 +138,13 @@ export default function StaffReservationsPage() {
               )
             })}
           </div>
-          <span className="text-xs text-muted-foreground">{filtered.length} records</span>
+          <span className="text-xs text-muted-foreground">{t('common.records', { count: filtered.length })}</span>
         </div>
 
         {filtered.length === 0 ? (
           <EmptyState
-            title="No reservations found"
-            description="Room and resource reservation requests will appear here."
+            title={t('pages.noReservations')}
+            description={t('pages.noReservationsDesc')}
             icon={<BookOpen className="size-6" />}
           />
         ) : (
@@ -150,12 +152,12 @@ export default function StaffReservationsPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-muted/40 border-b border-border">
-                  <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Request No</th>
-                  <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Room / Resource</th>
-                  <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider hidden md:table-cell">Requester</th>
-                  <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider hidden lg:table-cell">Date &amp; Time</th>
-                  <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Status</th>
-                  <th className="sr-only">Actions</th>
+                  <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">{t('pages.requestNo')}</th>
+                  <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">{t('pages.roomResource')}</th>
+                  <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider hidden md:table-cell">{t('common.requester')}</th>
+                  <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider hidden lg:table-cell">{t('pages.dateTime')}</th>
+                  <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">{t('common.status')}</th>
+                  <th className="sr-only">{t('common.actions')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">

@@ -5,6 +5,7 @@ import { StatusBadge, PriorityBadge } from '@/components/status-badge'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { Wrench, Clock, MapPin, User, CheckCircle2, AlertCircle, Circle, Plus } from 'lucide-react'
+import { useI18n } from '@/lib/i18n'
 
 type MaintenanceStatus = 'open' | 'in_progress' | 'completed'
 
@@ -63,19 +64,19 @@ const MOCK_MAINTENANCE = [
   },
 ]
 
-const statusConfig: Record<MaintenanceStatus, { label: string; icon: React.ReactNode; className: string }> = {
+const statusConfig: Record<MaintenanceStatus, { labelKey: string; icon: React.ReactNode; className: string }> = {
   open: {
-    label: 'Open',
+    labelKey: 'common.open',
     icon: <Circle className="size-3.5" />,
     className: 'text-amber-600',
   },
   in_progress: {
-    label: 'In Progress',
+    labelKey: 'common.inProgress',
     icon: <Clock className="size-3.5" />,
     className: 'text-blue-600',
   },
   completed: {
-    label: 'Completed',
+    labelKey: 'common.completed',
     icon: <CheckCircle2 className="size-3.5" />,
     className: 'text-emerald-600',
   },
@@ -86,6 +87,7 @@ function formatDate(d: string) {
 }
 
 export default function MaintenancePage() {
+  const { t } = useI18n()
   const [activeTab, setActiveTab] = useState<'all' | MaintenanceStatus>('all')
 
   const filtered = activeTab === 'all'
@@ -103,12 +105,12 @@ export default function MaintenancePage() {
     <div className="p-6 space-y-5 max-w-5xl mx-auto">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold text-foreground">Maintenance Requests</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Track and manage facility maintenance tickets.</p>
+          <h1 className="text-xl font-bold text-foreground">{t('pages.maintenanceRequests')}</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">{t('pages.maintenanceSubtitle')}</p>
         </div>
         <Button size="sm" className="gap-1.5">
           <Plus className="size-3.5" />
-          New Ticket
+          {t('tickets.newTicket')}
         </Button>
       </div>
 
@@ -127,7 +129,7 @@ export default function MaintenancePage() {
             >
               <div className={cn('flex items-center gap-1.5 text-sm font-medium mb-1', cfg.className)}>
                 {cfg.icon}
-                {cfg.label}
+                {t(cfg.labelKey)}
               </div>
               <p className="text-2xl font-bold text-foreground">{counts[s]}</p>
             </button>
@@ -139,7 +141,7 @@ export default function MaintenancePage() {
       <div className="bg-card border border-border rounded-lg shadow-sm overflow-hidden">
         <div className="px-5 py-3.5 border-b border-border">
           <p className="text-sm font-medium text-foreground">
-            {activeTab === 'all' ? 'All Maintenance Requests' : statusConfig[activeTab as MaintenanceStatus]?.label}
+            {activeTab === 'all' ? t('pages.allMaintenanceRequests') : t(statusConfig[activeTab as MaintenanceStatus]?.labelKey)}
             <span className="text-muted-foreground ml-1.5">({filtered.length})</span>
           </p>
         </div>
@@ -182,7 +184,7 @@ export default function MaintenancePage() {
                     <PriorityBadge priority={item.priority} />
                     <div className={cn('flex items-center gap-1 text-xs font-medium', cfg.className)}>
                       {cfg.icon}
-                      {cfg.label}
+                      {t(cfg.labelKey)}
                     </div>
                   </div>
                 </div>

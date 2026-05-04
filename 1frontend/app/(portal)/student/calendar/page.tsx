@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+import { useI18n } from '@/lib/i18n'
+import { formatStudentTime, translateStatus } from '@/lib/student-i18n-utils'
 
 interface CalendarEvent {
   id: string
@@ -24,12 +26,8 @@ const TYPE_COLORS: Record<string, string> = {
   reservation: 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800',
 }
 
-function formatTime(d: string) {
-  return new Date(d).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
-}
-
-function formatDateHeader(year: number, month: number) {
-  return new Date(year, month).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+function formatDateHeader(year: number, month: number, locale: 'tr' | 'en') {
+  return new Date(year, month).toLocaleDateString(locale === 'tr' ? 'tr-TR' : 'en-US', { month: 'long', year: 'numeric' })
 }
 
 function daysInMonth(year: number, month: number) {
@@ -48,6 +46,7 @@ export default function StudentCalendarPage() {
   const [viewYear, setViewYear] = useState(today.getFullYear())
   const [viewMonth, setViewMonth] = useState(today.getMonth())
   const [selectedDay, setSelectedDay] = useState<number | null>(today.getDate())
+  const { locale, t } = useI18n()
 
   const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
 
@@ -62,7 +61,7 @@ export default function StudentCalendarPage() {
       const data = await res.json()
       setEvents(Array.isArray(data) ? data : [])
     } catch {
-      toast.error('Failed to load calendar events.')
+      toast.error(t('messages.loadCalendarFail'))
     } finally {
       setIsLoading(false)
     }
@@ -114,7 +113,7 @@ export default function StudentCalendarPage() {
       link.click()
       URL.revokeObjectURL(url)
     } catch {
-      toast.error('Failed to export ICS.')
+      toast.error(t('messages.exportIcsFail'))
     }
   }
 
@@ -123,7 +122,7 @@ export default function StudentCalendarPage() {
       <div className="flex h-[60vh] items-center justify-center">
         <div className="flex flex-col items-center gap-3">
           <Loader2 className="size-8 animate-spin text-primary" />
-          <p className="text-sm text-muted-foreground animate-pulse">Loading calendar...</p>
+          <p className="text-sm text-muted-foreground animate-pulse">{t('pages.loadingCalendar')}</p>
         </div>
       </div>
     )
@@ -133,8 +132,8 @@ export default function StudentCalendarPage() {
     <div className="p-6 space-y-6 max-w-5xl mx-auto">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold text-foreground">My Calendar</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Appointments and reservations in one view.</p>
+          <h1 className="text-xl font-bold text-foreground">{t('pages.calendarTitle')}</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">{t('pages.calendarSubtitle')}</p>
         </div>
         <Button variant="outline" size="sm" className="gap-2" onClick={downloadIcs}>
           <Download className="size-4" />
@@ -144,8 +143,8 @@ export default function StudentCalendarPage() {
 
       <div className="flex items-center gap-4 flex-wrap">
         {[
-          { label: 'Appointment', type: 'appointment' },
-          { label: 'Reservation', type: 'reservation' },
+          { label: t('pages.appointmentsTitle'), type: 'appointment' },
+          { label: t('pages.reservationsTitle'), type: 'reservation' },
         ].map(({ label, type }) => (
           <span key={type} className={cn('text-xs px-2.5 py-1 rounded-full border font-medium', TYPE_COLORS[type])}>
             {label}
@@ -159,14 +158,14 @@ export default function StudentCalendarPage() {
             <button onClick={prevMonth} className="p-1.5 rounded-lg hover:bg-muted transition-colors">
               <ChevronLeft className="size-4 text-muted-foreground" />
             </button>
-            <h2 className="text-sm font-semibold text-foreground">{formatDateHeader(viewYear, viewMonth)}</h2>
+            <h2 className="text-sm font-semibold text-foreground">{formatDateHeader(viewYear, viewMonth, locale)}</h2>
             <button onClick={nextMonth} className="p-1.5 rounded-lg hover:bg-muted transition-colors">
               <ChevronRight className="size-4 text-muted-foreground" />
             </button>
           </div>
 
           <div className="grid grid-cols-7 border-b border-border">
-            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
+            {(locale === 'tr' ? ['Paz', 'Pzt', 'Sal', 'Car', 'Per', 'Cum', 'Cmt'] : ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']).map(d => (
               <div key={d} className="text-center text-[10px] font-bold text-muted-foreground py-2 uppercase tracking-wide">
                 {d}
               </div>
@@ -221,27 +220,27 @@ export default function StudentCalendarPage() {
             <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
               <Calendar className="size-4 text-primary" />
               {selectedDay
-                ? new Date(viewYear, viewMonth, selectedDay).toLocaleDateString('en-US', { month: 'long', day: 'numeric' })
-                : 'Select a day'}
+                ? new Date(viewYear, viewMonth, selectedDay).toLocaleDateString(locale === 'tr' ? 'tr-TR' : 'en-US', { month: 'long', day: 'numeric' })
+                : t('pages.clickDay')}
             </h3>
           </div>
           <div className="divide-y divide-border">
             {selectedDay && selectedEvents.length === 0 && (
-              <p className="text-xs text-muted-foreground text-center py-10">No events on this day.</p>
+              <p className="text-xs text-muted-foreground text-center py-10">{t('pages.noEventsOnDay')}</p>
             )}
             {!selectedDay && (
-              <p className="text-xs text-muted-foreground text-center py-10">Click a day to see events.</p>
+              <p className="text-xs text-muted-foreground text-center py-10">{t('pages.clickDay')}</p>
             )}
             {selectedEvents.map(ev => (
               <div key={ev.id} className="px-4 py-3.5 space-y-2">
                 <div className="flex items-start justify-between gap-2">
                   <p className="text-sm font-medium text-foreground leading-tight">{ev.title}</p>
                   <span className={cn('text-[10px] px-2 py-0.5 rounded-full border font-semibold whitespace-nowrap', TYPE_COLORS[ev.type])}>
-                    {ev.type}
+                    {ev.type === 'appointment' ? t('pages.appointmentsTitle') : t('pages.reservationsTitle')}
                   </span>
                 </div>
                 <p className="text-xs text-muted-foreground flex items-center gap-1.5">
-                  <Clock className="size-3" /> {formatTime(ev.startDate)} - {formatTime(ev.endDate)}
+                  <Clock className="size-3" /> {formatStudentTime(ev.startDate, locale)} - {formatStudentTime(ev.endDate, locale)}
                 </p>
                 {ev.location && (
                   <p className="text-xs text-muted-foreground flex items-center gap-1.5">
@@ -252,7 +251,7 @@ export default function StudentCalendarPage() {
                   <p className="text-xs text-muted-foreground leading-relaxed">{ev.description}</p>
                 )}
                 <Badge variant="outline" className="text-[10px] h-5">
-                  {ev.status}
+                  {translateStatus(ev.status, t)}
                 </Badge>
               </div>
             ))}

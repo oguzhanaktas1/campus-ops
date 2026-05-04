@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { getToken } from '@/lib/auth'
+import { useI18n } from '@/lib/i18n'
+import { translateStatus } from '@/lib/student-i18n-utils'
 
 const STATUS_BADGE: Record<string, string> = {
   SUBMITTED:  'bg-blue-50 text-blue-700 border-blue-200',
@@ -19,6 +21,7 @@ const STATUS_BADGE: Record<string, string> = {
 export default function StudentAccessRequestsPage() {
   const [requests, setRequests] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const { t } = useI18n()
 
   useEffect(() => {
     const fetch_ = async () => {
@@ -29,7 +32,7 @@ export default function StudentAccessRequestsPage() {
         })
         if (res.ok) setRequests(await res.json())
       } catch {
-        toast.error('Failed to load access requests.')
+        toast.error(t('messages.loadAccessRequestsFail'))
       } finally {
         setIsLoading(false)
       }
@@ -48,12 +51,12 @@ export default function StudentAccessRequestsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
-            <ShieldCheck className="size-5 text-primary" /> Access Requests
+            <ShieldCheck className="size-5 text-primary" /> {t('pages.accessRequestsTitle')}
           </h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Request access to systems, labs or campus resources.</p>
+          <p className="text-sm text-muted-foreground mt-0.5">{t('pages.accessRequestsSubtitle')}</p>
         </div>
         <Link href="/student/access-requests/new">
-          <Button size="sm" className="gap-2"><Plus className="size-4" /> New Request</Button>
+          <Button size="sm" className="gap-2"><Plus className="size-4" /> {t('common.newRequest')}</Button>
         </Link>
       </div>
 
@@ -61,8 +64,8 @@ export default function StudentAccessRequestsPage() {
         {requests.length === 0 ? (
           <div className="py-16 flex flex-col items-center text-center opacity-50">
             <AlertCircle className="size-10 mb-3" />
-            <p className="text-sm font-medium">No access requests yet.</p>
-            <p className="text-xs text-muted-foreground mt-1">Submit a request to get access to a system or resource.</p>
+            <p className="text-sm font-medium">{t('pages.noAccessRequests')}</p>
+            <p className="text-xs text-muted-foreground mt-1">{t('pages.noAccessRequestsDesc')}</p>
           </div>
         ) : (
           <div className="divide-y divide-border">
@@ -77,7 +80,7 @@ export default function StudentAccessRequestsPage() {
                   <p className="text-xs text-muted-foreground mt-0.5">{r.requestNo} · {r.accessType}</p>
                 </div>
                 <span className={cn('text-xs font-semibold px-2 py-0.5 rounded-full border ml-4 shrink-0', STATUS_BADGE[r.status] ?? STATUS_BADGE.SUBMITTED)}>
-                  {r.status?.replace(/_/g, ' ')}
+                  {translateStatus(r.status, t)}
                 </span>
               </Link>
             ))}

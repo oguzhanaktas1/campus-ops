@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 import { getToken } from '@/lib/auth'
+import { useI18n } from '@/lib/i18n'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -150,6 +151,7 @@ function exportCSV(data: ReportData) {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function AdminReportsPage() {
+  const { t } = useI18n()
   const [data,       setData]       = useState<ReportData | null>(null)
   const [loading,    setLoading]    = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -168,7 +170,7 @@ export default function AdminReportsPage() {
       const summary = sumRes.ok ? await sumRes.json() : {}
       setData({ ...report, overdueRequests: summary.overdueRequests ?? 0, approvalRate: summary.approvalRate ?? 0 })
     } catch {
-      toast.error('Failed to load report data.')
+      toast.error(t('reports.loadFail'))
     } finally {
       setLoading(false)
       setRefreshing(false)
@@ -182,7 +184,7 @@ export default function AdminReportsPage() {
       <div className="flex h-[60vh] items-center justify-center">
         <div className="flex flex-col items-center gap-3">
           <Loader2 className="size-8 animate-spin text-primary" />
-          <p className="text-sm text-muted-foreground animate-pulse">Generating report...</p>
+          <p className="text-sm text-muted-foreground animate-pulse">{t('reports.generating')}</p>
         </div>
       </div>
     )
@@ -208,19 +210,19 @@ export default function AdminReportsPage() {
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold text-foreground">Reports</h1>
+          <h1 className="text-xl font-bold text-foreground">{t('reports.title')}</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Operational summary generated on {new Date().toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })}.
+            {t('reports.subtitle')}
           </p>
         </div>
         <div className="flex items-center gap-2">
           <Button size="sm" variant="outline" className="gap-1.5 h-8 text-xs" onClick={() => void fetchReport(true)} disabled={refreshing}>
             <RefreshCw className={cn('size-3.5', refreshing && 'animate-spin')} />
-            Refresh
+            {t('common.refresh')}
           </Button>
           <Button size="sm" variant="outline" className="gap-1.5 h-8 text-xs" onClick={() => exportCSV(data)}>
             <Download className="size-3.5" />
-            Export CSV
+            {t('reports.download')}
           </Button>
         </div>
       </div>
@@ -231,7 +233,7 @@ export default function AdminReportsPage() {
           <CheckCircle2 className="size-4 text-emerald-600 flex-shrink-0" />
           <div>
             <p className="text-base font-bold text-emerald-700 dark:text-emerald-400">{resolveRate}%</p>
-            <p className="text-[11px] text-emerald-600/80 dark:text-emerald-500">Resolution Rate</p>
+            <p className="text-[11px] text-emerald-600/80 dark:text-emerald-500">{t('reports.resolutionRate')}</p>
           </div>
         </div>
         <div className={cn('border rounded-lg p-3.5 flex items-center gap-2.5',
@@ -243,7 +245,7 @@ export default function AdminReportsPage() {
             <p className={cn('text-base font-bold', (data.overdueRequests ?? 0) > 0 ? 'text-red-700 dark:text-red-400' : 'text-foreground')}>
               {data.overdueRequests ?? 0}
             </p>
-            <p className="text-[11px] text-muted-foreground">Overdue</p>
+            <p className="text-[11px] text-muted-foreground">{t('reports.overdue')}</p>
           </div>
         </div>
         <div className="bg-card border border-border rounded-lg p-3.5 flex items-center gap-2.5">
@@ -252,34 +254,34 @@ export default function AdminReportsPage() {
             <p className="text-base font-bold text-foreground">
               {data.avgResolutionDays != null ? `${data.avgResolutionDays}d` : '—'}
             </p>
-            <p className="text-[11px] text-muted-foreground">Avg. Resolution</p>
+            <p className="text-[11px] text-muted-foreground">{t('reports.avgResolution')}</p>
           </div>
         </div>
         <div className="bg-card border border-border rounded-lg p-3.5 flex items-center gap-2.5">
           <Users className="size-4 text-primary flex-shrink-0" />
           <div>
             <p className="text-base font-bold text-foreground">{data.totalUsers.toLocaleString()}</p>
-            <p className="text-[11px] text-muted-foreground">Total Users</p>
+            <p className="text-[11px] text-muted-foreground">{t('reports.totalUsers')}</p>
           </div>
         </div>
       </div>
 
       {/* ── Requests ──────────────────────────────────────────────────────────── */}
-      <Section title="Requests" icon={<FileText className="size-3.5" />}>
+      <Section title={t('reports.requests')} icon={<FileText className="size-3.5" />}>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-          <StatCard icon={<FileText    className="size-5" />} label="Total"      value={(data.totalRequests    ?? 0).toLocaleString()} />
-          <StatCard icon={<TrendingUp  className="size-5" />} label="Open"       value={data.openRequests      ?? 0} sub="Awaiting action"
+          <StatCard icon={<FileText    className="size-5" />} label={t('reports.total')}      value={(data.totalRequests    ?? 0).toLocaleString()} />
+          <StatCard icon={<TrendingUp  className="size-5" />} label={t('reports.open')}       value={data.openRequests      ?? 0} sub={t('reports.awaitingAction')}
             accent={(data.openRequests ?? 0) > 0 ? 'text-amber-600' : undefined} />
-          <StatCard icon={<CheckCircle2 className="size-5" />} label="Resolved"  value={data.resolvedRequests  ?? 0} sub={`${resolveRate}% of total`}
+          <StatCard icon={<CheckCircle2 className="size-5" />} label={t('reports.resolved')}  value={data.resolvedRequests  ?? 0} sub={t('reports.ofTotal', { rate: resolveRate })}
             accent="text-emerald-600" />
-          <StatCard icon={<Clock       className="size-5" />} label="Avg. Time"  value={data.avgResolutionDays != null ? `${data.avgResolutionDays}d` : '—'}
-            sub="Days to close" />
+          <StatCard icon={<Clock       className="size-5" />} label={t('reports.avgResolution')}  value={data.avgResolutionDays != null ? `${data.avgResolutionDays}d` : '—'}
+            sub={t('reports.daysToClose')} />
         </div>
 
         <div className="grid lg:grid-cols-2 gap-5">
           {/* By Status */}
           <div className="bg-card border border-border rounded-lg p-5 shadow-sm space-y-3">
-            <h3 className="text-sm font-semibold text-foreground">By Status</h3>
+            <h3 className="text-sm font-semibold text-foreground">{t('reports.byStatus')}</h3>
             {data.requestsByStatus?.length > 0 ? (
               <div className="space-y-3">
                 {data.requestsByStatus.map(row => (
@@ -293,12 +295,12 @@ export default function AdminReportsPage() {
                   />
                 ))}
               </div>
-            ) : <p className="text-xs text-muted-foreground text-center py-6">No data.</p>}
+            ) : <p className="text-xs text-muted-foreground text-center py-6">{t('reports.noData')}</p>}
           </div>
 
           {/* By Type */}
           <div className="bg-card border border-border rounded-lg p-5 shadow-sm space-y-3">
-            <h3 className="text-sm font-semibold text-foreground">By Type</h3>
+            <h3 className="text-sm font-semibold text-foreground">{t('reports.byType')}</h3>
             {data.requestsByType?.length > 0 ? (
               <div className="space-y-3">
                 {data.requestsByType.slice(0, 10).map((row, i) => (
@@ -311,13 +313,13 @@ export default function AdminReportsPage() {
                   />
                 ))}
               </div>
-            ) : <p className="text-xs text-muted-foreground text-center py-6">No data.</p>}
+            ) : <p className="text-xs text-muted-foreground text-center py-6">{t('reports.noData')}</p>}
           </div>
         </div>
       </Section>
 
       {/* ── IT Tickets ────────────────────────────────────────────────────────── */}
-      <Section title="IT Tickets" icon={<Ticket className="size-3.5" />}>
+      <Section title={t('reports.itTickets')} icon={<Ticket className="size-3.5" />}>
         <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
           <StatCard icon={<Ticket       className="size-5" />} label="Total"    value={(data.totalTickets ?? 0).toLocaleString()} />
           <StatCard icon={<XCircle      className="size-5" />} label="Open"     value={data.openTickets   ?? 0} sub="Unresolved"
@@ -328,7 +330,7 @@ export default function AdminReportsPage() {
 
         {data.ticketsByStatus?.length > 0 && (
           <div className="bg-card border border-border rounded-lg p-5 shadow-sm space-y-3">
-            <h3 className="text-sm font-semibold text-foreground">By Ticket Status</h3>
+            <h3 className="text-sm font-semibold text-foreground">{t('reports.byTicketStatus')}</h3>
             <div className="grid sm:grid-cols-2 gap-x-8 gap-y-3">
               {data.ticketsByStatus.map((row, i) => (
                 <ProgressRow
@@ -346,11 +348,11 @@ export default function AdminReportsPage() {
       </Section>
 
       {/* ── Operations ────────────────────────────────────────────────────────── */}
-      <Section title="Operations" icon={<BarChart2 className="size-3.5" />}>
+      <Section title={t('reports.operations')} icon={<BarChart2 className="size-3.5" />}>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard icon={<BookMarked   className="size-5" />} label="Total Reservations"  value={(data.totalReservations ?? 0).toLocaleString()} />
           <StatCard icon={<CalendarDays className="size-5" />} label="Total Appointments"  value={(data.totalAppointments ?? 0).toLocaleString()} />
-          <StatCard icon={<Users        className="size-5" />} label="Total Users"         value={(data.totalUsers        ?? 0).toLocaleString()} />
+          <StatCard icon={<Users        className="size-5" />} label={t('reports.totalUsers')}         value={(data.totalUsers        ?? 0).toLocaleString()} />
           <StatCard icon={<FileText     className="size-5" />} label="All Requests"        value={(data.totalRequests     ?? 0).toLocaleString()} />
         </div>
       </Section>
@@ -358,16 +360,16 @@ export default function AdminReportsPage() {
       {/* ── Summary table ─────────────────────────────────────────────────────── */}
       <div className="bg-card border border-border rounded-lg shadow-sm overflow-hidden">
         <div className="px-5 py-4 border-b border-border flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-foreground">Full Summary</h3>
+          <h3 className="text-sm font-semibold text-foreground">{t('reports.fullSummary')}</h3>
           <span className="text-xs text-muted-foreground">
-            Generated {new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
+            {t('reports.generated', { time: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) })}
           </span>
         </div>
         <table className="w-full text-xs">
           <thead>
             <tr className="bg-muted/40 border-b border-border">
-              <th className="text-left py-2.5 px-5 font-medium text-muted-foreground">Metric</th>
-              <th className="text-right py-2.5 px-5 font-medium text-muted-foreground">Value</th>
+              <th className="text-left py-2.5 px-5 font-medium text-muted-foreground">{t('reports.colName')}</th>
+              <th className="text-right py-2.5 px-5 font-medium text-muted-foreground">{t('reports.colPeriod')}</th>
             </tr>
           </thead>
           <tbody>

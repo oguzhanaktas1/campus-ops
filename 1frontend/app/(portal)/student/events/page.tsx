@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { getToken } from '@/lib/auth'
+import { useI18n } from '@/lib/i18n'
+import { formatStudentDate, translateStatus } from '@/lib/student-i18n-utils'
 
 const EVENT_STATUS_BADGE: Record<string, string> = {
   PUBLISHED:          'bg-blue-50 text-blue-700 border-blue-200',
@@ -36,6 +38,7 @@ export default function StudentEventsPage() {
   const [isLoadingRequests, setIsLoadingRequests] = useState(true)
   const backend = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
   const headers = { Authorization: `Bearer ${getToken()}` }
+  const { locale, t } = useI18n()
 
   useEffect(() => {
     const fetchEvents = async () => {
@@ -43,7 +46,7 @@ export default function StudentEventsPage() {
         const res = await fetch(`${backend}/campus-events`, { headers })
         if (res.ok) setEvents(await res.json())
       } catch {
-        toast.error('Failed to load events.')
+        toast.error(t('messages.loadEventsFail'))
       } finally {
         setIsLoadingEvents(false)
       }
@@ -57,7 +60,7 @@ export default function StudentEventsPage() {
         const res = await fetch(`${backend}/events`, { headers })
         if (res.ok) setRequests(await res.json())
       } catch {
-        toast.error('Failed to load event requests.')
+        toast.error(t('messages.loadEventRequestsFail'))
       } finally {
         setIsLoadingRequests(false)
       }
@@ -70,20 +73,20 @@ export default function StudentEventsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
-            <PartyPopper className="size-5 text-primary" /> Events
+            <PartyPopper className="size-5 text-primary" /> {t('pages.eventsTitle')}
           </h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Browse campus events and your event requests.</p>
+          <p className="text-sm text-muted-foreground mt-0.5">{t('pages.eventsSubtitle')}</p>
         </div>
         <Link href="/student/events/new">
-          <Button size="sm" className="gap-2"><Plus className="size-4" /> New Request</Button>
+          <Button size="sm" className="gap-2"><Plus className="size-4" /> {t('common.newRequest')}</Button>
         </Link>
       </div>
 
       {/* Tabs */}
       <div className="flex gap-1 border-b border-border">
         {[
-          { key: 'events', label: 'Campus Events' },
-          { key: 'requests', label: 'My Event Requests' },
+          { key: 'events', label: t('pages.campusEvents') },
+          { key: 'requests', label: t('pages.myEventRequests') },
         ].map(({ key, label }) => (
           <button
             key={key}
@@ -110,8 +113,8 @@ export default function StudentEventsPage() {
           ) : events.length === 0 ? (
             <div className="py-16 flex flex-col items-center text-center opacity-50">
               <AlertCircle className="size-10 mb-3" />
-              <p className="text-sm font-medium">No campus events available.</p>
-              <p className="text-xs text-muted-foreground mt-1">Check back later for upcoming events.</p>
+              <p className="text-sm font-medium">{t('pages.noCampusEvents')}</p>
+              <p className="text-xs text-muted-foreground mt-1">{t('pages.noCampusEventsDesc')}</p>
             </div>
           ) : (
             <div className="divide-y divide-border">
@@ -125,11 +128,11 @@ export default function StudentEventsPage() {
                     <p className="text-sm font-semibold text-foreground">{ev.title}</p>
                     <p className="text-xs text-muted-foreground mt-0.5">
                       {ev.eventType}
-                      {ev.startAt && ` · ${new Date(ev.startAt).toLocaleDateString()}`}
+                      {ev.startAt && ` · ${formatStudentDate(ev.startAt, locale)}`}
                       {ev.locationText && ` · ${ev.locationText}`}
                     </p>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      Registrations: {ev.registrationCount}
+                      {locale === 'tr' ? 'Kayitlar' : 'Registrations'}: {ev.registrationCount}
                       {ev.minimumAttendance && ` / min ${ev.minimumAttendance}`}
                     </p>
                   </div>
@@ -137,7 +140,7 @@ export default function StudentEventsPage() {
                     'text-xs font-semibold px-2 py-0.5 rounded-full border ml-4 shrink-0',
                     EVENT_STATUS_BADGE[ev.status] ?? EVENT_STATUS_BADGE.PUBLISHED,
                   )}>
-                    {ev.status?.replace(/_/g, ' ')}
+                    {translateStatus(ev.status, t)}
                   </span>
                 </Link>
               ))}
@@ -156,8 +159,8 @@ export default function StudentEventsPage() {
           ) : requests.length === 0 ? (
             <div className="py-16 flex flex-col items-center text-center opacity-50">
               <AlertCircle className="size-10 mb-3" />
-              <p className="text-sm font-medium">No event requests yet.</p>
-              <p className="text-xs text-muted-foreground mt-1">Submit a request to organize a campus event.</p>
+              <p className="text-sm font-medium">{t('pages.noEventRequests')}</p>
+              <p className="text-xs text-muted-foreground mt-1">{t('pages.noEventRequestsDesc')}</p>
             </div>
           ) : (
             <div className="divide-y divide-border">
@@ -171,14 +174,14 @@ export default function StudentEventsPage() {
                     <p className="text-sm font-semibold text-foreground truncate">{req.eventName}</p>
                     <p className="text-xs text-muted-foreground mt-0.5">
                       {req.requestNo} · {req.eventType}
-                      {req.startAt && ` · ${new Date(req.startAt).toLocaleDateString()}`}
+                      {req.startAt && ` · ${formatStudentDate(req.startAt, locale)}`}
                     </p>
                   </div>
                   <span className={cn(
                     'text-xs font-semibold px-2 py-0.5 rounded-full border ml-4 shrink-0',
                     REQ_STATUS_BADGE[req.status] ?? REQ_STATUS_BADGE.SUBMITTED,
                   )}>
-                    {req.status?.replace(/_/g, ' ')}
+                    {translateStatus(req.status, t)}
                   </span>
                 </Link>
               ))}

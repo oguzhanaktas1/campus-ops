@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { getToken } from '@/lib/auth'
+import { useI18n } from '@/lib/i18n'
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000'
 
@@ -35,6 +36,7 @@ function fmt(d: any) {
 
 export default function FacultyReservationDetailPage() {
   const { id } = useParams() as { id: string }
+  const { t } = useI18n()
   const [data, setData] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [approveNote, setApproveNote] = useState('')
@@ -64,8 +66,8 @@ export default function FacultyReservationDetailPage() {
         body: JSON.stringify({ action: 'approve', comment: approveNote.trim() || undefined }),
       })
       const result = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(result.message ?? 'Failed')
-      toast.success('Reservation approved.')
+      if (!res.ok) throw new Error(result.message ?? t('detail.failed'))
+      toast.success(t('detail.reservationApproved'))
       void fetchDetail()
     } catch (err: any) {
       toast.error(err.message)
@@ -76,7 +78,7 @@ export default function FacultyReservationDetailPage() {
 
   const handleReject = async () => {
     if (!rejectReason.trim()) {
-      toast.error('Reason required.')
+      toast.error(t('detail.reasonRequiredToast'))
       return
     }
     setIsActioning(true)
@@ -87,8 +89,8 @@ export default function FacultyReservationDetailPage() {
         body: JSON.stringify({ action: 'reject', comment: rejectReason.trim() }),
       })
       const result = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(result.message ?? 'Failed')
-      toast.success('Reservation rejected.')
+      if (!res.ok) throw new Error(result.message ?? t('detail.failed'))
+      toast.success(t('detail.reservationRejected'))
       setShowReject(false)
       void fetchDetail()
     } catch (err: any) {
@@ -102,8 +104,8 @@ export default function FacultyReservationDetailPage() {
   if (!data) return (
     <div className="p-6 text-center">
       <AlertTriangle className="size-8 text-muted-foreground/40 mb-3 mx-auto" />
-      <p className="text-sm font-medium">Reservation not found</p>
-      <Link href="/faculty/reservations"><Button variant="outline" className="mt-4">Back</Button></Link>
+      <p className="text-sm font-medium">{t('detail.reservationNotFound')}</p>
+      <Link href="/faculty/reservations"><Button variant="outline" className="mt-4">{t('common.back')}</Button></Link>
     </div>
   )
 
@@ -132,18 +134,18 @@ export default function FacultyReservationDetailPage() {
             <p className="text-sm font-medium">{data.requester?.fullName}</p>
             <p className="text-xs text-muted-foreground">{[data.requester?.faculty, data.requester?.department].filter(Boolean).join(' · ')}</p>
           </div>
-          <div className="ml-auto text-xs text-muted-foreground">Submitted {fmt(data.createdAt)}</div>
+          <div className="ml-auto text-xs text-muted-foreground">{t('detail.submitted')} {fmt(data.createdAt)}</div>
         </div>
       )}
 
       <div className="bg-card border border-border rounded-lg p-5 space-y-4">
-        <h2 className="text-sm font-semibold">Reservation Details</h2>
+        <h2 className="text-sm font-semibold">{t('detail.reservationDetails')}</h2>
         <div className="grid sm:grid-cols-2 gap-4 text-sm">
           {reservation.resource && (
             <div className="flex items-start gap-2">
               <MapPin className="size-4 text-muted-foreground shrink-0 mt-0.5" />
               <div>
-                <p className="text-xs text-muted-foreground">Room / Resource</p>
+                <p className="text-xs text-muted-foreground">{t('detail.roomResource')}</p>
                 <p className="font-medium">{reservation.resource.name}</p>
                 {reservation.resource.locationText && <p className="text-xs text-muted-foreground">{reservation.resource.locationText}</p>}
               </div>
@@ -152,48 +154,48 @@ export default function FacultyReservationDetailPage() {
           {reservation.attendeeCount && (
             <div className="flex items-start gap-2">
               <Users className="size-4 text-muted-foreground shrink-0 mt-0.5" />
-              <div><p className="text-xs text-muted-foreground">Attendees</p><p className="font-medium">{reservation.attendeeCount}</p></div>
+              <div><p className="text-xs text-muted-foreground">{t('detail.attendees')}</p><p className="font-medium">{reservation.attendeeCount}</p></div>
             </div>
           )}
           {reservation.startAt && (
             <div className="flex items-start gap-2">
               <Clock className="size-4 text-muted-foreground shrink-0 mt-0.5" />
-              <div><p className="text-xs text-muted-foreground">Start</p><p className="font-medium">{fmtDT(reservation.startAt)}</p></div>
+              <div><p className="text-xs text-muted-foreground">{t('detail.start')}</p><p className="font-medium">{fmtDT(reservation.startAt)}</p></div>
             </div>
           )}
           {reservation.endAt && (
             <div className="flex items-start gap-2">
               <Clock className="size-4 text-muted-foreground shrink-0 mt-0.5" />
-              <div><p className="text-xs text-muted-foreground">End</p><p className="font-medium">{fmtDT(reservation.endAt)}</p></div>
+              <div><p className="text-xs text-muted-foreground">{t('detail.end')}</p><p className="font-medium">{fmtDT(reservation.endAt)}</p></div>
             </div>
           )}
         </div>
-        {reservation.reservationPurpose && <div><p className="text-xs text-muted-foreground mb-1">Purpose</p><p className="text-sm">{reservation.reservationPurpose}</p></div>}
+        {reservation.reservationPurpose && <div><p className="text-xs text-muted-foreground mb-1">{t('detail.purpose')}</p><p className="text-sm">{reservation.reservationPurpose}</p></div>}
       </div>
 
       {isPending && (
         <div className="bg-card border border-border rounded-lg p-5 space-y-4">
-          <h2 className="text-sm font-semibold">Action</h2>
+          <h2 className="text-sm font-semibold">{t('detail.action')}</h2>
           {!showReject ? (
             <div className="space-y-3">
-              <Textarea placeholder="Approval note (optional)..." className="resize-none min-h-[72px]" value={approveNote} onChange={(e) => setApproveNote(e.target.value)} />
+              <Textarea placeholder={t('detail.approvalNotePlaceholder')} className="resize-none min-h-[72px]" value={approveNote} onChange={(e) => setApproveNote(e.target.value)} />
               <div className="flex gap-3">
                 <Button className="flex-1 gap-2 bg-emerald-600 hover:bg-emerald-700 text-white" onClick={handleApprove} disabled={isActioning}>
-                  {isActioning ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />} Approve
+                  {isActioning ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />} {t('common.approve')}
                 </Button>
                 <Button variant="outline" className="flex-1 gap-2 border-destructive text-destructive hover:bg-destructive/10" onClick={() => setShowReject(true)} disabled={isActioning}>
-                  <XCircle className="size-4" /> Reject
+                  <XCircle className="size-4" /> {t('common.reject')}
                 </Button>
               </div>
             </div>
           ) : (
             <div className="space-y-3">
-              <Textarea placeholder="Rejection reason (required)..." className="resize-none min-h-[80px]" value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} />
+              <Textarea placeholder={t('detail.rejectionReasonPlaceholder')} className="resize-none min-h-[80px]" value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} />
               <div className="flex gap-3">
                 <Button className="flex-1 gap-2 bg-destructive hover:bg-destructive/90 text-white" onClick={handleReject} disabled={isActioning}>
-                  {isActioning ? <Loader2 className="size-4 animate-spin" /> : <XCircle className="size-4" />} Confirm Rejection
+                  {isActioning ? <Loader2 className="size-4 animate-spin" /> : <XCircle className="size-4" />} {t('detail.confirmRejection')}
                 </Button>
-                <Button variant="outline" onClick={() => setShowReject(false)} disabled={isActioning}>Cancel</Button>
+                <Button variant="outline" onClick={() => setShowReject(false)} disabled={isActioning}>{t('common.cancel')}</Button>
               </div>
             </div>
           )}
@@ -202,7 +204,7 @@ export default function FacultyReservationDetailPage() {
 
       {data.timeline?.length > 0 && (
         <div className="bg-card border border-border rounded-lg p-5">
-          <p className="text-sm font-semibold mb-4">Status History</p>
+          <p className="text-sm font-semibold mb-4">{t('detail.statusHistory')}</p>
           <RequestTimeline events={data.timeline} />
         </div>
       )}

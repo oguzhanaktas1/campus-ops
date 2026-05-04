@@ -8,6 +8,7 @@ import { StatusBadge } from '@/components/status-badge'
 import { Search, Loader2, MessageSquare, AlertCircle, User, Clock, UserPlus } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+import { useI18n } from '@/lib/i18n'
 
 function formatDate(d: string) {
   if (!d) return ''
@@ -27,10 +28,10 @@ const categorySlugMap: Record<string, string> = {
 }
 
 const TABS = [
-  { id: 'active', label: 'Active' },
-  { id: 'unassigned', label: 'Needs Assignment' },
-  { id: 'all', label: 'All Requests' },
-  { id: 'closed', label: 'Closed' },
+  { id: 'active', labelKey: 'requests.active' },
+  { id: 'unassigned', labelKey: 'requests.needsAssignment' },
+  { id: 'all', labelKey: 'requests.allRequests' },
+  { id: 'closed', labelKey: 'requests.closed' },
 ]
 
 const priorityClass: Record<string, string> = {
@@ -43,6 +44,7 @@ const priorityClass: Record<string, string> = {
 const TERMINAL_STATUSES = new Set(['APPROVED', 'REJECTED', 'COMPLETED', 'CLOSED', 'CANCELLED'])
 
 export default function StaffRequestsPage() {
+  const { t } = useI18n()
   const router = useRouter()
   const [requests, setRequests] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -62,14 +64,14 @@ export default function StaffRequestsPage() {
 
         if (res.ok) setRequests(await res.json())
       } catch {
-        toast.error('Could not load requests.')
+        toast.error(t('requests.loadFail'))
       } finally {
         setIsLoading(false)
       }
     }
 
     fetchRequests()
-  }, [activeTab])
+  }, [activeTab, t])
 
   const filteredRequests = requests.filter(r => {
     const q = searchQuery.toLowerCase()
@@ -91,15 +93,15 @@ export default function StaffRequestsPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
         <div>
-          <h1 className="text-xl font-bold text-foreground">Inbox</h1>
+          <h1 className="text-xl font-bold text-foreground">{t('requests.title')}</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Review and manage incoming campus requests.
+            {t('requests.subtitle')}
           </p>
         </div>
         <div className="relative w-full sm:w-64">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search ID, title, or name..."
+            placeholder={t('requests.searchPlaceholder')}
             className="pl-9 h-9"
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
@@ -120,7 +122,7 @@ export default function StaffRequestsPage() {
                 : 'text-muted-foreground hover:text-foreground hover:bg-muted'
             )}
           >
-            {tab.label}
+            {t(tab.labelKey)}
           </button>
         ))}
       </div>
@@ -162,30 +164,30 @@ export default function StaffRequestsPage() {
                 </span>
 
                 <span className="text-xs text-muted-foreground border-l border-border pl-4">
-                  Type: <span className="font-medium text-foreground">{req.typeName}</span>
+                  {t('requests.type')}: <span className="font-medium text-foreground">{req.typeName}</span>
                 </span>
 
                 <span className="flex items-center gap-1 text-xs text-muted-foreground border-l border-border pl-4">
                   <User className="size-3.5" />
-                  From:{' '}
+                  {t('requests.from')}{' '}
                   <span className="font-medium text-foreground ml-1">{req.requesterName}</span>
                 </span>
 
                 {req.assignedTo ? (
                   <span className="flex items-center gap-1 text-xs text-muted-foreground border-l border-border pl-4">
                     <User className="size-3.5" />
-                    Assigned to:{' '}
+                    {t('requests.assignedTo')}{' '}
                     <span className="font-medium text-foreground ml-1">{req.assignedTo}</span>
                   </span>
                 ) : !TERMINAL_STATUSES.has(req.status) ? (
                   <span className="flex items-center gap-1 text-xs text-amber-600 font-medium border-l border-border pl-4">
-                    <UserPlus className="size-3.5" /> Unassigned
+                    <UserPlus className="size-3.5" /> {t('common.unassigned')}
                   </span>
                 ) : null}
 
                 {req.commentCount > 0 && (
                   <span className="flex items-center gap-1 text-xs text-primary font-medium border-l border-border pl-4">
-                    <MessageSquare className="size-3.5" /> {req.commentCount} Comments
+                    <MessageSquare className="size-3.5" /> {req.commentCount} {t('requests.comments')}
                   </span>
                 )}
               </div>
@@ -195,11 +197,11 @@ export default function StaffRequestsPage() {
           {filteredRequests.length === 0 && (
             <div className="flex flex-col items-center justify-center py-16 text-center bg-card border border-dashed rounded-lg">
               <AlertCircle className="size-10 text-muted-foreground/50 mb-3" />
-              <h3 className="text-sm font-semibold text-foreground">No requests found</h3>
+              <h3 className="text-sm font-semibold text-foreground">{t('requests.noRequests')}</h3>
               <p className="text-xs text-muted-foreground mt-1">
                 {searchQuery
-                  ? 'Try adjusting your search query.'
-                  : 'There are no requests in this category.'}
+                  ? t('requests.searchHint')
+                  : t('requests.emptyHint')}
               </p>
             </div>
           )}

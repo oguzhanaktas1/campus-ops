@@ -16,10 +16,11 @@ import {
   Loader2,
 } from 'lucide-react'
 import { fetchProfile, getStoredUser, getToken } from '@/lib/auth'
+import { useI18n } from '@/lib/i18n'
 
-function formatDate(d: string) {
+function formatDate(d: string, locale: string) {
   if (!d) return ''
-  return new Date(d).toLocaleDateString('en-US', {
+  return new Date(d).toLocaleDateString(locale === 'tr' ? 'tr-TR' : 'en-US', {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
@@ -33,6 +34,7 @@ export default function StudentDashboard() {
   const [reservations, setReservations] = useState<any[]>([])
   const [notifications, setNotifications] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const { locale, t } = useI18n()
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -115,29 +117,30 @@ export default function StudentDashboard() {
       uiType: n.type === 'SYSTEM' ? 'warning' : 'info',
     }))
 
-  const firstName = user?.firstName || user?.fullName?.split(' ')[0] || 'Student'
+  const firstName =
+    user?.firstName || user?.fullName?.split(' ')[0] || t('dashboard.fallbackName')
 
   const quickActions = [
     {
-      label: 'Internship Application',
+      label: t('dashboard.internshipApplication'),
       href: '/student/internships/new',
       icon: PlusCircle,
       color: 'bg-primary/10 text-primary',
     },
     {
-      label: 'Book Appointment',
+      label: t('dashboard.bookAppointment'),
       href: '/student/requests?type=internship_approval',
       icon: Calendar,
       color: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-400',
     },
     {
-      label: 'Reserve Room',
+      label: t('dashboard.reserveRoom'),
       href: '/student/requests?type=room_reservation',
       icon: BookMarked,
       color: 'bg-amber-100 text-amber-600 dark:bg-amber-950/30 dark:text-amber-400',
     },
     {
-      label: 'My Files',
+      label: t('dashboard.myFiles'),
       href: '/student/files',
       icon: FileText,
       color: 'bg-purple-100 text-purple-600 dark:bg-purple-950/30 dark:text-purple-400',
@@ -148,47 +151,47 @@ export default function StudentDashboard() {
     <div className="p-6 space-y-6 max-w-5xl mx-auto">
       <div>
         <h1 className="text-xl font-bold text-foreground">
-          Good morning, {firstName}
+          {t('dashboard.greeting', { name: firstName })}
         </h1>
         <p className="text-sm text-muted-foreground mt-0.5">
-          Here's a summary of your campus activity.
+          {t('dashboard.subtitle')}
         </p>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <MetricCard
-          title="Open Requests"
+          title={t('dashboard.openRequests')}
           value={open.length}
-          description="Awaiting action"
+          description={t('dashboard.awaitingAction')}
           icon={<FileText className="size-4" />}
           trend={open.length > 0 ? 12 : 0}
-          trendLabel="vs last month"
+          trendLabel={t('dashboard.vsLastMonth')}
         />
         <MetricCard
-          title="Pending Approvals"
+          title={t('dashboard.pendingApprovals')}
           value={pendingApprovals.length}
-          description="Under review"
+          description={t('dashboard.underReview')}
           icon={<Clock className="size-4" />}
         />
         <MetricCard
-          title="Completed"
+          title={t('dashboard.completed')}
           value={completed.length}
-          description="This semester"
+          description={t('dashboard.thisSemester')}
           icon={<CheckCircle2 className="size-4" />}
           trend={completed.length > 0 ? 8 : 0}
-          trendLabel="vs last month"
+          trendLabel={t('dashboard.vsLastMonth')}
         />
         <MetricCard
-          title="Upcoming"
+          title={t('dashboard.upcoming')}
           value={upcomingApts.length + confirmedRes.length}
-          description="Appointments & rooms"
+          description={t('dashboard.appointmentsRooms')}
           icon={<Calendar className="size-4" />}
         />
       </div>
 
       <div>
         <h2 className="text-sm font-semibold text-foreground mb-3">
-          Quick Actions
+          {t('dashboard.quickActions')}
         </h2>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {quickActions.map((action) => {
@@ -215,18 +218,18 @@ export default function StudentDashboard() {
         <div className="lg:col-span-2 bg-card border border-border rounded-lg shadow-sm">
           <div className="flex items-center justify-between px-5 py-4 border-b border-border">
             <h2 className="text-sm font-semibold text-foreground">
-              My Open Requests
+              {t('dashboard.myOpenRequests')}
             </h2>
             <Link href="/student/requests">
               <Button variant="ghost" size="sm" className="text-xs gap-1">
-                View all <ArrowRight className="size-3" />
+                {t('common.viewAll')} <ArrowRight className="size-3" />
               </Button>
             </Link>
           </div>
           <div className="divide-y divide-border">
             {open.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-8">
-                No open requests.
+                {t('dashboard.noOpenRequests')}
               </p>
             ) : (
               open.slice(0, 5).map((req) => (
@@ -237,7 +240,7 @@ export default function StudentDashboard() {
                         {req.title}
                       </p>
                       <p className="text-xs text-muted-foreground mt-0.5 capitalize">
-                        {req.type?.replace(/_/g, ' ')} · {formatDate(req.createdAt)}
+                        {req.type?.replace(/_/g, ' ')} · {formatDate(req.createdAt, locale)}
                       </p>
                     </div>
                     <StatusBadge status={req.status} />
@@ -252,7 +255,7 @@ export default function StudentDashboard() {
           <div className="bg-card border border-border rounded-lg shadow-sm">
             <div className="flex items-center justify-between px-4 py-3 border-b border-border">
               <h2 className="text-sm font-semibold text-foreground">
-                Upcoming Appointments
+                {t('dashboard.upcomingAppointments')}
               </h2>
               <Link href="/student/appointments">
                 <Button
@@ -260,7 +263,7 @@ export default function StudentDashboard() {
                   size="sm"
                   className="text-xs h-auto py-0.5 gap-1"
                 >
-                  View <ArrowRight className="size-3" />
+                  {t('common.view')} <ArrowRight className="size-3" />
                 </Button>
               </Link>
             </div>
@@ -274,13 +277,13 @@ export default function StudentDashboard() {
                     {apt.with}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    {formatDate(apt.date)} · {apt.time} · {apt.location}
+                    {formatDate(apt.date, locale)} · {apt.time} · {apt.location}
                   </p>
                 </div>
               ))}
               {upcomingApts.length === 0 && (
                 <p className="text-xs text-muted-foreground text-center py-4">
-                  No upcoming appointments.
+                  {t('dashboard.noUpcomingAppointments')}
                 </p>
               )}
             </div>
@@ -289,7 +292,7 @@ export default function StudentDashboard() {
           <div className="bg-card border border-border rounded-lg shadow-sm">
             <div className="flex items-center justify-between px-4 py-3 border-b border-border">
               <h2 className="text-sm font-semibold text-foreground">
-                Notifications
+                {t('dashboard.notifications')}
               </h2>
               <Link href="/student/notifications">
                 <Button
@@ -297,7 +300,7 @@ export default function StudentDashboard() {
                   size="sm"
                   className="text-xs h-auto py-0.5 gap-1"
                 >
-                  View <ArrowRight className="size-3" />
+                  {t('common.view')} <ArrowRight className="size-3" />
                 </Button>
               </Link>
             </div>
@@ -327,7 +330,7 @@ export default function StudentDashboard() {
               ))}
               {unread.length === 0 && (
                 <p className="text-xs text-muted-foreground text-center py-4">
-                  All caught up!
+                  {t('dashboard.allCaughtUp')}
                 </p>
               )}
             </div>

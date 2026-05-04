@@ -21,24 +21,28 @@ import {
 import AuthGuard from "@/components/AuthGuard/auth-guard";
 import { PortalAssistant } from "@/components/ai/portal-assistant";
 import { fetchProfile, getStoredUser, getToken } from "@/lib/auth";
+import { LanguageSwitcher } from "@/components/language-switcher";
+import { OrganizerI18nProvider } from "@/components/organizer/organizer-i18n-provider";
+import { useI18n } from "@/lib/i18n";
 
 const navItems: NavItem[] = [
-  { label: "Dashboard", href: "/organizer/dashboard", icon: LayoutDashboard },
-  { label: "Event Plans", href: "/organizer/plans", icon: ClipboardList },
-  { label: "Published Events", href: "/organizer/events", icon: PartyPopper },
-  { label: "Reservations", href: "/organizer/reservations", icon: BookMarked },
-  { label: "Access Requests", href: "/organizer/access-requests", icon: ShieldCheck },
-  { label: "Procurement", href: "/organizer/procurement", icon: ShoppingCart },
-  { label: "Equipment", href: "/organizer/equipment", icon: Package },
-  { label: "Notifications", href: "/organizer/notifications", icon: Bell },
-  { label: "Settings", href: "/organizer/settings", icon: Settings },
+  { label: "nav.dashboard", href: "/organizer/dashboard", icon: LayoutDashboard },
+  { label: "nav.eventPlans", href: "/organizer/plans", icon: ClipboardList },
+  { label: "nav.publishedEvents", href: "/organizer/events", icon: PartyPopper },
+  { label: "nav.reservations", href: "/organizer/reservations", icon: BookMarked },
+  { label: "nav.accessRequests", href: "/organizer/access-requests", icon: ShieldCheck },
+  { label: "nav.procurement", href: "/organizer/procurement", icon: ShoppingCart },
+  { label: "nav.equipment", href: "/organizer/equipment", icon: Package },
+  { label: "nav.notifications", href: "/organizer/notifications", icon: Bell },
+  { label: "nav.settings", href: "/organizer/settings", icon: Settings },
 ];
 
-export default function OrganizerLayout({
+function OrganizerLayoutInner({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const { t } = useI18n();
   const [user, setUser] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
@@ -76,13 +80,14 @@ export default function OrganizerLayout({
     <div className="flex items-center justify-between flex-1">
       <div className="hidden sm:block">
         <h1 className="text-sm font-semibold text-foreground">
-          Organizer Portal
+          {t('nav.organizerPortal')}
         </h1>
         <p className="text-xs text-muted-foreground">
           {user.department} · {user.staffId}
         </p>
       </div>
       <div className="flex items-center gap-1 ml-auto">
+        <LanguageSwitcher />
         <ThemeToggle />
         <NotificationBell role="organizer" />
         <ProfileDropdown user={user} settingsHref="/organizer/settings" />
@@ -90,26 +95,36 @@ export default function OrganizerLayout({
     </div>
   );
 
+  const translatedNavItems = navItems.map((item) => ({ ...item, label: t(item.label) }));
+
   return (
     <AuthGuard allowedRoles={["ORGANIZER", "ADMIN"]}>
       <PortalLayout
-        navItems={navItems}
-        portalName="Organizer Portal"
+        navItems={translatedNavItems}
+        portalName={t('nav.organizerPortal')}
         portalColor="purple"
         topbar={topbar}
       >
         {children}
         <PortalAssistant
           portal="organizer"
-          title="Organizer AI Assistant"
-          description="Event, reservation, equipment, and access-request guidance within organizer routes."
+          title={t('assistant.title')}
+          description={t('assistant.description')}
           prompts={[
-            "Where do I create a new event plan?",
-            "Can you explain the reservation process?",
-            "Which page should I go to for an equipment request?",
+            t('assistant.planPrompt'),
+            t('assistant.reservationPrompt'),
+            t('assistant.equipmentPrompt'),
           ]}
         />
       </PortalLayout>
     </AuthGuard>
+  );
+}
+
+export default function OrganizerLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <OrganizerI18nProvider>
+      <OrganizerLayoutInner>{children}</OrganizerLayoutInner>
+    </OrganizerI18nProvider>
   );
 }

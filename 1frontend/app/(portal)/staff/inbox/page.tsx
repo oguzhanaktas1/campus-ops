@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
+import { useI18n } from '@/lib/i18n'
 
 interface StaffRequest {
   id: string
@@ -31,11 +32,11 @@ interface StaffRequest {
 
 type TabKey = 'assigned' | 'pending' | 'department' | 'overdue'
 
-const TABS: { key: TabKey; label: string; icon: React.ReactNode }[] = [
-  { key: 'assigned', label: 'Assigned to Me', icon: <UserCheck className="size-3.5" /> },
-  { key: 'pending', label: 'Pending Approval', icon: <Clock className="size-3.5" /> },
-  { key: 'department', label: 'Department Queue', icon: <Users className="size-3.5" /> },
-  { key: 'overdue', label: 'Overdue', icon: <AlertTriangle className="size-3.5" /> },
+const TABS: { key: TabKey; icon: React.ReactNode }[] = [
+  { key: 'assigned', icon: <UserCheck className="size-3.5" /> },
+  { key: 'pending', icon: <Clock className="size-3.5" /> },
+  { key: 'department', icon: <Users className="size-3.5" /> },
+  { key: 'overdue', icon: <AlertTriangle className="size-3.5" /> },
 ]
 
 const PRIORITY_PULSE: Record<string, string> = {
@@ -80,6 +81,7 @@ function isOverdue(req: StaffRequest) {
 
 export default function StaffInboxPage() {
   const router = useRouter()
+  const { t } = useI18n()
   const [requests, setRequests] = useState<StaffRequest[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<TabKey>('assigned')
@@ -114,14 +116,14 @@ export default function StaffInboxPage() {
           setRequests([])
         }
       } catch {
-        toast.error('Failed to load inbox.')
+        toast.error(t('pages.inboxLoadFail'))
         setRequests([])
       } finally {
         setIsLoading(false)
       }
     }
     void fetchRequests()
-  }, [])
+  }, [t])
 
   const getTabRequests = (tab: TabKey): StaffRequest[] => {
     switch (tab) {
@@ -161,10 +163,10 @@ export default function StaffInboxPage() {
     <div className="mx-auto max-w-6xl space-y-6 p-6 pb-20">
       <div>
         <h1 className="flex items-center gap-2 text-xl font-bold text-foreground">
-          <Inbox className="size-5 text-primary" /> Inbox - Work Queue
+          <Inbox className="size-5 text-primary" /> {t('pages.inboxTitle')}
         </h1>
         <p className="mt-0.5 text-sm text-muted-foreground">
-          Prioritized work queue and department assignments
+          {t('pages.inboxSubtitle')}
         </p>
       </div>
 
@@ -175,9 +177,9 @@ export default function StaffInboxPage() {
         >
           <AlertTriangle className="size-4 flex-shrink-0 text-destructive" />
           <p className="text-sm font-medium text-destructive">
-            {tabCounts.overdue} overdue item{tabCounts.overdue > 1 ? 's' : ''} require immediate attention
+            {t('pages.overdueAttention', { count: tabCounts.overdue, suffix: tabCounts.overdue > 1 ? 's' : '' })}
           </p>
-          <span className="ml-auto text-xs text-destructive underline">View overdue</span>
+          <span className="ml-auto text-xs text-destructive underline">{t('pages.viewOverdue')}</span>
         </button>
       )}
 
@@ -200,7 +202,7 @@ export default function StaffInboxPage() {
                 )}
               >
                 {tab.icon}
-                {tab.label}
+                {tab.key === 'assigned' ? t('pages.assignedToMe') : tab.key === 'pending' ? t('pages.pendingApproval') : tab.key === 'department' ? t('pages.departmentQueue') : t('pages.overdue')}
                 {count > 0 && (
                   <span
                     className={cn(
@@ -225,17 +227,17 @@ export default function StaffInboxPage() {
           <EmptyState
             title={
               activeTab === 'assigned'
-                ? 'No assigned requests'
+                ? t('pages.noAssignedRequests')
                 : activeTab === 'pending'
-                  ? 'No pending approvals'
+                  ? t('pages.noPendingApprovals')
                   : activeTab === 'department'
-                    ? 'Department queue is empty'
-                    : 'No overdue items'
+                    ? t('pages.departmentQueueEmpty')
+                    : t('pages.noOverdueItems')
             }
             description={
               activeTab === 'overdue'
-                ? 'All items are within their deadlines.'
-                : 'New requests will appear here as they come in.'
+                ? t('pages.allWithinDeadlines')
+                : t('pages.newRequestsAppear')
             }
             icon={
               activeTab === 'overdue' ? (
@@ -251,25 +253,25 @@ export default function StaffInboxPage() {
               <thead>
                 <tr className="border-b border-border bg-muted/40">
                   <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    Request No
+                    {t('pages.requestNo')}
                   </th>
                   <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    Title
+                    {t('common.title')}
                   </th>
                   <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    Type
+                    {t('requests.type')}
                   </th>
                   <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    Priority
+                    {t('common.priority')}
                   </th>
                   <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    Due Date
+                    {t('pages.dueDate')}
                   </th>
                   <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    Status
+                    {t('common.status')}
                   </th>
                   <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    Requester
+                    {t('common.requester')}
                   </th>
                 </tr>
               </thead>

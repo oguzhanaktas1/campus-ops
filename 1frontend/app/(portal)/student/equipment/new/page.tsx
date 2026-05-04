@@ -14,6 +14,7 @@ import {
   getCurrentDateInputValue,
   validateDateWindow,
 } from '@/lib/date-time'
+import { useI18n } from '@/lib/i18n'
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000'
 
@@ -29,6 +30,7 @@ const CATEGORIES = [
 
 export default function NewStudentEquipmentPage() {
   const router = useRouter()
+  const { t } = useI18n()
   const [resources, setResources] = useState<any[]>([])
   const [isLoadingResources, setIsLoadingResources] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -101,8 +103,8 @@ export default function NewStudentEquipmentPage() {
       ? selectedResource.name
       : form.equipmentName.trim()
 
-    if (!equipmentName) { toast.error('Please select or specify an equipment item.'); return }
-    if (!form.purpose.trim()) { toast.error('Purpose is required.'); return }
+    if (!equipmentName) { toast.error(t('messages.equipmentRequired')); return }
+    if (!form.purpose.trim()) { toast.error(t('messages.purposeRequired')); return }
     const validationError = validateDateWindow({
       start: form.neededFrom,
       end: form.neededUntil,
@@ -134,8 +136,8 @@ export default function NewStudentEquipmentPage() {
       })
 
       const data = await res.json()
-      if (!res.ok) throw new Error(data.message || 'Failed to submit request.')
-      toast.success(`Equipment request ${data.requestNo} submitted.`)
+      if (!res.ok) throw new Error(data.message || t('messages.failed'))
+      toast.success(t('messages.equipmentSubmitted', { requestNo: data.requestNo }))
       router.push('/student/equipment')
     } catch (err: any) {
       toast.error(err.message)
@@ -151,8 +153,8 @@ export default function NewStudentEquipmentPage() {
           <Button variant="ghost" size="icon" className="size-8"><ArrowLeft className="size-4" /></Button>
         </Link>
         <div>
-          <h1 className="text-xl font-bold text-foreground">Request Equipment</h1>
-          <p className="text-sm text-muted-foreground">Borrow campus equipment for academic or project use.</p>
+          <h1 className="text-xl font-bold text-foreground">{t('pages.requestEquipmentTitle')}</h1>
+          <p className="text-sm text-muted-foreground">{t('pages.requestEquipmentSubtitle')}</p>
         </div>
       </div>
 
@@ -160,20 +162,20 @@ export default function NewStudentEquipmentPage() {
 
         {/* Equipment selector from catalog */}
         <div className="space-y-1.5">
-          <Label>Select from Equipment Catalog (optional)</Label>
+          <Label>{t('forms.equipmentCatalogOptional')}</Label>
           {isLoadingResources ? (
             <div className="flex items-center gap-2 h-10 text-sm text-muted-foreground">
-              <Loader2 className="size-4 animate-spin" /> Loading equipment...
+              <Loader2 className="size-4 animate-spin" /> {t('forms.loadingEquipment')}
             </div>
           ) : resources.length === 0 ? (
-            <p className="text-xs text-muted-foreground italic">No equipment available in catalog.</p>
+            <p className="text-xs text-muted-foreground italic">{t('forms.noEquipmentCatalog')}</p>
           ) : (
             <select
               value={form.labResourceId}
               onChange={(e) => handleResourceSelect(e.target.value)}
               className="w-full bg-background border border-input rounded-md px-3 h-9 text-sm outline-none focus:ring-2 focus:ring-ring"
             >
-              <option value="">— Select equipment from catalog —</option>
+              <option value="">- {t('forms.selectEquipmentCatalog')} -</option>
               {resources.map((r) => (
                 <option key={r.id} value={r.id}>
                   {r.name}{r.locationText ? ` (${r.locationText})` : ''}
@@ -206,9 +208,9 @@ export default function NewStudentEquipmentPage() {
         {/* Manual name if no catalog selection */}
         {!form.labResourceId && (
           <div className="space-y-1.5">
-            <Label>Equipment Name / Description <span className="text-destructive">*</span></Label>
+            <Label>{t('forms.equipmentName')} <span className="text-destructive">*</span></Label>
             <Input
-              placeholder="e.g. HDMI Projector, Laptop, Camera"
+              placeholder={t('forms.equipmentNamePlaceholder')}
               value={form.equipmentName}
               onChange={(e) => set('equipmentName', e.target.value)}
             />
@@ -217,7 +219,7 @@ export default function NewStudentEquipmentPage() {
 
         <div className="grid sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">
-            <Label>Category</Label>
+            <Label>{t('forms.category')}</Label>
             <select
               value={form.equipmentCategory}
               onChange={(e) => set('equipmentCategory', e.target.value)}
@@ -227,38 +229,38 @@ export default function NewStudentEquipmentPage() {
             </select>
           </div>
           <div className="space-y-1.5">
-            <Label>Quantity <span className="text-destructive">*</span></Label>
+            <Label>{t('forms.quantity')} <span className="text-destructive">*</span></Label>
             <Input type="number" min="1" value={form.quantity} onChange={(e) => set('quantity', e.target.value)} />
           </div>
         </div>
 
         <div className="grid sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">
-            <Label>Needed From (optional)</Label>
+            <Label>{t('forms.neededFromOptional')}</Label>
             <Input type="date" min={minDate} value={form.neededFrom} onChange={(e) => setDateField('neededFrom', e.target.value)} />
           </div>
           <div className="space-y-1.5">
-            <Label>Return By (optional)</Label>
+            <Label>{t('forms.returnByOptional')}</Label>
             <Input type="date" min={form.neededFrom || minDate} value={form.neededUntil} onChange={(e) => setDateField('neededUntil', e.target.value)} />
           </div>
         </div>
         {dateError && <p className="text-sm text-destructive">{dateError}</p>}
 
         <div className="space-y-1.5">
-          <Label>Purpose <span className="text-destructive">*</span></Label>
+          <Label>{t('forms.purpose')} <span className="text-destructive">*</span></Label>
           <textarea
             value={form.purpose}
             onChange={(e) => set('purpose', e.target.value)}
             rows={3}
-            placeholder="Describe what you need this equipment for (course, project, event, etc.)..."
+            placeholder={t('forms.purposePlaceholder')}
             className="w-full bg-background border border-input rounded-md px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring resize-none"
           />
         </div>
 
         <div className="space-y-1.5">
-          <Label>Urgency Reason (optional)</Label>
+          <Label>{t('forms.urgencyReasonOptional')}</Label>
           <Input
-            placeholder="Only fill if this is urgent..."
+            placeholder={t('forms.urgencyReasonPlaceholder')}
             value={form.urgencyReason}
             onChange={(e) => set('urgencyReason', e.target.value)}
           />
@@ -267,10 +269,10 @@ export default function NewStudentEquipmentPage() {
         <div className="flex items-center gap-3 pt-4 border-t border-border">
           <Button type="submit" disabled={isSubmitting} className="flex-1 sm:flex-none gap-2">
             {isSubmitting ? <Loader2 className="size-4 animate-spin" /> : <Package className="size-4" />}
-            Submit Request
+            {t('common.submitRequest')}
           </Button>
           <Link href="/student/equipment">
-            <Button type="button" variant="outline">Cancel</Button>
+            <Button type="button" variant="outline">{t('common.cancel')}</Button>
           </Link>
         </div>
       </form>

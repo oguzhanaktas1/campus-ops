@@ -9,6 +9,7 @@ import { CampusFlowLogo } from '@/components/campusflow-logo'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { Menu, ChevronDown } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
+import { useOptionalT } from '@/lib/optional-t'
 
 export interface NavItem {
   label: string
@@ -179,6 +180,7 @@ function SidebarNav({ navItems, portalName }: Pick<PortalLayoutProps, 'navItems'
 
 export function PortalLayout({ children, navItems, portalName, portalColor, topbar }: PortalLayoutProps) {
   const [mobileOpen, setMobileOpen] = useState(false)
+  const tt = useOptionalT()
 
   return (
     <div className="flex h-screen bg-background overflow-hidden">
@@ -203,7 +205,7 @@ export function PortalLayout({ children, navItems, portalName, portalColor, topb
             size="icon"
             className="lg:hidden size-8"
             onClick={() => setMobileOpen(true)}
-            aria-label="Open navigation"
+            aria-label={tt('common.openNavigation', 'Open navigation')}
           >
             <Menu className="size-4" />
           </Button>

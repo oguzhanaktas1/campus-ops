@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { getToken } from '@/lib/auth'
+import { useOptionalT } from '@/lib/optional-t'
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000'
 const DOC_TYPES = [
@@ -116,7 +117,7 @@ function Header({ backPath, title, description }: { backPath: string; title: str
   )
 }
 
-function Footer({ backPath, isSubmitting, submitLabel }: { backPath: string; isSubmitting: boolean; submitLabel: string }) {
+function Footer({ backPath, isSubmitting, submitLabel, cancelLabel }: { backPath: string; isSubmitting: boolean; submitLabel: string; cancelLabel: string }) {
   return (
     <div className="flex items-center gap-3 pt-4 border-t border-border">
       <Button type="submit" disabled={isSubmitting} className="gap-2">
@@ -125,7 +126,7 @@ function Footer({ backPath, isSubmitting, submitLabel }: { backPath: string; isS
       </Button>
       <Link href={backPath}>
         <Button type="button" variant="outline">
-          Cancel
+          {cancelLabel}
         </Button>
       </Link>
     </div>
@@ -133,9 +134,22 @@ function Footer({ backPath, isSubmitting, submitLabel }: { backPath: string; isS
 }
 
 function DocumentRevisionForm({ requestId, request, portal = 'student' }: Props) {
+  const tt = useOptionalT()
   const router = useRouter()
   const backPath = `/${portal}/requests/${requestId}`
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const DOC_TYPES = [
+    { value: 'TRANSCRIPT', label: tt('forms.docTranscript', 'Transcript') },
+    { value: 'ENROLLMENT_CERTIFICATE', label: tt('forms.docEnrollmentCert', 'Enrollment Certificate') },
+    { value: 'STUDENT_CERTIFICATE', label: tt('forms.docStudentCert', 'Student Certificate') },
+    { value: 'DIPLOMA', label: tt('forms.docDiploma', 'Diploma') },
+    { value: 'OTHER', label: tt('forms.docOther', 'Other') },
+  ]
+  const DELIVERY_METHODS = [
+    { value: 'PICKUP', label: tt('forms.deliveryPickup', 'Pickup from Office') },
+    { value: 'EMAIL', label: tt('forms.deliveryEmail', 'Send via Email') },
+    { value: 'MAIL', label: tt('forms.deliveryMail', 'Postal Mail') },
+  ]
   const [form, setForm] = useState({
     documentType: request.formData?.documentType ?? 'TRANSCRIPT',
     language: request.formData?.language ?? 'English',
@@ -149,10 +163,6 @@ function DocumentRevisionForm({ requestId, request, portal = 'student' }: Props)
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
-    if (!form.category) {
-      toast.error('Category is required.')
-      return
-    }
     setIsSubmitting(true)
     try {
       await updateRequest(`${portal}/requests/${requestId}`, {
@@ -163,10 +173,10 @@ function DocumentRevisionForm({ requestId, request, portal = 'student' }: Props)
         deliveryAddress: form.deliveryAddress || null,
         description: form.description || null,
       })
-      toast.success('Request updated and resubmitted.')
+      toast.success(tt('forms.revUpdated', 'Request updated and resubmitted.'))
       router.push(backPath)
     } catch (error: any) {
-      toast.error(error.message ?? 'Failed to update request.')
+      toast.error(error.message ?? tt('forms.revUpdateFail', 'Failed to update request.'))
     } finally {
       setIsSubmitting(false)
     }
@@ -174,32 +184,32 @@ function DocumentRevisionForm({ requestId, request, portal = 'student' }: Props)
 
   return (
     <div className="p-6 max-w-2xl mx-auto space-y-6">
-      <Header backPath={backPath} title="Revise Document Request" description="Update your document request and resubmit it." />
+      <Header backPath={backPath} title={tt('forms.revDocTitle', 'Revise Document Request')} description={tt('forms.revDocDesc', 'Update your document request and resubmit it.')} />
       <form onSubmit={handleSubmit} className="bg-card border border-border rounded-lg shadow-sm divide-y divide-border">
         <div className="px-5 py-4 space-y-3">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Document Type *</label>
+              <label className="text-xs font-medium text-muted-foreground">{tt('forms.documentType', 'Document Type')} *</label>
               <select value={form.documentType} onChange={(e) => set('documentType', e.target.value)} required className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
                 {DOC_TYPES.map((type) => <option key={type.value} value={type.value}>{type.label}</option>)}
               </select>
             </div>
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Language</label>
+              <label className="text-xs font-medium text-muted-foreground">{tt('forms.language', 'Language')}</label>
               <select value={form.language} onChange={(e) => set('language', e.target.value)} className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
-                <option value="English">English</option>
-                <option value="Turkish">Turkish</option>
+                <option value="English">{tt('forms.langEnglish', 'English')}</option>
+                <option value="Turkish">{tt('forms.langTurkish', 'Turkish')}</option>
               </select>
             </div>
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Number of Copies</label>
+              <label className="text-xs font-medium text-muted-foreground">{tt('forms.copies', 'Number of Copies')}</label>
               <input type="number" min={1} max={10} value={form.copiesCount} onChange={(e) => set('copiesCount', e.target.value)} className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
             </div>
           </div>
         </div>
         <div className="px-5 py-4 space-y-3">
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">Delivery Method *</label>
+            <label className="text-xs font-medium text-muted-foreground">{tt('forms.deliveryMethod', 'Delivery Method')} *</label>
             <div className="grid grid-cols-3 gap-2">
               {DELIVERY_METHODS.map((method) => (
                 <button key={method.value} type="button" onClick={() => set('deliveryMethod', method.value)} className={`px-3 py-2 rounded-md border text-sm font-medium ${form.deliveryMethod === method.value ? 'border-primary bg-primary/10 text-primary' : 'border-border bg-background text-muted-foreground'}`}>
@@ -210,17 +220,17 @@ function DocumentRevisionForm({ requestId, request, portal = 'student' }: Props)
           </div>
           {(form.deliveryMethod === 'EMAIL' || form.deliveryMethod === 'MAIL') && (
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">{form.deliveryMethod === 'EMAIL' ? 'Email Address' : 'Postal Address'} *</label>
+              <label className="text-xs font-medium text-muted-foreground">{form.deliveryMethod === 'EMAIL' ? tt('forms.emailAddress', 'Email Address') : tt('forms.postalAddress', 'Postal Address')} *</label>
               <input type={form.deliveryMethod === 'EMAIL' ? 'email' : 'text'} value={form.deliveryAddress} onChange={(e) => set('deliveryAddress', e.target.value)} required className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
             </div>
           )}
         </div>
         <div className="px-5 py-4 space-y-1.5">
-          <label className="text-xs font-medium text-muted-foreground">Additional Notes</label>
+          <label className="text-xs font-medium text-muted-foreground">{tt('forms.additionalNotes', 'Additional Notes')}</label>
           <textarea rows={3} value={form.description} onChange={(e) => set('description', e.target.value)} className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm resize-none" />
         </div>
         <div className="px-5 py-4">
-          <Footer backPath={backPath} isSubmitting={isSubmitting} submitLabel="Resubmit Request" />
+          <Footer backPath={backPath} isSubmitting={isSubmitting} submitLabel={tt('forms.revSubmitDoc', 'Resubmit Request')} cancelLabel={tt('forms.cancel', 'Cancel')} />
         </div>
       </form>
     </div>
@@ -228,6 +238,7 @@ function DocumentRevisionForm({ requestId, request, portal = 'student' }: Props)
 }
 
 function AccessRevisionForm({ requestId, request, portal = 'student' }: Props) {
+  const tt = useOptionalT()
   const router = useRouter()
   const backPath = `/${portal}/requests/${requestId}`
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -254,10 +265,10 @@ function AccessRevisionForm({ requestId, request, portal = 'student' }: Props) {
         startAt: form.startAt || null,
         endAt: form.endAt || null,
       })
-      toast.success('Request updated and resubmitted.')
+      toast.success(tt('forms.revUpdated', 'Request updated and resubmitted.'))
       router.push(backPath)
     } catch (error: any) {
-      toast.error(error.message ?? 'Failed to update request.')
+      toast.error(error.message ?? tt('forms.revUpdateFail', 'Failed to update request.'))
     } finally {
       setIsSubmitting(false)
     }
@@ -265,45 +276,46 @@ function AccessRevisionForm({ requestId, request, portal = 'student' }: Props) {
 
   return (
     <div className="p-6 max-w-2xl mx-auto pb-20 space-y-6">
-      <Header backPath={backPath} title="Revise Access Request" description="Update the access request and resubmit it." />
+      <Header backPath={backPath} title={tt('forms.revAccessTitle', 'Revise Access Request')} description={tt('forms.revAccessDesc', 'Update the access request and resubmit it.')} />
       <form onSubmit={handleSubmit} className="bg-card border border-border rounded-xl shadow-sm p-6 space-y-5">
         <div className="grid sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">
-            <Label>Access Type</Label>
+            <Label>{tt('forms.accessType', 'Access Type')}</Label>
             <select value={form.accessType} onChange={(e) => set('accessType', e.target.value)} className="w-full bg-background border border-input rounded-md px-3 h-9 text-sm">
               {ACCESS_TYPES.map((type) => <option key={type}>{type}</option>)}
             </select>
           </div>
           <div className="space-y-1.5">
-            <Label>Target Resource / System *</Label>
+            <Label>{tt('forms.targetResource', 'Target Resource / System')} *</Label>
             <Input value={form.targetResource} onChange={(e) => set('targetResource', e.target.value)} />
           </div>
         </div>
         <div className="space-y-1.5">
-          <Label>Requested Role / Permission</Label>
+          <Label>{tt('forms.requestedPermission', 'Requested Role / Permission')}</Label>
           <Input value={form.requestedRoleOrPermission} onChange={(e) => set('requestedRoleOrPermission', e.target.value)} />
         </div>
         <div className="grid sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">
-            <Label>Access Start Date</Label>
+            <Label>{tt('forms.accessStartDateOptional', 'Access Start Date')}</Label>
             <Input type="date" value={form.startAt} onChange={(e) => set('startAt', e.target.value)} />
           </div>
           <div className="space-y-1.5">
-            <Label>Access End Date</Label>
+            <Label>{tt('forms.accessEndDateOptional', 'Access End Date')}</Label>
             <Input type="date" value={form.endAt} onChange={(e) => set('endAt', e.target.value)} />
           </div>
         </div>
         <div className="space-y-1.5">
-          <Label>Justification *</Label>
+          <Label>{tt('forms.justification', 'Justification')} *</Label>
           <textarea rows={4} value={form.justification} onChange={(e) => set('justification', e.target.value)} className="w-full bg-background border border-input rounded-md px-3 py-2 text-sm resize-none" />
         </div>
-        <Footer backPath={backPath} isSubmitting={isSubmitting} submitLabel="Resubmit Access Request" />
+        <Footer backPath={backPath} isSubmitting={isSubmitting} submitLabel={tt('forms.revSubmitAccess', 'Resubmit Access Request')} cancelLabel={tt('forms.cancel', 'Cancel')} />
       </form>
     </div>
   )
 }
 
 function ReservationRevisionForm({ requestId, request, portal = 'student' }: Props) {
+  const tt = useOptionalT()
   const router = useRouter()
   const backPath = `/${portal}/requests/${requestId}`
   const [resources, setResources] = useState<any[]>([])
@@ -347,7 +359,7 @@ function ReservationRevisionForm({ requestId, request, portal = 'student' }: Pro
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
     if (new Date(form.startAt) >= new Date(form.endAt)) {
-      toast.error('End time must be after start time.')
+      toast.error(tt('forms.revEndAfterStart', 'End time must be after start time.'))
       return
     }
     setIsSubmitting(true)
@@ -364,10 +376,10 @@ function ReservationRevisionForm({ requestId, request, portal = 'student' }: Pro
         setupNotes: form.setupNotes.trim() || null,
         description: form.description.trim() || null,
       })
-      toast.success('Request updated and resubmitted.')
+      toast.success(tt('forms.revUpdated', 'Request updated and resubmitted.'))
       router.push(backPath)
     } catch (error: any) {
-      toast.error(error.message ?? 'Failed to update request.')
+      toast.error(error.message ?? tt('forms.revUpdateFail', 'Failed to update request.'))
     } finally {
       setIsSubmitting(false)
     }
@@ -375,17 +387,17 @@ function ReservationRevisionForm({ requestId, request, portal = 'student' }: Pro
 
   return (
     <div className="p-6 max-w-2xl mx-auto space-y-6 pb-20">
-      <Header backPath={backPath} title="Revise Reservation Request" description="Update the reservation details and resubmit it." />
+      <Header backPath={backPath} title={tt('forms.revReservTitle', 'Revise Reservation Request')} description={tt('forms.revReservDesc', 'Update the reservation details and resubmit it.')} />
       <form onSubmit={handleSubmit} className="bg-card border border-border rounded-lg p-6 space-y-5 shadow-sm">
         <div className="space-y-1.5">
-          <Label>Resource *</Label>
+          <Label>{tt('forms.resource', 'Resource')} *</Label>
           {isLoadingResources ? (
             <div className="flex items-center gap-2 h-10 text-sm text-muted-foreground">
-              <Loader2 className="size-4 animate-spin" /> Loading resources...
+              <Loader2 className="size-4 animate-spin" /> {tt('forms.loadingResources', 'Loading resources...')}
             </div>
           ) : (
             <Select value={form.resourceId} onValueChange={(value) => set('resourceId', value)}>
-              <SelectTrigger><SelectValue placeholder="Select a room or resource..." /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder={tt('forms.resourcePlaceholder', 'Select a room or resource...')} /></SelectTrigger>
               <SelectContent>
                 {resources.map((resource) => (
                   <SelectItem key={resource.id} value={resource.id}>{resource.name}</SelectItem>
@@ -396,53 +408,54 @@ function ReservationRevisionForm({ requestId, request, portal = 'student' }: Pro
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">
-            <Label>Event Name *</Label>
+            <Label>{tt('forms.eventName', 'Event Name')} *</Label>
             <Input value={form.eventName} onChange={(e) => set('eventName', e.target.value)} required />
           </div>
           <div className="space-y-1.5">
-            <Label>Expected Attendees *</Label>
+            <Label>{tt('forms.expectedAttendees', 'Expected Attendees')} *</Label>
             <Input type="number" min={1} value={form.attendeeCount} onChange={(e) => set('attendeeCount', e.target.value)} required />
           </div>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">
-            <Label>Start *</Label>
+            <Label>{tt('forms.start', 'Start')} *</Label>
             <Input type="datetime-local" value={form.startAt} onChange={(e) => set('startAt', e.target.value)} required />
           </div>
           <div className="space-y-1.5">
-            <Label>End *</Label>
+            <Label>{tt('forms.end', 'End')} *</Label>
             <Input type="datetime-local" value={form.endAt} onChange={(e) => set('endAt', e.target.value)} required />
           </div>
         </div>
         <div className="space-y-1.5">
-          <Label>Purpose *</Label>
+          <Label>{tt('forms.purpose', 'Purpose')} *</Label>
           <Textarea value={form.reservationPurpose} onChange={(e) => set('reservationPurpose', e.target.value)} required className="resize-none min-h-[80px]" />
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <label className="flex items-center gap-2.5 cursor-pointer p-3 border border-border rounded-lg">
             <input type="checkbox" checked={form.requiresSecurityApproval} onChange={(e) => set('requiresSecurityApproval', e.target.checked)} />
-            <span className="text-sm">Requires Security Approval</span>
+            <span className="text-sm">{tt('forms.requiresSecurityApproval', 'Requires Security Approval')}</span>
           </label>
           <label className="flex items-center gap-2.5 cursor-pointer p-3 border border-border rounded-lg">
             <input type="checkbox" checked={form.requiresTechnicalSupport} onChange={(e) => set('requiresTechnicalSupport', e.target.checked)} />
-            <span className="text-sm">Requires Technical Support</span>
+            <span className="text-sm">{tt('forms.requiresTechnicalSupport', 'Requires Technical Support')}</span>
           </label>
         </div>
         <div className="space-y-1.5">
-          <Label>Setup Notes</Label>
+          <Label>{tt('forms.setupNotesOptional', 'Setup Notes')}</Label>
           <Input value={form.setupNotes} onChange={(e) => set('setupNotes', e.target.value)} />
         </div>
         <div className="space-y-1.5">
-          <Label>Additional Description</Label>
+          <Label>{tt('forms.description', 'Additional Description')}</Label>
           <Textarea value={form.description} onChange={(e) => set('description', e.target.value)} className="resize-none min-h-[80px]" />
         </div>
-        <Footer backPath={backPath} isSubmitting={isSubmitting} submitLabel="Resubmit Reservation" />
+        <Footer backPath={backPath} isSubmitting={isSubmitting} submitLabel={tt('forms.revSubmitReserv', 'Resubmit Reservation')} cancelLabel={tt('forms.cancel', 'Cancel')} />
       </form>
     </div>
   )
 }
 
 function AppointmentRevisionForm({ requestId, request, portal = 'student' }: Props) {
+  const tt = useOptionalT()
   const router = useRouter()
   const backPath = `/${portal}/requests/${requestId}`
   const [facultyUsers, setFacultyUsers] = useState<any[]>([])
@@ -503,10 +516,10 @@ function AppointmentRevisionForm({ requestId, request, portal = 'student' }: Pro
         preferredStartAt: form.preferredStartAt ? new Date(form.preferredStartAt).toISOString() : null,
         preferredEndAt: form.preferredEndAt ? new Date(form.preferredEndAt).toISOString() : null,
       })
-      toast.success('Request updated and resubmitted.')
+      toast.success(tt('forms.revUpdated', 'Request updated and resubmitted.'))
       router.push(backPath)
     } catch (error: any) {
-      toast.error(error.message ?? 'Failed to update request.')
+      toast.error(error.message ?? tt('forms.revUpdateFail', 'Failed to update request.'))
     } finally {
       setIsSubmitting(false)
     }
@@ -514,17 +527,17 @@ function AppointmentRevisionForm({ requestId, request, portal = 'student' }: Pro
 
   return (
     <div className="p-6 max-w-2xl mx-auto space-y-6 pb-20">
-      <Header backPath={backPath} title="Revise Appointment Request" description="Update the appointment request and resubmit it." />
+      <Header backPath={backPath} title={tt('forms.revApptTitle', 'Revise Appointment Request')} description={tt('forms.revApptDesc', 'Update the appointment request and resubmit it.')} />
       <form onSubmit={handleSubmit} className="bg-card border border-border rounded-lg p-6 space-y-5 shadow-sm">
         <div className="space-y-1.5">
-          <Label>Person *</Label>
+          <Label>{tt('forms.person', 'Person')} *</Label>
           {isLoadingUsers ? (
             <div className="flex items-center gap-2 h-10 text-sm text-muted-foreground">
-              <Loader2 className="size-4 animate-spin" /> Loading...
+              <Loader2 className="size-4 animate-spin" /> {tt('forms.loading', 'Loading...')}
             </div>
           ) : (
             <Select value={form.targetUserId} onValueChange={(value) => setForm((prev) => ({ ...prev, targetUserId: value }))}>
-              <SelectTrigger><SelectValue placeholder="Select faculty or staff..." /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder={tt('forms.personPlaceholder', 'Select faculty or staff...')} /></SelectTrigger>
               <SelectContent>
                 {facultyUsers.map((user) => <SelectItem key={user.id} value={user.id}>{user.fullName} - {user.role}</SelectItem>)}
               </SelectContent>
@@ -533,7 +546,7 @@ function AppointmentRevisionForm({ requestId, request, portal = 'student' }: Pro
         </div>
         {availability.length > 0 && (
           <div className="bg-muted/30 border border-border rounded-lg p-3">
-            <p className="text-xs font-semibold text-muted-foreground mb-2">Availability</p>
+            <p className="text-xs font-semibold text-muted-foreground mb-2">{tt('forms.availability', 'Availability')}</p>
             <div className="flex flex-wrap gap-2">
               {availability.filter((slot) => slot.isActive).map((slot: any) => (
                 <span key={slot.id} className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full">
@@ -545,40 +558,41 @@ function AppointmentRevisionForm({ requestId, request, portal = 'student' }: Pro
         )}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">
-            <Label>Type *</Label>
+            <Label>{tt('forms.type', 'Type')} *</Label>
             <Select value={form.appointmentType} onValueChange={(value) => setForm((prev) => ({ ...prev, appointmentType: value }))}>
-              <SelectTrigger><SelectValue placeholder="Select type..." /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder={tt('forms.typePlaceholder', 'Select type...')} /></SelectTrigger>
               <SelectContent>
                 {APPOINTMENT_TYPES.map((type) => <SelectItem key={type} value={type}>{type.replace('_', ' ')}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
           <div className="space-y-1.5">
-            <Label>Topic *</Label>
+            <Label>{tt('forms.topic', 'Topic')} *</Label>
             <Input value={form.topic} onChange={(e) => setForm((prev) => ({ ...prev, topic: e.target.value }))} required />
           </div>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">
-            <Label>Preferred Start</Label>
+            <Label>{tt('forms.preferredStart', 'Preferred Start')}</Label>
             <Input type="datetime-local" value={form.preferredStartAt} onChange={(e) => setForm((prev) => ({ ...prev, preferredStartAt: e.target.value }))} />
           </div>
           <div className="space-y-1.5">
-            <Label>Preferred End</Label>
+            <Label>{tt('forms.preferredEnd', 'Preferred End')}</Label>
             <Input type="datetime-local" value={form.preferredEndAt} onChange={(e) => setForm((prev) => ({ ...prev, preferredEndAt: e.target.value }))} />
           </div>
         </div>
         <div className="space-y-1.5">
-          <Label>Details</Label>
+          <Label>{tt('forms.detailsOptional', 'Details')}</Label>
           <Textarea value={form.details} onChange={(e) => setForm((prev) => ({ ...prev, details: e.target.value }))} className="resize-none min-h-[80px]" />
         </div>
-        <Footer backPath={backPath} isSubmitting={isSubmitting} submitLabel="Resubmit Appointment" />
+        <Footer backPath={backPath} isSubmitting={isSubmitting} submitLabel={tt('forms.revSubmitAppt', 'Resubmit Appointment')} cancelLabel={tt('forms.cancel', 'Cancel')} />
       </form>
     </div>
   )
 }
 
 function ProcurementRevisionForm({ requestId, request, portal = 'student' }: Props) {
+  const tt = useOptionalT()
   const router = useRouter()
   const backPath = `/${portal}/requests/${requestId}`
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -609,10 +623,10 @@ function ProcurementRevisionForm({ requestId, request, portal = 'student' }: Pro
         budgetCode: form.budgetCode.trim() || null,
         priority: form.priority,
       })
-      toast.success('Request updated and resubmitted.')
+      toast.success(tt('forms.revUpdated', 'Request updated and resubmitted.'))
       router.push(backPath)
     } catch (error: any) {
-      toast.error(error.message ?? 'Failed to update request.')
+      toast.error(error.message ?? tt('forms.revUpdateFail', 'Failed to update request.'))
     } finally {
       setIsSubmitting(false)
     }
@@ -620,53 +634,54 @@ function ProcurementRevisionForm({ requestId, request, portal = 'student' }: Pro
 
   return (
     <div className="p-6 max-w-3xl mx-auto space-y-6 pb-20">
-      <Header backPath={backPath} title="Revise Procurement Request" description="Update the procurement details and resubmit it." />
+      <Header backPath={backPath} title={tt('forms.revProcTitle', 'Revise Procurement Request')} description={tt('forms.revProcDesc', 'Update the procurement details and resubmit it.')} />
       <form onSubmit={handleSubmit} className="bg-card border border-border rounded-xl shadow-sm p-6 space-y-5">
         <div className="grid sm:grid-cols-2 gap-4">
           <div className="space-y-1.5 sm:col-span-2">
-            <Label>Item Name *</Label>
+            <Label>{tt('forms.itemName', 'Item Name')} *</Label>
             <Input value={form.itemName} onChange={(e) => setValue('itemName', e.target.value)} />
           </div>
           <div className="space-y-1.5">
-            <Label>Category</Label>
+            <Label>{tt('forms.category', 'Category')}</Label>
             <select value={form.itemCategory} onChange={(e) => setValue('itemCategory', e.target.value)} className="w-full bg-background border border-input rounded-md px-3 h-9 text-sm">
               {PROCUREMENT_CATEGORIES.map((category) => <option key={category}>{category}</option>)}
             </select>
           </div>
           <div className="space-y-1.5">
-            <Label>Priority *</Label>
+            <Label>{tt('common.priority', 'Priority')} *</Label>
             <select value={form.priority} onChange={(e) => setValue('priority', e.target.value)} className="w-full bg-background border border-input rounded-md px-3 h-9 text-sm">
               {PROCUREMENT_PRIORITIES.map((priority) => <option key={priority}>{priority}</option>)}
             </select>
           </div>
           <div className="space-y-1.5">
-            <Label>Quantity *</Label>
+            <Label>{tt('forms.quantity', 'Quantity')} *</Label>
             <Input type="number" min="1" value={form.quantity} onChange={(e) => setValue('quantity', e.target.value)} />
           </div>
           <div className="space-y-1.5">
-            <Label>Unit Price Estimate</Label>
+            <Label>{tt('forms.unitPriceEstimate', 'Unit Price Estimate')}</Label>
             <Input type="number" min="0" step="0.01" value={form.unitPriceEstimate} onChange={(e) => setValue('unitPriceEstimate', e.target.value)} />
           </div>
           <div className="space-y-1.5">
-            <Label>Vendor Preference</Label>
+            <Label>{tt('forms.vendorPreference', 'Vendor Preference')}</Label>
             <Input value={form.vendorPreference} onChange={(e) => setValue('vendorPreference', e.target.value)} />
           </div>
           <div className="space-y-1.5">
-            <Label>Budget Code</Label>
+            <Label>{tt('forms.budgetCode', 'Budget Code')}</Label>
             <Input value={form.budgetCode} onChange={(e) => setValue('budgetCode', e.target.value)} />
           </div>
         </div>
         <div className="space-y-1.5">
-          <Label>Justification *</Label>
+          <Label>{tt('forms.justification', 'Justification')} *</Label>
           <textarea rows={5} value={form.justification} onChange={(e) => setValue('justification', e.target.value)} className="w-full bg-background border border-input rounded-md px-3 py-2 text-sm resize-none" />
         </div>
-        <Footer backPath={backPath} isSubmitting={isSubmitting} submitLabel="Resubmit Procurement" />
+        <Footer backPath={backPath} isSubmitting={isSubmitting} submitLabel={tt('forms.revSubmitProc', 'Resubmit Procurement')} cancelLabel={tt('forms.cancel', 'Cancel')} />
       </form>
     </div>
   )
 }
 
 function EventRevisionForm({ requestId, request, portal = 'student' }: Props) {
+  const tt = useOptionalT()
   const router = useRouter()
   const backPath = `/${portal}/requests/${requestId}`
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -705,10 +720,10 @@ function EventRevisionForm({ requestId, request, portal = 'student' }: Props) {
         needsSecuritySupport: form.needsSecuritySupport,
         needsTechnicalSupport: form.needsTechnicalSupport,
       })
-      toast.success('Request updated and resubmitted.')
+      toast.success(tt('forms.revUpdated', 'Request updated and resubmitted.'))
       router.push(backPath)
     } catch (error: any) {
-      toast.error(error.message ?? 'Failed to update request.')
+      toast.error(error.message ?? tt('forms.revUpdateFail', 'Failed to update request.'))
     } finally {
       setIsSubmitting(false)
     }
@@ -716,49 +731,49 @@ function EventRevisionForm({ requestId, request, portal = 'student' }: Props) {
 
   return (
     <div className="p-6 max-w-2xl mx-auto pb-20 space-y-6">
-      <Header backPath={backPath} title="Revise Event Request" description="Update the event details and resubmit it." />
+      <Header backPath={backPath} title={tt('forms.revEventTitle', 'Revise Event Request')} description={tt('forms.revEventDesc', 'Update the event details and resubmit it.')} />
       <form onSubmit={handleSubmit} className="bg-card border border-border rounded-xl shadow-sm p-6 space-y-5">
         <div className="space-y-1.5">
-          <Label>Event Name *</Label>
+          <Label>{tt('forms.eventName', 'Event Name')} *</Label>
           <Input value={form.eventName} onChange={(e) => set('eventName', e.target.value)} />
         </div>
         <div className="grid sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">
-            <Label>Event Type</Label>
+            <Label>{tt('forms.eventType', 'Event Type')}</Label>
             <select value={form.eventType} onChange={(e) => set('eventType', e.target.value)} className="w-full bg-background border border-input rounded-md px-3 h-9 text-sm">
               {EVENT_TYPES.map((type) => <option key={type}>{type}</option>)}
             </select>
           </div>
           <div className="space-y-1.5">
-            <Label>Expected Attendance *</Label>
+            <Label>{tt('forms.expectedAttendance', 'Expected Attendance')} *</Label>
             <Input type="number" min="1" value={form.expectedAttendance} onChange={(e) => set('expectedAttendance', e.target.value)} />
           </div>
         </div>
         <div className="grid sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">
-            <Label>Start Date & Time *</Label>
+            <Label>{tt('forms.startDateTime', 'Start Date & Time')} *</Label>
             <Input type="datetime-local" value={form.startAt} onChange={(e) => set('startAt', e.target.value)} />
           </div>
           <div className="space-y-1.5">
-            <Label>End Date & Time *</Label>
+            <Label>{tt('forms.endDateTime', 'End Date & Time')} *</Label>
             <Input type="datetime-local" value={form.endAt} onChange={(e) => set('endAt', e.target.value)} />
           </div>
         </div>
         <div className="space-y-1.5">
-          <Label>Preferred Location</Label>
+          <Label>{tt('forms.preferredLocation', 'Preferred Location')}</Label>
           <Input value={form.locationPreference} onChange={(e) => set('locationPreference', e.target.value)} />
         </div>
         <div className="space-y-1.5">
-          <Label>Description *</Label>
+          <Label>{tt('forms.description', 'Description')} *</Label>
           <textarea rows={4} value={form.description} onChange={(e) => set('description', e.target.value)} className="w-full bg-background border border-input rounded-md px-3 py-2 text-sm resize-none" />
         </div>
         <div className="space-y-3 p-4 bg-muted/30 rounded-lg">
           <div className="space-y-2">
             {[
-              { key: 'needsBudget', label: 'Budget Required' },
-              { key: 'needsPosterApproval', label: 'Poster / Announcement Approval' },
-              { key: 'needsSecuritySupport', label: 'Security Support' },
-              { key: 'needsTechnicalSupport', label: 'Technical Support (AV, IT)' },
+              { key: 'needsBudget', label: tt('forms.budgetRequired', 'Budget Required') },
+              { key: 'needsPosterApproval', label: tt('forms.posterApproval', 'Poster / Announcement Approval') },
+              { key: 'needsSecuritySupport', label: tt('forms.securitySupport', 'Security Support') },
+              { key: 'needsTechnicalSupport', label: tt('forms.technicalSupport', 'Technical Support (AV, IT)') },
             ].map(({ key, label }) => (
               <label key={key} className="flex items-center gap-2 cursor-pointer">
                 <input type="checkbox" checked={(form as any)[key]} onChange={(e) => set(key, e.target.checked)} className="rounded" />
@@ -768,18 +783,19 @@ function EventRevisionForm({ requestId, request, portal = 'student' }: Props) {
           </div>
           {form.needsBudget && (
             <div className="space-y-1.5 mt-2">
-              <Label>Estimated Budget</Label>
+              <Label>{tt('forms.estimatedBudget', 'Estimated Budget')}</Label>
               <Input type="number" min="0" step="0.01" value={form.estimatedBudget} onChange={(e) => set('estimatedBudget', e.target.value)} />
             </div>
           )}
         </div>
-        <Footer backPath={backPath} isSubmitting={isSubmitting} submitLabel="Resubmit Event Request" />
+        <Footer backPath={backPath} isSubmitting={isSubmitting} submitLabel={tt('forms.revSubmitEvent', 'Resubmit Event Request')} cancelLabel={tt('forms.cancel', 'Cancel')} />
       </form>
     </div>
   )
 }
 
 function EquipmentRevisionForm({ requestId, request, portal = 'student' }: Props) {
+  const tt = useOptionalT()
   const router = useRouter()
   const backPath = `/${portal}/requests/${requestId}`
   const [resources, setResources] = useState<any[]>([])
@@ -832,10 +848,10 @@ function EquipmentRevisionForm({ requestId, request, portal = 'student' }: Props
         neededUntil: form.neededUntil || null,
         urgencyReason: form.urgencyReason.trim() || null,
       })
-      toast.success('Request updated and resubmitted.')
+      toast.success(tt('forms.revUpdated', 'Request updated and resubmitted.'))
       router.push(backPath)
     } catch (error: any) {
-      toast.error(error.message ?? 'Failed to update request.')
+      toast.error(error.message ?? tt('forms.revUpdateFail', 'Failed to update request.'))
     } finally {
       setIsSubmitting(false)
     }
@@ -843,64 +859,65 @@ function EquipmentRevisionForm({ requestId, request, portal = 'student' }: Props
 
   return (
     <div className="p-6 max-w-2xl mx-auto space-y-6 pb-20">
-      <Header backPath={backPath} title="Revise Equipment Request" description="Update the equipment request and resubmit it." />
+      <Header backPath={backPath} title={tt('forms.revEquipTitle', 'Revise Equipment Request')} description={tt('forms.revEquipDesc', 'Update the equipment request and resubmit it.')} />
       <form onSubmit={handleSubmit} className="bg-card border border-border rounded-xl shadow-sm p-6 space-y-5">
         <div className="space-y-1.5">
-          <Label>Select from Equipment Catalog</Label>
+          <Label>{tt('forms.equipmentCatalogOptional', 'Select from Equipment Catalog')}</Label>
           {isLoadingResources ? (
             <div className="flex items-center gap-2 h-10 text-sm text-muted-foreground">
-              <Loader2 className="size-4 animate-spin" /> Loading equipment...
+              <Loader2 className="size-4 animate-spin" /> {tt('forms.loadingEquipment', 'Loading equipment...')}
             </div>
           ) : (
             <select value={form.labResourceId} onChange={(e) => handleResourceSelect(e.target.value)} className="w-full bg-background border border-input rounded-md px-3 h-9 text-sm">
-              <option value="">Select equipment from catalog</option>
+              <option value="">{tt('forms.selectEquipmentCatalog', 'Select equipment from catalog')}</option>
               {resources.map((resource) => <option key={resource.id} value={resource.id}>{resource.name}</option>)}
             </select>
           )}
         </div>
         {!form.labResourceId && (
           <div className="space-y-1.5">
-            <Label>Equipment Name / Description *</Label>
+            <Label>{tt('forms.equipmentName', 'Equipment Name / Description')} *</Label>
             <Input value={form.equipmentName} onChange={(e) => setForm((prev) => ({ ...prev, equipmentName: e.target.value }))} />
           </div>
         )}
         <div className="grid sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">
-            <Label>Category</Label>
+            <Label>{tt('forms.category', 'Category')}</Label>
             <select value={form.equipmentCategory} onChange={(e) => setForm((prev) => ({ ...prev, equipmentCategory: e.target.value }))} className="w-full bg-background border border-input rounded-md px-3 h-9 text-sm">
               {EQUIPMENT_CATEGORIES.map((category) => <option key={category}>{category}</option>)}
             </select>
           </div>
           <div className="space-y-1.5">
-            <Label>Quantity *</Label>
+            <Label>{tt('forms.quantity', 'Quantity')} *</Label>
             <Input type="number" min="1" value={form.quantity} onChange={(e) => setForm((prev) => ({ ...prev, quantity: e.target.value }))} />
           </div>
         </div>
         <div className="grid sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">
-            <Label>Needed From</Label>
+            <Label>{tt('forms.neededFromOptional', 'Needed From')}</Label>
             <Input type="date" value={form.neededFrom} onChange={(e) => setForm((prev) => ({ ...prev, neededFrom: e.target.value }))} />
           </div>
           <div className="space-y-1.5">
-            <Label>Return By</Label>
+            <Label>{tt('forms.returnByOptional', 'Return By')}</Label>
             <Input type="date" value={form.neededUntil} onChange={(e) => setForm((prev) => ({ ...prev, neededUntil: e.target.value }))} />
           </div>
         </div>
         <div className="space-y-1.5">
-          <Label>Purpose *</Label>
+          <Label>{tt('forms.purpose', 'Purpose')} *</Label>
           <textarea rows={3} value={form.purpose} onChange={(e) => setForm((prev) => ({ ...prev, purpose: e.target.value }))} className="w-full bg-background border border-input rounded-md px-3 py-2 text-sm resize-none" />
         </div>
         <div className="space-y-1.5">
-          <Label>Urgency Reason</Label>
+          <Label>{tt('forms.urgencyReasonOptional', 'Urgency Reason')}</Label>
           <Input value={form.urgencyReason} onChange={(e) => setForm((prev) => ({ ...prev, urgencyReason: e.target.value }))} />
         </div>
-        <Footer backPath={backPath} isSubmitting={isSubmitting} submitLabel="Resubmit Equipment Request" />
+        <Footer backPath={backPath} isSubmitting={isSubmitting} submitLabel={tt('forms.revSubmitEquip', 'Resubmit Equipment Request')} cancelLabel={tt('forms.cancel', 'Cancel')} />
       </form>
     </div>
   )
 }
 
 function InternshipRevisionForm({ requestId, request, portal = 'student' }: Props) {
+  const tt = useOptionalT()
   const router = useRouter()
   const backPath = `/${portal}/requests/${requestId}`
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -933,10 +950,10 @@ function InternshipRevisionForm({ requestId, request, portal = 'student' }: Prop
         durationDays: Number(form.durationDays) || 0,
         insuranceRequired: form.insuranceRequired,
       })
-      toast.success('Request updated and resubmitted.')
+      toast.success(tt('forms.revUpdated', 'Request updated and resubmitted.'))
       router.push(backPath)
     } catch (error: any) {
-      toast.error(error.message ?? 'Failed to update request.')
+      toast.error(error.message ?? tt('forms.revUpdateFail', 'Failed to update request.'))
     } finally {
       setIsSubmitting(false)
     }
@@ -951,22 +968,22 @@ function InternshipRevisionForm({ requestId, request, portal = 'student' }: Prop
 
   return (
     <div className="mx-auto max-w-2xl p-6 pb-20 space-y-6">
-      <Header backPath={backPath} title="Revise Internship Application" description="Update the internship application and resubmit it." />
+      <Header backPath={backPath} title={tt('forms.revInternTitle', 'Revise Internship Application')} description={tt('forms.revInternDesc', 'Update the internship application and resubmit it.')} />
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="space-y-4 rounded-lg border border-border bg-card p-5">
-          <h2 className="text-sm font-semibold text-foreground">Company Information</h2>
+          <h2 className="text-sm font-semibold text-foreground">{tt('forms.companyInfo', 'Company Information')}</h2>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            {field('Company Name', 'companyName', 'text', true)}
-            {field('Industry / Sector', 'companySector')}
-            {field('Contact Person', 'companyContactName')}
-            {field('Contact Email', 'companyContactEmail', 'email')}
+            {field(tt('forms.companyName', 'Company Name'), 'companyName', 'text', true)}
+            {field(tt('forms.industrySector', 'Industry / Sector'), 'companySector')}
+            {field(tt('forms.contactPerson', 'Contact Person'), 'companyContactName')}
+            {field(tt('forms.contactEmail', 'Contact Email'), 'companyContactEmail', 'email')}
           </div>
         </div>
         <div className="space-y-4 rounded-lg border border-border bg-card p-5">
-          <h2 className="text-sm font-semibold text-foreground">Internship Details</h2>
+          <h2 className="text-sm font-semibold text-foreground">{tt('forms.internshipDetails', 'Internship Details')}</h2>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
-              <Label>Type *</Label>
+              <Label>{tt('forms.type', 'Type')} *</Label>
               <Select value={form.internshipType} onValueChange={(value) => setForm((prev) => ({ ...prev, internshipType: value }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -975,7 +992,7 @@ function InternshipRevisionForm({ requestId, request, portal = 'student' }: Prop
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label>Work Mode *</Label>
+              <Label>{tt('forms.workMode', 'Work Mode')} *</Label>
               <Select value={form.workMode} onValueChange={(value) => setForm((prev) => ({ ...prev, workMode: value }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -983,22 +1000,22 @@ function InternshipRevisionForm({ requestId, request, portal = 'student' }: Prop
                 </SelectContent>
               </Select>
             </div>
-            {field('Start Date', 'startDate', 'date', true)}
-            {field('End Date', 'endDate', 'date', true)}
-            {field('Duration (days)', 'durationDays', 'number')}
+            {field(tt('forms.startDate', 'Start Date'), 'startDate', 'date', true)}
+            {field(tt('forms.endDate', 'End Date'), 'endDate', 'date', true)}
+            {field(tt('forms.durationDays', 'Duration (days)'), 'durationDays', 'number')}
             <div className="flex items-center gap-3">
               <input type="checkbox" checked={form.insuranceRequired} onChange={(e) => setForm((prev) => ({ ...prev, insuranceRequired: e.target.checked }))} />
-              <Label>Insurance Required</Label>
+              <Label>{tt('forms.insuranceRequired', 'Insurance Required')}</Label>
             </div>
           </div>
         </div>
         <div className="flex justify-end gap-3">
           <Link href={backPath}>
-            <Button type="button" variant="outline" disabled={isSubmitting}>Cancel</Button>
+            <Button type="button" variant="outline" disabled={isSubmitting}>{tt('forms.cancel', 'Cancel')}</Button>
           </Link>
           <Button type="submit" disabled={isSubmitting}>
             {isSubmitting && <Loader2 className="mr-2 size-4 animate-spin" />}
-            Resubmit Application
+            {tt('forms.revSubmitIntern', 'Resubmit Application')}
           </Button>
         </div>
       </form>
@@ -1007,6 +1024,7 @@ function InternshipRevisionForm({ requestId, request, portal = 'student' }: Prop
 }
 
 function ItTicketRevisionForm({ requestId, request, portal = 'faculty' }: Props) {
+  const tt = useOptionalT()
   const router = useRouter()
   const backPath = `/${portal}/requests/${requestId}`
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -1036,10 +1054,10 @@ function ItTicketRevisionForm({ requestId, request, portal = 'faculty' }: Props)
         locationText: form.locationText.trim() || null,
         subcategory: form.subcategory.trim() || null,
       })
-      toast.success('Ticket updated and resubmitted.')
+      toast.success(tt('forms.revTicketUpdated', 'Ticket updated and resubmitted.'))
       router.push(backPath)
     } catch (error: any) {
-      toast.error(error.message ?? 'Failed to update ticket.')
+      toast.error(error.message ?? tt('forms.revTicketFail', 'Failed to update ticket.'))
     } finally {
       setIsSubmitting(false)
     }
@@ -1047,25 +1065,25 @@ function ItTicketRevisionForm({ requestId, request, portal = 'faculty' }: Props)
 
   return (
     <div className="mx-auto max-w-3xl space-y-5 p-6 pb-20">
-      <Header backPath={backPath} title="Revise IT Ticket" description="Update the ticket details and resubmit it to IT." />
+      <Header backPath={backPath} title={tt('forms.revItTitle', 'Revise IT Ticket')} description={tt('forms.revItDesc', 'Update the ticket details and resubmit it to IT.')} />
 
       <form onSubmit={handleSubmit} className="space-y-4 rounded-xl border border-border bg-card p-5">
         <div className="space-y-2">
-          <Label>Title *</Label>
+          <Label>{tt('tickets.title', 'Title')} *</Label>
           <Input
             value={form.title}
             onChange={(event) => set('title', event.target.value)}
-            placeholder="Printer not working in faculty office"
+            placeholder={tt('forms.itTitlePlaceholder', 'Printer not working in faculty office')}
             required
           />
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">
           <div className="space-y-2">
-            <Label>Category *</Label>
+            <Label>{tt('tickets.category', 'Category')} *</Label>
             <Select value={form.category} onValueChange={(value) => set('category', value)} required>
               <SelectTrigger>
-                <SelectValue placeholder="Select category..." />
+                <SelectValue placeholder={tt('forms.itCategoryPlaceholder', 'Select category...')} />
               </SelectTrigger>
               <SelectContent>
                 {IT_CATEGORIES.map((category) => (
@@ -1076,7 +1094,7 @@ function ItTicketRevisionForm({ requestId, request, portal = 'faculty' }: Props)
           </div>
 
           <div className="space-y-2">
-            <Label>Priority</Label>
+            <Label>{tt('common.priority', 'Priority')}</Label>
             <Select value={form.priority} onValueChange={(value) => set('priority', value)}>
               <SelectTrigger>
                 <SelectValue />
@@ -1092,60 +1110,61 @@ function ItTicketRevisionForm({ requestId, request, portal = 'faculty' }: Props)
 
         <div className="grid gap-4 md:grid-cols-2">
           <div className="space-y-2">
-            <Label>Affected System</Label>
+            <Label>{tt('forms.itAffectedSystem', 'Affected System')}</Label>
             <Input
               value={form.affectedSystem}
               onChange={(event) => set('affectedSystem', event.target.value)}
-              placeholder="Printer / Wi-Fi / LMS"
+              placeholder={tt('forms.itAffectedSystemPlaceholder', 'Printer / Wi-Fi / LMS')}
             />
           </div>
 
           <div className="space-y-2">
-            <Label>Location</Label>
+            <Label>{tt('tickets.location', 'Location')}</Label>
             <Input
               value={form.locationText}
               onChange={(event) => set('locationText', event.target.value)}
-              placeholder="Engineering Building, Room 214"
+              placeholder={tt('forms.itLocationPlaceholder', 'Engineering Building, Room 214')}
             />
           </div>
         </div>
 
         <div className="space-y-2">
-          <Label>Subcategory</Label>
+          <Label>{tt('forms.itSubcategory', 'Subcategory')}</Label>
           <Input
             value={form.subcategory}
             onChange={(event) => set('subcategory', event.target.value)}
-            placeholder="VPN, Outlook, printer driver..."
+            placeholder={tt('forms.itSubcategoryPlaceholder', 'VPN, Outlook, printer driver...')}
           />
         </div>
 
         <div className="space-y-2">
-          <Label>Description</Label>
+          <Label>{tt('tickets.description', 'Description')}</Label>
           <Textarea
             value={form.description}
             onChange={(event) => set('description', event.target.value)}
-            placeholder="Describe the issue, what you tried, and when it started."
+            placeholder={tt('forms.itDescriptionPlaceholder', 'Describe the issue, what you tried, and when it started.')}
             rows={6}
           />
         </div>
 
-        <Footer backPath={backPath} isSubmitting={isSubmitting} submitLabel="Resubmit Ticket" />
+        <Footer backPath={backPath} isSubmitting={isSubmitting} submitLabel={tt('forms.revSubmitTicket', 'Resubmit Ticket')} cancelLabel={tt('forms.cancel', 'Cancel')} />
       </form>
     </div>
   )
 }
 
 function UnsupportedRevisionForm({ requestId, request, portal = 'student' }: Props) {
+  const tt = useOptionalT()
   const backPath = `/${portal}/requests/${requestId}`
   return (
     <div className="p-6 max-w-2xl mx-auto space-y-6">
-      <Header backPath={backPath} title="Revise Request" description="This request type does not have a specialized revision form yet." />
+      <Header backPath={backPath} title={tt('forms.revGenericTitle', 'Revise Request')} description={tt('forms.revGenericDesc', 'This request type does not have a specialized revision form yet.')} />
       <div className="rounded-lg border border-border bg-card p-6 space-y-3">
         <p className="text-sm text-muted-foreground">
-          Request type: <span className="font-medium text-foreground">{request.typeName ?? request.type}</span>
+          {tt('forms.requestType', 'Request type')}: <span className="font-medium text-foreground">{request.typeName ?? request.type}</span>
         </p>
         <Link href={backPath}>
-          <Button variant="outline">Back to Detail</Button>
+          <Button variant="outline">{tt('forms.backToDetail', 'Back to Detail')}</Button>
         </Link>
       </div>
     </div>

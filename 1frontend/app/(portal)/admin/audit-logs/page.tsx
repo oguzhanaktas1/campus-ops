@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { toast } from 'sonner'
 import { getToken } from '@/lib/auth'
+import { useI18n } from '@/lib/i18n'
 
 interface AuditLog {
   id: string
@@ -27,17 +28,17 @@ function formatDate(d: string) {
   })
 }
 
-const ACTION_LABEL: Record<string, string> = {
-  CREATE: 'Created Record',
-  UPDATE: 'Updated Record',
-  DELETE: 'Deleted Record',
-  LOGIN: 'System Login',
-  LOGOUT: 'System Logout',
-  APPROVE: 'Approved Request',
-  REJECT: 'Rejected Request',
-}
-
 export default function AdminAuditPage() {
+  const { t } = useI18n()
+  const actionLabel: Record<string, string> = {
+    CREATE: t('auditLogs.actionCreate'),
+    UPDATE: t('auditLogs.actionUpdate'),
+    DELETE: t('auditLogs.actionDelete'),
+    LOGIN: t('auditLogs.actionLogin'),
+    LOGOUT: t('auditLogs.actionLogout'),
+    APPROVE: t('auditLogs.actionApprove'),
+    REJECT: t('auditLogs.actionReject'),
+  }
   const [logs, setLogs] = useState<AuditLog[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -60,11 +61,11 @@ export default function AdminAuditPage() {
       setTotal(data.total ?? 0)
       setTotalPages(data.totalPages ?? 1)
     } catch {
-      toast.error('Failed to load audit trail.')
+      toast.error(t('auditLogs.noLogs'))
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [t])
 
   useEffect(() => { fetchLogs(1, '') }, [fetchLogs])
 
@@ -85,8 +86,8 @@ export default function AdminAuditPage() {
   return (
     <div className="p-6 space-y-5 max-w-6xl mx-auto pb-20">
       <div>
-        <h1 className="text-xl font-bold text-foreground">Audit Log</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">System-wide activity and security event trail.</p>
+        <h1 className="text-xl font-bold text-foreground">{t('auditLogs.title')}</h1>
+        <p className="text-sm text-muted-foreground mt-0.5">{t('auditLogs.subtitle')}</p>
       </div>
 
       {/* Search + stats */}
@@ -94,14 +95,14 @@ export default function AdminAuditPage() {
         <div className="relative max-w-sm flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
           <Input
-            placeholder="Search by action, actor, target or IP..."
+            placeholder={t('auditLogs.searchPlaceholder')}
             className="pl-9"
             value={search}
             onChange={(e) => handleSearchChange(e.target.value)}
           />
         </div>
         <span className="text-xs text-muted-foreground font-medium whitespace-nowrap">
-          {total} entries
+          {t('auditLogs.entries', { count: total })}
         </span>
       </div>
 
@@ -116,12 +117,12 @@ export default function AdminAuditPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border bg-muted/40">
-                  <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground">Action</th>
-                  <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground hidden sm:table-cell">Actor</th>
-                  <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground hidden md:table-cell">Target</th>
-                  <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground hidden lg:table-cell">IP Address</th>
-                  <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground">Status</th>
-                  <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground hidden md:table-cell">Time</th>
+                  <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground">{t('auditLogs.colAction')}</th>
+                  <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground hidden sm:table-cell">{t('auditLogs.colUser')}</th>
+                  <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground hidden md:table-cell">{t('auditLogs.colResource')}</th>
+                  <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground hidden lg:table-cell">{t('auditLogs.ipAddress')}</th>
+                  <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground">{t('auditLogs.status')}</th>
+                  <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground hidden md:table-cell">{t('auditLogs.colTime')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -135,7 +136,7 @@ export default function AdminAuditPage() {
                   >
                     <td className="px-5 py-3.5">
                       <p className="font-semibold text-foreground tracking-wide">
-                        {ACTION_LABEL[log.action] ?? log.action}
+                        {actionLabel[log.action] ?? log.action}
                       </p>
                     </td>
                     <td className="px-5 py-3.5 hidden sm:table-cell">
@@ -179,8 +180,8 @@ export default function AdminAuditPage() {
           {!isLoading && logs.length === 0 && (
             <div className="text-center py-16">
               <ScrollText className="size-10 text-muted-foreground/30 mx-auto mb-3" />
-              <p className="text-sm font-medium text-foreground">No audit entries found.</p>
-              <p className="text-xs text-muted-foreground mt-1">Try adjusting your search terms.</p>
+              <p className="text-sm font-medium text-foreground">{t('auditLogs.noLogs')}</p>
+              <p className="text-xs text-muted-foreground mt-1">{t('auditLogs.emptyHint')}</p>
             </div>
           )}
         </div>
@@ -189,7 +190,7 @@ export default function AdminAuditPage() {
         {totalPages > 1 && (
           <div className="px-5 py-3 border-t border-border flex items-center justify-between gap-4">
             <span className="text-xs text-muted-foreground">
-              Page {page} of {totalPages}
+              {t('auditLogs.pageOf', { page, total: totalPages })}
             </span>
             <div className="flex items-center gap-2">
               <Button

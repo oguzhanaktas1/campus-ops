@@ -7,6 +7,7 @@ import { Bell, Info, CheckCircle2, AlertTriangle, XCircle, Loader2, CheckCheck, 
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 import { getToken } from '@/lib/auth'
+import { useI18n } from '@/lib/i18n'
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000'
 
@@ -26,6 +27,7 @@ function formatRelative(d: string) {
 }
 
 export default function AdminNotificationsPage() {
+  const { t } = useI18n()
   const router = useRouter()
   const [notifications, setNotifications] = useState<any[]>([])
   const [selectedIds, setSelectedIds] = useState<string[]>([])
@@ -41,7 +43,7 @@ export default function AdminNotificationsPage() {
         setNotifications(Array.isArray(d) ? d : (d.notifications ?? []))
       }
     } catch {
-      toast.error('Failed to load notifications.')
+      toast.error(t('notifications.loadFail'))
     } finally {
       setIsLoading(false)
     }
@@ -66,9 +68,9 @@ export default function AdminNotificationsPage() {
       if (!res.ok) throw new Error()
       setNotifications((prev) => prev.filter((n) => !selectedIds.includes(n.id)))
       setSelectedIds([])
-      toast.success(`${selectedIds.length} notifications deleted`)
+      toast.success(t('notifications.deleteSuccess', { count: selectedIds.length }))
     } catch {
-      toast.error('Failed to delete notifications')
+      toast.error(t('notifications.deleteFail'))
     }
   }
 
@@ -92,9 +94,9 @@ export default function AdminNotificationsPage() {
         method: 'PATCH',
         headers: { Authorization: `Bearer ${getToken()}` },
       })
-      if (res.ok) toast.success('All notifications marked as read.')
+      if (res.ok) toast.success(t('notifications.markAllSuccess'))
     } catch {
-      toast.error('Failed to mark all as read.')
+      toast.error(t('notifications.markAllFail'))
     }
   }
 
@@ -105,20 +107,20 @@ export default function AdminNotificationsPage() {
     <div className="p-6 space-y-5 max-w-2xl mx-auto pb-20">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold text-foreground">Notifications</h1>
+          <h1 className="text-xl font-bold text-foreground">{t('notifications.title')}</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {unreadCount > 0 ? `${unreadCount} unread` : 'All caught up'}
+            {t('notifications.subtitle')}
           </p>
         </div>
         <div className="flex items-center gap-2">
           {selectedIds.length > 0 && (
             <Button variant="destructive" size="sm" onClick={handleDeleteSelected} className="gap-2">
-              <Trash2 className="size-4" /> Delete ({selectedIds.length})
+              <Trash2 className="size-4" /> {t('notifications.deleteSelected', { count: selectedIds.length })}
             </Button>
           )}
           {unreadCount > 0 && (
             <Button variant="outline" size="sm" onClick={handleMarkAllRead} className="gap-2 text-xs">
-              <CheckCheck className="size-4" /> Mark all read
+              <CheckCheck className="size-4" /> {t('notifications.markAllRead')}
             </Button>
           )}
         </div>
@@ -132,8 +134,8 @@ export default function AdminNotificationsPage() {
         ) : notifications.length === 0 ? (
           <div className="flex flex-col items-center py-16 text-center opacity-50">
             <Bell className="size-8 mb-3" />
-            <p className="text-sm font-medium">No notifications</p>
-            <p className="text-xs text-muted-foreground mt-1">Admin alerts and updates will appear here.</p>
+            <p className="text-sm font-medium">{t('notifications.noNotifications')}</p>
+            <p className="text-xs text-muted-foreground mt-1">{t('notifications.emptyHint')}</p>
           </div>
         ) : (
           <>
@@ -145,7 +147,7 @@ export default function AdminNotificationsPage() {
                 className="size-4 rounded border-gray-300 cursor-pointer"
               />
               <span className="text-sm font-medium text-muted-foreground cursor-pointer select-none" onClick={toggleSelectAll}>
-                {isAllSelected ? 'Deselect All' : 'Select All'}
+                {isAllSelected ? t('notifications.deselectAll') : t('notifications.selectAll')}
               </span>
             </div>
             <div className="divide-y divide-border">

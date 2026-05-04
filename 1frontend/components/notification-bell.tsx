@@ -11,14 +11,15 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { cn } from '@/lib/utils'
+import { useOptionalT } from '@/lib/optional-t'
 
-function timeAgo(ts: string) {
+function timeAgo(ts: string, tt: (key: string, fallback: string, params?: Record<string, string | number>) => string) {
   if (!ts) return ''
   const diff = (Date.now() - new Date(ts).getTime()) / 1000
-  if (diff < 60) return 'just now'
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`
-  return `${Math.floor(diff / 86400)}d ago`
+  if (diff < 60) return tt('time.justNow', 'just now')
+  if (diff < 3600) return tt('time.minutesAgoShort', '{{count}}m ago', { count: Math.floor(diff / 60) })
+  if (diff < 86400) return tt('time.hoursAgoShort', '{{count}}h ago', { count: Math.floor(diff / 3600) })
+  return tt('time.daysAgoShort', '{{count}}d ago', { count: Math.floor(diff / 86400) })
 }
 
 const typeColors: Record<string, string> = {
@@ -35,6 +36,7 @@ export function NotificationBell({ role = 'student' }: NotificationBellProps) {
   const router = useRouter()
   const [notifications, setNotifications] = useState<any[]>([])
   const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const tt = useOptionalT()
   
   // 🔥 DİNAMİK ENDPOINT MANTIĞI 🔥
   // Gelen role göre otomatik url oluşturur: /staff/notifications, /admin/notifications vb.
@@ -148,7 +150,7 @@ export function NotificationBell({ role = 'student' }: NotificationBellProps) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative size-8" aria-label="Notifications">
+        <Button variant="ghost" size="icon" className="relative size-8" aria-label={tt('nav.notifications', 'Notifications')}>
           <Bell className="size-4" />
           {unreadCount > 0 && (
             <span className="absolute -top-0.5 -right-0.5 size-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
@@ -160,16 +162,16 @@ export function NotificationBell({ role = 'student' }: NotificationBellProps) {
       <DropdownMenuContent align="end" className="w-80 p-0">
         
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-          <span className="text-sm font-semibold">Notifications</span>
+          <span className="text-sm font-semibold">{tt('nav.notifications', 'Notifications')}</span>
           <div className="flex items-center gap-2">
             {selectedIds.length > 0 ? (
               <Button variant="destructive" size="sm" className="h-6 px-2 text-[10px] gap-1" onClick={handleDeleteSelected}>
-                <Trash2 className="size-3" /> Delete ({selectedIds.length})
+                <Trash2 className="size-3" /> {tt('common.delete', 'Delete')} ({selectedIds.length})
               </Button>
             ) : (
               unreadCount > 0 && (
                 <Button variant="ghost" size="sm" className="text-xs h-auto py-0.5" onClick={handleMarkAllRead}>
-                  Mark all read
+                  {tt('common.markAllRead', 'Mark all read')}
                 </Button>
               )
             )}
@@ -186,14 +188,14 @@ export function NotificationBell({ role = 'student' }: NotificationBellProps) {
               className="size-3.5 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer"
             />
             <span className="text-xs font-medium text-muted-foreground cursor-pointer select-none" onClick={toggleSelectAll}>
-              {isAllSelected ? 'Deselect All' : 'Select All'}
+              {isAllSelected ? tt('common.deselectAll', 'Deselect All') : tt('common.selectAll', 'Select All')}
             </span>
           </div>
         )}
 
         <ScrollArea className="max-h-80">
           {notifications.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-8">No notifications</p>
+            <p className="text-sm text-muted-foreground text-center py-8">{tt('notifications.empty', 'No notifications')}</p>
           ) : (
             notifications.slice(0, 8).map((n) => (
               <div
@@ -226,7 +228,7 @@ export function NotificationBell({ role = 'student' }: NotificationBellProps) {
                       {n.message}
                     </p>
                     <p className="text-[10px] text-muted-foreground/70 mt-1 uppercase tracking-wider font-medium">
-                      {timeAgo(n.createdAt)}
+                      {timeAgo(n.createdAt, tt)}
                     </p>
                   </div>
                 </button>
@@ -242,7 +244,7 @@ export function NotificationBell({ role = 'student' }: NotificationBellProps) {
               className="w-full text-xs" 
               onClick={() => router.push(`/${role}/notifications`)}
             >
-              View all notifications
+              {tt('notifications.viewAll', 'View all notifications')}
             </Button>
           </div>
         )}

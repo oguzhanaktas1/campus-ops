@@ -15,6 +15,7 @@ import {
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { getToken } from '@/lib/auth'
+import { useI18n } from '@/lib/i18n'
 
 type ActionType = 'approve' | 'reject' | 'revision' | null
 
@@ -26,6 +27,7 @@ function formatDate(d: string) {
 }
 
 export default function StaffApprovalsPage() {
+  const { t } = useI18n()
   const [pending, setPending] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isProcessing, setIsProcessing] = useState(false)
@@ -43,10 +45,10 @@ export default function StaffApprovalsPage() {
         setPending(data)
         if (data.length > 0 && !selectedId) setSelectedId(data[0].id)
       } else {
-        toast.error('Failed to load pending requests.')
+        toast.error(t('pages.pendingLoadFail'))
       }
     } catch {
-      toast.error('Failed to load pending requests.')
+      toast.error(t('pages.pendingLoadFail'))
     } finally {
       setIsLoading(false)
     }
@@ -60,7 +62,7 @@ export default function StaffApprovalsPage() {
     if (!selectedId) return
 
     if ((action === 'reject' || action === 'revision') && !comment.trim()) {
-      toast.error(`A comment is required to ${action} this request.`)
+      toast.error(t('pages.commentRequired', { action }))
       return
     }
 
@@ -76,7 +78,7 @@ export default function StaffApprovalsPage() {
       })
 
       if (res.ok) {
-        toast.success(`Request ${action === 'approve' ? 'approved' : action === 'reject' ? 'rejected' : 'revision requested'} successfully.`)
+        toast.success(t('pages.requestActionSuccess', { action: action === 'approve' ? t('common.approved') : action === 'reject' ? t('common.rejected') : t('pages.requestRevision') }))
         setDone((prev) => ({ ...prev, [selectedId]: action }))
         setComment('')
         setTimeout(() => {
@@ -86,10 +88,10 @@ export default function StaffApprovalsPage() {
         }, 1500)
       } else {
         const err = await res.json().catch(() => ({})) as { message?: string }
-        toast.error(err.message ?? 'Failed to process request.')
+        toast.error(err.message ?? t('pages.requestProcessFail'))
       }
     } catch {
-      toast.error('Network error. Please try again.')
+      toast.error(t('pages.networkTryAgain'))
     } finally {
       setIsProcessing(false)
     }
@@ -108,9 +110,9 @@ export default function StaffApprovalsPage() {
       {/* Left: pending list */}
       <div className="lg:w-80 flex-shrink-0 border-r border-border overflow-y-auto bg-card">
         <div className="px-4 py-3 border-b border-border">
-          <h2 className="text-sm font-semibold text-foreground">Pending Actions</h2>
+          <h2 className="text-sm font-semibold text-foreground">{t('pages.pendingActions')}</h2>
           <p className="text-xs text-muted-foreground mt-0.5">
-            {pending.filter((p) => !done[p.id]).length} requires action
+            {t('pages.requiresAction', { count: pending.filter((p) => !done[p.id]).length })}
           </p>
         </div>
         <div className="divide-y divide-border">
@@ -153,8 +155,8 @@ export default function StaffApprovalsPage() {
           {pending.length === 0 && (
             <div className="flex flex-col items-center justify-center py-12 text-center">
               <CheckCircle2 className="size-10 text-emerald-500/20 mb-3" />
-              <p className="text-sm font-medium text-foreground">All Caught Up!</p>
-              <p className="text-xs text-muted-foreground mt-1">No requests pending your action.</p>
+              <p className="text-sm font-medium text-foreground">{t('pages.allCaughtUpActions')}</p>
+              <p className="text-xs text-muted-foreground mt-1">{t('pages.noPendingActions')}</p>
             </div>
           )}
         </div>
@@ -164,7 +166,7 @@ export default function StaffApprovalsPage() {
       <div className="flex-1 overflow-y-auto p-6 bg-muted/5">
         {!selected ? (
           <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
-            Select a request to review
+            {t('pages.selectRequestReview')}
           </div>
         ) : (
           <div className="max-w-3xl space-y-6">
@@ -197,10 +199,10 @@ export default function StaffApprovalsPage() {
 
             <div className="bg-card border border-border rounded-lg p-5 shadow-sm">
               <p className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
-                <Info className="size-4 text-muted-foreground" /> Request Description
+                <Info className="size-4 text-muted-foreground" /> {t('pages.requestDescription')}
               </p>
               <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
-                {selected.description || 'No description provided.'}
+                {selected.description || t('pages.noDescription')}
               </p>
             </div>
 
@@ -208,23 +210,23 @@ export default function StaffApprovalsPage() {
             {done[selected.id] ? (
               <div className="bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900 p-6 rounded-lg text-center">
                 <CheckCircle2 className="size-8 text-emerald-500 mx-auto mb-2" />
-                <p className="text-sm font-bold text-emerald-800 dark:text-emerald-400">Action Recorded</p>
+                <p className="text-sm font-bold text-emerald-800 dark:text-emerald-400">{t('pages.actionRecorded')}</p>
                 <p className="text-xs text-emerald-700 dark:text-emerald-500 mt-1">
-                  This request has been processed and is now locked.
+                  {t('pages.requestLocked')}
                 </p>
               </div>
             ) : (
               <div className="bg-card border border-border rounded-lg p-5 shadow-sm space-y-4">
                 <div className="flex justify-between items-center">
-                  <p className="text-sm font-semibold text-foreground">Decision</p>
+                  <p className="text-sm font-semibold text-foreground">{t('pages.decision')}</p>
                   {!comment.trim() && (
                     <p className="text-[10px] text-amber-600 font-medium bg-amber-50 px-2 py-1 rounded">
-                      Comment required for Reject / Revision
+                      {t('pages.commentRequiredRejectRevision')}
                     </p>
                   )}
                 </div>
                 <Textarea
-                  placeholder="Provide reasoning or feedback (required for Reject/Revision)..."
+                  placeholder={t('pages.decisionPlaceholder')}
                   value={comment}
                   onChange={(e) => setComment(e.target.value)}
                   className="resize-none min-h-[100px]"
@@ -237,7 +239,7 @@ export default function StaffApprovalsPage() {
                     onClick={() => handleAction('approve')}
                   >
                     {isProcessing ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
-                    Approve
+                    {t('common.approve')}
                   </Button>
                   <Button
                     variant="destructive"
@@ -246,7 +248,7 @@ export default function StaffApprovalsPage() {
                     onClick={() => handleAction('reject')}
                   >
                     {isProcessing ? <Loader2 className="size-4 animate-spin" /> : <XCircle className="size-4" />}
-                    Reject
+                    {t('common.reject')}
                   </Button>
                   <Button
                     variant="outline"
@@ -255,7 +257,7 @@ export default function StaffApprovalsPage() {
                     onClick={() => handleAction('revision')}
                   >
                     {isProcessing ? <Loader2 className="size-4 animate-spin" /> : <RotateCcw className="size-4" />}
-                    Request Revision
+                    {t('pages.requestRevision')}
                   </Button>
                 </div>
               </div>

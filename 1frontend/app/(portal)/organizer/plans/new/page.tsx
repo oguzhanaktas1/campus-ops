@@ -19,6 +19,7 @@ import {
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { getToken } from '@/lib/auth'
+import { useI18n } from '@/lib/i18n'
 
 const EVENT_TYPES = [
   'Conference',
@@ -64,6 +65,7 @@ function RequestRequirementCard(props: {
   onChange: (value: string) => void
   required: boolean
 }) {
+  const { t } = useI18n()
   const selected = props.options.find((option) => option.id === props.value)
   const approved = selected ? isApproved(selected.status) : false
 
@@ -87,7 +89,7 @@ function RequestRequirementCard(props: {
                     : 'bg-muted text-muted-foreground border-border',
                 )}
               >
-                {props.required ? 'Required' : 'Optional'}
+                {props.required ? t('common.required') : t('common.optional')}
               </span>
             </div>
             <p className="text-xs text-muted-foreground mt-1">
@@ -108,7 +110,7 @@ function RequestRequirementCard(props: {
       </div>
 
       <div className="space-y-1.5">
-        <Label>Select Existing Request</Label>
+        <Label>{t('pages.selectExistingRequest')}</Label>
         <select
           value={props.value}
           onChange={(e) => props.onChange(e.target.value)}
@@ -157,6 +159,7 @@ function RequestRequirementCard(props: {
 
 export default function NewEventPlanPage() {
   const router = useRouter()
+  const { t } = useI18n()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isLoadingDependencies, setIsLoadingDependencies] = useState(true)
   const [reservationOptions, setReservationOptions] = useState<RequestOption[]>([])
@@ -247,14 +250,14 @@ export default function NewEventPlanPage() {
           })),
         )
       } catch {
-        toast.error('Failed to load prerequisite requests.')
+        toast.error(t('pages.prereqLoadFail'))
       } finally {
         setIsLoadingDependencies(false)
       }
     }
 
     void loadDependencies()
-  }, [])
+  }, [t])
 
   const selectedReservation = useMemo(
     () => reservationOptions.find((item) => item.id === form.reservationRequestId),
@@ -272,11 +275,11 @@ export default function NewEventPlanPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!form.title.trim() || !form.minimumAttendance) {
-      toast.error('Title and minimum attendance are required.')
+      toast.error(t('pages.titleMinRequired'))
       return
     }
     if (!canCreatePlan) {
-      toast.error('Approved reservation and access requests are required.')
+      toast.error(t('pages.approvalsRequired'))
       return
     }
 
@@ -312,13 +315,13 @@ export default function NewEventPlanPage() {
 
       const data = await res.json().catch(() => null)
       if (!res.ok) {
-        throw new Error(data?.message || 'Failed to create event plan.')
+        throw new Error(data?.message || t('pages.planCreateFail'))
       }
 
-      toast.success('Event plan created.')
+      toast.success(t('pages.planCreated'))
       router.push(`/organizer/plans/${data.id}`)
     } catch (error: any) {
-      toast.error(error.message || 'Failed to create event plan.')
+      toast.error(error.message || t('pages.planCreateFail'))
     } finally {
       setIsSubmitting(false)
     }
@@ -328,10 +331,10 @@ export default function NewEventPlanPage() {
     <div className="p-6 max-w-4xl mx-auto pb-20">
       <div className="mb-6">
         <h1 className="text-xl font-bold flex items-center gap-2">
-          <ClipboardList className="size-5 text-primary" /> New Event Plan
+          <ClipboardList className="size-5 text-primary" /> {t('dashboard.newEventPlan')}
         </h1>
         <p className="text-sm text-muted-foreground mt-0.5">
-          Create an event preparation plan after required prerequisites are approved.
+          {t('pages.plansSubtitle')}
         </p>
       </div>
 
@@ -340,7 +343,7 @@ export default function NewEventPlanPage() {
         className="bg-card border border-border rounded-xl shadow-sm p-6 space-y-6"
       >
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-          <p className="font-semibold">Approval rules</p>
+          <p className="font-semibold">{t('pages.approvalRules')}</p>
           <p className="mt-1">
             Reservation and access requests are mandatory and must be approved before you can create the plan.
             Equipment and procurement requests are optional.
@@ -349,49 +352,49 @@ export default function NewEventPlanPage() {
 
         {isLoadingDependencies ? (
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Loader2 className="size-4 animate-spin" /> Loading prerequisite requests...
+            <Loader2 className="size-4 animate-spin" /> {t('common.loading')}
           </div>
         ) : (
           <div className="grid gap-4 lg:grid-cols-2">
             <RequestRequirementCard
-              title="Reservation Request"
+              title={t('pages.reservations')}
               description="Reserve the room or venue for the event."
               icon={<BookMarked className="size-5" />}
               createHref="/organizer/reservations/new"
-              createLabel="New Reservation"
+              createLabel={t('pages.reserveRoom')}
               options={reservationOptions}
               value={form.reservationRequestId}
               onChange={(value) => set('reservationRequestId', value)}
               required
             />
             <RequestRequirementCard
-              title="Access Request"
+              title={t('nav.accessRequests')}
               description="Request lab, area or system access needed for the event."
               icon={<ShieldCheck className="size-5" />}
               createHref="/organizer/access-requests/new"
-              createLabel="New Access"
+              createLabel={t('pages.newAccessRequest')}
               options={accessOptions}
               value={form.accessRequestId}
               onChange={(value) => set('accessRequestId', value)}
               required
             />
             <RequestRequirementCard
-              title="Equipment Request"
+              title={t('pages.equipmentRequests')}
               description="Optional equipment such as projector, laptop or audio kit."
               icon={<Package className="size-5" />}
               createHref="/organizer/equipment/new"
-              createLabel="New Equipment"
+              createLabel={t('pages.requestEquipment')}
               options={equipmentOptions}
               value={form.equipmentRequestId}
               onChange={(value) => set('equipmentRequestId', value)}
               required={false}
             />
             <RequestRequirementCard
-              title="Procurement Request"
+              title={t('pages.procurementTitle')}
               description="Optional purchases or external service procurement."
               icon={<ShoppingCart className="size-5" />}
               createHref="/organizer/procurement/new"
-              createLabel="New Procurement"
+              createLabel={t('common.newRequest')}
               options={procurementOptions}
               value={form.procurementRequestId}
               onChange={(value) => set('procurementRequestId', value)}
@@ -402,10 +405,10 @@ export default function NewEventPlanPage() {
 
         <div className="space-y-1.5">
           <Label>
-            Title <span className="text-destructive">*</span>
+            {t('common.title')} <span className="text-destructive">*</span>
           </Label>
           <Input
-            placeholder="e.g. Spring Tech Summit 2025"
+            placeholder={t('pages.titlePlaceholder')}
             value={form.title}
             onChange={(e) => set('title', e.target.value)}
           />
@@ -413,7 +416,7 @@ export default function NewEventPlanPage() {
 
         <div className="grid sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">
-            <Label>Event Type</Label>
+            <Label>{t('pages.eventType')}</Label>
             <select
               value={form.eventType}
               onChange={(e) => set('eventType', e.target.value)}
@@ -425,9 +428,9 @@ export default function NewEventPlanPage() {
             </select>
           </div>
           <div className="space-y-1.5">
-            <Label>Location Preference</Label>
+            <Label>{t('pages.locationPreference')}</Label>
             <Input
-              placeholder="e.g. Eng. Hall A"
+              placeholder={t('pages.locationPlaceholder')}
               value={form.locationPreference}
               onChange={(e) => set('locationPreference', e.target.value)}
             />
@@ -435,12 +438,12 @@ export default function NewEventPlanPage() {
         </div>
 
         <div className="space-y-1.5">
-          <Label>Description</Label>
+          <Label>{t('common.description')}</Label>
           <textarea
             value={form.description}
             onChange={(e) => set('description', e.target.value)}
             rows={3}
-            placeholder="Describe the event..."
+            placeholder={t('pages.eventDescriptionPlaceholder')}
             className="w-full bg-background border border-input rounded-md px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring resize-none"
           />
         </div>
@@ -448,22 +451,22 @@ export default function NewEventPlanPage() {
         <div className="grid sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">
             <Label>
-              Minimum Attendance <span className="text-destructive">*</span>
+              {t('pages.minAttendance')} <span className="text-destructive">*</span>
             </Label>
             <Input
               type="number"
               min="1"
-              placeholder="e.g. 30"
+              placeholder={t('pages.minAttendancePlaceholder')}
               value={form.minimumAttendance}
               onChange={(e) => set('minimumAttendance', e.target.value)}
             />
           </div>
           <div className="space-y-1.5">
-            <Label>Target Attendance</Label>
+            <Label>{t('pages.targetAttendance')}</Label>
             <Input
               type="number"
               min="1"
-              placeholder="e.g. 100"
+              placeholder={t('pages.targetAttendancePlaceholder')}
               value={form.targetAttendance}
               onChange={(e) => set('targetAttendance', e.target.value)}
             />
@@ -472,11 +475,11 @@ export default function NewEventPlanPage() {
 
         <div className="space-y-2 p-4 bg-muted/30 rounded-lg">
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-            Tentative Dates
+            {t('pages.tentativeDates')}
           </p>
           <div className="grid sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <Label>Start</Label>
+              <Label>{t('pages.start')}</Label>
               <Input
                 type="datetime-local"
                 value={form.tentativeStartAt}
@@ -484,7 +487,7 @@ export default function NewEventPlanPage() {
               />
             </div>
             <div className="space-y-1.5">
-              <Label>End</Label>
+              <Label>{t('pages.end')}</Label>
               <Input
                 type="datetime-local"
                 value={form.tentativeEndAt}
@@ -496,11 +499,11 @@ export default function NewEventPlanPage() {
 
         <div className="space-y-2 p-4 bg-muted/30 rounded-lg">
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-            Pre-Registration Window
+            {t('pages.preregWindow')}
           </p>
           <div className="grid sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <Label>Opens</Label>
+              <Label>{t('pages.registrationOpens')}</Label>
               <Input
                 type="datetime-local"
                 value={form.registrationStartAt}
@@ -508,7 +511,7 @@ export default function NewEventPlanPage() {
               />
             </div>
             <div className="space-y-1.5">
-              <Label>Closes</Label>
+              <Label>{t('pages.registrationCloses')}</Label>
               <Input
                 type="datetime-local"
                 value={form.registrationEndAt}
@@ -519,21 +522,21 @@ export default function NewEventPlanPage() {
         </div>
 
         <div className="space-y-1.5">
-          <Label>Source Event Request ID (optional)</Label>
+          <Label>{t('pages.sourceRequestId')}</Label>
           <Input
-            placeholder="Student event request ID"
+            placeholder={t('pages.sourceRequestPlaceholder')}
             value={form.sourceEventRequestId}
             onChange={(e) => set('sourceEventRequestId', e.target.value)}
           />
         </div>
 
         <div className="space-y-1.5">
-          <Label>Notes</Label>
+          <Label>{t('common.notes')}</Label>
           <textarea
             value={form.notes}
             onChange={(e) => set('notes', e.target.value)}
             rows={2}
-            placeholder="Internal notes..."
+            placeholder={t('pages.notesPlaceholder')}
             className="w-full bg-background border border-input rounded-md px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring resize-none"
           />
         </div>
@@ -546,10 +549,10 @@ export default function NewEventPlanPage() {
 
         <div className="flex justify-end gap-3 pt-2">
           <Button type="button" variant="outline" onClick={() => router.back()}>
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button type="submit" disabled={isSubmitting || isLoadingDependencies || !canCreatePlan} className="gap-2">
-            {isSubmitting && <Loader2 className="size-4 animate-spin" />} Create Plan
+            {isSubmitting && <Loader2 className="size-4 animate-spin" />} {t('common.newPlan')}
           </Button>
         </div>
       </form>

@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { getToken } from '@/lib/auth'
+import { useI18n } from '@/lib/i18n'
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000'
 
@@ -25,6 +26,7 @@ const CATEGORIES = [
 
 export default function OrganizerNewProcurementPage() {
   const router = useRouter()
+  const { t } = useI18n()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [form, setForm] = useState({
     itemName: '',
@@ -44,18 +46,18 @@ export default function OrganizerNewProcurementPage() {
     event.preventDefault()
 
     if (!form.itemName.trim()) {
-      toast.error('Item name is required.')
+      toast.error(t('pages.itemNameRequired'))
       return
     }
 
     if (!form.justification.trim()) {
-      toast.error('Justification is required.')
+      toast.error(t('pages.justificationRequired'))
       return
     }
 
     const quantity = Number(form.quantity)
     if (!Number.isInteger(quantity) || quantity < 1) {
-      toast.error('Quantity must be at least 1.')
+      toast.error(t('pages.quantityMin'))
       return
     }
 
@@ -67,7 +69,7 @@ export default function OrganizerNewProcurementPage() {
       unitPriceEstimate !== undefined &&
       (Number.isNaN(unitPriceEstimate) || unitPriceEstimate < 0)
     ) {
-      toast.error('Unit price estimate must be a valid positive number.')
+      toast.error(t('pages.unitPriceInvalid'))
       return
     }
 
@@ -92,12 +94,12 @@ export default function OrganizerNewProcurementPage() {
       })
 
       const data = await res.json()
-      if (!res.ok) throw new Error(data.message || 'Failed to submit request.')
+      if (!res.ok) throw new Error(data.message || t('pages.accessSubmitFail'))
 
-      toast.success(`Procurement request ${data.requestNo} submitted.`)
+      toast.success(t('pages.procurementSubmitted', { requestNo: data.requestNo }))
       router.push(`/organizer/requests/${data.requestId}`)
     } catch (error: any) {
-      toast.error(error.message || 'Something went wrong.')
+      toast.error(error.message || t('pages.somethingWrong'))
     } finally {
       setIsSubmitting(false)
     }
@@ -113,10 +115,10 @@ export default function OrganizerNewProcurementPage() {
         </Link>
         <div>
           <h1 className="text-xl font-bold text-foreground">
-            New Procurement Request
+            {t('common.newRequest')}
           </h1>
           <p className="text-sm text-muted-foreground">
-            Create a request for purchasing an item or service.
+            {t('pages.procurementSubtitle')}
           </p>
         </div>
       </div>
@@ -128,17 +130,17 @@ export default function OrganizerNewProcurementPage() {
         <div className="grid sm:grid-cols-2 gap-4">
           <div className="space-y-1.5 sm:col-span-2">
             <Label>
-              Item Name <span className="text-destructive">*</span>
+              {t('pages.itemName')} <span className="text-destructive">*</span>
             </Label>
             <Input
               value={form.itemName}
               onChange={(e) => setValue('itemName', e.target.value)}
-              placeholder="e.g. 15 laptops for software lab"
+              placeholder={t('pages.itemPlaceholder')}
             />
           </div>
 
           <div className="space-y-1.5">
-            <Label>Category</Label>
+            <Label>{t('common.category')}</Label>
             <select
               value={form.itemCategory}
               onChange={(e) => setValue('itemCategory', e.target.value)}
@@ -167,7 +169,7 @@ export default function OrganizerNewProcurementPage() {
 
           <div className="space-y-1.5">
             <Label>
-              Quantity <span className="text-destructive">*</span>
+              {t('common.quantity')} <span className="text-destructive">*</span>
             </Label>
             <Input
               type="number"
@@ -178,45 +180,45 @@ export default function OrganizerNewProcurementPage() {
           </div>
 
           <div className="space-y-1.5">
-            <Label>Unit Price Estimate</Label>
+            <Label>{t('pages.unitPriceEstimate')}</Label>
             <Input
               type="number"
               min="0"
               step="0.01"
               value={form.unitPriceEstimate}
               onChange={(e) => setValue('unitPriceEstimate', e.target.value)}
-              placeholder="e.g. 1200"
+              placeholder={t('pages.unitPricePlaceholder')}
             />
           </div>
 
           <div className="space-y-1.5">
-            <Label>Vendor Preference</Label>
+            <Label>{t('pages.vendorPreference')}</Label>
             <Input
               value={form.vendorPreference}
               onChange={(e) => setValue('vendorPreference', e.target.value)}
-              placeholder="Preferred vendor or supplier"
+              placeholder={t('pages.vendorPlaceholder')}
             />
           </div>
 
           <div className="space-y-1.5">
-            <Label>Budget Code</Label>
+            <Label>{t('pages.budgetCode')}</Label>
             <Input
               value={form.budgetCode}
               onChange={(e) => setValue('budgetCode', e.target.value)}
-              placeholder="Optional budget or cost center code"
+              placeholder={t('pages.budgetPlaceholder')}
             />
           </div>
         </div>
 
         <div className="space-y-1.5">
           <Label>
-            Justification <span className="text-destructive">*</span>
+            {t('pages.justification')} <span className="text-destructive">*</span>
           </Label>
           <textarea
             rows={5}
             value={form.justification}
             onChange={(e) => setValue('justification', e.target.value)}
-            placeholder="Explain why this purchase is needed, who will use it, and what outcome it supports."
+            placeholder={t('pages.purchaseJustificationPlaceholder')}
             className="w-full bg-background border border-input rounded-md px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring resize-none"
           />
         </div>
@@ -228,11 +230,11 @@ export default function OrganizerNewProcurementPage() {
             ) : (
               <ShoppingCart className="size-4" />
             )}
-            Submit Request
+            {t('common.newRequest')}
           </Button>
           <Link href="/organizer/procurement">
             <Button type="button" variant="outline">
-              Cancel
+              {t('common.cancel')}
             </Button>
           </Link>
         </div>

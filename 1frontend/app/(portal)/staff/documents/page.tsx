@@ -14,6 +14,7 @@ import {
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { getToken } from '@/lib/auth'
+import { useI18n } from '@/lib/i18n'
 
 interface DocumentRequest {
   id: string
@@ -30,12 +31,12 @@ interface DocumentRequest {
 
 type FilterStatus = 'all' | 'pending' | 'in_progress' | 'completed' | 'rejected'
 
-const FILTER_TABS: { key: FilterStatus; label: string }[] = [
-  { key: 'all', label: 'All' },
-  { key: 'pending', label: 'Pending' },
-  { key: 'in_progress', label: 'In Progress' },
-  { key: 'completed', label: 'Completed' },
-  { key: 'rejected', label: 'Rejected' },
+const FILTER_TABS: { key: FilterStatus; labelKey: string }[] = [
+  { key: 'all', labelKey: 'common.all' },
+  { key: 'pending', labelKey: 'common.pending' },
+  { key: 'in_progress', labelKey: 'pages.documentFilterInProgress' },
+  { key: 'completed', labelKey: 'common.completed' },
+  { key: 'rejected', labelKey: 'common.rejected' },
 ]
 
 const DOC_TYPE_LABELS: Record<string, string> = {
@@ -62,6 +63,7 @@ function getDocType(req: DocumentRequest): string {
 
 export default function StaffDocumentsPage() {
   const router = useRouter()
+  const { t } = useI18n()
   const [documents, setDocuments] = useState<DocumentRequest[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [activeFilter, setActiveFilter] = useState<FilterStatus>('all')
@@ -80,7 +82,7 @@ export default function StaffDocumentsPage() {
           setDocuments([])
         }
       } catch {
-        toast.error('Failed to load documents.')
+        toast.error(t('pages.documentsLoadFail'))
         setDocuments([])
       } finally {
         setIsLoading(false)
@@ -150,7 +152,7 @@ export default function StaffDocumentsPage() {
                       : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
                   )}
                 >
-                  {tab.label}
+                  {t(tab.labelKey)}
                   {count > 0 && (
                     <span
                       className={cn(
@@ -172,11 +174,11 @@ export default function StaffDocumentsPage() {
 
         {filtered.length === 0 ? (
           <EmptyState
-            title="No document requests"
+            title={t('documents.noDocumentRequests')}
             description={
               activeFilter === 'all'
-                ? 'Administrative and document requests will appear here.'
-                : `No ${activeFilter.replace('_', ' ')} document requests found.`
+                ? t('documents.documentsEmptyAll')
+                : t('documents.documentsEmptyFilter', { filter: activeFilter.replace('_', ' ') })
             }
             icon={<FolderOpen className="size-6" />}
           />
@@ -200,7 +202,7 @@ export default function StaffDocumentsPage() {
                   <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                     Submitted At
                   </th>
-                  <th className="sr-only">Actions</th>
+                  <th className="sr-only">{t('common.actions')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">

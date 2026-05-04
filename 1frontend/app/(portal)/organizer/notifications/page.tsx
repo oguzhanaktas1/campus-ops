@@ -7,6 +7,7 @@ import { Bell, Loader2, CheckCheck, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 import { getToken } from '@/lib/auth'
+import { useI18n } from '@/lib/i18n'
 
 const typeColors: Record<string, string> = {
   IN_APP: 'bg-blue-500',
@@ -22,6 +23,7 @@ function timeAgo(ts: string) {
 }
 
 export default function OrganizerNotificationsPage() {
+  const { t } = useI18n()
   const [notifications, setNotifications] = useState<any[]>([])
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -35,7 +37,7 @@ export default function OrganizerNotificationsPage() {
       })
       if (res.ok) { const d = await res.json(); setNotifications(Array.isArray(d) ? d : (d.notifications ?? [])); }
     } catch {
-      toast.error('Failed to load notifications')
+      toast.error(t('pages.notificationsLoadFail'))
     } finally {
       setIsLoading(false)
     }
@@ -77,12 +79,12 @@ export default function OrganizerNotificationsPage() {
       if (res.ok) {
         setNotifications(prev => prev.filter(n => !selectedIds.includes(n.id)))
         setSelectedIds([])
-        toast.success(`${selectedIds.length} notifications deleted`)
+        toast.success(t('pages.notificationsDeleted', { count: selectedIds.length }))
       } else {
         throw new Error('Failed')
       }
     } catch {
-      toast.error('Failed to delete notifications')
+      toast.error(t('pages.notificationsDeleteFail'))
     }
   }
 
@@ -116,10 +118,10 @@ export default function OrganizerNotificationsPage() {
 
       if (res.ok) {
         setNotifications(prev => prev.map(n => ({ ...n, isRead: true })))
-        toast.success('All notifications marked as read')
+        toast.success(t('pages.allNotificationsRead'))
       }
     } catch {
-      toast.error('Failed to mark all as read')
+      toast.error(t('pages.allNotificationsReadFail'))
     }
   }
 
@@ -133,20 +135,20 @@ export default function OrganizerNotificationsPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
-            Notifications
+            {t('common.notifications')}
           </h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Stay up to date with your requests</p>
+          <p className="text-sm text-muted-foreground mt-0.5">{t('pages.notificationsSubtitle')}</p>
         </div>
 
         <div className="flex items-center gap-2">
           {selectedIds.length > 0 && (
             <Button variant="destructive" size="sm" onClick={handleDeleteSelected} className="gap-2 shadow-sm animate-in fade-in zoom-in duration-200">
-              <Trash2 className="size-4" /> Delete ({selectedIds.length})
+              <Trash2 className="size-4" /> {t('pages.deleteSelected', { count: selectedIds.length })}
             </Button>
           )}
           {unreadCount > 0 && (
             <Button variant="outline" size="sm" onClick={handleMarkAllRead} className="gap-2">
-              <CheckCheck className="size-4" /> Mark all read
+              <CheckCheck className="size-4" /> {t('pages.markAllRead')}
             </Button>
           )}
         </div>
@@ -163,7 +165,7 @@ export default function OrganizerNotificationsPage() {
               className="size-4 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer"
             />
             <span className="text-sm font-medium text-muted-foreground cursor-pointer select-none" onClick={toggleSelectAll}>
-              {isAllSelected ? 'Deselect All' : 'Select All'}
+              {isAllSelected ? t('pages.deselectAll') : t('pages.selectAll')}
             </span>
           </div>
         )}
@@ -206,8 +208,8 @@ export default function OrganizerNotificationsPage() {
           {notifications.length === 0 && (
             <div className="py-12 flex flex-col items-center justify-center text-center opacity-50">
               <Bell className="size-10 mb-3" />
-              <p className="text-sm font-medium">All Caught Up!</p>
-              <p className="text-xs">No notifications to display.</p>
+              <p className="text-sm font-medium">{t('pages.allCaughtUp')}</p>
+              <p className="text-xs">{t('pages.noNotifications')}</p>
             </div>
           )}
         </div>

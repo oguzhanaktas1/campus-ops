@@ -21,6 +21,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { getToken } from '@/lib/auth'
+import { useI18n } from '@/lib/i18n'
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000'
 
@@ -45,6 +46,7 @@ const TERMINAL = ['APPROVED', 'REJECTED', 'CANCELLED', 'CLOSED', 'COMPLETED']
 export default function FacultyInternshipDetailPage() {
   const params = useParams()
   const id = params?.id as string
+  const { t } = useI18n()
 
   const [data, setData] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -65,7 +67,7 @@ export default function FacultyInternshipDetailPage() {
 
   const handleAction = async (action: NonNullable<ActionType>) => {
     if ((action === 'reject' || action === 'revision') && !comment.trim()) {
-      toast.error(`A comment is required to ${action} this request.`)
+      toast.error(t('approvals.revisionNotesPlaceholder'))
       return
     }
 
@@ -82,7 +84,13 @@ export default function FacultyInternshipDetailPage() {
 
       if (res.ok) {
         const result = await res.json().catch(() => ({}))
-        toast.success(`Request ${action === 'approve' ? 'approved' : action === 'reject' ? 'rejected' : 'sent for revision'}.`)
+        toast.success(
+          action === 'approve'
+            ? t('approvals.successApprove')
+            : action === 'reject'
+            ? t('approvals.successReject')
+            : t('approvals.successRevision')
+        )
         const nextStatus = result.status ?? (action === 'approve' ? 'APPROVED' : action === 'reject' ? 'REJECTED' : 'REVISION_REQUESTED')
         if (TERMINAL.includes(nextStatus)) setDoneAction(action)
         setData((prev: any) => ({
@@ -96,10 +104,10 @@ export default function FacultyInternshipDetailPage() {
         setComment('')
       } else {
         const err = await res.json().catch(() => ({})) as { message?: string }
-        toast.error(err.message ?? 'Failed to process request.')
+        toast.error(err.message ?? t('approvals.failApprove'))
       }
     } catch {
-      toast.error('Network error.')
+      toast.error(t('detail.networkError'))
     } finally {
       setIsProcessing(false)
     }
@@ -118,9 +126,9 @@ export default function FacultyInternshipDetailPage() {
       <div className="p-6 max-w-3xl mx-auto">
         <div className="flex flex-col items-center py-16 text-center">
           <AlertTriangle className="size-8 text-muted-foreground/40 mb-3" />
-          <p className="text-sm font-medium text-foreground">Internship not found</p>
+          <p className="text-sm font-medium text-foreground">{t('internships.noInternships')}</p>
           <Link href="/faculty/internships" className="mt-3">
-            <Button variant="outline" size="sm">Back to internships</Button>
+            <Button variant="outline" size="sm">{t('common.back')}</Button>
           </Link>
         </div>
       </div>
@@ -134,7 +142,7 @@ export default function FacultyInternshipDetailPage() {
       <div className="flex items-center gap-3">
         <Link href="/faculty/internships">
           <Button variant="ghost" size="sm" className="gap-1.5">
-            <ArrowLeft className="size-4" /> Back
+            <ArrowLeft className="size-4" /> {t('common.back')}
           </Button>
         </Link>
       </div>
@@ -148,7 +156,7 @@ export default function FacultyInternshipDetailPage() {
           <div>
             <h1 className="text-lg font-bold text-foreground">{data.title}</h1>
             <p className="text-xs text-muted-foreground mt-0.5">
-              {data.requestNo} · Submitted {formatDate(data.createdAt)}
+              {data.requestNo} · {t('common.created')} {formatDate(data.createdAt)}
             </p>
           </div>
         </div>
@@ -158,7 +166,7 @@ export default function FacultyInternshipDetailPage() {
       {/* Student info */}
       <div className="bg-card border border-border rounded-lg p-5 space-y-3">
         <p className="text-sm font-semibold text-foreground flex items-center gap-2">
-          <User className="size-4 text-muted-foreground" /> Student
+          <User className="size-4 text-muted-foreground" /> {t('internships.colStudent')}
         </p>
         <div className="flex items-center gap-3">
           <div className="size-9 rounded-full bg-primary/10 flex items-center justify-center text-primary text-sm font-bold">
@@ -178,28 +186,28 @@ export default function FacultyInternshipDetailPage() {
       {/* Company info */}
       <div className="bg-card border border-border rounded-lg p-5 space-y-4">
         <p className="text-sm font-semibold text-foreground flex items-center gap-2">
-          <Building2 className="size-4 text-muted-foreground" /> Company Details
+          <Building2 className="size-4 text-muted-foreground" /> {t('internships.colCompany')}
         </p>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-          <InfoRow label="Company" value={data.companyName} />
-          <InfoRow label="Sector" value={data.companySector} />
-          <InfoRow label="Contact" value={data.companyContactName} />
-          <InfoRow label="Contact Email" value={data.companyContactEmail} />
+          <InfoRow label={t('internships.colCompany')} value={data.companyName} />
+          <InfoRow label={t('detail.sector')} value={data.companySector} />
+          <InfoRow label={t('detail.contact')} value={data.companyContactName} />
+          <InfoRow label={t('detail.contactEmail')} value={data.companyContactEmail} />
         </div>
       </div>
 
       {/* Internship details */}
       <div className="bg-card border border-border rounded-lg p-5 space-y-4">
         <p className="text-sm font-semibold text-foreground flex items-center gap-2">
-          <Calendar className="size-4 text-muted-foreground" /> Internship Details
+          <Calendar className="size-4 text-muted-foreground" /> {t('internships.title')}
         </p>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-          <InfoRow label="Type" value={data.internshipType} />
-          <InfoRow label="Work Mode" value={data.workMode} />
-          <InfoRow label="Start Date" value={formatDate(data.startDate)} />
-          <InfoRow label="End Date" value={formatDate(data.endDate)} />
-          <InfoRow label="Duration" value={data.durationDays ? `${data.durationDays} days` : null} />
-          <InfoRow label="Insurance" value={data.insuranceRequired ? 'Required' : 'Not Required'} />
+          <InfoRow label={t('common.type')} value={data.internshipType} />
+          <InfoRow label={t('detail.workMode')} value={data.workMode} />
+          <InfoRow label={t('detail.startDate')} value={formatDate(data.startDate)} />
+          <InfoRow label={t('detail.endDate')} value={formatDate(data.endDate)} />
+          <InfoRow label={t('common.duration')} value={data.durationDays ? `${data.durationDays} days` : null} />
+          <InfoRow label={t('detail.insurance')} value={data.insuranceRequired ? t('detail.required') : t('detail.notRequired')} />
         </div>
       </div>
 
@@ -207,15 +215,15 @@ export default function FacultyInternshipDetailPage() {
       {canAct && (
         <div className="bg-card border border-border rounded-lg p-5 shadow-sm space-y-4">
           <div className="flex justify-between items-center">
-            <p className="text-sm font-semibold text-foreground">Faculty Decision</p>
+            <p className="text-sm font-semibold text-foreground">{t('approvals.title')}</p>
             {!comment.trim() && (
               <p className="text-[10px] text-amber-600 font-medium bg-amber-50 px-2 py-1 rounded">
-                Comment required for Reject / Revision
+                {t('approvals.revisionNotesPlaceholder')}
               </p>
             )}
           </div>
           <Textarea
-            placeholder="Provide reasoning or feedback (required for Reject/Revision)..."
+            placeholder={t('approvals.notesPlaceholder')}
             value={comment}
             onChange={(e) => setComment(e.target.value)}
             className="resize-none min-h-[100px]"
@@ -223,13 +231,13 @@ export default function FacultyInternshipDetailPage() {
           />
           <div className="flex gap-3 flex-wrap">
             <Button className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white flex-1 sm:flex-none" disabled={isProcessing} onClick={() => handleAction('approve')}>
-              {isProcessing ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />} Approve
+              {isProcessing ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />} {t('approvals.approveBtn')}
             </Button>
             <Button variant="destructive" className="gap-2 flex-1 sm:flex-none" disabled={isProcessing} onClick={() => handleAction('reject')}>
-              {isProcessing ? <Loader2 className="size-4 animate-spin" /> : <XCircle className="size-4" />} Reject
+              {isProcessing ? <Loader2 className="size-4 animate-spin" /> : <XCircle className="size-4" />} {t('approvals.rejectBtn')}
             </Button>
             <Button variant="outline" className="gap-2 flex-1 sm:flex-none border-amber-200 text-amber-700 hover:bg-amber-50 hover:text-amber-800" disabled={isProcessing} onClick={() => handleAction('revision')}>
-              {isProcessing ? <Loader2 className="size-4 animate-spin" /> : <RotateCcw className="size-4" />} Request Revision
+              {isProcessing ? <Loader2 className="size-4 animate-spin" /> : <RotateCcw className="size-4" />} {t('approvals.revisionBtn')}
             </Button>
           </div>
         </div>
@@ -238,7 +246,7 @@ export default function FacultyInternshipDetailPage() {
       {/* Comments */}
       {data.comments?.length > 0 && (
         <div className="bg-card border border-border rounded-lg p-5 space-y-3">
-          <p className="text-sm font-semibold text-foreground">Comments</p>
+          <p className="text-sm font-semibold text-foreground">{t('detail.comments')}</p>
           {data.comments.map((c: any) => (
             <div key={c.id} className="border-l-2 border-border pl-3">
               <div className="flex items-center gap-2">
@@ -255,7 +263,7 @@ export default function FacultyInternshipDetailPage() {
       {/* Timeline */}
       {data.timeline?.length > 0 && (
         <div className="bg-card border border-border rounded-lg p-5">
-          <p className="text-sm font-semibold text-foreground mb-4">Status History</p>
+          <p className="text-sm font-semibold text-foreground mb-4">{t('detail.statusHistory')}</p>
           <RequestTimeline events={data.timeline} />
         </div>
       )}

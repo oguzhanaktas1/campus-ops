@@ -8,6 +8,7 @@ import { StatusBadge } from '@/components/status-badge'
 import { CheckSquare, Clock, ArrowRight, CheckCircle2, XCircle, Loader2 } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import { fetchProfile, getStoredUser, getToken } from '@/lib/auth'
+import { useI18n } from '@/lib/i18n'
 
 function formatDate(d: string) {
   if (!d) return ''
@@ -20,6 +21,7 @@ function formatTime(d: string) {
 }
 
 export default function FacultyDashboard() {
+  const { t } = useI18n()
   const [user, setUser] = useState<any>(null)
   const [pending, setPending] = useState<any[]>([])
   const [appointments, setAppointments] = useState<any[]>([])
@@ -121,23 +123,23 @@ export default function FacultyDashboard() {
   return (
     <div className="p-6 space-y-6 max-w-5xl mx-auto">
       <div>
-        <h1 className="text-xl font-bold text-foreground">Welcome, {title} {lastName}</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">Your pending approvals and schedule for today.</p>
+        <h1 className="text-xl font-bold text-foreground">{t('dashboard.welcome', { title, name: lastName })}</h1>
+        <p className="text-sm text-muted-foreground mt-0.5">{t('dashboard.subtitle')}</p>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <MetricCard title="Pending Approvals" value={metrics.pendingCount} description="Require action" icon={<CheckSquare className="size-4" />} valueClassName="text-amber-600" />
-        <MetricCard title="Approved Today" value={metrics.approvedToday} icon={<CheckCircle2 className="size-4" />} trend={metrics.approvedToday > 0 ? 15 : 0} trendLabel="vs yesterday" />
-        <MetricCard title="Rejected Today" value={metrics.rejectedToday} icon={<XCircle className="size-4" />} />
-        <MetricCard title="Avg Review Time" value={`${metrics.avgReviewHours}h`} description="Per request" icon={<Clock className="size-4" />} trend={-8} trendLabel="vs last week" />
+        <MetricCard title={t('dashboard.pendingApprovals')} value={metrics.pendingCount} description={t('common.requiredAction')} icon={<CheckSquare className="size-4" />} valueClassName="text-amber-600" />
+        <MetricCard title={t('dashboard.approvedToday')} value={metrics.approvedToday} icon={<CheckCircle2 className="size-4" />} trend={metrics.approvedToday > 0 ? 15 : 0} trendLabel={t('common.vsYesterday')} />
+        <MetricCard title={t('dashboard.rejectedToday')} value={metrics.rejectedToday} icon={<XCircle className="size-4" />} />
+        <MetricCard title={t('dashboard.avgReviewTime')} value={`${metrics.avgReviewHours}h`} description={t('common.perRequest')} icon={<Clock className="size-4" />} trend={-8} trendLabel={t('common.vsLastWeek')} />
       </div>
 
       <div className="grid lg:grid-cols-3 gap-5">
         <div className="lg:col-span-2 bg-card border border-border rounded-lg shadow-sm">
           <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-            <h2 className="text-sm font-semibold text-foreground">Pending Approvals</h2>
+            <h2 className="text-sm font-semibold text-foreground">{t('dashboard.pendingApprovals')}</h2>
             <Link href="/faculty/approvals">
-              <Button variant="ghost" size="sm" className="text-xs gap-1">View all <ArrowRight className="size-3" /></Button>
+              <Button variant="ghost" size="sm" className="text-xs gap-1">{t('common.viewAll')} <ArrowRight className="size-3" /></Button>
             </Link>
           </div>
           <div className="divide-y divide-border">
@@ -155,7 +157,7 @@ export default function FacultyDashboard() {
               </Link>
             ))}
             {pending.length === 0 && (
-              <p className="text-sm text-muted-foreground text-center py-8">No pending approvals.</p>
+              <p className="text-sm text-muted-foreground text-center py-8">{t('dashboard.noPending')}</p>
             )}
           </div>
         </div>
@@ -163,10 +165,10 @@ export default function FacultyDashboard() {
         <div className="space-y-5">
           <div className="bg-card border border-border rounded-lg shadow-sm">
             <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-              <h2 className="text-sm font-semibold text-foreground">Today's Appointments</h2>
+              <h2 className="text-sm font-semibold text-foreground">{t('dashboard.todayAppointments')}</h2>
               <Link href="/faculty/appointments">
                 <Button variant="ghost" size="sm" className="text-xs h-auto py-0.5 gap-1">
-                  View <ArrowRight className="size-3" />
+                  {t('common.view')} <ArrowRight className="size-3" />
                 </Button>
               </Link>
             </div>
@@ -174,12 +176,12 @@ export default function FacultyDashboard() {
               {appointments.slice(0, 3).map((apt) => (
                 <div key={apt.id} className="px-4 py-3">
                   <p className="text-sm font-medium text-foreground">{apt.title}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{apt.description || 'No description'}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">{formatTime(apt.startDate)} · Office / Online</p>
+                  <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{apt.description || t('common.noDescription')}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{formatTime(apt.startDate)} · {t('dashboard.officeOnline')}</p>
                 </div>
               ))}
               {appointments.length === 0 && (
-                <p className="text-xs text-muted-foreground text-center py-4">No appointments today.</p>
+                <p className="text-xs text-muted-foreground text-center py-4">{t('dashboard.noAppointments')}</p>
               )}
             </div>
           </div>
@@ -187,14 +189,14 @@ export default function FacultyDashboard() {
       </div>
 
       <div className="bg-card border border-border rounded-lg shadow-sm p-5">
-        <h2 className="text-sm font-semibold text-foreground mb-4">Approval Activity - This Week</h2>
+        <h2 className="text-sm font-semibold text-foreground mb-4">{t('dashboard.approvalActivity')}</h2>
         <ResponsiveContainer width="100%" height={200}>
           <BarChart data={weeklyData} barSize={20} barGap={4}>
             <XAxis dataKey="day" tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
             <YAxis tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
             <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8 }} cursor={{ fill: 'oklch(0.94 0.01 264 / 0.5)' }} />
-            <Bar dataKey="approved" name="Approved" fill="oklch(0.53 0.14 162)" radius={[4, 4, 0, 0]} />
-            <Bar dataKey="rejected" name="Rejected" fill="oklch(0.577 0.245 27.325)" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="approved" name={t('common.approved')} fill="oklch(0.53 0.14 162)" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="rejected" name={t('common.rejected')} fill="oklch(0.577 0.245 27.325)" radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </div>

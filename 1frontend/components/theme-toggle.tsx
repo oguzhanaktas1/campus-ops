@@ -4,9 +4,11 @@ import { Moon, Sun } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useEffect, useState } from 'react'
 import { getSavedTheme, saveTheme } from '@/lib/theme-storage'
+import { useOptionalT } from '@/lib/optional-t'
 
 export function ThemeToggle() {
   const [dark, setDark] = useState(false)
+  const tt = useOptionalT()
 
   useEffect(() => {
     const saved = getSavedTheme()
@@ -31,7 +33,7 @@ export function ThemeToggle() {
       size="icon"
       className="size-8"
       onClick={toggle}
-      aria-label="Toggle theme"
+      aria-label={tt('common.toggleTheme', 'Toggle theme')}
     >
       {dark ? <Sun className="size-4" /> : <Moon className="size-4" />}
     </Button>

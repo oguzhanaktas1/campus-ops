@@ -6,6 +6,7 @@ import { ShoppingCart, Loader2, AlertCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { getToken } from '@/lib/auth'
+import { useI18n } from '@/lib/i18n'
 
 const STATUS_BADGE: Record<string, string> = {
   SUBMITTED:    'bg-blue-50 text-blue-700 border-blue-200',
@@ -18,6 +19,7 @@ const STATUS_BADGE: Record<string, string> = {
 
 export default function StaffProcurementPage() {
   const router = useRouter()
+  const { t } = useI18n()
   const [requests, setRequests] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [filter, setFilter] = useState('all')
@@ -30,11 +32,11 @@ export default function StaffProcurementPage() {
       })
       if (res.ok) setRequests(await res.json())
     } catch {
-      toast.error('Failed to load procurement requests.')
+      toast.error(t('pages.procurementLoadFail'))
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [t])
 
   useEffect(() => { fetchRequests() }, [fetchRequests])
 
@@ -49,8 +51,8 @@ export default function StaffProcurementPage() {
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6 pb-20">
       <div>
-        <h1 className="text-xl font-bold flex items-center gap-2"><ShoppingCart className="size-5 text-primary" /> Procurement Requests</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">Manage purchase and procurement requests.</p>
+        <h1 className="text-xl font-bold flex items-center gap-2"><ShoppingCart className="size-5 text-primary" /> {t('pages.procurementRequests')}</h1>
+        <p className="text-sm text-muted-foreground mt-0.5">{t('pages.procurementSubtitle')}</p>
       </div>
 
       {/* Filter pills */}
@@ -59,7 +61,7 @@ export default function StaffProcurementPage() {
           <button key={s} onClick={() => setFilter(s)}
             className={cn('text-xs px-3 py-1.5 rounded-full border font-semibold transition-colors',
               filter === s ? 'bg-foreground text-background border-foreground' : 'bg-background text-muted-foreground border-border hover:border-foreground')}>
-            {s === 'all' ? 'All' : s.replace(/_/g, ' ')}
+            {s === 'all' ? t('common.all') : s.replace(/_/g, ' ')}
           </button>
         ))}
       </div>
@@ -68,18 +70,18 @@ export default function StaffProcurementPage() {
         {filtered.length === 0 ? (
           <div className="py-16 flex flex-col items-center text-center opacity-50">
             <AlertCircle className="size-10 mb-3" />
-            <p className="text-sm font-medium">No procurement requests found.</p>
+            <p className="text-sm font-medium">{t('pages.noProcurement')}</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="border-b border-border bg-muted/40">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Request #</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Item</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden sm:table-cell">Requester</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden md:table-cell">Est. Total</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Status</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">{t('pages.requestNumber')}</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">{t('pages.item')}</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden sm:table-cell">{t('common.requester')}</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden md:table-cell">{t('pages.estTotal')}</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">{t('common.status')}</th>
                   <th className="px-4 py-3" />
                 </tr>
               </thead>
@@ -105,7 +107,7 @@ export default function StaffProcurementPage() {
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      <span className="text-xs text-primary font-medium">View</span>
+                      <span className="text-xs text-primary font-medium">{t('common.view')}</span>
                     </td>
                   </tr>
                 ))}

@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { getToken } from '@/lib/auth'
+import { useI18n } from '@/lib/i18n'
 
 const STATUS_BADGE: Record<string, string> = {
   SUBMITTED:  'bg-blue-50 text-blue-700 border-blue-200',
@@ -17,6 +18,7 @@ const STATUS_BADGE: Record<string, string> = {
 }
 
 export default function OrganizerAccessRequestsPage() {
+  const { t } = useI18n()
   const [requests, setRequests] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
@@ -29,13 +31,13 @@ export default function OrganizerAccessRequestsPage() {
         })
         if (res.ok) setRequests(await res.json())
       } catch {
-        toast.error('Failed to load access requests.')
+        toast.error(t('pages.accessLoadFail'))
       } finally {
         setIsLoading(false)
       }
     }
     fetch_()
-  }, [])
+  }, [t])
 
   if (isLoading) return (
     <div className="flex h-[60vh] items-center justify-center">
@@ -48,12 +50,12 @@ export default function OrganizerAccessRequestsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
-            <ShieldCheck className="size-5 text-primary" /> Access Requests
+            <ShieldCheck className="size-5 text-primary" /> {t('nav.accessRequests')}
           </h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Request access to systems, labs or campus resources.</p>
+          <p className="text-sm text-muted-foreground mt-0.5">{t('pages.accessSubtitle')}</p>
         </div>
         <Link href="/organizer/access-requests/new">
-          <Button size="sm" className="gap-2"><Plus className="size-4" /> New Request</Button>
+          <Button size="sm" className="gap-2"><Plus className="size-4" /> {t('common.newRequest')}</Button>
         </Link>
       </div>
 
@@ -61,8 +63,8 @@ export default function OrganizerAccessRequestsPage() {
         {requests.length === 0 ? (
           <div className="py-16 flex flex-col items-center text-center opacity-50">
             <AlertCircle className="size-10 mb-3" />
-            <p className="text-sm font-medium">No access requests yet.</p>
-            <p className="text-xs text-muted-foreground mt-1">Submit a request to get access to a system or resource.</p>
+            <p className="text-sm font-medium">{t('pages.noAccessRequests')}</p>
+            <p className="text-xs text-muted-foreground mt-1">{t('pages.noAccessRequestsDesc')}</p>
           </div>
         ) : (
           <div className="divide-y divide-border">

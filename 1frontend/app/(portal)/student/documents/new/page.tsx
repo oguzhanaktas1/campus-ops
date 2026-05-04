@@ -7,26 +7,14 @@ import { ArrowLeft, FileText, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 import { getToken } from '@/lib/auth'
 import { toast } from 'sonner'
+import { useI18n } from '@/lib/i18n'
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000'
-
-const DOC_TYPES = [
-  { value: 'TRANSCRIPT', label: 'Transcript' },
-  { value: 'ENROLLMENT_CERTIFICATE', label: 'Enrollment Certificate' },
-  { value: 'STUDENT_CERTIFICATE', label: 'Student Certificate' },
-  { value: 'DIPLOMA', label: 'Diploma' },
-  { value: 'OTHER', label: 'Other' },
-]
-
-const DELIVERY_METHODS = [
-  { value: 'PICKUP', label: 'Pickup from Office' },
-  { value: 'EMAIL', label: 'Send via Email' },
-  { value: 'MAIL', label: 'Postal Mail' },
-]
 
 export default function NewDocumentPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { t } = useI18n()
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const [form, setForm] = useState({
@@ -60,12 +48,12 @@ export default function NewDocumentPage() {
       })
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
-        throw new Error((err as any).message ?? 'Failed to submit request.')
+        throw new Error((err as any).message ?? t('documents.submitFail'))
       }
-      toast.success('Document request submitted.')
+      toast.success(t('documents.submitted'))
       router.push('/student/documents')
     } catch (err: any) {
-      toast.error(err.message ?? 'Failed to submit request.')
+      toast.error(err.message ?? t('documents.submitFail'))
     } finally {
       setIsSubmitting(false)
     }
@@ -80,8 +68,8 @@ export default function NewDocumentPage() {
           </Button>
         </Link>
         <div>
-          <h1 className="text-xl font-bold text-foreground">New Document Request</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Request an official document from the registrar.</p>
+          <h1 className="text-xl font-bold text-foreground">{t('documents.newTitle')}</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">{t('documents.newSubtitle')}</p>
         </div>
       </div>
 
@@ -89,35 +77,41 @@ export default function NewDocumentPage() {
         {/* Document Type */}
         <div className="px-5 py-4 space-y-3">
           <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
-            <FileText className="size-4 text-primary" /> Document Details
+            <FileText className="size-4 text-primary" /> {t('documents.details')}
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Document Type *</label>
+              <label className="text-xs font-medium text-muted-foreground">{t('documents.documentType')} *</label>
               <select
                 value={form.documentType}
                 onChange={(e) => set('documentType', e.target.value)}
                 required
                 className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
               >
-                {DOC_TYPES.map((t) => (
-                  <option key={t.value} value={t.value}>{t.label}</option>
+                {[
+                  { value: 'TRANSCRIPT', label: t('documents.transcript') },
+                  { value: 'ENROLLMENT_CERTIFICATE', label: t('documents.enrollmentCertificate') },
+                  { value: 'STUDENT_CERTIFICATE', label: t('documents.studentCertificate') },
+                  { value: 'DIPLOMA', label: t('documents.diploma') },
+                  { value: 'OTHER', label: t('documents.other') },
+                ].map((item) => (
+                  <option key={item.value} value={item.value}>{item.label}</option>
                 ))}
               </select>
             </div>
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Language</label>
+              <label className="text-xs font-medium text-muted-foreground">{t('forms.language')}</label>
               <select
                 value={form.language}
                 onChange={(e) => set('language', e.target.value)}
                 className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
               >
-                <option value="English">English</option>
-                <option value="Turkish">Turkish</option>
+                <option value="English">{t('forms.langEnglish')}</option>
+                <option value="Turkish">{t('forms.langTurkish')}</option>
               </select>
             </div>
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Number of Copies</label>
+              <label className="text-xs font-medium text-muted-foreground">{t('forms.copies')}</label>
               <input
                 type="number"
                 min={1}
@@ -132,12 +126,16 @@ export default function NewDocumentPage() {
 
         {/* Delivery */}
         <div className="px-5 py-4 space-y-3">
-          <h2 className="text-sm font-semibold text-foreground">Delivery Preferences</h2>
+          <h2 className="text-sm font-semibold text-foreground">{t('forms.deliveryPreferences')}</h2>
           <div className="space-y-4">
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Delivery Method *</label>
+              <label className="text-xs font-medium text-muted-foreground">{t('documents.deliveryMethod')} *</label>
               <div className="grid grid-cols-3 gap-2">
-                {DELIVERY_METHODS.map((m) => (
+                {[
+                  { value: 'PICKUP', label: t('documents.pickup') },
+                  { value: 'EMAIL', label: t('documents.emailDelivery') },
+                  { value: 'MAIL', label: t('documents.mailDelivery') },
+                ].map((m) => (
                   <button
                     key={m.value}
                     type="button"
@@ -156,13 +154,13 @@ export default function NewDocumentPage() {
             {(form.deliveryMethod === 'EMAIL' || form.deliveryMethod === 'MAIL') && (
               <div className="space-y-1.5">
                 <label className="text-xs font-medium text-muted-foreground">
-                  {form.deliveryMethod === 'EMAIL' ? 'Email Address' : 'Postal Address'} *
+                  {form.deliveryMethod === 'EMAIL' ? t('documents.emailAddress') : t('documents.postalAddress')} *
                 </label>
                 <input
                   type={form.deliveryMethod === 'EMAIL' ? 'email' : 'text'}
                   value={form.deliveryAddress}
                   onChange={(e) => set('deliveryAddress', e.target.value)}
-                  placeholder={form.deliveryMethod === 'EMAIL' ? 'your@email.com' : 'Full postal address'}
+                  placeholder={form.deliveryMethod === 'EMAIL' ? t('forms.emailPlaceholder') : t('forms.addressPlaceholder')}
                   required
                   className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                 />
@@ -173,12 +171,12 @@ export default function NewDocumentPage() {
 
         {/* Notes */}
         <div className="px-5 py-4 space-y-1.5">
-          <label className="text-xs font-medium text-muted-foreground">Additional Notes</label>
+          <label className="text-xs font-medium text-muted-foreground">{t('forms.additionalNotes')}</label>
           <textarea
             rows={3}
             value={form.description}
             onChange={(e) => set('description', e.target.value)}
-            placeholder="Any special instructions or additional information..."
+            placeholder={t('forms.additionalNotesPlaceholder')}
             className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-none"
           />
         </div>
@@ -186,11 +184,11 @@ export default function NewDocumentPage() {
         {/* Submit */}
         <div className="px-5 py-4 flex items-center justify-end gap-3">
           <Link href="/student/documents">
-            <Button type="button" variant="ghost" size="sm">Cancel</Button>
+            <Button type="button" variant="ghost" size="sm">{t('common.cancel')}</Button>
           </Link>
           <Button type="submit" size="sm" disabled={isSubmitting} className="gap-1.5">
             {isSubmitting && <Loader2 className="size-3.5 animate-spin" />}
-            Submit Request
+            {t('common.submitRequest')}
           </Button>
         </div>
       </form>

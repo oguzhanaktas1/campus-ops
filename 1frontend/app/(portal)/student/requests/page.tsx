@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Clock, Loader2, MessageSquare, AlertCircle, User, Search } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useI18n } from '@/lib/i18n'
 
 const statusColor: Record<string, string> = {
   approved: 'bg-emerald-50 text-emerald-700 border-emerald-200',
@@ -21,13 +22,13 @@ const statusColor: Record<string, string> = {
 }
 
 const STATUS_TABS = [
-  { id: 'all', label: 'All' },
-  { id: 'submitted', label: 'Submitted' },
-  { id: 'in_review', label: 'In Review' },
-  { id: 'waiting_approval', label: 'Waiting Approval' },
-  { id: 'approved', label: 'Approved' },
-  { id: 'rejected', label: 'Rejected' },
-  { id: 'completed', label: 'Completed' },
+  { id: 'all', labelKey: 'requests.all' },
+  { id: 'submitted', labelKey: 'requests.submitted' },
+  { id: 'in_review', labelKey: 'requests.inReview' },
+  { id: 'waiting_approval', labelKey: 'requests.waitingApproval' },
+  { id: 'approved', labelKey: 'requests.approved' },
+  { id: 'rejected', labelKey: 'requests.rejected' },
+  { id: 'completed', labelKey: 'requests.completed' },
 ]
 
 interface RequestItem {
@@ -48,6 +49,7 @@ const formatTitle = (str: string) =>
 
 export default function RequestsListingPage() {
   const searchParams = useSearchParams()
+  const { locale, t } = useI18n()
   const filterType = searchParams.get('type')
   const filterCategory = searchParams.get('category')
 
@@ -82,7 +84,7 @@ export default function RequestsListingPage() {
     fetchRequests()
   }, [filterType, filterCategory])
 
-  let pageTitle = 'All Requests'
+  let pageTitle = t('requests.allRequests')
   if (filterType) {
     pageTitle = requests.length > 0 ? requests[0].typeName : formatTitle(filterType)
   } else if (filterCategory) {
@@ -90,8 +92,8 @@ export default function RequestsListingPage() {
   }
 
   const pageSubtitle = (filterType || filterCategory)
-    ? `Manage your ${pageTitle.toLowerCase()}`
-    : 'Overview of all your campus requests'
+    ? t('requests.manageYour', { title: pageTitle.toLowerCase() })
+    : t('requests.subtitle')
 
   const filtered = requests.filter(r => {
     const q = searchQuery.toLowerCase()
@@ -115,7 +117,7 @@ export default function RequestsListingPage() {
         <div className="relative w-full sm:w-64">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search title, type, assignee..."
+            placeholder={t('requests.searchPlaceholder')}
             className="pl-9 h-9"
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
@@ -136,7 +138,7 @@ export default function RequestsListingPage() {
                 : 'text-muted-foreground hover:text-foreground hover:bg-muted'
             )}
           >
-            {tab.label}
+            {t(tab.labelKey)}
           </button>
         ))}
       </div>
@@ -179,7 +181,7 @@ export default function RequestsListingPage() {
                   <div className="flex items-center gap-4 flex-wrap mt-3">
                     <span className="flex items-center gap-1 text-xs text-muted-foreground">
                       <Clock className="size-3.5" />
-                      {new Date(req.createdAt).toLocaleDateString('en-US', {
+                      {new Date(req.createdAt).toLocaleDateString(locale === 'tr' ? 'tr-TR' : 'en-US', {
                         month: 'short',
                         day: 'numeric',
                         year: 'numeric',
@@ -188,21 +190,21 @@ export default function RequestsListingPage() {
 
                     {!filterType && (
                       <span className="text-xs text-muted-foreground border-l border-border pl-4">
-                        Type:{' '}
+                        {t('requests.type')}:{' '}
                         <span className="font-medium text-foreground">{req.typeName}</span>
                       </span>
                     )}
 
                     {assigneeToShow && (
                       <span className="flex items-center gap-1 text-xs text-muted-foreground border-l border-border pl-4">
-                        <User className="size-3.5" /> Assigned to:{' '}
+                        <User className="size-3.5" /> {t('requests.assignedTo')}:{' '}
                         <span className="font-medium text-foreground">{assigneeToShow}</span>
                       </span>
                     )}
 
                     {req.commentCount > 0 && (
                       <span className="flex items-center gap-1 text-xs text-primary font-medium border-l border-border pl-4">
-                        <MessageSquare className="size-3.5" /> {req.commentCount} Comments
+                        <MessageSquare className="size-3.5" /> {t('requests.comments', { count: req.commentCount })}
                       </span>
                     )}
                   </div>
@@ -214,11 +216,11 @@ export default function RequestsListingPage() {
           {filtered.length === 0 && (
             <div className="flex flex-col items-center justify-center py-16 text-center bg-card border border-dashed rounded-lg">
               <AlertCircle className="size-10 text-muted-foreground/50 mb-3" />
-              <h3 className="text-sm font-semibold text-foreground">No requests found</h3>
+              <h3 className="text-sm font-semibold text-foreground">{t('requests.noRequestsFound')}</h3>
               <p className="text-xs text-muted-foreground mt-1">
                 {searchQuery || statusFilter !== 'all'
-                  ? 'Try adjusting your search or filter.'
-                  : `You haven't created any ${pageTitle.toLowerCase()} yet.`}
+                  ? t('requests.adjustSearch')
+                  : t('requests.noneCreated', { title: pageTitle.toLowerCase() })}
               </p>
             </div>
           )}

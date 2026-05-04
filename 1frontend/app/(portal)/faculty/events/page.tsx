@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { getToken } from '@/lib/auth'
+import { useI18n } from '@/lib/i18n'
 
 const STATUS_BADGE: Record<string, string> = {
   SUBMITTED:  'bg-blue-50 text-blue-700 border-blue-200',
@@ -17,6 +18,7 @@ const STATUS_BADGE: Record<string, string> = {
 }
 
 export default function FacultyEventsPage() {
+  const { t } = useI18n()
   const [events, setEvents] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [actionId, setActionId] = useState<string | null>(null)
@@ -30,11 +32,11 @@ export default function FacultyEventsPage() {
       })
       if (res.ok) setEvents(await res.json())
     } catch {
-      toast.error('Failed to load events.')
+      toast.error(t('events.loadFail'))
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [t])
 
   useEffect(() => { fetchEvents() }, [fetchEvents])
 
@@ -52,7 +54,7 @@ export default function FacultyEventsPage() {
       setNote('')
       fetchEvents()
     } catch {
-      toast.error('Failed to update status.')
+      toast.error(t('events.loadFail'))
     }
   }
 
@@ -68,13 +70,13 @@ export default function FacultyEventsPage() {
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6 pb-20">
       <div>
-        <h1 className="text-xl font-bold flex items-center gap-2"><PartyPopper className="size-5 text-primary" /> Event Requests</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">Review and approve campus event requests.</p>
+        <h1 className="text-xl font-bold flex items-center gap-2"><PartyPopper className="size-5 text-primary" /> {t('events.title')}</h1>
+        <p className="text-sm text-muted-foreground mt-0.5">{t('events.subtitle', { count: events.length })}</p>
       </div>
 
       {pending.length > 0 && (
         <section className="space-y-3">
-          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Pending Review ({pending.length})</h2>
+          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">{t('common.pending')} ({pending.length})</h2>
           <div className="bg-card border border-border rounded-xl shadow-sm divide-y divide-border overflow-hidden">
             {pending.map((ev) => (
               <div key={ev.id} className="px-5 py-4 space-y-3">
@@ -94,31 +96,31 @@ export default function FacultyEventsPage() {
 
                 {actionId === ev.id ? (
                   <div className="space-y-2">
-                    <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} placeholder="Note (optional)..."
+                    <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} placeholder={t('approvals.notesPlaceholder')}
                       className="w-full bg-background border border-input rounded-md px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring resize-none" />
                     <div className="flex gap-2">
                       <Button asChild size="sm" variant="outline">
                         <Link href={`/faculty/requests/${ev.id}?from=/faculty/events`}>
-                          View Detail
+                          {t('events.viewDetail')}
                         </Link>
                       </Button>
                       <Button size="sm" className="gap-1.5 bg-green-600 hover:bg-green-700" onClick={() => updateStatus(ev.id, 'APPROVED')}>
-                        <CheckCircle className="size-3.5" /> Approve
+                        <CheckCircle className="size-3.5" /> {t('common.approve')}
                       </Button>
                       <Button size="sm" variant="destructive" className="gap-1.5" onClick={() => updateStatus(ev.id, 'REJECTED')}>
-                        <XCircle className="size-3.5" /> Reject
+                        <XCircle className="size-3.5" /> {t('common.reject')}
                       </Button>
-                      <Button size="sm" variant="ghost" onClick={() => { setActionId(null); setNote('') }}>Cancel</Button>
+                      <Button size="sm" variant="ghost" onClick={() => { setActionId(null); setNote('') }}>{t('common.cancel')}</Button>
                     </div>
                   </div>
                 ) : (
                   <div className="flex shrink-0 gap-2">
                     <Button asChild size="sm" variant="outline">
                       <Link href={`/faculty/requests/${ev.id}?from=/faculty/events`}>
-                        View Detail
+                        {t('events.viewDetail')}
                       </Link>
                     </Button>
-                    <Button size="sm" variant="outline" onClick={() => setActionId(ev.id)}>Review</Button>
+                    <Button size="sm" variant="outline" onClick={() => setActionId(ev.id)}>{t('common.confirm')}</Button>
                   </div>
                 )}
               </div>
@@ -129,7 +131,7 @@ export default function FacultyEventsPage() {
 
       {others.length > 0 && (
         <section className="space-y-3">
-          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Past Decisions ({others.length})</h2>
+          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">{t('events.pastDecisions')} ({others.length})</h2>
           <div className="bg-card border border-border rounded-xl shadow-sm divide-y divide-border overflow-hidden">
             {others.map((ev) => (
               <Link
@@ -153,7 +155,7 @@ export default function FacultyEventsPage() {
       {events.length === 0 && (
         <div className="py-16 flex flex-col items-center text-center opacity-50 bg-card border border-border rounded-xl">
           <AlertCircle className="size-10 mb-3" />
-          <p className="text-sm font-medium">No event requests.</p>
+          <p className="text-sm font-medium">{t('events.noEvents')}</p>
         </div>
       )}
     </div>

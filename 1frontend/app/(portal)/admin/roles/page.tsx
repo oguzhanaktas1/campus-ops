@@ -20,6 +20,7 @@ import {
 } from '@/components/ui/select'
 import { Search, Plus, Pencil, Trash2, Loader2, Shield, Lock } from 'lucide-react'
 import { toast } from 'sonner'
+import { useI18n } from '@/lib/i18n'
 
 type ScopeType = 'GLOBAL' | 'CAMPUS' | 'FACULTY' | 'DEPARTMENT' | 'UNIT'
 
@@ -46,6 +47,7 @@ interface Role {
 const EMPTY_FORM = { name: '', description: '', scopeType: 'GLOBAL' as ScopeType }
 
 export default function RolesPage() {
+  const { t } = useI18n()
   const [roles, setRoles] = useState<Role[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -63,10 +65,10 @@ export default function RolesPage() {
         headers: { Authorization: `Bearer ${token}` },
       })
       if (res.ok) setRoles(await res.json())
-      else toast.error('Failed to load roles')
+      else toast.error(t('roles.loadFail'))
     } catch (error) {
       console.error('API Error:', error)
-      toast.error('Failed to load roles')
+      toast.error(t('roles.loadFail'))
     } finally {
       setIsLoading(false)
     }
@@ -88,7 +90,7 @@ export default function RolesPage() {
 
   const handleSave = async () => {
     if (!form.name.trim()) {
-      toast.error('Role name is required')
+      toast.error(t('roles.nameRequired'))
       return
     }
     setIsSaving(true)
@@ -104,16 +106,16 @@ export default function RolesPage() {
         body: JSON.stringify(form),
       })
       if (res.ok) {
-        toast.success(editingItem ? 'Role updated!' : 'Role created!')
+        toast.success(editingItem ? t('roles.saveSuccess') : t('roles.createSuccess'))
         setDialogOpen(false)
         fetchRoles()
       } else {
         const err = await res.json().catch(() => ({}))
-        toast.error((err as { message?: string }).message || 'Failed to save role')
+        toast.error((err as { message?: string }).message || t('roles.saveFail'))
       }
     } catch (error) {
       console.error('Save error:', error)
-      toast.error('Failed to save role')
+      toast.error(t('roles.saveFail'))
     } finally {
       setIsSaving(false)
     }
@@ -121,10 +123,10 @@ export default function RolesPage() {
 
   const handleDelete = async (role: Role) => {
     if (role.isSystem) {
-      toast.error('System roles cannot be deleted')
+      toast.error(t('roles.cannotDeleteSystem'))
       return
     }
-    if (!window.confirm(`Are you sure you want to delete the role "${role.name}"? This cannot be undone.`)) return
+    if (!window.confirm(t('roles.confirmDelete', { name: role.name }))) return
     try {
       const token = localStorage.getItem('access_token')
       const res = await fetch(`${backendUrl}/admin/roles/${role.id}`, {
@@ -132,14 +134,14 @@ export default function RolesPage() {
         headers: { Authorization: `Bearer ${token}` },
       })
       if (res.ok) {
-        toast.success('Role deleted!')
+        toast.success(t('roles.deleteSuccess'))
         fetchRoles()
       } else {
-        toast.error('Failed to delete role')
+        toast.error(t('roles.deleteFail'))
       }
     } catch (error) {
       console.error('Delete error:', error)
-      toast.error('Failed to delete role')
+      toast.error(t('roles.deleteFail'))
     }
   }
 
@@ -181,17 +183,17 @@ export default function RolesPage() {
       </td>
       <td className="px-5 py-3.5 hidden lg:table-cell">
         <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-muted text-foreground border border-border">
-          {role.permissionsCount ?? 0} permissions
+          {t('roles.permissionsCount', { count: role.permissionsCount ?? 0 })}
         </span>
       </td>
       <td className="px-5 py-3.5">
         {role.isSystem ? (
           <span className="flex items-center gap-1 px-2 py-1 rounded-md bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700 text-[10px] font-bold tracking-wider w-fit">
-            <Lock className="size-2.5" /> SYSTEM
+            <Lock className="size-2.5" /> {t('roles.systemRole')}
           </span>
         ) : (
           <span className="px-2 py-1 rounded-md bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 text-[10px] font-bold tracking-wider">
-            CUSTOM
+            {t('roles.customRole')}
           </span>
         )}
       </td>
@@ -206,7 +208,7 @@ export default function RolesPage() {
             className="size-7 text-destructive hover:text-destructive hover:bg-destructive/10 disabled:opacity-40"
             onClick={() => handleDelete(role)}
             disabled={role.isSystem}
-            title={role.isSystem ? 'System roles cannot be deleted' : 'Delete role'}
+            title={role.isSystem ? t('roles.cannotDeleteSystem') : t('common.delete')}
           >
             <Trash2 className="size-3.5" />
           </Button>
@@ -227,13 +229,13 @@ export default function RolesPage() {
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold text-foreground">Role Management</h1>
+          <h1 className="text-xl font-bold text-foreground">{t('roles.title')}</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {roles.length} role{roles.length !== 1 ? 's' : ''} configured in the system.
+            {t('roles.subtitle', { count: roles.length })}
           </p>
         </div>
         <Button size="sm" className="gap-1.5" onClick={openAdd}>
-          <Plus className="size-3.5" /> Add Role
+          <Plus className="size-3.5" /> {t('roles.addRole')}
         </Button>
       </div>
 
@@ -242,7 +244,7 @@ export default function RolesPage() {
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
           <Input
-            placeholder="Search roles by name, description or scope..."
+            placeholder={t('roles.searchPlaceholder')}
             className="pl-9 h-9"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -251,10 +253,10 @@ export default function RolesPage() {
         <div className="flex items-center gap-4 text-sm ml-auto">
           <span className="font-medium text-muted-foreground">
             <Lock className="inline size-3.5 mr-1 mb-0.5" />
-            {roles.filter((r) => r.isSystem).length} System
+            {t('roles.systemRoles', { count: roles.filter((r) => r.isSystem).length })}
           </span>
           <span className="font-medium text-muted-foreground">
-            {roles.filter((r) => !r.isSystem).length} Custom
+            {t('roles.customRoles', { count: roles.filter((r) => !r.isSystem).length })}
           </span>
         </div>
       </div>
@@ -264,18 +266,18 @@ export default function RolesPage() {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border bg-muted/40">
-              <th className="px-5 py-3 text-left font-semibold text-muted-foreground">Role</th>
-              <th className="px-5 py-3 text-left font-semibold text-muted-foreground hidden md:table-cell">Scope</th>
-              <th className="px-5 py-3 text-left font-semibold text-muted-foreground hidden lg:table-cell">Permissions</th>
-              <th className="px-5 py-3 text-left font-semibold text-muted-foreground">Type</th>
-              <th className="px-5 py-3 text-right font-semibold text-muted-foreground">Actions</th>
+              <th className="px-5 py-3 text-left font-semibold text-muted-foreground">{t('roles.colRole')}</th>
+              <th className="px-5 py-3 text-left font-semibold text-muted-foreground hidden md:table-cell">{t('roles.colScope')}</th>
+              <th className="px-5 py-3 text-left font-semibold text-muted-foreground hidden lg:table-cell">{t('roles.colPermissions')}</th>
+              <th className="px-5 py-3 text-left font-semibold text-muted-foreground">{t('roles.colType')}</th>
+              <th className="px-5 py-3 text-right font-semibold text-muted-foreground">{t('roles.colActions')}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
             {groupedRoles.mainRoles.length > 0 && (
               <tr className="bg-muted/25">
                 <td colSpan={5} className="px-5 py-2 text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
-                  Main Roles
+                  {t('roles.mainRoles')}
                 </td>
               </tr>
             )}
@@ -283,7 +285,7 @@ export default function RolesPage() {
             {groupedRoles.secondaryRoles.length > 0 && (
               <tr className="bg-muted/25">
                 <td colSpan={5} className="px-5 py-2 text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
-                  Secondary Roles
+                  {t('roles.secondaryRoles')}
                 </td>
               </tr>
             )}
@@ -293,7 +295,7 @@ export default function RolesPage() {
         {filtered.length === 0 && (
           <div className="text-center py-12">
             <Shield className="size-8 text-muted-foreground/40 mx-auto mb-3" />
-            <p className="text-sm text-muted-foreground">No roles found.</p>
+            <p className="text-sm text-muted-foreground">{t('roles.noRoles')}</p>
           </div>
         )}
       </div>
@@ -302,32 +304,32 @@ export default function RolesPage() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>{editingItem ? 'Edit Role' : 'Add Role'}</DialogTitle>
+            <DialogTitle>{editingItem ? t('roles.editRole') : t('roles.addRole')}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-1.5">
               <Label htmlFor="role-name">
-                Name <span className="text-destructive">*</span>
+                {t('roles.roleName')} <span className="text-destructive">*</span>
               </Label>
               <Input
                 id="role-name"
-                placeholder="e.g. Department Coordinator"
+                placeholder={t('roles.roleNamePlaceholder')}
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="role-description">Description</Label>
+              <Label htmlFor="role-description">{t('roles.roleDescription')}</Label>
               <Input
                 id="role-description"
-                placeholder="Brief description of this role..."
+                placeholder={t('roles.roleDescriptionPlaceholder')}
                 value={form.description}
                 onChange={(e) => setForm({ ...form, description: e.target.value })}
               />
             </div>
             <div className="space-y-1.5">
               <Label>
-                Scope Type <span className="text-destructive">*</span>
+                {t('roles.scopeType')} <span className="text-destructive">*</span>
               </Label>
               <Select
                 value={form.scopeType}
@@ -345,17 +347,17 @@ export default function RolesPage() {
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
-                Defines the organizational level this role applies to.
+                {t('roles.scopeTypeHint')}
               </p>
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={isSaving}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button onClick={handleSave} disabled={isSaving}>
               {isSaving && <Loader2 className="mr-2 size-4 animate-spin" />}
-              {editingItem ? 'Save Changes' : 'Create Role'}
+              {editingItem ? t('common.save') : t('roles.createRole')}
             </Button>
           </DialogFooter>
         </DialogContent>

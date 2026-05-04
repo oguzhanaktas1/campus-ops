@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { getToken } from '@/lib/auth'
+import { useI18n } from '@/lib/i18n'
 
 const STATUS_BADGE: Record<string, string> = {
   SUBMITTED:  'bg-blue-50 text-blue-700 border-blue-200',
@@ -18,6 +19,7 @@ const STATUS_BADGE: Record<string, string> = {
 
 export default function StaffAccessRequestsPage() {
   const router = useRouter()
+  const { t } = useI18n()
   const [requests, setRequests] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [actionId, setActionId] = useState<string | null>(null)
@@ -32,11 +34,11 @@ export default function StaffAccessRequestsPage() {
       })
       if (res.ok) setRequests(await res.json())
     } catch {
-      toast.error('Failed to load access requests.')
+      toast.error(t('pages.accessLoadFail'))
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [t])
 
   useEffect(() => { fetchRequests() }, [fetchRequests])
 
@@ -49,12 +51,12 @@ export default function StaffAccessRequestsPage() {
         body: JSON.stringify({ status, note }),
       })
       if (!res.ok) throw new Error()
-      toast.success('Access request updated.')
+      toast.success(t('pages.accessUpdateSuccess'))
       setActionId(null)
       setNote('')
       fetchRequests()
     } catch {
-      toast.error('Failed to update status.')
+      toast.error(t('pages.accessUpdateFail'))
     }
   }
 
@@ -69,8 +71,8 @@ export default function StaffAccessRequestsPage() {
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6 pb-20">
       <div>
-        <h1 className="text-xl font-bold flex items-center gap-2"><ShieldCheck className="size-5 text-primary" /> Access Requests</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">Process system and resource access requests.</p>
+        <h1 className="text-xl font-bold flex items-center gap-2"><ShieldCheck className="size-5 text-primary" /> {t('pages.accessRequests')}</h1>
+        <p className="text-sm text-muted-foreground mt-0.5">{t('pages.accessSubtitle')}</p>
       </div>
 
       <div className="flex gap-2 flex-wrap">
@@ -78,7 +80,7 @@ export default function StaffAccessRequestsPage() {
           <button key={s} onClick={() => setFilter(s)}
             className={cn('text-xs px-3 py-1.5 rounded-full border font-semibold transition-colors',
               filter === s ? 'bg-foreground text-background border-foreground' : 'bg-background text-muted-foreground border-border hover:border-foreground')}>
-            {s === 'all' ? 'All' : s.replace(/_/g, ' ')}
+            {s === 'all' ? t('common.all') : s.replace(/_/g, ' ')}
           </button>
         ))}
       </div>
@@ -87,7 +89,7 @@ export default function StaffAccessRequestsPage() {
         {filtered.length === 0 ? (
           <div className="py-16 flex flex-col items-center text-center opacity-50">
             <AlertCircle className="size-10 mb-3" />
-            <p className="text-sm font-medium">No access requests found.</p>
+            <p className="text-sm font-medium">{t('pages.noAccessRequests')}</p>
           </div>
         ) : (
           filtered.map((r) => (

@@ -16,6 +16,7 @@ import {
   getRevisionFieldMode,
   type RevisionPolicy,
 } from '@/lib/revision-policy'
+import { useOptionalT } from '@/lib/optional-t'
 
 export interface FormField {
   id: string;
@@ -56,6 +57,17 @@ const IT_CATEGORIES = [
   'Other',
 ]
 
+const IT_CATEGORY_LABEL_KEYS: Record<string, string> = {
+  Hardware: 'forms.itCategoryHardware',
+  Software: 'forms.itCategorySoftware',
+  'Network / Connectivity': 'forms.itCategoryNetwork',
+  'Account / Access': 'forms.itCategoryAccount',
+  'Printer / Peripheral': 'forms.itCategoryPrinter',
+  'Email / Collaboration': 'forms.itCategoryEmail',
+  Security: 'forms.itCategorySecurity',
+  Other: 'forms.other',
+}
+
 const EQUIPMENT_CATEGORIES = [
   'Laboratory Equipment',
   'Computer Hardware',
@@ -67,6 +79,17 @@ const EQUIPMENT_CATEGORIES = [
   'Other',
 ]
 
+const EQUIPMENT_CATEGORY_LABEL_KEYS: Record<string, string> = {
+  'Laboratory Equipment': 'forms.equipmentCategoryLaboratory',
+  'Computer Hardware': 'forms.equipmentCategoryComputer',
+  'Audio/Visual Equipment': 'forms.equipmentCategoryAv',
+  Furniture: 'forms.equipmentCategoryFurniture',
+  'Office Supplies': 'forms.equipmentCategoryOffice',
+  'Measurement Instruments': 'forms.equipmentCategoryMeasurement',
+  'Safety Equipment': 'forms.equipmentCategorySafety',
+  Other: 'forms.other',
+}
+
 export function RequestForm({
   initialData,
   isEditMode = false,
@@ -74,6 +97,7 @@ export function RequestForm({
   revisionPolicy,
 }: RequestFormProps) {
   const router = useRouter()
+  const tt = useOptionalT()
   const [isLoading, setIsLoading] = useState(false)
   const [isAiAvailable, setIsAiAvailable] = useState(false)
   const [isAiParsing, setIsAiParsing] = useState(false)
@@ -252,14 +276,14 @@ export function RequestForm({
     setError('')
 
     if (!formData.typeKey) {
-      setError('Please select a request type.')
+      setError(tt('messages.selectRequestType', 'Please select a request type.'))
       setIsLoading(false)
       return
     }
 
     // 🔥 Hoca zorunluysa kontrol et
     if (requiresFaculty && !selectedFacultyId) {
-      setError('This academic request requires you to assign a faculty member.')
+      setError(tt('messages.facultyAssigneeRequired', 'This academic request requires you to assign a faculty member.'))
       setIsLoading(false)
       return
     }
@@ -271,7 +295,7 @@ export function RequestForm({
       // ── IT TICKET PATH ─────────────────────────────────────────────────────
       if (isItTicketType && !isEditMode) {
         if (!itState.category) {
-          setError('Please select an IT category.')
+          setError(tt('messages.selectItCategory', 'Please select an IT category.'))
           setIsLoading(false)
           return
         }
@@ -282,7 +306,7 @@ export function RequestForm({
             Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({
-            title: formData.title?.trim() || `${itState.category} Issue`,
+            title: formData.title?.trim() || tt('forms.itIssueTitle', '{{category}} Issue', { category: itState.category }),
             description: formData.description?.trim() || undefined,
             priority: formData.priority || 'MEDIUM',
             category: itState.category,
@@ -293,9 +317,9 @@ export function RequestForm({
         })
         if (!res.ok) {
           const err = await res.json().catch(() => ({})) as { message?: string }
-          throw new Error(err.message || 'Failed to submit IT ticket.')
+          throw new Error(err.message || tt('messages.submitItTicketFail', 'Failed to submit IT ticket.'))
         }
-        toast.success('IT support ticket submitted successfully!')
+        toast.success(tt('messages.itTicketSubmitted', 'IT support ticket submitted successfully!'))
         router.push('/student/requests')
         return
       }
@@ -303,17 +327,17 @@ export function RequestForm({
       // ── EQUIPMENT REQUEST PATH ──────────────────────────────────────────────
       if (isEquipmentType && !isEditMode) {
         if (!equipState.equipmentName.trim()) {
-          setError('Equipment name is required.')
+          setError(tt('messages.equipmentNameRequired', 'Equipment name is required.'))
           setIsLoading(false)
           return
         }
         if (!equipState.equipmentCategory) {
-          setError('Equipment category is required.')
+          setError(tt('messages.equipmentCategoryRequired', 'Equipment category is required.'))
           setIsLoading(false)
           return
         }
         if (!equipState.purpose.trim()) {
-          setError('Purpose is required.')
+          setError(tt('messages.purposeRequired', 'Purpose is required.'))
           setIsLoading(false)
           return
         }
@@ -338,9 +362,9 @@ export function RequestForm({
         })
         if (!res.ok) {
           const err = await res.json().catch(() => ({})) as { message?: string }
-          throw new Error(err.message || 'Failed to submit equipment request.')
+          throw new Error(err.message || tt('messages.submitEquipmentFail', 'Failed to submit equipment request.'))
         }
-        toast.success('Equipment request submitted successfully!')
+        toast.success(tt('messages.equipmentSubmittedGeneric', 'Equipment request submitted successfully!'))
         router.push('/student/requests')
         return
       }
@@ -376,9 +400,17 @@ export function RequestForm({
         body: submitData
       })
 
-      if (!res.ok) throw new Error((await res.json()).message || `Failed to ${isEditMode ? 'update' : 'submit'} request.`)
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(
+          err.message ||
+          (isEditMode
+            ? tt('messages.updateRequestFail', 'Failed to update request.')
+            : tt('messages.submitRequestFail', 'Failed to submit request.')),
+        )
+      }
 
-      toast.success(`Request ${isEditMode ? 'updated' : 'submitted'} successfully!`)
+      toast.success(isEditMode ? tt('messages.requestUpdated', 'Request updated successfully!') : tt('messages.requestSubmitted', 'Request submitted successfully!'))
       router.push('/student/requests')
     } catch (err: any) {
       setError(err.message)
@@ -392,7 +424,7 @@ export function RequestForm({
     const sourceText = [formData.title, formData.description].filter(Boolean).join('\n\n')
 
     if (!token || !sourceText.trim()) {
-      setAiParseNote('Add a title or description first.')
+      setAiParseNote(tt('forms.aiNeedsText', 'Add a title or description first.'))
       return
     }
 
@@ -414,7 +446,7 @@ export function RequestForm({
       })
 
       if (!res.ok) {
-        throw new Error('Parser unavailable')
+        throw new Error(tt('forms.aiParserUnavailable', 'Parser unavailable'))
       }
 
       const data = await res.json()
@@ -494,11 +526,11 @@ export function RequestForm({
 
       setAiParseNote(
         Array.isArray(data.missingFields) && data.missingFields.length > 0
-          ? `AI parsed a draft. Missing fields: ${data.missingFields.join(', ')}`
-          : 'AI parsed a draft and prefilled available fields.',
+          ? tt('forms.aiParsedMissing', 'AI parsed a draft. Missing fields: {{fields}}', { fields: data.missingFields.join(', ') })
+          : tt('forms.aiParsed', 'AI parsed a draft and prefilled available fields.'),
       )
     } catch {
-      setAiParseNote('AI parser is unavailable. You can continue filling the form normally.')
+      setAiParseNote(tt('forms.aiParserContinue', 'AI parser is unavailable. You can continue filling the form normally.'))
     } finally {
       setIsAiParsing(false)
     }
@@ -513,9 +545,9 @@ export function RequestForm({
           <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <p className="text-sm font-semibold text-primary">AI Form Helper</p>
+                <p className="text-sm font-semibold text-primary">{tt('forms.aiFormHelper', 'AI Form Helper')}</p>
                 <p className="text-xs text-muted-foreground">
-                  Optional helper only. It can prefill draft fields from your title and description, but you make the final edits and final submission.
+                  {tt('forms.aiFormHelperDesc', 'Optional helper only. It can prefill draft fields from your title and description, but you make the final edits and final submission.')}
                 </p>
               </div>
               <Button
@@ -526,7 +558,7 @@ export function RequestForm({
                 disabled={isAiParsing}
               >
                 {isAiParsing && <Loader2 className="size-4 animate-spin" />}
-                Parse with AI
+                {tt('forms.parseWithAi', 'Parse with AI')}
               </Button>
             </div>
             {aiParseNote && (
@@ -536,9 +568,9 @@ export function RequestForm({
         )}
         
         <div className="space-y-1.5">
-          <Label>Request Type <span className="text-destructive">*</span></Label>
+          <Label>{tt('forms.requestType', 'Request Type')} <span className="text-destructive">*</span></Label>
           <Select value={formData.typeKey || ""} onValueChange={handleTypeChange} required disabled={isLoadingTypes || isEditMode}>
-            <SelectTrigger className={isEditMode ? "bg-muted/50 cursor-not-allowed opacity-80" : ""}><SelectValue placeholder={isLoadingTypes ? "Loading..." : "Select request type..."} /></SelectTrigger>
+            <SelectTrigger className={isEditMode ? "bg-muted/50 cursor-not-allowed opacity-80" : ""}><SelectValue placeholder={isLoadingTypes ? tt('common.loading', 'Loading...') : tt('forms.requestTypePlaceholder', 'Select request type...')} /></SelectTrigger>
             <SelectContent>
               {requestTypes.map((rt) => (
                 <SelectItem key={rt.key} value={rt.key}>{rt.name}</SelectItem>
@@ -549,10 +581,10 @@ export function RequestForm({
 
         {!isEquipmentType && (
           <div className="space-y-1.5">
-            <Label htmlFor="title">Request Title <span className="text-destructive">*</span></Label>
+            <Label htmlFor="title">{tt('forms.requestTitle', 'Request Title')} <span className="text-destructive">*</span></Label>
             <Input
               id="title"
-              placeholder="Brief title..."
+              placeholder={tt('forms.briefTitlePlaceholder', 'Brief title...')}
               required={!isEquipmentType}
               value={formData.title}
               onChange={(e) => handleChange(e.target.id, e.target.value)}
@@ -565,14 +597,14 @@ export function RequestForm({
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           
           <div className="space-y-1.5">
-            <Label>Priority</Label>
+            <Label>{tt('detail.priority', 'Priority')}</Label>
             <Select value={formData.priority} onValueChange={(val) => handleChange('priority', val)} disabled={isEditMode}>
               <SelectTrigger className={isEditMode ? "bg-muted/50 cursor-not-allowed opacity-80" : ""}><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="LOW">Low</SelectItem>
-                <SelectItem value="MEDIUM">Medium</SelectItem>
-                <SelectItem value="HIGH">High</SelectItem>
-                <SelectItem value="URGENT">Urgent</SelectItem>
+                <SelectItem value="LOW">{tt('forms.priorityLow', 'Low')}</SelectItem>
+                <SelectItem value="MEDIUM">{tt('forms.priorityMedium', 'Medium')}</SelectItem>
+                <SelectItem value="HIGH">{tt('forms.priorityHigh', 'High')}</SelectItem>
+                <SelectItem value="URGENT">{tt('forms.priorityUrgent', 'Urgent')}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -580,20 +612,20 @@ export function RequestForm({
           {/* 🔥 DİNAMİK ATAMA ALANI 🔥 */}
           {!formData.typeKey ? (
              <div className="space-y-1.5 opacity-50">
-               <Label>Assignee</Label>
-               <Input disabled value="Select request type first" className="bg-muted cursor-not-allowed text-muted-foreground" />
+               <Label>{tt('forms.assignee', 'Assignee')}</Label>
+               <Input disabled value={tt('forms.selectRequestTypeFirst', 'Select request type first')} className="bg-muted cursor-not-allowed text-muted-foreground" />
              </div>
           ) : isStaffRouted ? (
              <div className="space-y-1.5">
-               <Label>Assignee</Label>
+               <Label>{tt('forms.assignee', 'Assignee')}</Label>
                <div className="flex items-center gap-2 h-10 w-full rounded-md border border-input bg-muted/50 px-3 py-2 text-sm text-muted-foreground cursor-not-allowed">
                   <Server className="size-4 shrink-0 text-primary/70" />
-                  Routed to Staff / IT Queue
+                  {tt('forms.routedToStaffIt', 'Routed to Staff / IT Queue')}
                </div>
              </div>
           ) : (
             <div className="space-y-1.5">
-              <Label>Assign to Faculty <span className="text-destructive">*</span></Label>
+              <Label>{tt('forms.assignToFaculty', 'Assign to Faculty')} <span className="text-destructive">*</span></Label>
               <Select
                 value={selectedFacultyId}
                 onValueChange={setSelectedFacultyId}
@@ -601,7 +633,7 @@ export function RequestForm({
                 required={requiresFaculty}
               >
                 <SelectTrigger className={cn(!selectedFacultyId ? "text-muted-foreground" : "", isEditMode ? "bg-muted/50 cursor-not-allowed opacity-80" : "")}>
-                  <SelectValue placeholder="Select a faculty member..." />
+                  <SelectValue placeholder={tt('forms.personPlaceholder', 'Select a faculty member...')} />
                 </SelectTrigger>
                 <SelectContent>
                   {faculties.map((fac) => (
@@ -621,32 +653,32 @@ export function RequestForm({
         {isItTicketType && !isEditMode && (
           <div className="grid grid-cols-2 gap-4 bg-amber-500/5 p-5 rounded-lg border border-amber-500/20">
             <div className="col-span-2 mb-1">
-              <h3 className="text-sm font-semibold text-amber-700 dark:text-amber-300">IT Ticket Details</h3>
-              <p className="text-xs text-muted-foreground mt-0.5">Help us route your request faster.</p>
+              <h3 className="text-sm font-semibold text-amber-700 dark:text-amber-300">{tt('forms.itTicketDetails', 'IT Ticket Details')}</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">{tt('forms.itTicketDetailsDesc', 'Help us route your request faster.')}</p>
             </div>
 
             <div className="space-y-1.5">
-              <Label>IT Category <span className="text-destructive">*</span></Label>
+              <Label>{tt('forms.itCategory', 'IT Category')} <span className="text-destructive">*</span></Label>
               <Select
                 value={itState.category}
                 onValueChange={(v) => setItState(p => ({ ...p, category: v }))}
               >
                 <SelectTrigger className="border-amber-500/20 bg-background">
-                  <SelectValue placeholder="Select category..." />
+                  <SelectValue placeholder={tt('forms.itCategoryPlaceholder', 'Select category...')} />
                 </SelectTrigger>
                 <SelectContent>
                   {IT_CATEGORIES.map((c) => (
-                    <SelectItem key={c} value={c}>{c}</SelectItem>
+                    <SelectItem key={c} value={c}>{tt(IT_CATEGORY_LABEL_KEYS[c] ?? 'forms.other', c)}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="itSubcategory">Subcategory</Label>
+              <Label htmlFor="itSubcategory">{tt('forms.itSubcategory', 'Subcategory')}</Label>
               <Input
                 id="itSubcategory"
-                placeholder="e.g. VPN, Outlook, Printer driver..."
+                placeholder={tt('forms.itSubcategoryPlaceholder', 'e.g. VPN, Outlook, Printer driver...')}
                 value={itState.subcategory}
                 onChange={(e) => setItState(p => ({ ...p, subcategory: e.target.value }))}
                 className="border-amber-500/20 focus-visible:ring-amber-500/40 bg-background"
@@ -654,10 +686,10 @@ export function RequestForm({
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="affectedSystem">Affected System / App</Label>
+              <Label htmlFor="affectedSystem">{tt('forms.itAffectedSystem', 'Affected System / App')}</Label>
               <Input
                 id="affectedSystem"
-                placeholder="e.g. Campus WiFi, Banner, Lab PC-12..."
+                placeholder={tt('forms.itAffectedSystemPlaceholder', 'e.g. Campus WiFi, Banner, Lab PC-12...')}
                 value={itState.affectedSystem}
                 onChange={(e) => setItState(p => ({ ...p, affectedSystem: e.target.value }))}
                 className="border-amber-500/20 focus-visible:ring-amber-500/40 bg-background"
@@ -665,10 +697,10 @@ export function RequestForm({
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="locationText">Location</Label>
+              <Label htmlFor="locationText">{tt('forms.location', 'Location')}</Label>
               <Input
                 id="locationText"
-                placeholder="e.g. Building A, Room 301..."
+                placeholder={tt('forms.itLocationPlaceholder', 'e.g. Building A, Room 301...')}
                 value={itState.locationText}
                 onChange={(e) => setItState(p => ({ ...p, locationText: e.target.value }))}
                 className="border-amber-500/20 focus-visible:ring-amber-500/40 bg-background"
@@ -681,15 +713,15 @@ export function RequestForm({
         {isEquipmentType && !isEditMode && (
           <div className="grid grid-cols-2 gap-4 bg-blue-500/5 p-5 rounded-lg border border-blue-500/20">
             <div className="col-span-2 mb-1">
-              <h3 className="text-sm font-semibold text-blue-700 dark:text-blue-300">Equipment Details</h3>
-              <p className="text-xs text-muted-foreground mt-0.5">Specify what equipment you need and why.</p>
+              <h3 className="text-sm font-semibold text-blue-700 dark:text-blue-300">{tt('forms.equipmentDetails', 'Equipment Details')}</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">{tt('forms.equipmentDetailsDesc', 'Specify what equipment you need and why.')}</p>
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="equipmentName">Equipment Name <span className="text-destructive">*</span></Label>
+              <Label htmlFor="equipmentName">{tt('forms.equipmentName', 'Equipment Name')} <span className="text-destructive">*</span></Label>
               <Input
                 id="equipmentName"
-                placeholder="e.g. Oscilloscope, Projector..."
+                placeholder={tt('forms.equipmentNamePlaceholder', 'e.g. Oscilloscope, Projector...')}
                 value={equipState.equipmentName}
                 onChange={(e) => setEquipState(p => ({ ...p, equipmentName: e.target.value }))}
                 className="border-blue-500/20 focus-visible:ring-blue-500/40 bg-background"
@@ -697,24 +729,24 @@ export function RequestForm({
             </div>
 
             <div className="space-y-1.5">
-              <Label>Category <span className="text-destructive">*</span></Label>
+              <Label>{tt('common.category', 'Category')} <span className="text-destructive">*</span></Label>
               <Select
                 value={equipState.equipmentCategory}
                 onValueChange={(v) => setEquipState(p => ({ ...p, equipmentCategory: v }))}
               >
                 <SelectTrigger className="border-blue-500/20 bg-background">
-                  <SelectValue placeholder="Select category..." />
+                  <SelectValue placeholder={tt('forms.categoryPlaceholder', 'Select category...')} />
                 </SelectTrigger>
                 <SelectContent>
                   {EQUIPMENT_CATEGORIES.map((c) => (
-                    <SelectItem key={c} value={c}>{c}</SelectItem>
+                    <SelectItem key={c} value={c}>{tt(EQUIPMENT_CATEGORY_LABEL_KEYS[c] ?? 'forms.other', c)}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="quantity">Quantity <span className="text-destructive">*</span></Label>
+              <Label htmlFor="quantity">{tt('forms.quantity', 'Quantity')} <span className="text-destructive">*</span></Label>
               <Input
                 id="quantity"
                 type="number"
@@ -726,10 +758,10 @@ export function RequestForm({
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="purpose">Purpose / Usage <span className="text-destructive">*</span></Label>
+              <Label htmlFor="purpose">{tt('forms.purposeUsage', 'Purpose / Usage')} <span className="text-destructive">*</span></Label>
               <Input
                 id="purpose"
-                placeholder="Describe how it will be used..."
+                placeholder={tt('forms.purposePlaceholder', 'Describe how it will be used...')}
                 value={equipState.purpose}
                 onChange={(e) => setEquipState(p => ({ ...p, purpose: e.target.value }))}
                 className="border-blue-500/20 focus-visible:ring-blue-500/40 bg-background"
@@ -737,7 +769,7 @@ export function RequestForm({
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="neededFrom">Needed From</Label>
+              <Label htmlFor="neededFrom">{tt('forms.neededFrom', 'Needed From')}</Label>
               <Input
                 id="neededFrom"
                 type="date"
@@ -748,7 +780,7 @@ export function RequestForm({
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="neededUntil">Needed Until</Label>
+              <Label htmlFor="neededUntil">{tt('forms.neededUntil', 'Needed Until')}</Label>
               <Input
                 id="neededUntil"
                 type="date"
@@ -759,10 +791,10 @@ export function RequestForm({
             </div>
 
             <div className="col-span-2 space-y-1.5">
-              <Label htmlFor="urgencyReason">Urgency Reason (if urgent)</Label>
+              <Label htmlFor="urgencyReason">{tt('forms.urgencyReasonOptional', 'Urgency Reason (if urgent)')}</Label>
               <Input
                 id="urgencyReason"
-                placeholder="Why is this request urgent? (optional)"
+                placeholder={tt('forms.urgencyReasonPlaceholder', 'Why is this request urgent? (optional)')}
                 value={equipState.urgencyReason}
                 onChange={(e) => setEquipState(p => ({ ...p, urgencyReason: e.target.value }))}
                 className="border-blue-500/20 focus-visible:ring-blue-500/40 bg-background"
@@ -776,9 +808,11 @@ export function RequestForm({
           <div className="grid grid-cols-2 gap-4 bg-primary/5 p-5 rounded-lg border border-primary/20">
             <div className="col-span-2 mb-1 flex items-center justify-between">
               <div>
-                <h3 className="text-sm font-semibold text-primary">Form Details</h3>
+                <h3 className="text-sm font-semibold text-primary">{tt('forms.formDetails', 'Form Details')}</h3>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  {isEditMode ? "Update the requested information below based on faculty feedback." : "Please fill out the required information for this request type."}
+                  {isEditMode
+                    ? tt('forms.updateRequestedInfo', 'Update the requested information below based on faculty feedback.')
+                    : tt('forms.fillRequiredInfo', 'Please fill out the required information for this request type.')}
                 </p>
               </div>
             </div>
@@ -814,7 +848,7 @@ export function RequestForm({
                     <SelectTrigger className={cn(
                       "border-primary/20 focus:ring-primary/50 bg-background",
                       isFieldLocked(field.id) && "bg-muted/50 cursor-not-allowed opacity-80"
-                    )}><SelectValue placeholder="Select..." /></SelectTrigger>
+                    )}><SelectValue placeholder={tt('common.select', 'Select...')} /></SelectTrigger>
                     <SelectContent>
                       {field.options.map(opt => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}
                     </SelectContent>
@@ -828,11 +862,11 @@ export function RequestForm({
 
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
-            <Label htmlFor="description">Additional Notes / Description <span className="text-destructive">*</span></Label>
+            <Label htmlFor="description">{tt('forms.additionalNotesDescription', 'Additional Notes / Description')} <span className="text-destructive">*</span></Label>
           </div>
           <Textarea 
             id="description" 
-            placeholder="Provide details about your request..." 
+            placeholder={tt('forms.requestDetailsPlaceholder', 'Provide details about your request...')} 
             className={cn(
               "min-h-[120px] resize-none",
               isEditMode ? "border-primary/20 focus-visible:ring-primary/50 bg-primary/5" : "",
@@ -847,12 +881,12 @@ export function RequestForm({
 
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <Label>Attachments (optional)</Label>
+            <Label>{tt('forms.attachmentsOptional', 'Attachments (optional)')}</Label>
           </div>
 
           {existingFiles.length > 0 && (
             <div className="space-y-2 mb-3">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Currently Uploaded:</p>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{tt('forms.currentlyUploaded', 'Currently Uploaded:')}</p>
               {existingFiles.map((file) => (
                 <div key={file.id} className="flex items-center justify-between p-2.5 bg-muted/40 border border-border rounded-md">
                   <div className="flex items-center gap-2.5 overflow-hidden">
@@ -872,13 +906,15 @@ export function RequestForm({
             className={cn("border-2 border-dashed rounded-lg p-6 flex flex-col items-center gap-2 text-center cursor-pointer transition-colors", isDragging ? "border-primary bg-primary/5" : "border-border hover:border-primary/50", isEditMode && "bg-primary/5 border-primary/20")}
           >
             <Upload className={cn("size-6", isDragging ? "text-primary" : "text-muted-foreground")} />
-            <p className="text-sm text-muted-foreground">Drop files here or <span className="text-primary font-medium">browse</span></p>
-            <p className="text-xs text-muted-foreground">PDF, DOC, JPG up to 10MB</p>
+            <p className="text-sm text-muted-foreground">
+              {tt('forms.dropFilesHere', 'Drop files here or')} <span className="text-primary font-medium">{tt('forms.browse', 'browse')}</span>
+            </p>
+            <p className="text-xs text-muted-foreground">{tt('forms.fileTypeHint', 'PDF, DOC, JPG up to 10MB')}</p>
           </div>
           
            {files.length > 0 && (
             <div className="space-y-2 mt-3">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">New Files to Upload:</p>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{tt('forms.newFilesToUpload', 'New Files to Upload:')}</p>
               {files.map((file, index) => (
                 <div key={index} className="flex items-center justify-between p-2.5 bg-emerald-500/10 border border-emerald-500/20 rounded-md">
                   <div className="flex items-center gap-2.5 overflow-hidden">
@@ -896,10 +932,10 @@ export function RequestForm({
         <div className="flex items-center gap-3 pt-4 border-t border-border">
           <Button type="submit" className="flex-1 sm:flex-none" disabled={isLoading}>
             {isLoading && <Loader2 className="size-4 animate-spin mr-2" />} 
-            {isEditMode ? 'Save & Resubmit' : 'Submit Request'}
+            {isEditMode ? tt('forms.saveAndResubmit', 'Save & Resubmit') : tt('common.submitRequest', 'Submit Request')}
           </Button>
           <Link href="/student/requests">
-            <Button type="button" variant="outline">Cancel</Button>
+            <Button type="button" variant="outline">{tt('common.cancel', 'Cancel')}</Button>
           </Link>
         </div>
       </form>

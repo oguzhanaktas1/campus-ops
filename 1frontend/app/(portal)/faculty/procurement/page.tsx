@@ -6,6 +6,7 @@ import { ShoppingCart, Loader2, AlertCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { getToken } from '@/lib/auth'
+import { useI18n } from '@/lib/i18n'
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000'
 
@@ -29,6 +30,7 @@ function fmtCurrency(v: any) {
 }
 
 export default function FacultyProcurementPage() {
+  const { t } = useI18n()
   const [requests, setRequests] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [filter, setFilter] = useState('all')
@@ -40,11 +42,11 @@ export default function FacultyProcurementPage() {
       })
       if (res.ok) setRequests(await res.json())
     } catch {
-      toast.error('Failed to load procurement requests.')
+      toast.error(t('procurement.loadFail'))
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [t])
 
   useEffect(() => { fetchRequests() }, [fetchRequests])
 
@@ -60,10 +62,10 @@ export default function FacultyProcurementPage() {
     <div className="p-6 max-w-5xl mx-auto space-y-6 pb-20">
       <div>
         <h1 className="text-xl font-bold flex items-center gap-2">
-          <ShoppingCart className="size-5 text-primary" /> Procurement Requests
+          <ShoppingCart className="size-5 text-primary" /> {t('procurement.title')}
         </h1>
         <p className="text-sm text-muted-foreground mt-0.5">
-          Review and approve purchasing requests in your faculty.
+          {t('procurement.subtitle', { count: requests.length })}
         </p>
       </div>
 
@@ -79,7 +81,7 @@ export default function FacultyProcurementPage() {
                 : 'bg-background text-muted-foreground border-border hover:border-foreground'
             )}
           >
-            {s === 'all' ? 'All' : s.replace(/_/g, ' ')}
+            {s === 'all' ? t('common.all') : s.replace(/_/g, ' ')}
           </button>
         ))}
       </div>
@@ -88,7 +90,7 @@ export default function FacultyProcurementPage() {
         {filtered.length === 0 ? (
           <div className="py-16 flex flex-col items-center text-center opacity-50">
             <AlertCircle className="size-10 mb-3" />
-            <p className="text-sm font-medium">No procurement requests found.</p>
+            <p className="text-sm font-medium">{t('procurement.noProcurement')}</p>
           </div>
         ) : (
           filtered.map((r) => (
@@ -99,7 +101,7 @@ export default function FacultyProcurementPage() {
             >
               <div className="min-w-0">
                 <p className="text-sm font-semibold truncate">
-                  {r.productName || r.title || 'Procurement Request'}
+                  {r.productName || r.title || t('procurement.title')}
                 </p>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   {r.requestNo} · {r.requesterName}

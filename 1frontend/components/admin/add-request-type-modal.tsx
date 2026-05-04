@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Loader2, Settings2 } from 'lucide-react'
 import { toast } from 'sonner'
+import { useOptionalT } from '@/lib/optional-t'
 
 interface AddModalProps {
   isOpen: boolean
@@ -19,6 +20,7 @@ interface AddModalProps {
 
 export function AddRequestTypeModal({ isOpen, onClose, onSuccess }: AddModalProps) {
   const [isLoading, setIsLoading] = useState(false)
+  const tt = useOptionalT()
   const [formData, setFormData] = useState({
     name: '',
     key: '',
@@ -51,15 +53,15 @@ export function AddRequestTypeModal({ isOpen, onClose, onSuccess }: AddModalProp
 
       if (!res.ok) {
         const err = await res.json()
-        throw new Error(err.message || 'Operation failed')
+        throw new Error(err.message || tt('requestTypes.operationFailed', 'Operation failed'))
       }
 
-      toast.success('Request Type created successfully!')
+      toast.success(tt('requestTypes.createSuccess', 'Request Type created successfully!'))
       setFormData({ name: '', key: '', category: '', description: '' }) // Formu sıfırla
       onSuccess()
       onClose()
     } catch (err: any) {
-      toast.error(err.message || 'Failed to create request type.')
+      toast.error(err.message || tt('requestTypes.createFail', 'Failed to create request type.'))
     } finally {
       setIsLoading(false)
     }
@@ -70,37 +72,37 @@ export function AddRequestTypeModal({ isOpen, onClose, onSuccess }: AddModalProp
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Settings2 className="size-5 text-primary" /> Add New Request Type
+            <Settings2 className="size-5 text-primary" /> {tt('requestTypes.addNew', 'Add New Request Type')}
           </DialogTitle>
-          <DialogDescription>Define a new request category for the system.</DialogDescription>
+          <DialogDescription>{tt('requestTypes.addDescription', 'Define a new request category for the system.')}</DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4 py-4">
           <div className="space-y-2">
-            <Label>Display Name</Label>
-            <Input required placeholder="e.g. IT Support Ticket" value={formData.name} onChange={(e) => handleNameChange(e.target.value)} />
+            <Label>{tt('requestTypes.displayName', 'Display Name')}</Label>
+            <Input required placeholder={tt('requestTypes.nameExample', 'e.g. IT Support Ticket')} value={formData.name} onChange={(e) => handleNameChange(e.target.value)} />
           </div>
           
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label className="text-muted-foreground">Unique Key (Auto-Generated)</Label>
+              <Label className="text-muted-foreground">{tt('requestTypes.uniqueKeyAuto', 'Unique Key (Auto-Generated)')}</Label>
               <Input required value={formData.key} readOnly className="bg-muted/50 cursor-not-allowed font-mono text-xs" />
             </div>
             <div className="space-y-2">
-              <Label>Category</Label>
-              <Input required placeholder="e.g. IT, HR, Facilities" value={formData.category} onChange={(e) => setFormData({...formData, category: e.target.value})} />
+              <Label>{tt('common.category', 'Category')}</Label>
+              <Input required placeholder={tt('requestTypes.categoryExample', 'e.g. IT, HR, Facilities')} value={formData.category} onChange={(e) => setFormData({...formData, category: e.target.value})} />
             </div>
           </div>
 
           <div className="space-y-2">
-            <Label>Description</Label>
-            <Textarea className="h-20" placeholder="Brief explanation of what this request type is used for..." value={formData.description} onChange={(e) => setFormData({...formData, description: e.target.value})} />
+            <Label>{tt('common.description', 'Description')}</Label>
+            <Textarea className="h-20" placeholder={tt('requestTypes.descriptionPlaceholder', 'Brief explanation of what this request type is used for...')} value={formData.description} onChange={(e) => setFormData({...formData, description: e.target.value})} />
           </div>
 
           <DialogFooter className="border-t pt-6 mt-6">
-            <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
+            <Button type="button" variant="ghost" onClick={onClose}>{tt('common.cancel', 'Cancel')}</Button>
             <Button type="submit" disabled={isLoading} className="min-w-[120px]">
-              {isLoading ? <Loader2 className="size-4 animate-spin mr-2" /> : null} Create Type
+              {isLoading ? <Loader2 className="size-4 animate-spin mr-2" /> : null} {tt('requestTypes.createType', 'Create Type')}
             </Button>
           </DialogFooter>
         </form>

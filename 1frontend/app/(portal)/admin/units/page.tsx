@@ -20,6 +20,7 @@ import {
 } from '@/components/ui/select'
 import { Search, Plus, Pencil, Trash2, Loader2, Layers } from 'lucide-react'
 import { toast } from 'sonner'
+import { useI18n } from '@/lib/i18n'
 
 interface Campus {
   id: string
@@ -64,6 +65,7 @@ const EMPTY_FORM = {
 const NONE_VALUE = '__none__'
 
 export default function UnitsPage() {
+  const { t } = useI18n()
   const [units, setUnits] = useState<Unit[]>([])
   const [campuses, setCampuses] = useState<Campus[]>([])
   const [faculties, setFaculties] = useState<Faculty[]>([])
@@ -84,10 +86,10 @@ export default function UnitsPage() {
         headers: { Authorization: `Bearer ${token}` },
       })
       if (res.ok) setUnits(await res.json())
-      else toast.error('Failed to load units')
+      else toast.error(t('organization.saveFail'))
     } catch (error) {
       console.error('API Error:', error)
-      toast.error('Failed to load units')
+      toast.error(t('organization.saveFail'))
     } finally {
       setIsLoading(false)
     }
@@ -136,7 +138,7 @@ export default function UnitsPage() {
 
   const handleSave = async () => {
     if (!form.name.trim() || !form.code.trim()) {
-      toast.error('Name and code are required')
+      toast.error(t('common.required'))
       return
     }
     setIsSaving(true)
@@ -163,23 +165,23 @@ export default function UnitsPage() {
         body: JSON.stringify(body),
       })
       if (res.ok) {
-        toast.success(editingItem ? 'Unit updated!' : 'Unit created!')
+        toast.success(t('organization.saveSuccess'))
         setDialogOpen(false)
         fetchUnits()
       } else {
         const err = await res.json().catch(() => ({}))
-        toast.error((err as { message?: string }).message || 'Failed to save unit')
+        toast.error((err as { message?: string }).message || t('organization.saveFail'))
       }
     } catch (error) {
       console.error('Save error:', error)
-      toast.error('Failed to save unit')
+      toast.error(t('organization.saveFail'))
     } finally {
       setIsSaving(false)
     }
   }
 
   const handleDelete = async (unit: Unit) => {
-    if (!window.confirm(`Are you sure you want to delete "${unit.name}"? This cannot be undone.`)) return
+    if (!window.confirm(t('organization.confirmDelete', { name: unit.name }))) return
     try {
       const token = localStorage.getItem('access_token')
       const res = await fetch(`${backendUrl}/admin/units/${unit.id}`, {
@@ -187,14 +189,14 @@ export default function UnitsPage() {
         headers: { Authorization: `Bearer ${token}` },
       })
       if (res.ok) {
-        toast.success('Unit deleted!')
+        toast.success(t('organization.deleteSuccess'))
         fetchUnits()
       } else {
-        toast.error('Failed to delete unit')
+        toast.error(t('organization.deleteFail'))
       }
     } catch (error) {
       console.error('Delete error:', error)
-      toast.error('Failed to delete unit')
+      toast.error(t('organization.deleteFail'))
     }
   }
 
@@ -227,13 +229,13 @@ export default function UnitsPage() {
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold text-foreground">Unit Management</h1>
+          <h1 className="text-xl font-bold text-foreground">{t('organization.unitsTitle')}</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {units.length} unit{units.length !== 1 ? 's' : ''} registered in the system.
+            {t('organization.unitsSubtitle', { count: units.length })}
           </p>
         </div>
         <Button size="sm" className="gap-1.5" onClick={openAdd}>
-          <Plus className="size-3.5" /> Add Unit
+          <Plus className="size-3.5" /> {t('organization.addUnit')}
         </Button>
       </div>
 
@@ -242,15 +244,15 @@ export default function UnitsPage() {
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
           <Input
-            placeholder="Search units by name, code or parent..."
+            placeholder={t('common.search')}
             className="pl-9 h-9"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
         <div className="flex items-center gap-4 text-sm ml-auto">
-          <span className="font-medium text-emerald-600">{units.filter((u) => u.isActive).length} Active</span>
-          <span className="font-medium text-muted-foreground">{units.filter((u) => !u.isActive).length} Inactive</span>
+          <span className="font-medium text-emerald-600">{units.filter((u) => u.isActive).length} {t('common.active')}</span>
+          <span className="font-medium text-muted-foreground">{units.filter((u) => !u.isActive).length} {t('common.inactive')}</span>
         </div>
       </div>
 
@@ -259,11 +261,11 @@ export default function UnitsPage() {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border bg-muted/40">
-              <th className="px-5 py-3 text-left font-semibold text-muted-foreground">Unit</th>
-              <th className="px-5 py-3 text-left font-semibold text-muted-foreground hidden md:table-cell">Code</th>
-              <th className="px-5 py-3 text-left font-semibold text-muted-foreground hidden lg:table-cell">Parent</th>
-              <th className="px-5 py-3 text-left font-semibold text-muted-foreground">Status</th>
-              <th className="px-5 py-3 text-right font-semibold text-muted-foreground">Actions</th>
+              <th className="px-5 py-3 text-left font-semibold text-muted-foreground">{t('organization.unitsTitle')}</th>
+              <th className="px-5 py-3 text-left font-semibold text-muted-foreground hidden md:table-cell">{t('organization.facultyCode')}</th>
+              <th className="px-5 py-3 text-left font-semibold text-muted-foreground hidden lg:table-cell">{t('common.name')}</th>
+              <th className="px-5 py-3 text-left font-semibold text-muted-foreground">{t('common.status')}</th>
+              <th className="px-5 py-3 text-right font-semibold text-muted-foreground">{t('common.actions')}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
@@ -288,11 +290,11 @@ export default function UnitsPage() {
                 <td className="px-5 py-3.5">
                   {unit.isActive ? (
                     <span className="px-2 py-1 rounded-md bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 text-[10px] font-bold tracking-wider">
-                      ACTIVE
+                      {t('common.active').toUpperCase()}
                     </span>
                   ) : (
                     <span className="px-2 py-1 rounded-md bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300 border border-gray-200 dark:border-gray-700 text-[10px] font-bold tracking-wider">
-                      INACTIVE
+                      {t('common.inactive').toUpperCase()}
                     </span>
                   )}
                 </td>
@@ -318,7 +320,7 @@ export default function UnitsPage() {
         {filtered.length === 0 && (
           <div className="text-center py-12">
             <Layers className="size-8 text-muted-foreground/40 mx-auto mb-3" />
-            <p className="text-sm text-muted-foreground">No units found.</p>
+            <p className="text-sm text-muted-foreground">{t('organization.noUnits')}</p>
           </div>
         )}
       </div>
@@ -327,42 +329,42 @@ export default function UnitsPage() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>{editingItem ? 'Edit Unit' : 'Add Unit'}</DialogTitle>
+            <DialogTitle>{editingItem ? t('organization.editUnit') : t('organization.addUnit')}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-1.5">
               <Label htmlFor="unit-name">
-                Name <span className="text-destructive">*</span>
+                {t('organization.unitName')} <span className="text-destructive">*</span>
               </Label>
               <Input
                 id="unit-name"
-                placeholder="e.g. Student Affairs Office"
+                placeholder={t('organization.unitNamePlaceholder')}
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
               />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="unit-code">
-                Code <span className="text-destructive">*</span>
+                {t('organization.facultyCode')} <span className="text-destructive">*</span>
               </Label>
               <Input
                 id="unit-code"
-                placeholder="e.g. SAO"
+                placeholder={t('organization.unitCodePlaceholder')}
                 value={form.code}
                 onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })}
               />
             </div>
             <div className="space-y-1.5">
-              <Label>Campus (optional)</Label>
+              <Label>{t('common.name')} ({t('common.optional')})</Label>
               <Select
                 value={form.campusId || NONE_VALUE}
                 onValueChange={(v) => setForm({ ...form, campusId: v === NONE_VALUE ? '' : v })}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="None" />
+                  <SelectValue placeholder={t('common.none')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={NONE_VALUE}>None</SelectItem>
+                  <SelectItem value={NONE_VALUE}>{t('common.none')}</SelectItem>
                   {campuses.map((c) => (
                     <SelectItem key={c.id} value={c.id}>
                       {c.name} ({c.code})
@@ -372,16 +374,16 @@ export default function UnitsPage() {
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label>Faculty (optional)</Label>
+              <Label>{t('organization.facultiesTitle')} ({t('common.optional')})</Label>
               <Select
                 value={form.facultyId || NONE_VALUE}
                 onValueChange={(v) => setForm({ ...form, facultyId: v === NONE_VALUE ? '' : v })}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="None" />
+                  <SelectValue placeholder={t('common.none')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={NONE_VALUE}>None</SelectItem>
+                  <SelectItem value={NONE_VALUE}>{t('common.none')}</SelectItem>
                   {faculties.map((f) => (
                     <SelectItem key={f.id} value={f.id}>
                       {f.name} ({f.code})
@@ -391,16 +393,16 @@ export default function UnitsPage() {
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label>Department (optional)</Label>
+              <Label>{t('organization.departmentsTitle')} ({t('common.optional')})</Label>
               <Select
                 value={form.departmentId || NONE_VALUE}
                 onValueChange={(v) => setForm({ ...form, departmentId: v === NONE_VALUE ? '' : v })}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="None" />
+                  <SelectValue placeholder={t('common.none')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={NONE_VALUE}>None</SelectItem>
+                  <SelectItem value={NONE_VALUE}>{t('common.none')}</SelectItem>
                   {departments.map((d) => (
                     <SelectItem key={d.id} value={d.id}>
                       {d.name} ({d.code})

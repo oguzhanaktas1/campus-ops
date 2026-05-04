@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { getToken } from '@/lib/auth'
+import { useI18n } from '@/lib/i18n'
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000'
 
@@ -31,6 +32,7 @@ function fmtDatetime(d: string) {
 }
 
 export default function AdminEventsPage() {
+  const { t } = useI18n()
   const [data, setData] = useState<{ items: any[]; metrics: any } | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -44,11 +46,11 @@ export default function AdminEventsPage() {
       if (!res.ok) throw new Error()
       setData(await res.json())
     } catch {
-      toast.error('Failed to load event requests.')
+      toast.error(t('events.loadFail'))
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [t])
 
   useEffect(() => { void fetchData() }, [fetchData])
 
@@ -83,18 +85,18 @@ export default function AdminEventsPage() {
     <div className="p-6 max-w-7xl mx-auto space-y-6 pb-20">
       <div>
         <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
-          <PartyPopper className="size-5 text-primary" /> Event Requests
+          <PartyPopper className="size-5 text-primary" /> {t('events.title')}
         </h1>
-        <p className="text-sm text-muted-foreground mt-0.5">Manage and approve campus event applications.</p>
-        <p className="text-xs text-muted-foreground mt-1">Open request details from the request number.</p>
+        <p className="text-sm text-muted-foreground mt-0.5">{t('events.subtitle')}</p>
+        <p className="text-xs text-muted-foreground mt-1">{t('events.detailHint')}</p>
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {[
-          { label: 'Total', value: m.total, color: 'text-foreground' },
-          { label: 'Pending', value: m.pending, color: 'text-amber-600' },
-          { label: 'Approved', value: m.approved, color: 'text-emerald-600' },
-          { label: 'Rejected', value: m.rejected, color: 'text-red-600' },
+          { label: t('events.total'), value: m.total, color: 'text-foreground' },
+          { label: t('events.pending'), value: m.pending, color: 'text-amber-600' },
+          { label: t('events.approved'), value: m.approved, color: 'text-emerald-600' },
+          { label: t('events.rejected'), value: m.rejected, color: 'text-red-600' },
         ].map(({ label, value, color }) => (
           <div key={label} className="bg-card border border-border rounded-xl p-4 shadow-sm">
             <p className="text-xs text-muted-foreground">{label}</p>
@@ -106,10 +108,10 @@ export default function AdminEventsPage() {
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-          <Input placeholder="Search by event name, organizer, type..." className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
+          <Input placeholder={t('events.searchPlaceholder')} className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
         <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="bg-background border border-input rounded-md px-3 h-9 text-sm outline-none focus:ring-2 focus:ring-ring">
-          <option value="all">All Statuses</option>
+          <option value="all">{t('events.allStatuses')}</option>
           {['SUBMITTED', 'IN_REVIEW', 'WAITING_APPROVAL', 'APPROVED', 'REJECTED', 'COMPLETED', 'CLOSED'].map((s) => (
             <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>
           ))}
@@ -120,21 +122,21 @@ export default function AdminEventsPage() {
         {filtered.length === 0 ? (
           <div className="py-16 flex flex-col items-center text-center opacity-50">
             <AlertCircle className="size-10 mb-3" />
-            <p className="text-sm font-medium">No event requests found.</p>
+            <p className="text-sm font-medium">{t('events.noEvents')}</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-muted/40 border-b border-border">
                 <tr>
-                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">Request #</th>
-                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">Event</th>
-                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">Type</th>
-                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">Organizer</th>
-                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">Attendees</th>
-                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">Starts</th>
-                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">Status</th>
-                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">Date</th>
+                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">{t('events.requestNumber')}</th>
+                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">{t('events.colTitle')}</th>
+                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">{t('events.colType')}</th>
+                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">{t('events.colOrganizer')}</th>
+                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">{t('events.colAttendees')}</th>
+                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">{t('events.colStarts')}</th>
+                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">{t('events.colStatus')}</th>
+                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">{t('events.colDate')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -143,7 +145,7 @@ export default function AdminEventsPage() {
                     <td className="px-4 py-3 font-mono text-xs">
                       {r.request?.id ? (
                         <Link href={`/admin/requests/${r.request.id}`} className="text-primary hover:underline">
-                          {r.request?.requestNo ?? 'Open'}
+                          {r.request?.requestNo ?? t('events.open')}
                         </Link>
                       ) : (
                         <span className="text-muted-foreground">-</span>

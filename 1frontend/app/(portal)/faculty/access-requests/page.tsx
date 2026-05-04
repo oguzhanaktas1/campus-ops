@@ -6,6 +6,7 @@ import { ShieldCheck, Loader2, AlertCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { getToken } from '@/lib/auth'
+import { useI18n } from '@/lib/i18n'
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000'
 
@@ -24,6 +25,7 @@ function fmt(d: any) {
 }
 
 export default function FacultyAccessRequestsPage() {
+  const { t } = useI18n()
   const [requests, setRequests] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [filter, setFilter] = useState('all')
@@ -40,11 +42,11 @@ export default function FacultyAccessRequestsPage() {
         setRequests([])
       }
     } catch {
-      toast.error('Failed to load access requests.')
+      toast.error(t('accessRequests.loadFail'))
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [t])
 
   useEffect(() => {
     void fetchRequests()
@@ -64,10 +66,10 @@ export default function FacultyAccessRequestsPage() {
     <div className="p-6 max-w-5xl mx-auto space-y-6 pb-20">
       <div>
         <h1 className="text-xl font-bold flex items-center gap-2">
-          <ShieldCheck className="size-5 text-primary" /> Access Requests
+          <ShieldCheck className="size-5 text-primary" /> {t('accessRequests.title')}
         </h1>
         <p className="text-sm text-muted-foreground mt-0.5">
-          Review system and resource access requests in your faculty scope.
+          {t('accessRequests.subtitle', { count: requests.length })}
         </p>
       </div>
 
@@ -83,7 +85,7 @@ export default function FacultyAccessRequestsPage() {
                 : 'bg-background text-muted-foreground border-border hover:border-foreground',
             )}
           >
-            {s === 'all' ? 'All' : s.replace(/_/g, ' ')}
+            {s === 'all' ? t('common.all') : s.replace(/_/g, ' ')}
           </button>
         ))}
       </div>
@@ -92,7 +94,7 @@ export default function FacultyAccessRequestsPage() {
         {filtered.length === 0 ? (
           <div className="py-16 flex flex-col items-center text-center opacity-50">
             <AlertCircle className="size-10 mb-3" />
-            <p className="text-sm font-medium">No access requests found.</p>
+            <p className="text-sm font-medium">{t('accessRequests.noRequests')}</p>
           </div>
         ) : (
           filtered.map((r) => (
@@ -102,9 +104,9 @@ export default function FacultyAccessRequestsPage() {
               className="flex items-center justify-between px-5 py-4 hover:bg-muted/20 transition-colors"
             >
               <div className="min-w-0">
-                <p className="text-sm font-semibold truncate">{r.title || 'Access Request'}</p>
+                <p className="text-sm font-semibold truncate">{r.title || t('accessRequests.title')}</p>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  {r.typeName || 'Access Request'} · {r.submittedByName}
+                  {r.typeName || t('accessRequests.title')} · {r.submittedByName}
                   {r.createdAt && ` · ${fmt(r.createdAt)}`}
                 </p>
               </div>

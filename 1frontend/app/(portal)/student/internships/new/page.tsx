@@ -20,6 +20,7 @@ import {
   getCurrentDateInputValue,
   validateDateWindow,
 } from '@/lib/date-time'
+import { useI18n } from '@/lib/i18n'
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000'
 
@@ -28,6 +29,7 @@ const WORK_MODES = ['ONSITE', 'REMOTE', 'HYBRID']
 
 export default function NewInternshipPage() {
   const router = useRouter()
+  const { t } = useI18n()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [dateError, setDateError] = useState<string | null>(null)
   const minDate = getCurrentDateInputValue()
@@ -62,11 +64,11 @@ export default function NewInternshipPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!form.companyName.trim()) {
-      toast.error('Company name is required.')
+      toast.error(t('messages.companyRequired'))
       return
     }
     if (!form.startDate || !form.endDate) {
-      toast.error('Start and end dates are required.')
+      toast.error(t('messages.internshipDatesRequired'))
       return
     }
     const validationError = validateDateWindow({
@@ -106,14 +108,14 @@ export default function NewInternshipPage() {
       })
 
       if (res.ok) {
-        toast.success('Internship application submitted successfully.')
+        toast.success(t('messages.internshipSubmitted'))
         router.push('/student/internships')
       } else {
         const err = (await res.json().catch(() => ({}))) as { message?: string }
-        toast.error(err.message ?? 'Failed to submit application.')
+        toast.error(err.message ?? t('messages.submitApplicationFail'))
       }
     } catch {
-      toast.error('Network error. Please try again.')
+      toast.error(t('messages.networkTryAgain'))
     } finally {
       setIsSubmitting(false)
     }
@@ -146,13 +148,13 @@ export default function NewInternshipPage() {
       <div className="mb-6 flex items-center gap-3">
         <Link href="/student/internships">
           <Button variant="ghost" size="sm" className="gap-1.5">
-            <ArrowLeft className="size-4" /> Back
+            <ArrowLeft className="size-4" /> {t('forms.back')}
           </Button>
         </Link>
         <div className="flex items-center gap-2">
           <Briefcase className="size-5 text-primary" />
           <h1 className="text-xl font-bold text-foreground">
-            New Internship Application
+            {t('pages.newInternshipTitle')}
           </h1>
         </div>
       </div>
@@ -160,24 +162,24 @@ export default function NewInternshipPage() {
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="space-y-4 rounded-lg border border-border bg-card p-5">
           <h2 className="text-sm font-semibold text-foreground">
-            Company Information
+            {t('forms.companyName') === 'Company Name' ? 'Company Information' : 'Sirket Bilgileri'}
           </h2>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            {field('Company Name', 'companyName', 'text', 'e.g. Acme Corp', true)}
-            {field('Industry / Sector', 'companySector', 'text', 'e.g. Software')}
-            {field('Contact Person', 'companyContactName', 'text', 'e.g. Jane Doe')}
-            {field('Contact Email', 'companyContactEmail', 'email', 'contact@company.com')}
+            {field(t('forms.companyName'), 'companyName', 'text', t('forms.companyNamePlaceholder'), true)}
+            {field(t('forms.industrySector'), 'companySector', 'text', t('forms.industrySectorPlaceholder'))}
+            {field(t('forms.contactPerson'), 'companyContactName', 'text', t('forms.contactPersonPlaceholder'))}
+            {field(t('forms.contactEmail'), 'companyContactEmail', 'email', t('forms.contactEmailPlaceholder'))}
           </div>
         </div>
 
         <div className="space-y-4 rounded-lg border border-border bg-card p-5">
           <h2 className="text-sm font-semibold text-foreground">
-            Internship Details
+            {t('pages.internshipsTitle')}
           </h2>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label>
-                Type <span className="text-destructive">*</span>
+                {t('forms.type')} <span className="text-destructive">*</span>
               </Label>
               <Select
                 value={form.internshipType}
@@ -197,7 +199,7 @@ export default function NewInternshipPage() {
             </div>
             <div className="space-y-1.5">
               <Label>
-                Work Mode <span className="text-destructive">*</span>
+                {t('forms.workMode')} <span className="text-destructive">*</span>
               </Label>
               <Select
                 value={form.workMode}
@@ -217,7 +219,7 @@ export default function NewInternshipPage() {
             </div>
             <div className="space-y-1.5">
               <Label>
-                Start Date <span className="text-destructive">*</span>
+                {t('forms.startDate')} <span className="text-destructive">*</span>
               </Label>
               <Input
                 type="date"
@@ -229,7 +231,7 @@ export default function NewInternshipPage() {
             </div>
             <div className="space-y-1.5">
               <Label>
-                End Date <span className="text-destructive">*</span>
+                {t('forms.endDate')} <span className="text-destructive">*</span>
               </Label>
               <Input
                 type="date"
@@ -240,7 +242,7 @@ export default function NewInternshipPage() {
               />
             </div>
             <div className="space-y-1.5">
-              <Label>Duration (days)</Label>
+              <Label>{t('forms.durationDays')}</Label>
               <Input
                 type="number"
                 min={1}
@@ -248,7 +250,7 @@ export default function NewInternshipPage() {
                 onChange={(e) =>
                   setForm({ ...form, durationDays: e.target.value })
                 }
-                placeholder="Enter planned duration"
+                placeholder={t('forms.durationPlaceholder')}
               />
             </div>
             <div className="flex flex-col justify-end space-y-1.5">
@@ -284,7 +286,7 @@ export default function NewInternshipPage() {
                     })
                   }
                 >
-                  Insurance Required
+                  {t('forms.insuranceRequired')}
                 </Label>
               </div>
             </div>
@@ -294,21 +296,19 @@ export default function NewInternshipPage() {
 
         <div className="rounded-lg border border-border bg-card p-5">
           <p className="text-sm text-muted-foreground">
-            After submission, the application is routed automatically to users
-            with the `ADVISOR` role first. After advisor approval, it moves to
-            users with the `INTERNSHIP_COORDINATOR` role.
+            {t('forms.internshipRouteInfo')}
           </p>
         </div>
 
         <div className="flex justify-end gap-3">
           <Link href="/student/internships">
             <Button type="button" variant="outline" disabled={isSubmitting}>
-              Cancel
+              {t('common.cancel')}
             </Button>
           </Link>
           <Button type="submit" disabled={isSubmitting}>
             {isSubmitting && <Loader2 className="mr-2 size-4 animate-spin" />}
-            Submit Application
+            {t('forms.submitApplication')}
           </Button>
         </div>
       </form>

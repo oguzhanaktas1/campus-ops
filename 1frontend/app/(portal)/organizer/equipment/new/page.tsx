@@ -13,6 +13,7 @@ import {
   getCurrentDateInputValue,
   validateDateWindow,
 } from '@/lib/date-time'
+import { useI18n } from '@/lib/i18n'
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000'
 
@@ -28,6 +29,7 @@ const CATEGORIES = [
 
 export default function OrganizerNewEquipmentPage() {
   const router = useRouter()
+  const { t } = useI18n()
   const [resources, setResources] = useState<any[]>([])
   const [isLoadingResources, setIsLoadingResources] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -98,8 +100,8 @@ export default function OrganizerNewEquipmentPage() {
       ? selectedResource.name
       : form.equipmentName.trim()
 
-    if (!equipmentName) { toast.error('Please select or specify an equipment item.'); return }
-    if (!form.purpose.trim()) { toast.error('Purpose is required.'); return }
+    if (!equipmentName) { toast.error(t('pages.equipmentSelectRequired')); return }
+    if (!form.purpose.trim()) { toast.error(t('pages.purposeRequired')); return }
     const validationError = validateDateWindow({
       start: form.neededFrom,
       end: form.neededUntil,
@@ -131,8 +133,8 @@ export default function OrganizerNewEquipmentPage() {
       })
 
       const data = await res.json()
-      if (!res.ok) throw new Error(data.message || 'Failed to submit request.')
-      toast.success(`Equipment request ${data.requestNo} submitted.`)
+      if (!res.ok) throw new Error(data.message || t('pages.accessSubmitFail'))
+      toast.success(t('pages.equipmentSubmitted', { requestNo: data.requestNo }))
       router.push('/organizer/equipment')
     } catch (err: any) {
       toast.error(err.message)
@@ -148,21 +150,21 @@ export default function OrganizerNewEquipmentPage() {
           <Button variant="ghost" size="icon" className="size-8"><ArrowLeft className="size-4" /></Button>
         </Link>
         <div>
-          <h1 className="text-xl font-bold text-foreground">Request Equipment</h1>
-          <p className="text-sm text-muted-foreground">Borrow campus equipment for event or project use.</p>
+          <h1 className="text-xl font-bold text-foreground">{t('pages.requestEquipment')}</h1>
+          <p className="text-sm text-muted-foreground">{t('pages.requestEquipmentSubtitle')}</p>
         </div>
       </div>
 
       <form onSubmit={handleSubmit} className="bg-card border border-border rounded-xl shadow-sm p-6 space-y-5">
 
         <div className="space-y-1.5">
-          <Label>Select from Equipment Catalog (optional)</Label>
+          <Label>{t('pages.equipmentCatalog')}</Label>
           {isLoadingResources ? (
             <div className="flex items-center gap-2 h-10 text-sm text-muted-foreground">
-              <Loader2 className="size-4 animate-spin" /> Loading equipment...
+              <Loader2 className="size-4 animate-spin" /> {t('common.loading')}
             </div>
           ) : resources.length === 0 ? (
-            <p className="text-xs text-muted-foreground italic">No equipment available in catalog.</p>
+            <p className="text-xs text-muted-foreground italic">{t('pages.noEquipmentCatalog')}</p>
           ) : (
             <select
               value={form.labResourceId}
@@ -200,9 +202,9 @@ export default function OrganizerNewEquipmentPage() {
 
         {!form.labResourceId && (
           <div className="space-y-1.5">
-            <Label>Equipment Name / Description <span className="text-destructive">*</span></Label>
+            <Label>{t('pages.equipmentName')} <span className="text-destructive">*</span></Label>
             <Input
-              placeholder="e.g. HDMI Projector, Laptop, Camera"
+              placeholder={t('pages.equipmentNamePlaceholder')}
               value={form.equipmentName}
               onChange={(e) => set('equipmentName', e.target.value)}
             />
@@ -211,7 +213,7 @@ export default function OrganizerNewEquipmentPage() {
 
         <div className="grid sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">
-            <Label>Category</Label>
+            <Label>{t('common.category')}</Label>
             <select
               value={form.equipmentCategory}
               onChange={(e) => set('equipmentCategory', e.target.value)}
@@ -221,38 +223,38 @@ export default function OrganizerNewEquipmentPage() {
             </select>
           </div>
           <div className="space-y-1.5">
-            <Label>Quantity <span className="text-destructive">*</span></Label>
+            <Label>{t('common.quantity')} <span className="text-destructive">*</span></Label>
             <Input type="number" min="1" value={form.quantity} onChange={(e) => set('quantity', e.target.value)} />
           </div>
         </div>
 
         <div className="grid sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">
-            <Label>Needed From (optional)</Label>
+            <Label>{t('pages.neededFrom')}</Label>
             <Input type="date" min={minDate} value={form.neededFrom} onChange={(e) => setDateField('neededFrom', e.target.value)} />
           </div>
           <div className="space-y-1.5">
-            <Label>Return By (optional)</Label>
+            <Label>{t('pages.returnBy')}</Label>
             <Input type="date" min={form.neededFrom || minDate} value={form.neededUntil} onChange={(e) => setDateField('neededUntil', e.target.value)} />
           </div>
         </div>
         {dateError && <p className="text-sm text-destructive">{dateError}</p>}
 
         <div className="space-y-1.5">
-          <Label>Purpose <span className="text-destructive">*</span></Label>
+          <Label>{t('pages.purpose')} <span className="text-destructive">*</span></Label>
           <textarea
             value={form.purpose}
             onChange={(e) => set('purpose', e.target.value)}
             rows={3}
-            placeholder="Describe what you need this equipment for (event, project, etc.)..."
+            placeholder={t('pages.purposePlaceholder')}
             className="w-full bg-background border border-input rounded-md px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring resize-none"
           />
         </div>
 
         <div className="space-y-1.5">
-          <Label>Urgency Reason (optional)</Label>
+          <Label>{t('pages.urgencyReason')}</Label>
           <Input
-            placeholder="Only fill if this is urgent..."
+            placeholder={t('pages.urgencyPlaceholder')}
             value={form.urgencyReason}
             onChange={(e) => set('urgencyReason', e.target.value)}
           />
@@ -261,10 +263,10 @@ export default function OrganizerNewEquipmentPage() {
         <div className="flex items-center gap-3 pt-4 border-t border-border">
           <Button type="submit" disabled={isSubmitting} className="flex-1 sm:flex-none gap-2">
             {isSubmitting ? <Loader2 className="size-4 animate-spin" /> : <Package className="size-4" />}
-            Submit Request
+            {t('common.newRequest')}
           </Button>
           <Link href="/organizer/equipment">
-            <Button type="button" variant="outline">Cancel</Button>
+            <Button type="button" variant="outline">{t('common.cancel')}</Button>
           </Link>
         </div>
       </form>

@@ -9,6 +9,7 @@ import { ArrowLeft, Box, Loader2, Plus, Trash2, Pencil, Save } from 'lucide-reac
 import { toast } from 'sonner'
 import { getToken } from '@/lib/auth'
 import { cn } from '@/lib/utils'
+import { useI18n } from '@/lib/i18n'
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000'
 
@@ -57,6 +58,7 @@ const EMPTY_SLOT: Omit<AvailabilitySlot, 'id'> = {
 export default function AdminResourceDetailPage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
+  const { t } = useI18n()
 
   const [resource, setResource] = useState<ResourceDetail | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -92,16 +94,16 @@ export default function AdminResourceDetailPage() {
       })
       setSlots(data.availabilitySlots ?? [])
     } catch {
-      toast.error('Failed to load resource.')
+      toast.error(t('resources.loadFail'))
     } finally {
       setIsLoading(false)
     }
-  }, [id])
+  }, [id, t])
 
   useEffect(() => { void load() }, [load])
 
   async function handleSave() {
-    if (!form.name.trim() || !form.code.trim()) { toast.error('Name and code are required.'); return }
+    if (!form.name.trim() || !form.code.trim()) { toast.error(t('resources.nameCodeRequired')); return }
     setIsSaving(true)
     try {
       const res = await fetch(`${BACKEND}/admin/resources/${id}`, {
@@ -110,11 +112,11 @@ export default function AdminResourceDetailPage() {
         body: JSON.stringify({ ...form, capacity: form.capacity ? parseInt(form.capacity) : undefined }),
       })
       if (!res.ok) throw new Error()
-      toast.success('Resource updated.')
+      toast.success(t('resources.updated'))
       setEditMode(false)
       await load()
     } catch {
-      toast.error('Failed to update resource.')
+      toast.error(t('resources.updateFail'))
     } finally {
       setIsSaving(false)
     }
@@ -129,11 +131,11 @@ export default function AdminResourceDetailPage() {
         body: JSON.stringify({ slots: slots.map(({ id: _id, ...s }) => s) }),
       })
       if (!res.ok) throw new Error()
-      toast.success('Availability saved.')
+      toast.success(t('resources.availabilitySaved'))
       setSlotsChanged(false)
       await load()
     } catch {
-      toast.error('Failed to save availability.')
+      toast.error(t('resources.availabilitySaveFail'))
     } finally {
       setIsSavingSlots(false)
     }
@@ -163,7 +165,7 @@ export default function AdminResourceDetailPage() {
   }
 
   if (!resource) {
-    return <div className="p-6 text-center text-muted-foreground">Resource not found.</div>
+    return <div className="p-6 text-center text-muted-foreground">{t('resources.notFound')}</div>
   }
 
   return (
@@ -185,13 +187,13 @@ export default function AdminResourceDetailPage() {
                 ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800'
                 : 'bg-slate-50 text-slate-600 border-slate-200 dark:bg-slate-800/30 dark:text-slate-400 dark:border-slate-700'
             )}>
-              {resource.isActive ? 'Active' : 'Inactive'}
+              {resource.isActive ? t('resources.active') : t('resources.inactive')}
             </span>
           </div>
           <p className="text-sm text-muted-foreground mt-0.5">{resource.code}</p>
         </div>
         <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setEditMode(!editMode)}>
-          <Pencil className="size-3.5" />{editMode ? 'Cancel' : 'Edit'}
+          <Pencil className="size-3.5" />{editMode ? t('common.cancel') : t('common.edit')}
         </Button>
       </div>
 
@@ -199,16 +201,16 @@ export default function AdminResourceDetailPage() {
       <div className="bg-card border border-border rounded-lg shadow-sm divide-y divide-border">
         <div className="px-5 py-4">
           <h2 className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
-            <Box className="size-4 text-primary" /> Resource Details
+            <Box className="size-4 text-primary" /> {t('resources.details')}
           </h2>
           {editMode ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {([
-                { label: 'Name *', key: 'name', type: 'text' },
-                { label: 'Code *', key: 'code', type: 'text' },
-                { label: 'Location', key: 'locationText', type: 'text' },
-                { label: 'Capacity', key: 'capacity', type: 'number' },
-                { label: 'Description', key: 'description', type: 'text' },
+                { label: `${t('resources.name')} *`, key: 'name', type: 'text' },
+                { label: `${t('resources.code')} *`, key: 'code', type: 'text' },
+                { label: t('resources.location'), key: 'locationText', type: 'text' },
+                { label: t('resources.colCapacity'), key: 'capacity', type: 'number' },
+                { label: t('common.description'), key: 'description', type: 'text' },
               ] as const).map(({ label, key, type }) => (
                 <div key={key} className="space-y-1.5">
                   <label className="text-xs font-medium text-muted-foreground">{label}</label>
@@ -220,7 +222,7 @@ export default function AdminResourceDetailPage() {
                 </div>
               ))}
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-muted-foreground">Type</label>
+                <label className="text-xs font-medium text-muted-foreground">{t('common.type')}</label>
                 <select
                   value={form.resourceType}
                   onChange={(e) => setForm((f) => ({ ...f, resourceType: e.target.value }))}
@@ -237,27 +239,27 @@ export default function AdminResourceDetailPage() {
                   onChange={(e) => setForm((f) => ({ ...f, isActive: e.target.checked }))}
                   className="rounded"
                 />
-                <label htmlFor="isActive" className="text-sm text-foreground">Active</label>
+                <label htmlFor="isActive" className="text-sm text-foreground">{t('common.active')}</label>
               </div>
               <div className="sm:col-span-2 flex justify-end gap-3 pt-2">
-                <Button variant="outline" size="sm" onClick={() => setEditMode(false)} disabled={isSaving}>Cancel</Button>
+                <Button variant="outline" size="sm" onClick={() => setEditMode(false)} disabled={isSaving}>{t('common.cancel')}</Button>
                 <Button size="sm" onClick={handleSave} disabled={isSaving} className="gap-1.5">
                   {isSaving ? <Loader2 className="size-3.5 animate-spin" /> : <Save className="size-3.5" />}
-                  Save Changes
+                  {t('common.save')}
                 </Button>
               </div>
             </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
               {[
-                { label: 'Code', value: resource.code },
-                { label: 'Type', value: resource.resourceType },
-                { label: 'Capacity', value: resource.capacity ?? '—' },
-                { label: 'Location', value: resource.locationText ?? '—' },
-                { label: 'Campus', value: resource.campus?.name ?? '—' },
-                { label: 'Faculty', value: resource.faculty?.name ?? '—' },
-                { label: 'Department', value: resource.department?.name ?? '—' },
-                { label: 'Unit', value: resource.unit?.name ?? '—' },
+                { label: t('resources.code'), value: resource.code },
+                { label: t('common.type'), value: resource.resourceType },
+                { label: t('resources.colCapacity'), value: resource.capacity ?? '—' },
+                { label: t('resources.location'), value: resource.locationText ?? '—' },
+                { label: t('resources.campus'), value: resource.campus?.name ?? '—' },
+                { label: t('resources.faculty'), value: resource.faculty?.name ?? '—' },
+                { label: t('resources.department'), value: resource.department?.name ?? '—' },
+                { label: t('resources.unit'), value: resource.unit?.name ?? '—' },
               ].map((f) => (
                 <div key={f.label}>
                   <p className="text-xs text-muted-foreground">{f.label}</p>
@@ -266,7 +268,7 @@ export default function AdminResourceDetailPage() {
               ))}
               {resource.description && (
                 <div className="col-span-2 sm:col-span-3">
-                  <p className="text-xs text-muted-foreground">Description</p>
+                  <p className="text-xs text-muted-foreground">{t('common.description')}</p>
                   <p className="text-sm font-medium text-foreground mt-0.5">{resource.description}</p>
                 </div>
               )}
@@ -278,23 +280,23 @@ export default function AdminResourceDetailPage() {
       {/* Availability */}
       <div className="bg-card border border-border rounded-lg shadow-sm overflow-hidden">
         <div className="px-5 py-4 border-b border-border flex items-center justify-between gap-4">
-          <h2 className="text-sm font-semibold text-foreground">Weekly Availability</h2>
+          <h2 className="text-sm font-semibold text-foreground">{t('resources.weeklyAvailability')}</h2>
           <div className="flex items-center gap-2">
             {slotsChanged && (
               <Button size="sm" className="gap-1.5" onClick={handleSaveSlots} disabled={isSavingSlots}>
                 {isSavingSlots ? <Loader2 className="size-3.5 animate-spin" /> : <Save className="size-3.5" />}
-                Save
+                {t('resources.save')}
               </Button>
             )}
             <Button size="sm" variant="outline" className="gap-1.5" onClick={addSlot}>
-              <Plus className="size-3.5" /> Add Slot
+              <Plus className="size-3.5" /> {t('resources.addSlot')}
             </Button>
           </div>
         </div>
 
         {slots.length === 0 ? (
           <div className="py-10 text-center text-sm text-muted-foreground">
-            No availability slots defined. Click "Add Slot" to start.
+            {t('resources.noSlots')}
           </div>
         ) : (
           <div className="divide-y divide-border">
@@ -329,7 +331,7 @@ export default function AdminResourceDetailPage() {
                     onChange={(e) => updateSlot(idx, 'isAvailable', e.target.checked)}
                     className="rounded"
                   />
-                  Available
+                  {t('resources.available')}
                 </label>
                 <Button
                   variant="ghost"

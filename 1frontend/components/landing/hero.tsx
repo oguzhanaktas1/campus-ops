@@ -1,14 +1,28 @@
+'use client'
+
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
+import { useI18n } from '@/lib/i18n'
 import { ArrowRight, CheckCircle2 } from 'lucide-react'
 
-const trustPoints = [
-  'No credit card required',
-  'Free 30-day trial',
-  'Setup in under 10 minutes',
-]
+const DashboardPreview = () => {
+  const { t } = useI18n()
+  const sidebarItems = [
+    t('hero.previewRequests'),
+    t('hero.previewDocuments'),
+    t('hero.previewAppointments'),
+    t('hero.previewEquipment'),
+    t('hero.previewEvents'),
+    t('hero.previewSettings'),
+  ]
+  const metrics = [
+    { color: 'bg-blue-500', label: t('hero.previewPending'), val: '3' },
+    { color: 'bg-emerald-500', label: t('hero.previewApproved'), val: '12' },
+    { color: 'bg-amber-500', label: t('hero.previewInReview'), val: '2' },
+    { color: 'bg-purple-500', label: t('hero.previewCompleted'), val: '47' },
+  ]
 
-const DashboardPreview = () => (
+  return (
   <div className="relative w-full max-w-4xl mx-auto mt-14">
     {/* Glow effect */}
     <div className="absolute inset-x-0 -top-10 h-40 bg-primary/20 blur-3xl rounded-full opacity-60 pointer-events-none" aria-hidden="true" />
@@ -37,7 +51,7 @@ const DashboardPreview = () => (
             <div className="size-3 rounded bg-primary/40" />
             <div className="h-2 w-16 bg-primary/40 rounded" />
           </div>
-          {['Requests', 'Documents', 'Appointments', 'Equipment', 'Events', 'Settings'].map((item) => (
+          {sidebarItems.map((item) => (
             <div key={item} className="h-7 rounded-md hover:bg-muted flex items-center gap-2 px-2">
               <div className="size-2.5 rounded bg-muted-foreground/25" />
               <div className="h-2 bg-muted-foreground/25 rounded" style={{ width: `${item.length * 5}px` }} />
@@ -58,12 +72,7 @@ const DashboardPreview = () => (
 
           {/* Metric cards */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-            {[
-              { color: 'bg-blue-500', label: 'Pending', val: '3' },
-              { color: 'bg-emerald-500', label: 'Approved', val: '12' },
-              { color: 'bg-amber-500', label: 'In Review', val: '2' },
-              { color: 'bg-purple-500', label: 'Completed', val: '47' },
-            ].map((m) => (
+            {metrics.map((m) => (
               <div key={m.label} className="bg-card border border-border rounded-lg p-3">
                 <div className={`size-5 rounded mb-2 ${m.color} opacity-80`} />
                 <div className="text-lg font-bold text-foreground leading-none">{m.val}</div>
@@ -99,9 +108,17 @@ const DashboardPreview = () => (
       </div>
     </div>
   </div>
-)
+  )
+}
 
 export function Hero() {
+  const { t } = useI18n()
+  const trustPoints = [
+    t('hero.trustNoCard'),
+    t('hero.trustTrial'),
+    t('hero.trustSetup'),
+  ]
+
   return (
     <section
       className="relative overflow-hidden pt-16 pb-8 sm:pt-20 sm:pb-12"
@@ -119,7 +136,7 @@ export function Hero() {
         <div className="inline-flex items-center gap-2 bg-primary/8 border border-primary/20 rounded-full px-4 py-1.5 mb-8">
           <div className="size-1.5 rounded-full bg-primary animate-pulse" />
           <span className="text-xs font-semibold text-primary tracking-wide uppercase">
-            Purpose-built for higher education
+            {t('hero.eyebrow')}
           </span>
         </div>
 
@@ -128,30 +145,29 @@ export function Hero() {
           id="hero-heading"
           className="text-4xl sm:text-5xl lg:text-[3.75rem] font-extrabold text-foreground leading-[1.1] tracking-tight text-balance mb-6"
         >
-          One platform for every{' '}
+          {t('hero.titlePrefix')}{' '}
           <span className="relative">
             <span className="bg-gradient-to-r from-primary via-indigo-500 to-primary bg-clip-text text-transparent">
-              campus operation
+              {t('hero.titleHighlight')}
             </span>
           </span>
         </h1>
 
         {/* Subheading */}
         <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto text-balance mb-10 leading-relaxed">
-          CampusFlow connects students, faculty, staff, and admins in a unified workflow platform.
-          Eliminate paperwork, automate approvals, and keep your institution running at full speed.
+          {t('hero.subtitle')}
         </p>
 
         {/* CTA buttons */}
         <div className="flex items-center justify-center gap-3 flex-wrap mb-8">
           <Link href="/login">
             <Button size="lg" className="gap-2 shadow-md shadow-primary/25 h-12 px-6 text-base">
-              Start free trial <ArrowRight className="size-4" />
+              {t('hero.startTrial')} <ArrowRight className="size-4" />
             </Button>
           </Link>
           <Link href="/login">
             <Button size="lg" variant="outline" className="h-12 px-6 text-base">
-              Login
+              {t('hero.login')}
             </Button>
           </Link>
         </div>

@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { getToken } from '@/lib/auth'
+import { useI18n } from '@/lib/i18n'
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000'
 
@@ -34,6 +35,7 @@ function InfoRow({ label, value }: { label: string; value?: string | null }) {
 
 export default function FacultyAppointmentDetailPage() {
   const { id } = useParams() as { id: string }
+  const { t } = useI18n()
   const [data, setData] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isProcessing, setIsProcessing] = useState(false)
@@ -59,7 +61,7 @@ export default function FacultyAppointmentDetailPage() {
   useEffect(() => { void load() }, [load])
 
   const handleConfirm = async () => {
-    if (!confirmState.startAt || !confirmState.endAt) { toast.error('Start and end times are required.'); return }
+    if (!confirmState.startAt || !confirmState.endAt) { toast.error(t('detail.startEndRequired')); return }
     setIsProcessing(true)
     try {
       const res = await fetch(`${BACKEND}/appointment-requests/${id}/confirm`, {
@@ -72,17 +74,17 @@ export default function FacultyAppointmentDetailPage() {
           note: confirmState.note || undefined,
         }),
       })
-      if (res.ok) { toast.success('Appointment confirmed.'); await load() }
+      if (res.ok) { toast.success(t('detail.appointmentConfirmed')); await load() }
       else {
         const err = await res.json().catch(() => ({})) as { message?: string }
-        toast.error(err.message ?? 'Failed to confirm.')
+        toast.error(err.message ?? t('detail.failedConfirm'))
       }
-    } catch { toast.error('Network error.') }
+    } catch { toast.error(t('detail.networkError')) }
     finally { setIsProcessing(false) }
   }
 
   const handleDecline = async () => {
-    if (!declineReason.trim()) { toast.error('Reason required.'); return }
+    if (!declineReason.trim()) { toast.error(t('detail.reasonRequiredToast')); return }
     setIsProcessing(true)
     try {
       const res = await fetch(`${BACKEND}/appointment-requests/${id}/decline`, {
@@ -90,12 +92,12 @@ export default function FacultyAppointmentDetailPage() {
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
         body: JSON.stringify({ reason: declineReason.trim() }),
       })
-      if (res.ok) { toast.success('Appointment declined.'); setShowDecline(false); await load() }
+      if (res.ok) { toast.success(t('detail.appointmentDeclined')); setShowDecline(false); await load() }
       else {
         const err = await res.json().catch(() => ({})) as { message?: string }
-        toast.error(err.message ?? 'Failed to decline.')
+        toast.error(err.message ?? t('detail.failedDecline'))
       }
-    } catch { toast.error('Network error.') }
+    } catch { toast.error(t('detail.networkError')) }
     finally { setIsProcessing(false) }
   }
 
@@ -103,8 +105,8 @@ export default function FacultyAppointmentDetailPage() {
   if (!data) return (
     <div className="p-6 max-w-3xl mx-auto flex flex-col items-center py-16">
       <AlertTriangle className="size-8 text-muted-foreground/40 mb-3" />
-      <p className="text-sm font-medium">Request not found</p>
-      <Link href="/faculty/appointments"><Button variant="outline" size="sm" className="mt-3">Back</Button></Link>
+      <p className="text-sm font-medium">{t('detail.requestNotFound')}</p>
+      <Link href="/faculty/appointments"><Button variant="outline" size="sm" className="mt-3">{t('common.back')}</Button></Link>
     </div>
   )
 
@@ -112,7 +114,7 @@ export default function FacultyAppointmentDetailPage() {
 
   return (
     <div className="p-6 space-y-5 max-w-4xl mx-auto pb-20">
-      <Link href="/faculty/appointments"><Button variant="ghost" size="sm" className="gap-1.5"><ArrowLeft className="size-4" /> Back</Button></Link>
+      <Link href="/faculty/appointments"><Button variant="ghost" size="sm" className="gap-1.5"><ArrowLeft className="size-4" /> {t('common.back')}</Button></Link>
 
       <div className="bg-card border border-border rounded-lg p-5 flex items-start justify-between gap-4">
         <div className="flex items-start gap-3">
@@ -131,7 +133,7 @@ export default function FacultyAppointmentDetailPage() {
         <div className="lg:col-span-3 space-y-5">
           {data.requester && (
             <div className="bg-card border border-border rounded-lg p-5 space-y-3">
-              <p className="text-sm font-semibold flex items-center gap-2"><User className="size-4 text-muted-foreground" /> Requester</p>
+              <p className="text-sm font-semibold flex items-center gap-2"><User className="size-4 text-muted-foreground" /> {t('detail.requester')}</p>
               <div className="flex items-center gap-3">
                 <div className="size-9 rounded-full bg-primary/10 flex items-center justify-center text-primary text-sm font-bold">
                   {data.requester?.fullName?.charAt(0) ?? 'R'}
@@ -145,29 +147,29 @@ export default function FacultyAppointmentDetailPage() {
           )}
 
           <div className="bg-card border border-border rounded-lg p-5 space-y-4">
-            <p className="text-sm font-semibold">Appointment Details</p>
+            <p className="text-sm font-semibold">{t('detail.appointmentDetails')}</p>
             <div className="grid grid-cols-2 gap-4">
-              <InfoRow label="Type" value={data.appointmentType} />
-              <InfoRow label="Preferred Start" value={fmt(data.preferredStartAt)} />
-              <InfoRow label="Preferred End" value={fmt(data.preferredEndAt)} />
+              <InfoRow label={t('common.type')} value={data.appointmentType} />
+              <InfoRow label={t('detail.preferredStart')} value={fmt(data.preferredStartAt)} />
+              <InfoRow label={t('detail.preferredEnd')} value={fmt(data.preferredEndAt)} />
             </div>
-            {data.details && <div><p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Details</p><p className="text-sm text-muted-foreground">{data.details}</p></div>}
+            {data.details && <div><p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-1">{t('detail.details')}</p><p className="text-sm text-muted-foreground">{data.details}</p></div>}
           </div>
 
           {data.actualAppointment && (
             <div className="bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800 rounded-lg p-4">
-              <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-300 mb-2">Confirmed Appointment</p>
+              <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-300 mb-2">{t('detail.confirmedAppointment')}</p>
               <div className="grid grid-cols-2 gap-3">
-                <InfoRow label="Start" value={fmt(data.actualAppointment.startAt)} />
-                <InfoRow label="End" value={fmt(data.actualAppointment.endAt)} />
-                {data.actualAppointment.locationText && <InfoRow label="Location" value={data.actualAppointment.locationText} />}
+                <InfoRow label={t('detail.start')} value={fmt(data.actualAppointment.startAt)} />
+                <InfoRow label={t('detail.end')} value={fmt(data.actualAppointment.endAt)} />
+                {data.actualAppointment.locationText && <InfoRow label={t('detail.location')} value={data.actualAppointment.locationText} />}
               </div>
             </div>
           )}
 
           {data.statusHistory?.length > 0 && (
             <div className="bg-card border border-border rounded-lg p-5">
-              <p className="text-sm font-semibold mb-4">Status History</p>
+              <p className="text-sm font-semibold mb-4">{t('detail.statusHistory')}</p>
               <RequestTimeline events={data.statusHistory} />
             </div>
           )}
@@ -177,44 +179,44 @@ export default function FacultyAppointmentDetailPage() {
           <div className="lg:col-span-2">
             {!showDecline ? (
               <div className="bg-card border border-border rounded-lg p-5 space-y-4">
-                <p className="text-sm font-semibold">Confirm Appointment</p>
+                <p className="text-sm font-semibold">{t('detail.confirmAppointment')}</p>
                 <div className="space-y-1.5">
-                  <Label>Confirmed Start</Label>
+                  <Label>{t('detail.confirmedStart')}</Label>
                   <Input type="datetime-local" value={confirmState.startAt} onChange={(e) => setConfirmState((p) => ({ ...p, startAt: e.target.value }))} disabled={isProcessing} />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Confirmed End</Label>
+                  <Label>{t('detail.confirmedEnd')}</Label>
                   <Input type="datetime-local" value={confirmState.endAt} onChange={(e) => setConfirmState((p) => ({ ...p, endAt: e.target.value }))} disabled={isProcessing} />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Location (optional)</Label>
-                  <Input placeholder="e.g. Office 204" value={confirmState.locationText} onChange={(e) => setConfirmState((p) => ({ ...p, locationText: e.target.value }))} disabled={isProcessing} />
+                  <Label>{t('detail.locationOptional')}</Label>
+                  <Input placeholder={t('detail.locationPlaceholder')} value={confirmState.locationText} onChange={(e) => setConfirmState((p) => ({ ...p, locationText: e.target.value }))} disabled={isProcessing} />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Note (optional)</Label>
+                  <Label>{t('detail.noteOptional')}</Label>
                   <Textarea className="resize-none min-h-[70px]" value={confirmState.note} onChange={(e) => setConfirmState((p) => ({ ...p, note: e.target.value }))} disabled={isProcessing} />
                 </div>
                 <div className="flex gap-3">
                   <Button className="flex-1 gap-2 bg-emerald-600 hover:bg-emerald-700 text-white" onClick={handleConfirm} disabled={isProcessing}>
-                    {isProcessing ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />} Confirm
+                    {isProcessing ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />} {t('common.confirm')}
                   </Button>
                   <Button variant="outline" className="flex-1 gap-2 border-destructive text-destructive hover:bg-destructive/10" onClick={() => setShowDecline(true)} disabled={isProcessing}>
-                    <XCircle className="size-4" /> Decline
+                    <XCircle className="size-4" /> {t('common.declined')}
                   </Button>
                 </div>
               </div>
             ) : (
               <div className="bg-card border border-border rounded-lg p-5 space-y-4">
-                <p className="text-sm font-semibold">Decline Request</p>
+                <p className="text-sm font-semibold">{t('detail.declineRequest')}</p>
                 <div className="space-y-1.5">
-                  <Label>Reason <span className="text-destructive">*</span></Label>
-                  <Textarea className="resize-none min-h-[80px]" placeholder="Explain why..." value={declineReason} onChange={(e) => setDeclineReason(e.target.value)} disabled={isProcessing} />
+                  <Label>{t('detail.reasonRequired')} <span className="text-destructive">*</span></Label>
+                  <Textarea className="resize-none min-h-[80px]" placeholder={t('detail.explainWhyPlaceholder')} value={declineReason} onChange={(e) => setDeclineReason(e.target.value)} disabled={isProcessing} />
                 </div>
                 <div className="flex gap-3">
                   <Button className="flex-1 gap-2 bg-destructive hover:bg-destructive/90 text-white" onClick={handleDecline} disabled={isProcessing}>
-                    {isProcessing ? <Loader2 className="size-4 animate-spin" /> : <XCircle className="size-4" />} Decline
+                    {isProcessing ? <Loader2 className="size-4 animate-spin" /> : <XCircle className="size-4" />} {t('common.declined')}
                   </Button>
-                  <Button variant="outline" onClick={() => setShowDecline(false)} disabled={isProcessing}>Cancel</Button>
+                  <Button variant="outline" onClick={() => setShowDecline(false)} disabled={isProcessing}>{t('common.cancel')}</Button>
                 </div>
               </div>
             )}
