@@ -141,6 +141,12 @@ function formatTs(ts?: string) {
   return new Date(ts).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
 }
 
+function formatNumber(value: unknown, digits = 0) {
+  const number = Number(value ?? 0)
+  if (!Number.isFinite(number)) return digits > 0 ? (0).toFixed(digits) : '0'
+  return digits > 0 ? number.toFixed(digits) : String(number)
+}
+
 function ExternalUrl({ label, href }: { label: string; href: string }) {
   return (
     <a
@@ -386,15 +392,15 @@ export default function MonitoringPage() {
                 {queues.map((q) => (
                   <tr key={q.name} className="border-b border-border/50 hover:bg-muted/20 transition-colors">
                     <td className="py-2 px-4 font-mono text-foreground">{q.name}</td>
-                    <td className="text-right py-2 px-3 text-foreground">{q.messagesReady}</td>
-                    <td className={cn('text-right py-2 px-3', q.messagesUnacked > 0 ? 'text-amber-600 font-medium' : 'text-foreground')}>
-                      {q.messagesUnacked}
+                    <td className="text-right py-2 px-3 text-foreground">{formatNumber(q.messagesReady)}</td>
+                    <td className={cn('text-right py-2 px-3', Number(q.messagesUnacked) > 0 ? 'text-amber-600 font-medium' : 'text-foreground')}>
+                      {formatNumber(q.messagesUnacked)}
                     </td>
-                    <td className={cn('text-right py-2 px-3', q.messages > 100 ? 'text-red-600 font-bold' : 'text-foreground')}>
-                      {q.messages}
+                    <td className={cn('text-right py-2 px-3', Number(q.messages) > 100 ? 'text-red-600 font-bold' : 'text-foreground')}>
+                      {formatNumber(q.messages)}
                     </td>
-                    <td className="text-right py-2 px-3 text-foreground">{q.consumers}</td>
-                    <td className="text-right py-2 px-3 text-muted-foreground">{q.publishRate.toFixed(1)}</td>
+                    <td className="text-right py-2 px-3 text-foreground">{formatNumber(q.consumers)}</td>
+                    <td className="text-right py-2 px-3 text-muted-foreground">{formatNumber(q.publishRate, 1)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -535,6 +541,7 @@ function ServiceCard({
 }
 
 function AiRuntimeDetails({ ai }: { ai: ServiceStatus }) {
+  const { t } = useI18n()
   const runtime = ai.runtime
   const runtimeOk = runtime?.status === 'ok'
   const runtimeUnreachable = runtime?.status === 'unreachable'
