@@ -83,6 +83,17 @@ export default function AdminAuditPage() {
     fetchLogs(pg, search)
   }
 
+  const paginationPages = Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
+    const pg = totalPages <= 7
+      ? i + 1
+      : page <= 4
+        ? i + 1
+        : page >= totalPages - 3
+          ? totalPages - 6 + i
+          : page - 3 + i
+    return pg < 1 || pg > totalPages ? null : pg
+  })
+
   return (
     <div className="p-6 space-y-5 max-w-6xl mx-auto pb-20">
       <div>
@@ -188,17 +199,29 @@ export default function AdminAuditPage() {
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="px-5 py-3 border-t border-border flex items-center justify-between gap-4">
-            <span className="text-xs text-muted-foreground">
+          <div className="relative px-5 py-3 border-t border-border flex items-center justify-center gap-4">
+            <span className="absolute left-5 text-xs text-muted-foreground">
               {t('auditLogs.pageOf', { page, total: totalPages })}
             </span>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1">
               <Button
                 variant="outline" size="icon" className="size-8"
                 onClick={() => goToPage(page - 1)} disabled={page <= 1 || isLoading}
               >
                 <ChevronLeft className="size-4" />
               </Button>
+              {paginationPages.map((pg, i) => pg === null ? null : (
+                <Button
+                  key={`${pg}-${i}`}
+                  variant={pg === page ? 'default' : 'outline'}
+                  size="sm"
+                  className="h-8 min-w-[32px] text-xs"
+                  disabled={isLoading}
+                  onClick={() => goToPage(pg)}
+                >
+                  {pg}
+                </Button>
+              ))}
               <Button
                 variant="outline" size="icon" className="size-8"
                 onClick={() => goToPage(page + 1)} disabled={page >= totalPages || isLoading}

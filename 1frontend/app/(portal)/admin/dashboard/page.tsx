@@ -4,17 +4,17 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
-  FileText, Users, CheckSquare, Activity, CheckCircle2, Loader2,
-  Workflow, BarChart3, AlertTriangle, Ticket, CalendarDays,
-  BookMarked, Clock, TrendingUp, ArrowRight, ShieldCheck, Monitor,
+  FileText, Users, CheckSquare, Activity, Loader2,
+  Workflow, BarChart3, AlertTriangle, CalendarDays,
+  BookMarked, ArrowRight, Monitor,
   RefreshCw, Zap,
 } from 'lucide-react'
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, CartesianGrid,
+  PieChart, Pie,
 } from 'recharts'
 import { cn } from '@/lib/utils'
 import { getToken } from '@/lib/auth'
-import { MetricCard } from '@/components/metric-card'
 import { Button } from '@/components/ui/button'
 import { useI18n } from '@/lib/i18n'
 
@@ -70,23 +70,6 @@ function useTimeAgo() {
     if (hours < 24) return t('dashboard.hoursAgo', { n: hours })
     return t('dashboard.daysAgo', { n: days })
   }
-}
-
-function ApprovalRing({ rate }: { rate: number }) {
-  const r = 32
-  const circ = 2 * Math.PI * r
-  const dash = Math.min(rate / 100, 1) * circ
-  const color = rate >= 70 ? '#10b981' : rate >= 40 ? '#f59e0b' : '#ef4444'
-  return (
-    <svg width="80" height="80" viewBox="0 0 80 80" className="-rotate-90">
-      <circle cx="40" cy="40" r={r} fill="none" stroke="currentColor" strokeWidth="8" className="text-muted/30" />
-      <circle
-        cx="40" cy="40" r={r} fill="none" stroke={color} strokeWidth="8"
-        strokeDasharray={`${dash} ${circ}`} strokeLinecap="round"
-        style={{ transition: 'stroke-dasharray 0.8s ease' }}
-      />
-    </svg>
-  )
 }
 
 export default function AdminDashboard() {
@@ -195,18 +178,25 @@ export default function AdminDashboard() {
   const rbs = (r.requestsByStatus ?? []) as { status: string; count: number }[]
   const rbt = (r.requestsByType   ?? []) as { type: string;   count: number }[]
 
-  // approval vs rejection split for mini chart
-  const approvalData = [
-    { name: 'Approved', value: m.approvalRate ?? 0,       fill: '#10b981' },
-    { name: 'Rejected', value: 100 - (m.approvalRate ?? 0), fill: '#ef444422' },
-  ]
-
   const today = new Date().toLocaleDateString('tr-TR', { weekday: 'long', day: 'numeric', month: 'long' })
 
   const approvalRate = m.approvalRate ?? 0
-  const approvalColor =
-    approvalRate >= 70 ? 'text-emerald-600' :
-    approvalRate >= 40 ? 'text-amber-600'   : 'text-red-600'
+  const approvalColor = 'text-emerald-600'
+  const requestTypeChart = rbt.slice(0, 8).map((item, i) => ({
+    ...item,
+    fill: ['#6366f1', '#10b981', '#f59e0b', '#8b5cf6', '#06b6d4', '#ec4899', '#14b8a6', '#64748b'][i % 8],
+  }))
+
+  const getAssigneeName = (req: any) => {
+    const explicit = req.assignedToName || req.currentAssigneeName || req.assigneeName
+    if (explicit && !/^unassigned|not assigned$/i.test(String(explicit))) return explicit
+    if (Array.isArray(req.assignedToNames) && req.assignedToNames.length > 0) return req.assignedToNames.join(', ')
+    return req.currentAssignee?.profile?.fullName
+      || req.currentAssignee?.email
+      || req.assignedTo?.profile?.fullName
+      || req.assignedTo?.email
+      || '—'
+  }
 
   return (
     <div className="p-6 space-y-6 max-w-6xl mx-auto">
@@ -354,7 +344,7 @@ export default function AdminDashboard() {
             label: t('dashboard.approvalRate'),
             value: `${approvalRate}%`,
             sub: t('dashboard.approvedTotalDecisions'),
-            accent: approvalRate >= 70 ? 'bg-emerald-500' : approvalRate >= 40 ? 'bg-amber-500' : 'bg-red-500',
+            accent: 'bg-emerald-500',
             icon: CheckSquare,
             iconCls: approvalColor,
             valueCls: approvalColor,
@@ -435,41 +425,46 @@ export default function AdminDashboard() {
           )}
         </div>
 
-        {/* Right column: approval ring + open tickets */}
+        {/* Right column: request type mix + open tickets */}
         <div className="space-y-4">
-          {/* Approval Rate Donut */}
+          {/* Request Type Donut */}
           <div className="bg-card border border-border rounded-2xl shadow-sm p-5">
-            <h2 className="text-sm font-bold text-foreground">{t('dashboard.approvalRate')}</h2>
-            <p className="text-xs text-muted-foreground mt-0.5 mb-4">{t('dashboard.ofTotalDecisions')}</p>
-            <div className="flex items-center gap-5">
-              <div className="relative flex-shrink-0">
-                <ApprovalRing rate={approvalRate} />
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <span className={cn('text-[13px] font-black leading-none rotate-90', approvalColor)}>
-                    {approvalRate}
-                    <span className="text-[9px] font-semibold">%</span>
-                  </span>
+            <h2 className="text-sm font-bold text-foreground">{t('dashboard.requestsByType')}</h2>
+            <p className="text-xs text-muted-foreground mt-0.5 mb-3">Top request categories</p>
+            {requestTypeChart.length > 0 ? (
+              <div className="grid grid-cols-[150px_1fr] items-center gap-3">
+                <ResponsiveContainer width="100%" height={150}>
+                  <PieChart>
+                    <Pie
+                      data={requestTypeChart}
+                      dataKey="count"
+                      nameKey="type"
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={42}
+                      outerRadius={64}
+                      paddingAngle={2}
+                    >
+                      {requestTypeChart.map((entry) => <Cell key={entry.type} fill={entry.fill} />)}
+                    </Pie>
+                    <Tooltip contentStyle={{ fontSize: 12, borderRadius: 10 }} />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="space-y-1.5 min-w-0">
+                  {requestTypeChart.slice(0, 5).map((item) => (
+                    <div key={item.type} className="flex items-center justify-between gap-2 text-[11px]">
+                      <span className="flex items-center gap-1.5 min-w-0 text-muted-foreground">
+                        <span className="size-2 rounded-full flex-shrink-0" style={{ backgroundColor: item.fill }} />
+                        <span className="truncate">{item.type}</span>
+                      </span>
+                      <span className="font-bold text-foreground">{item.count}</span>
+                    </div>
+                  ))}
                 </div>
               </div>
-              <div className="space-y-2">
-                <div>
-                  <p className={cn('text-3xl font-black leading-none', approvalColor)}>
-                    {approvalRate}
-                    <span className="text-base font-semibold text-muted-foreground ml-0.5">%</span>
-                  </p>
-                </div>
-                <div className="space-y-1">
-                  <div className="flex items-center gap-1.5">
-                    <span className="size-2 rounded-full bg-emerald-500 flex-shrink-0" />
-                    <span className="text-[11px] text-muted-foreground">Approved</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <span className="size-2 rounded-full bg-red-400 flex-shrink-0" />
-                    <span className="text-[11px] text-muted-foreground">Rejected</span>
-                  </div>
-                </div>
-              </div>
-            </div>
+            ) : (
+              <div className="flex h-[150px] items-center justify-center text-sm text-muted-foreground">{t('dashboard.noData')}</div>
+            )}
           </div>
 
           {/* Open IT Tickets */}
@@ -510,7 +505,7 @@ export default function AdminDashboard() {
       </div>
 
       {/* ── Request by Type ─────────────────────────────────────────────────── */}
-      {rbt.length > 0 && (
+      {requestTypeChart.length > 0 && (
         <div className="bg-card border border-border rounded-2xl shadow-sm p-5">
           <div className="flex items-center justify-between mb-5">
             <div>
@@ -518,45 +513,17 @@ export default function AdminDashboard() {
               <p className="text-xs text-muted-foreground mt-0.5">Top {Math.min(rbt.length, 8)} request categories</p>
             </div>
           </div>
-          <div className="space-y-3">
-            {rbt.slice(0, 8).map((item, i) => {
-              const max = rbt[0]?.count ?? 1
-              const pct = Math.round((item.count / max) * 100)
-              const colorMap = [
-                { bar: 'bg-primary',     badge: 'bg-primary/10 text-primary' },
-                { bar: 'bg-emerald-500', badge: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400' },
-                { bar: 'bg-amber-500',   badge: 'bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400' },
-                { bar: 'bg-purple-500',  badge: 'bg-purple-50 text-purple-700 dark:bg-purple-950/30 dark:text-purple-400' },
-                { bar: 'bg-blue-500',    badge: 'bg-blue-50 text-blue-700 dark:bg-blue-950/30 dark:text-blue-400' },
-                { bar: 'bg-red-500',     badge: 'bg-red-50 text-red-700 dark:bg-red-950/30 dark:text-red-400' },
-                { bar: 'bg-pink-500',    badge: 'bg-pink-50 text-pink-700 dark:bg-pink-950/30 dark:text-pink-400' },
-                { bar: 'bg-cyan-500',    badge: 'bg-cyan-50 text-cyan-700 dark:bg-cyan-950/30 dark:text-cyan-400' },
-              ]
-              const c = colorMap[i % colorMap.length]
-              return (
-                <div key={item.type} className="flex items-center gap-3">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-xs font-semibold text-foreground truncate max-w-[200px]">{item.type}</span>
-                      <span className={cn(
-                        'text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 ml-2',
-                        c.badge,
-                      )}>
-                        {item.count}
-                      </span>
-                    </div>
-                    <div className="h-2 bg-muted rounded-full overflow-hidden">
-                      <div
-                        className={cn('h-full rounded-full transition-all duration-700', c.bar)}
-                        style={{ width: `${pct}%` }}
-                      />
-                    </div>
-                  </div>
-                  <span className="text-[10px] text-muted-foreground font-medium w-8 text-right flex-shrink-0">{pct}%</span>
-                </div>
-              )
-            })}
-          </div>
+          <ResponsiveContainer width="100%" height={260}>
+            <BarChart data={requestTypeChart} layout="vertical" barSize={18} margin={{ top: 4, right: 18, bottom: 4, left: 96 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.88 0.01 264 / 0.5)" horizontal={false} />
+              <XAxis type="number" tick={{ fontSize: 11, fill: 'oklch(0.55 0.02 264)' }} axisLine={false} tickLine={false} />
+              <YAxis type="category" dataKey="type" width={92} tick={{ fontSize: 10, fill: 'oklch(0.55 0.02 264)' }} axisLine={false} tickLine={false} />
+              <Tooltip contentStyle={{ fontSize: 12, borderRadius: 10 }} />
+              <Bar dataKey="count" radius={[0, 6, 6, 0]}>
+                {requestTypeChart.map((entry) => <Cell key={entry.type} fill={entry.fill} />)}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
         </div>
       )}
 
@@ -628,7 +595,7 @@ export default function AdminDashboard() {
                       </span>
                     </td>
                     <td className="py-3 px-3 text-muted-foreground hidden lg:table-cell">
-                      {req.assignedToName ?? '—'}
+                      {getAssigneeName(req)}
                     </td>
                     <td className="py-3 px-5 text-right text-muted-foreground font-medium">
                       {timeAgo(req.createdAt)}

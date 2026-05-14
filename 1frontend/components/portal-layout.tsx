@@ -88,7 +88,7 @@ function SidebarNav({ navItems, portalName }: Pick<PortalLayoutProps, 'navItems'
       </div>
 
       {/* Navigasyon Alanı */}
-      <div className="flex-1 overflow-y-auto px-2 py-3 scrollbar-thin scrollbar-thumb-sidebar-border scrollbar-track-transparent">
+      <div className="admin-sidebar-scrollbar flex-1 overflow-y-auto px-2 py-3 scrollbar-thin scrollbar-thumb-sidebar-border scrollbar-track-transparent">
         <nav className="space-y-1">
           {navItems.map((item) => {
             const Icon = item.icon
@@ -213,7 +213,7 @@ export function PortalLayout({ children, navItems, portalName, portalColor, topb
         </header>
 
         {/* Page Content */}
-        <main className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent">
+        <main className="admin-scrollbar flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent">
           {children}
         </main>
       </div>

@@ -514,8 +514,8 @@ export default function AdminResourcesPage() {
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between text-sm">
-          <p className="text-muted-foreground">{t('resources.pageOf', { page, total: totalPages })}</p>
+        <div className="relative flex items-center justify-center text-sm">
+          <p className="absolute left-0 text-muted-foreground">{t('resources.pageOf', { page, total: totalPages })}</p>
           <div className="flex items-center gap-1">
             <Button
               variant="outline" size="sm" className="gap-1"

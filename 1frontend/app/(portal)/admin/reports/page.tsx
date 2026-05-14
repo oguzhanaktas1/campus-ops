@@ -6,6 +6,10 @@ import {
   Loader2, TrendingUp, Clock, Users, CheckCircle2, XCircle,
   AlertTriangle, RefreshCw, Download,
 } from 'lucide-react'
+import {
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, CartesianGrid,
+  PieChart, Pie,
+} from 'recharts'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
@@ -33,35 +37,25 @@ interface ReportData {
 
 // ─── Styling maps ─────────────────────────────────────────────────────────────
 
-const STATUS_BADGE: Record<string, string> = {
-  SUBMITTED:          'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/30 dark:text-indigo-400 dark:border-indigo-800',
-  IN_REVIEW:          'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-800',
-  WAITING_APPROVAL:   'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/30 dark:text-purple-400 dark:border-purple-800',
-  APPROVED:           'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800',
-  REJECTED:           'bg-red-50 text-red-700 border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-800',
-  COMPLETED:          'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800',
-  CANCELLED:          'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800/30 dark:text-slate-400 dark:border-slate-700',
-  REVISION_REQUESTED: 'bg-pink-50 text-pink-700 border-pink-200 dark:bg-pink-950/30 dark:text-pink-400 dark:border-pink-800',
-  DRAFT:              'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800/30 dark:text-slate-400 dark:border-slate-700',
-  OPEN:               'bg-red-50 text-red-700 border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-800',
-  TRIAGED:            'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-800',
-  IN_PROGRESS:        'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/30 dark:text-indigo-400 dark:border-indigo-800',
-  WAITING_USER:       'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/30 dark:text-purple-400 dark:border-purple-800',
-  RESOLVED:           'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800',
-  CLOSED:             'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800/30 dark:text-slate-400 dark:border-slate-700',
-  REOPENED:           'bg-pink-50 text-pink-700 border-pink-200 dark:bg-pink-950/30 dark:text-pink-400 dark:border-pink-800',
+const CHART_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#8b5cf6', '#06b6d4', '#ec4899', '#ef4444', '#64748b']
+const STATUS_COLORS: Record<string, string> = {
+  SUBMITTED: '#6366f1',
+  IN_REVIEW: '#f59e0b',
+  WAITING_APPROVAL: '#8b5cf6',
+  APPROVED: '#10b981',
+  REJECTED: '#ef4444',
+  COMPLETED: '#059669',
+  CANCELLED: '#94a3b8',
+  REVISION_REQUESTED: '#ec4899',
+  DRAFT: '#64748b',
+  OPEN: '#ef4444',
+  TRIAGED: '#f59e0b',
+  IN_PROGRESS: '#6366f1',
+  WAITING_USER: '#8b5cf6',
+  RESOLVED: '#10b981',
+  CLOSED: '#94a3b8',
+  REOPENED: '#ec4899',
 }
-
-const BAR_COLORS = [
-  'bg-gradient-to-r from-indigo-600 to-indigo-400',
-  'bg-gradient-to-r from-emerald-600 to-emerald-400',
-  'bg-gradient-to-r from-amber-600 to-amber-400',
-  'bg-gradient-to-r from-purple-600 to-purple-400',
-  'bg-gradient-to-r from-blue-600 to-blue-400',
-  'bg-gradient-to-r from-red-600 to-red-400',
-  'bg-gradient-to-r from-pink-600 to-pink-400',
-  'bg-gradient-to-r from-cyan-600 to-cyan-400',
-]
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -85,34 +79,6 @@ function StatCard({ icon, label, value, sub, accent, accentColor }: {
   )
 }
 
-function ProgressRow({ label, count, max, colorClass, badge }: {
-  label: string; count: number; max: number; colorClass: string; badge?: string
-}) {
-  const pct = max > 0 ? Math.round((count / max) * 100) : 0
-  return (
-    <div className="space-y-1.5">
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2 min-w-0">
-          {badge ? (
-            <span className={cn('text-[10px] font-semibold px-2 py-0.5 rounded-full border flex-shrink-0', STATUS_BADGE[badge] ?? 'bg-muted text-muted-foreground border-border')}>
-              {label}
-            </span>
-          ) : (
-            <span className="text-xs font-medium text-foreground truncate">{label}</span>
-          )}
-        </div>
-        <div className="flex items-center gap-2 flex-shrink-0">
-          <span className="text-xs text-muted-foreground">{pct}%</span>
-          <span className="text-sm font-bold text-foreground w-8 text-right">{count}</span>
-        </div>
-      </div>
-      <div className="h-2.5 bg-muted rounded-full overflow-hidden">
-        <div className={cn('h-full rounded-full transition-all duration-500', colorClass)} style={{ width: `${pct}%` }} />
-      </div>
-    </div>
-  )
-}
-
 function Section({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) {
   return (
     <div>
@@ -123,6 +89,15 @@ function Section({ title, icon, children }: { title: string; icon: React.ReactNo
         <h2 className="text-sm font-bold text-foreground uppercase tracking-wider">{title}</h2>
         <div className="flex-1 h-px bg-border" />
       </div>
+      {children}
+    </div>
+  )
+}
+
+function ChartPanel({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="bg-card border border-border rounded-lg p-5 shadow-sm">
+      <h3 className="text-sm font-semibold text-foreground mb-4">{title}</h3>
       {children}
     </div>
   )
@@ -203,10 +178,6 @@ export default function AdminReportsPage() {
   }
 
   if (!data) return null
-
-  const maxStatus = Math.max(...(data.requestsByStatus?.map(s => s.count) ?? [1]), 1)
-  const maxType   = Math.max(...(data.requestsByType?.map(t => t.count)   ?? [1]), 1)
-  const maxTicket = Math.max(...(data.ticketsByStatus?.map(t => t.count)  ?? [1]), 1)
 
   const resolveRate = data.totalRequests > 0
     ? Math.round((data.resolvedRequests / data.totalRequests) * 100)
@@ -300,42 +271,41 @@ export default function AdminReportsPage() {
         </div>
 
         <div className="grid lg:grid-cols-2 gap-5">
-          {/* By Status */}
-          <div className="bg-card border border-border rounded-lg p-5 shadow-sm space-y-3">
-            <h3 className="text-sm font-semibold text-foreground">{t('reports.byStatus')}</h3>
+          <ChartPanel title={t('reports.byStatus')}>
             {data.requestsByStatus?.length > 0 ? (
-              <div className="space-y-3">
-                {data.requestsByStatus.map(row => (
-                  <ProgressRow
-                    key={row.status}
-                    label={row.status.replace(/_/g, ' ')}
-                    count={row.count}
-                    max={maxStatus}
-                    colorClass="bg-gradient-to-r from-indigo-600 to-indigo-400"
-                    badge={row.status}
-                  />
-                ))}
-              </div>
+              <ResponsiveContainer width="100%" height={260}>
+                <BarChart data={data.requestsByStatus} barSize={22}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.88 0.01 264 / 0.55)" vertical={false} />
+                  <XAxis dataKey="status" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={(v) => v.replace(/_/g, ' ').slice(0, 12)} />
+                  <YAxis tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
+                  <Tooltip contentStyle={{ fontSize: 12, borderRadius: 10 }} />
+                  <Bar dataKey="count" radius={[6, 6, 0, 0]}>
+                    {data.requestsByStatus.map((row, i) => (
+                      <Cell key={row.status} fill={STATUS_COLORS[row.status] ?? CHART_COLORS[i % CHART_COLORS.length]} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
             ) : <p className="text-xs text-muted-foreground text-center py-6">{t('reports.noData')}</p>}
-          </div>
+          </ChartPanel>
 
-          {/* By Type */}
-          <div className="bg-card border border-border rounded-lg p-5 shadow-sm space-y-3">
-            <h3 className="text-sm font-semibold text-foreground">{t('reports.byType')}</h3>
+          <ChartPanel title={t('reports.byType')}>
             {data.requestsByType?.length > 0 ? (
-              <div className="space-y-3">
-                {data.requestsByType.slice(0, 10).map((row, i) => (
-                  <ProgressRow
-                    key={row.type}
-                    label={row.type}
-                    count={row.count}
-                    max={maxType}
-                    colorClass={BAR_COLORS[i % BAR_COLORS.length]}
-                  />
-                ))}
-              </div>
+              <ResponsiveContainer width="100%" height={260}>
+                <BarChart data={data.requestsByType.slice(0, 10)} layout="vertical" barSize={18} margin={{ top: 4, right: 18, bottom: 4, left: 96 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.88 0.01 264 / 0.55)" horizontal={false} />
+                  <XAxis type="number" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
+                  <YAxis type="category" dataKey="type" width={92} tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
+                  <Tooltip contentStyle={{ fontSize: 12, borderRadius: 10 }} />
+                  <Bar dataKey="count" radius={[0, 6, 6, 0]}>
+                    {data.requestsByType.slice(0, 10).map((row, i) => (
+                      <Cell key={row.type} fill={CHART_COLORS[i % CHART_COLORS.length]} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
             ) : <p className="text-xs text-muted-foreground text-center py-6">{t('reports.noData')}</p>}
-          </div>
+          </ChartPanel>
         </div>
       </Section>
 
@@ -353,21 +323,33 @@ export default function AdminReportsPage() {
         </div>
 
         {data.ticketsByStatus?.length > 0 && (
-          <div className="bg-card border border-border rounded-lg p-5 shadow-sm space-y-3">
-            <h3 className="text-sm font-semibold text-foreground">{t('reports.byTicketStatus')}</h3>
-            <div className="grid sm:grid-cols-2 gap-x-8 gap-y-3">
-              {data.ticketsByStatus.map((row, i) => (
-                <ProgressRow
-                  key={row.status}
-                  label={row.status.replace(/_/g, ' ')}
-                  count={row.count}
-                  max={maxTicket}
-                  colorClass={BAR_COLORS[i % BAR_COLORS.length]}
-                  badge={row.status}
-                />
-              ))}
+          <ChartPanel title={t('reports.byTicketStatus')}>
+            <div className="grid gap-5 lg:grid-cols-[1.2fr_0.8fr]">
+              <ResponsiveContainer width="100%" height={240}>
+                <BarChart data={data.ticketsByStatus} barSize={22}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.88 0.01 264 / 0.55)" vertical={false} />
+                  <XAxis dataKey="status" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={(v) => v.replace(/_/g, ' ')} />
+                  <YAxis tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
+                  <Tooltip contentStyle={{ fontSize: 12, borderRadius: 10 }} />
+                  <Bar dataKey="count" radius={[6, 6, 0, 0]}>
+                    {data.ticketsByStatus.map((row, i) => (
+                      <Cell key={row.status} fill={STATUS_COLORS[row.status] ?? CHART_COLORS[i % CHART_COLORS.length]} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+              <ResponsiveContainer width="100%" height={240}>
+                <PieChart>
+                  <Pie data={data.ticketsByStatus} dataKey="count" nameKey="status" cx="50%" cy="50%" innerRadius={58} outerRadius={86} paddingAngle={2}>
+                    {data.ticketsByStatus.map((row, i) => (
+                      <Cell key={row.status} fill={STATUS_COLORS[row.status] ?? CHART_COLORS[i % CHART_COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip contentStyle={{ fontSize: 12, borderRadius: 10 }} />
+                </PieChart>
+              </ResponsiveContainer>
             </div>
-          </div>
+          </ChartPanel>
         )}
       </Section>
 

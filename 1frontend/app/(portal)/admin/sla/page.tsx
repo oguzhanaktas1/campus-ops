@@ -94,8 +94,8 @@ function Pagination({ page, totalPages, isLoading, onChange }: {
     return pg < 1 || pg > totalPages ? null : pg
   })
   return (
-    <div className="flex items-center justify-between text-sm pt-2">
-      <p className="text-muted-foreground">Page {page} of {totalPages}</p>
+    <div className="relative flex items-center justify-center text-sm pt-2">
+      <p className="absolute left-0 text-muted-foreground">Page {page} of {totalPages}</p>
       <div className="flex items-center gap-1">
         <Button variant="outline" size="sm" className="gap-1" disabled={page <= 1 || isLoading} onClick={() => onChange(page - 1)}>
           <ChevronLeft className="size-4" /> Prev

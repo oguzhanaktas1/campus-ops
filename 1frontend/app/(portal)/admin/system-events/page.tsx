@@ -290,8 +290,8 @@ export default function AdminSystemEventsPage() {
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="border-t border-border px-5 py-3 flex items-center justify-between gap-4">
-            <span className="text-xs text-muted-foreground">
+          <div className="relative border-t border-border px-5 py-3 flex items-center justify-center gap-4">
+            <span className="absolute left-5 text-xs text-muted-foreground">
               {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filtered.length)} / {filtered.length}
             </span>
             <PaginationBar page={page} totalPages={totalPages} onChange={setPage} />

@@ -698,7 +698,7 @@ export class AdminService {
       CacheKeys.version('admin:requests:list'),
     );
     const key = CacheKeys.adminRequestsList(
-      makeCacheHash({ scope: 'all' }),
+      makeCacheHash({ scope: 'all', assigneeMapping: 'v2' }),
       version,
     );
 
@@ -714,6 +714,15 @@ export class AdminService {
             orderBy: { assignedAt: 'desc' },
           },
           itTicket: { include: { assignedTo: { include: { profile: true } } } },
+          workflowInstance: {
+            include: {
+              instanceSteps: {
+                where: { status: 'PENDING' },
+                include: { assignedTo: { include: { profile: true } } },
+                orderBy: { startedAt: 'desc' },
+              },
+            },
+          },
         },
         orderBy: { createdAt: 'desc' },
       });
@@ -727,6 +736,10 @@ export class AdminService {
 
         const itTicketAssignee = (req as any).itTicket?.assignedTo?.profile?.fullName
           || (req as any).itTicket?.assignedTo?.email;
+        const workflowAssignee = (req as any).workflowInstance?.instanceSteps
+          ?.map((step) => step.assignedTo?.profile?.fullName || step.assignedTo?.email)
+          ?.filter(Boolean)
+          ?.join(', ');
 
         return {
         id: req.id,
@@ -741,7 +754,11 @@ export class AdminService {
         assignedToName:
           assignedToNames.length > 0
             ? assignedToNames.join(', ')
-            : req.currentAssignee?.profile?.fullName || itTicketAssignee || 'Unassigned',
+            : req.currentAssignee?.profile?.fullName
+              || req.currentAssignee?.email
+              || itTicketAssignee
+              || workflowAssignee
+              || 'Unassigned',
         assignedToNames,
         createdAt: req.createdAt,
         updatedAt: req.updatedAt,

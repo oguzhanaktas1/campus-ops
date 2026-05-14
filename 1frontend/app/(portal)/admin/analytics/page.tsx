@@ -183,7 +183,6 @@ export default function AdminAnalyticsPage() {
   const requestsByType:   { type:   string; count: number }[] = d.requestsByType   ?? []
   const ticketsByStatus:  { status: string; count: number }[] = d.ticketsByStatus  ?? []
 
-  const reqPieData  = requestsByStatus.map((r, i) => ({ type: r.status, count: r.count, color: STATUS_COLORS[r.status] ?? PIE_COLORS[i % PIE_COLORS.length] }))
   const tktPieData  = ticketsByStatus.map((t, i)  => ({ type: t.status, count: t.count, color: STATUS_COLORS[t.status] ?? PIE_COLORS[i % PIE_COLORS.length] }))
   const typePieData = requestsByType.slice(0, 8).map((r, i) => ({ type: r.type, count: r.count, color: PIE_COLORS[i % PIE_COLORS.length] }))
 
@@ -307,11 +306,11 @@ export default function AdminAnalyticsPage() {
               ) : <EmptyChart />}
             </ChartCard>
 
-            <ChartCard title={t('analytics.requestsByStatus')}>
-              {reqPieData.length > 0 ? (
+            <ChartCard title={t('analytics.requestsByType')}>
+              {typePieData.length > 0 ? (
                 <>
-                  <DonutChart data={reqPieData} height={180} />
-                  <PieLegend data={reqPieData} />
+                  <DonutChart data={typePieData} height={180} />
+                  <PieLegend data={typePieData} />
                 </>
               ) : <EmptyChart />}
             </ChartCard>

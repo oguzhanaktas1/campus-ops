@@ -599,8 +599,8 @@ export default function AdminWorkflowInstancesPage() {
 
             {/* Pagination */}
             {totalPages > 1 && (
-              <div className="flex items-center justify-between rounded-xl border border-border bg-card px-5 py-3">
-                <span className="text-xs text-muted-foreground">
+              <div className="relative flex items-center justify-center rounded-xl border border-border bg-card px-5 py-3">
+                <span className="absolute left-5 text-xs text-muted-foreground">
                   {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filteredRecords.length)} / {filteredRecords.length}
                 </span>
                 <PaginationBar page={page} totalPages={totalPages} onChange={setPage} />
