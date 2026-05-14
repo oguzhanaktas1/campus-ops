@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useState, useCallback, useMemo } from 'react'
-import { Webhook, Search, Loader2, CheckCircle2, XCircle, Clock, RefreshCw } from 'lucide-react'
+import { Fragment, useEffect, useState, useCallback, useMemo } from 'react'
+import { Webhook, Search, Loader2, CheckCircle2, XCircle, Clock, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
@@ -24,6 +24,8 @@ interface WebhookLog {
   integration?: { id: string; name: string; provider: string } | null
 }
 
+const PAGE_SIZE = 20
+
 function formatDate(d: string) {
   if (!d) return '—'
   return new Date(d).toLocaleString('en-US', {
@@ -45,6 +47,7 @@ export default function AdminWebhookLogsPage() {
   const [search, setSearch] = useState('')
   const [successFilter, setSuccessFilter] = useState<'all' | 'success' | 'failure'>('all')
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [page, setPage] = useState(1)
 
   const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
 
@@ -74,6 +77,26 @@ export default function AdminWebhookLogsPage() {
       l.integration?.provider?.toLowerCase().includes(q)
     )
   }, [logs, search])
+
+  useEffect(() => {
+    setPage(1)
+    setExpandedId(null)
+  }, [search, successFilter])
+
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE)
+  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+
+  const getPages = (): (number | '...')[] => {
+    const pages: (number | '...')[] = []
+    for (let i = 1; i <= totalPages; i++) {
+      if (i === 1 || i === totalPages || Math.abs(i - page) <= 1) {
+        pages.push(i)
+      } else if (pages[pages.length - 1] !== '...') {
+        pages.push('...')
+      }
+    }
+    return pages
+  }
 
   if (isLoading) {
     return (
@@ -149,8 +172,8 @@ export default function AdminWebhookLogsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {filtered.map(l => (
-                <>
+              {paginated.map(l => (
+                <Fragment key={l.id}>
                   <tr
                     key={l.id}
                     className={cn(
@@ -226,7 +249,7 @@ export default function AdminWebhookLogsPage() {
                       </td>
                     </tr>
                   )}
-                </>
+                </Fragment>
               ))}
             </tbody>
           </table>
@@ -238,6 +261,36 @@ export default function AdminWebhookLogsPage() {
             </div>
           )}
         </div>
+        {totalPages > 1 && (
+          <div className="relative border-t border-border px-5 py-3 flex items-center justify-center gap-4">
+            <span className="absolute left-5 text-xs text-muted-foreground">
+              {(page - 1) * PAGE_SIZE + 1}-{Math.min(page * PAGE_SIZE, filtered.length)} / {filtered.length}
+            </span>
+            <div className="flex items-center justify-center gap-1">
+              <Button variant="outline" size="icon" className="size-8" disabled={page === 1} onClick={() => setPage(page - 1)}>
+                <ChevronLeft className="size-4" />
+              </Button>
+              {getPages().map((p, i) =>
+                p === '...' ? (
+                  <span key={`e-${i}`} className="px-2 text-xs text-muted-foreground">...</span>
+                ) : (
+                  <Button
+                    key={p}
+                    variant={p === page ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setPage(p as number)}
+                    className="min-w-[32px] h-8 text-xs"
+                  >
+                    {p}
+                  </Button>
+                )
+              )}
+              <Button variant="outline" size="icon" className="size-8" disabled={page === totalPages} onClick={() => setPage(page + 1)}>
+                <ChevronRight className="size-4" />
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

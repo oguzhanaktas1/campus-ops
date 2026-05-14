@@ -427,8 +427,8 @@ export default function AdminUsersPage() {
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between text-sm">
-          <p className="text-muted-foreground">
+        <div className="relative flex items-center justify-center text-sm">
+          <p className="absolute left-0 hidden sm:block text-muted-foreground">
             {t('users.pageOf', { page, total: totalPages })}
           </p>
           <div className="flex items-center gap-1">
