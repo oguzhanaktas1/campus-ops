@@ -11,7 +11,6 @@ import {
 } from 'lucide-react'
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, CartesianGrid,
-  PieChart, Pie,
 } from 'recharts'
 import { cn } from '@/lib/utils'
 import { getToken } from '@/lib/auth'
@@ -269,9 +268,9 @@ export default function AdminDashboard() {
 
   const approvalRate = m.approvalRate ?? 0
   const approvalColor = 'text-emerald-600'
-  const requestTypeChart = rbt.slice(0, 8).map((item, i) => ({
+  const requestTypeChart = rbt.slice(0, 10).map((item, i) => ({
     ...item,
-    fill: ['#6366f1', '#10b981', '#f59e0b', '#8b5cf6', '#06b6d4', '#ec4899', '#14b8a6', '#64748b'][i % 8],
+    fill: ['#6366f1', '#10b981', '#f59e0b', '#8b5cf6', '#06b6d4', '#ec4899', '#14b8a6', '#64748b', '#f97316', '#84cc16'][i % 10],
   }))
 
   const getAssigneeName = (req: any) => {
@@ -539,48 +538,8 @@ export default function AdminDashboard() {
           )}
         </div>
 
-        {/* Right column: request type mix + open tickets */}
+        {/* Right column: open tickets */}
         <div className="space-y-4">
-          {/* Request Type Donut */}
-          <div className="bg-card border border-border rounded-2xl shadow-sm p-5">
-            <h2 className="text-sm font-bold text-foreground">{t('dashboard.requestsByType')}</h2>
-            <p className="text-xs text-muted-foreground mt-0.5 mb-3">Top request categories</p>
-            {requestTypeChart.length > 0 ? (
-              <div className="grid grid-cols-[150px_1fr] items-center gap-3">
-                <ResponsiveContainer width="100%" height={150}>
-                  <PieChart>
-                    <Pie
-                      data={requestTypeChart}
-                      dataKey="count"
-                      nameKey="type"
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={42}
-                      outerRadius={64}
-                      paddingAngle={2}
-                    >
-                      {requestTypeChart.map((entry) => <Cell key={entry.type} fill={entry.fill} />)}
-                    </Pie>
-                    <Tooltip contentStyle={{ fontSize: 12, borderRadius: 10 }} />
-                  </PieChart>
-                </ResponsiveContainer>
-                <div className="space-y-1.5 min-w-0">
-                  {requestTypeChart.slice(0, 5).map((item) => (
-                    <div key={item.type} className="flex items-center justify-between gap-2 text-[11px]">
-                      <span className="flex items-center gap-1.5 min-w-0 text-muted-foreground">
-                        <span className="size-2 rounded-full flex-shrink-0" style={{ backgroundColor: item.fill }} />
-                        <span className="truncate">{item.type}</span>
-                      </span>
-                      <span className="font-bold text-foreground">{item.count}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <div className="flex h-[150px] items-center justify-center text-sm text-muted-foreground">{t('dashboard.noData')}</div>
-            )}
-          </div>
-
           {/* Open IT Tickets */}
           <div className="bg-card border border-border rounded-2xl shadow-sm p-5">
             <div className="flex items-center justify-between mb-3">
@@ -624,7 +583,7 @@ export default function AdminDashboard() {
           <div className="flex items-center justify-between mb-5">
             <div>
               <h2 className="text-sm font-bold text-foreground">{t('dashboard.requestsByType')}</h2>
-              <p className="text-xs text-muted-foreground mt-0.5">Top {Math.min(rbt.length, 8)} request categories</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Top {Math.min(rbt.length, 10)} request categories</p>
             </div>
           </div>
           <ResponsiveContainer width="100%" height={260}>

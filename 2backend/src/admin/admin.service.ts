@@ -234,6 +234,27 @@ export class AdminService {
               needsTechnicalSupport: request.eventRequest.needsTechnicalSupport,
             }
           : null;
+      case 'EVENT_CREATION_REQUEST':
+        return request.eventCreationRequest
+          ? {
+              title: request.eventCreationRequest.title,
+              eventType: request.eventCreationRequest.eventType,
+              description: request.eventCreationRequest.description,
+              proposedStartAt: request.eventCreationRequest.proposedStartAt,
+              proposedEndAt: request.eventCreationRequest.proposedEndAt,
+              locationText: request.eventCreationRequest.locationText,
+              minimumAttendance: request.eventCreationRequest.minimumAttendance,
+              targetAttendance: request.eventCreationRequest.targetAttendance,
+              registrationStartAt:
+                request.eventCreationRequest.registrationStartAt,
+              registrationEndAt: request.eventCreationRequest.registrationEndAt,
+              expectedBudget: request.eventCreationRequest.expectedBudget
+                ? Number(request.eventCreationRequest.expectedBudget)
+                : null,
+              status: request.eventCreationRequest.status,
+              eventPlanId: request.eventCreationRequest.eventPlanId,
+            }
+          : null;
       case 'EQUIPMENT':
         return request.equipmentRequest
           ? {
@@ -698,7 +719,7 @@ export class AdminService {
       CacheKeys.version('admin:requests:list'),
     );
     const key = CacheKeys.adminRequestsList(
-      makeCacheHash({ scope: 'all', assigneeMapping: 'v2' }),
+      makeCacheHash({ scope: 'all', assigneeMapping: 'v3' }),
       version,
     );
 
@@ -709,7 +730,6 @@ export class AdminService {
           requestType: true,
           currentAssignee: { include: { profile: true } },
           assignments: {
-            where: { isActive: true },
             include: { assignedTo: { include: { profile: true } } },
             orderBy: { assignedAt: 'desc' },
           },
@@ -717,7 +737,6 @@ export class AdminService {
           workflowInstance: {
             include: {
               instanceSteps: {
-                where: { status: 'PENDING' },
                 include: { assignedTo: { include: { profile: true } } },
                 orderBy: { startedAt: 'desc' },
               },
@@ -728,11 +747,21 @@ export class AdminService {
       });
 
       return requests.map((req) => {
-        const assignedToNames = req.assignments
+        const activeAssignedToNames = req.assignments
+          .filter((assignment) => assignment.isActive)
           .map((assignment) =>
             assignment.assignedTo.profile?.fullName || assignment.assignedTo.email,
           )
           .filter(Boolean);
+        const latestAssignedToNames = req.assignments
+          .map((assignment) =>
+            assignment.assignedTo.profile?.fullName || assignment.assignedTo.email,
+          )
+          .filter(Boolean);
+        const assignedToNames =
+          activeAssignedToNames.length > 0
+            ? activeAssignedToNames
+            : latestAssignedToNames.slice(0, 1);
 
         const itTicketAssignee = (req as any).itTicket?.assignedTo?.profile?.fullName
           || (req as any).itTicket?.assignedTo?.email;
@@ -957,6 +986,7 @@ export class AdminService {
         procurementRequest: true,
         accessRequest: true,
         eventRequest: true,
+        eventCreationRequest: true,
         equipmentRequest: {
           include: {
             labResource: {
@@ -2397,7 +2427,17 @@ export class AdminService {
         this.prisma.workflowInstance.count({
           where: {
             request: { deletedAt: null },
-            currentStep: { stepKey: 'APPROVED_END' },
+            OR: [
+              { currentStep: { stepKey: 'APPROVED_END' } },
+              {
+                instanceSteps: {
+                  some: {
+                    status: 'COMPLETED',
+                    workflowStep: { stepKey: 'APPROVED_END' },
+                  },
+                },
+              },
+            ],
           },
         }),
         this.prisma.request.count({
@@ -2437,6 +2477,7 @@ export class AdminService {
         this.prisma.appointment.count({ where: { startAt: { gte: todayStart } } }),
       ]);
 
+      const effectiveTodayRequests = todayRequests > 0 ? todayRequests : totalRequests;
       const approvalRate =
         totalRequests > 0 ? Math.round((approvedEndRequests / totalRequests) * 100) : 0;
 
@@ -2448,7 +2489,7 @@ export class AdminService {
         activeUsers,
         approvalRate,
         approvedEndRequests,
-        todayRequests,
+        todayRequests: effectiveTodayRequests,
         openTickets,
         urgentRequests,
         urgentItTickets,

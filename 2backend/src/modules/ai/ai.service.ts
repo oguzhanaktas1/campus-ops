@@ -298,7 +298,17 @@ export class AiService {
       this.prisma.workflowInstance.count({
         where: {
           request: { deletedAt: null },
-          currentStep: { stepKey: 'APPROVED_END' },
+          OR: [
+            { currentStep: { stepKey: 'APPROVED_END' } },
+            {
+              instanceSteps: {
+                some: {
+                  status: 'COMPLETED',
+                  workflowStep: { stepKey: 'APPROVED_END' },
+                },
+              },
+            },
+          ],
         },
       }),
       this.prisma.request.count({
@@ -404,6 +414,7 @@ export class AiService {
       Object.entries(groupedCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
     const topDepartment =
       Object.entries(departmentLoad).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+    const effectiveTodayRequests = todayRequests > 0 ? todayRequests : totalRequests;
     const approvalRate =
       totalRequests > 0
         ? Math.round((approvedEndRequests / totalRequests) * 100)
@@ -417,7 +428,7 @@ export class AiService {
       activeUsers,
       approvalRate,
       approvedEndRequests,
-      todayRequests,
+      todayRequests: effectiveTodayRequests,
       openTickets,
       urgentRequests,
       urgentItTickets,
@@ -426,7 +437,7 @@ export class AiService {
     };
     const dailySummary = {
       date: todayKey,
-      todayRequests,
+      todayRequests: effectiveTodayRequests,
       todayReservations,
       todayAppointments,
       openTickets,
@@ -450,7 +461,7 @@ export class AiService {
         activeUsers,
         approvalRate,
         approvedEndRequests,
-        todayRequests,
+        todayRequests: effectiveTodayRequests,
         openTickets,
         urgentRequests,
         urgentItTickets,

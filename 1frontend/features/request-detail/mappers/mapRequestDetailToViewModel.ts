@@ -397,6 +397,7 @@ export function mapRequestDetailToViewModel(
       raw.procurementRequest ??
       raw.accessRequest ??
       raw.eventRequest ??
+      raw.eventCreationRequest ??
       raw.equipment ??
       raw.equipmentRequest ??
       raw.ticket ??
