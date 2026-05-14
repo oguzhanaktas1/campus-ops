@@ -223,10 +223,11 @@ export class AiService {
       overdueRequests,
       totalUsers,
       activeUsers,
-      totalApproved,
-      totalRejected,
+      approvedEndRequests,
       todayRequests,
       openTickets,
+      urgentRequests,
+      urgentItTickets,
       todayReservations,
       todayAppointments,
     ] = await Promise.all([
@@ -294,17 +295,34 @@ export class AiService {
       this.prisma.user.count({
         where: { deletedAt: null, status: 'ACTIVE' },
       }),
-      this.prisma.request.count({
-        where: { deletedAt: null, status: 'APPROVED' },
-      }),
-      this.prisma.request.count({
-        where: { deletedAt: null, status: 'REJECTED' },
+      this.prisma.workflowInstance.count({
+        where: {
+          request: { deletedAt: null },
+          currentStep: { stepKey: 'APPROVED_END' },
+        },
       }),
       this.prisma.request.count({
         where: { deletedAt: null, createdAt: { gte: todayStart } },
       }),
       this.prisma.itTicket.count({
         where: {
+          ticketStatus: {
+            in: [
+              'OPEN',
+              'IN_PROGRESS',
+              'TRIAGED',
+              'WAITING_USER',
+              'REOPENED',
+            ],
+          },
+        },
+      }),
+      this.prisma.request.count({
+        where: { deletedAt: null, priority: 'URGENT' },
+      }),
+      this.prisma.itTicket.count({
+        where: {
+          request: { deletedAt: null, priority: 'URGENT' },
           ticketStatus: {
             in: [
               'OPEN',
@@ -386,10 +404,9 @@ export class AiService {
       Object.entries(groupedCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
     const topDepartment =
       Object.entries(departmentLoad).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
-    const totalDecisionCount = totalApproved + totalRejected;
     const approvalRate =
-      totalDecisionCount > 0
-        ? Math.round((totalApproved / totalDecisionCount) * 100)
+      totalRequests > 0
+        ? Math.round((approvedEndRequests / totalRequests) * 100)
         : 0;
     const latestDailyMetric = dailyMetrics[dailyMetrics.length - 1] ?? null;
     const dashboardSnapshot = {
@@ -399,8 +416,11 @@ export class AiService {
       totalUsers,
       activeUsers,
       approvalRate,
+      approvedEndRequests,
       todayRequests,
       openTickets,
+      urgentRequests,
+      urgentItTickets,
       todayReservations,
       todayAppointments,
     };
@@ -429,8 +449,11 @@ export class AiService {
         totalUsers,
         activeUsers,
         approvalRate,
+        approvedEndRequests,
         todayRequests,
         openTickets,
+        urgentRequests,
+        urgentItTickets,
         todayReservations,
         todayAppointments,
         topRequestType,

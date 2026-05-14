@@ -2334,7 +2334,7 @@ export class AdminService {
     const version = await this.cacheService.getVersion(
       CacheKeys.version('admin:dashboard:summary'),
     );
-    const key = CacheKeys.adminDashboardSummary(version);
+    const key = `${CacheKeys.adminDashboardSummary(version)}:approved-end-rate-v2`;
 
     return this.cacheService.getOrSet(key, CacheTtls.medium, async () => {
       const now = new Date();
@@ -2350,10 +2350,11 @@ export class AdminService {
         overdueRequests,
         totalUsers,
         activeUsers,
-        totalApproved,
-        totalRejected,
+        approvedEndRequests,
         todayRequests,
         openTickets,
+        urgentRequests,
+        urgentItTickets,
         todayReservations,
         todayAppointments,
       ] = await Promise.all([
@@ -2393,11 +2394,11 @@ export class AdminService {
         this.prisma.user.count({
           where: { deletedAt: null, status: 'ACTIVE' },
         }),
-        this.prisma.request.count({
-          where: { deletedAt: null, status: 'APPROVED' },
-        }),
-        this.prisma.request.count({
-          where: { deletedAt: null, status: 'REJECTED' },
+        this.prisma.workflowInstance.count({
+          where: {
+            request: { deletedAt: null },
+            currentStep: { stepKey: 'APPROVED_END' },
+          },
         }),
         this.prisma.request.count({
           where: { deletedAt: null, createdAt: { gte: todayStart } },
@@ -2415,13 +2416,29 @@ export class AdminService {
             },
           },
         }),
+        this.prisma.request.count({
+          where: { deletedAt: null, priority: 'URGENT' },
+        }),
+        this.prisma.itTicket.count({
+          where: {
+            request: { deletedAt: null, priority: 'URGENT' },
+            ticketStatus: {
+              in: [
+                'OPEN',
+                'IN_PROGRESS',
+                'TRIAGED',
+                'WAITING_USER',
+                'REOPENED',
+              ],
+            },
+          },
+        }),
         this.prisma.reservation.count({ where: { startAt: { gte: todayStart } } }),
         this.prisma.appointment.count({ where: { startAt: { gte: todayStart } } }),
       ]);
 
-      const total = totalApproved + totalRejected;
       const approvalRate =
-        total > 0 ? Math.round((totalApproved / total) * 100) : 0;
+        totalRequests > 0 ? Math.round((approvedEndRequests / totalRequests) * 100) : 0;
 
       return {
         totalRequests,
@@ -2430,8 +2447,11 @@ export class AdminService {
         totalUsers,
         activeUsers,
         approvalRate,
+        approvedEndRequests,
         todayRequests,
         openTickets,
+        urgentRequests,
+        urgentItTickets,
         todayReservations,
         todayAppointments,
       };

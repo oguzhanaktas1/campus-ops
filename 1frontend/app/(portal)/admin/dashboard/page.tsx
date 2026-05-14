@@ -18,7 +18,7 @@ import { getToken } from '@/lib/auth'
 import { Button } from '@/components/ui/button'
 import { useI18n } from '@/lib/i18n'
 
-const ADMIN_AI_SUMMARY_CACHE_KEY = 'campusops-ai-summary:admin-dashboard'
+const ADMIN_AI_SUMMARY_CACHE_KEY = 'campusops-ai-summary:admin-dashboard:v2'
 
 const STATUS_COLORS: Record<string, string> = {
   SUBMITTED:          '#6366f1',
@@ -79,54 +79,122 @@ export default function AdminDashboard() {
   const [metrics, setMetrics]   = useState<any>(null)
   const [recent,  setRecent]    = useState<any[]>([])
   const [reports, setReports]   = useState<any>(null)
+  const [monitoring, setMonitoring] = useState<any>(null)
   const [aiNarration, setAiNarration] = useState<any>(null)
   const [aiLoading, setAiLoading] = useState(false)
   const [loading, setLoading]   = useState(true)
   const [refreshing, setRefreshing] = useState(false)
-
-  const readCachedAiNarration = () => {
-    if (typeof window === 'undefined') return null
-    const raw = sessionStorage.getItem(ADMIN_AI_SUMMARY_CACHE_KEY)
-    if (!raw) return null
-
-    try {
-      return JSON.parse(raw)
-    } catch {
-      sessionStorage.removeItem(ADMIN_AI_SUMMARY_CACHE_KEY)
-      return null
-    }
-  }
 
   const writeCachedAiNarration = (value: unknown) => {
     if (typeof window === 'undefined') return
     sessionStorage.setItem(ADMIN_AI_SUMMARY_CACHE_KEY, JSON.stringify(value))
   }
 
+  const getMonitoringSummary = (snapshot: any) => {
+    if (!snapshot) return { status: 'unknown', problems: ['Monitoring snapshot unavailable'], warnings: [] as string[] }
+
+    const problems: string[] = []
+    const warnings: string[] = []
+    const serviceStatus = [
+      ['Backend', snapshot.backend?.status],
+      ['Workers', snapshot.workers?.status],
+      ['AI service', snapshot.ai?.status],
+    ]
+
+    for (const [label, status] of serviceStatus) {
+      if (!['ok', 'ready'].includes(String(status ?? '').toLowerCase())) {
+        problems.push(`${label}: ${status ?? 'unknown'}`)
+      }
+    }
+    if (snapshot.rabbitmq?.error) problems.push(`RabbitMQ: ${snapshot.rabbitmq.error}`)
+    if ((snapshot.outbox?.failed ?? 0) > 0) problems.push(`Outbox failed: ${snapshot.outbox.failed}`)
+    if ((snapshot.outbox?.pending ?? 0) > 0) warnings.push(`Outbox pending: ${snapshot.outbox.pending}`)
+
+    return {
+      status: problems.length > 0 ? 'problem' : warnings.length > 0 ? 'warning' : 'ok',
+      problems,
+      warnings,
+    }
+  }
+
+  const buildLocalAiNarration = (dashboard: any, report: any, snapshot: any) => {
+    const monitor = getMonitoringSummary(snapshot)
+    const summary = `Dashboard summary: ${dashboard.totalRequests ?? 0} total requests, ${dashboard.openRequests ?? 0} open requests, ${dashboard.activeUsers ?? 0} active users, ${dashboard.urgentRequests ?? 0} urgent requests, ${dashboard.urgentItTickets ?? 0} urgent IT tickets, and ${dashboard.todayRequests ?? 0} requests today. Monitoring status is ${monitor.status === 'ok' ? 'healthy' : monitor.status}; ${monitor.problems.length ? `problems: ${monitor.problems.join(', ')}.` : 'no blocking problem detected.'}`
+    return {
+      summary,
+      highlights: [
+        `Approval rate is ${dashboard.approvalRate ?? 0}% from ${dashboard.approvedEndRequests ?? 0} APPROVED_END requests over ${dashboard.totalRequests ?? 0} total requests.`,
+        `Open operational load: ${dashboard.openRequests ?? 0} requests and ${dashboard.openTickets ?? 0} IT tickets.`,
+        `Top request type: ${report?.requestsByType?.[0]?.type ?? 'n/a'} (${report?.requestsByType?.[0]?.count ?? 0}).`,
+      ],
+      confidence: 0.8,
+      fallbackUsed: true,
+    }
+  }
+
   const fetchAiNarration = async (
     base: string,
     headers: Record<string, string>,
-    force = false,
+    dashboardData: any,
+    reportData: any,
+    recentData: any[],
+    monitoringData: any,
   ) => {
-    if (!force) {
-      const cached = readCachedAiNarration()
-      if (cached) {
-        setAiNarration(cached)
-        setAiLoading(false)
-        return
-      }
-    }
+    const monitor = getMonitoringSummary(monitoringData)
 
     setAiLoading(true)
     try {
-      const aiRes = await fetch(`${base}/ai/analytics/admin-overview`, { headers })
+      const aiRes = await fetch(`${base}/ai/analytics/summary`, {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          domain: 'ADMIN_DASHBOARD',
+          kpis: {
+            totalRequests: dashboardData.totalRequests ?? 0,
+            openRequests: dashboardData.openRequests ?? 0,
+            activeUsers: dashboardData.activeUsers ?? 0,
+            urgentRequests: dashboardData.urgentRequests ?? 0,
+            urgentItTickets: dashboardData.urgentItTickets ?? 0,
+            todayRequests: dashboardData.todayRequests ?? 0,
+            openTickets: dashboardData.openTickets ?? 0,
+            approvalRate: dashboardData.approvalRate ?? 0,
+            approvedEndRequests: dashboardData.approvedEndRequests ?? 0,
+            monitoringStatus: monitor.status,
+            monitoringProblems: monitor.problems,
+            monitoringWarnings: monitor.warnings,
+          },
+          chartData: {
+            requestsByStatus: reportData?.requestsByStatus ?? [],
+            requestsByType: reportData?.requestsByType ?? [],
+            ticketsByStatus: reportData?.ticketsByStatus ?? [],
+            recentRequests: recentData.map((item) => ({
+              requestNo: item.requestNo,
+              title: item.title,
+              status: item.status,
+              priority: item.priority,
+              assignee: getAssigneeName(item),
+            })),
+            monitoring: monitoringData,
+          },
+          trendDeltas: {},
+          groupedCounts: Object.fromEntries((reportData?.requestsByType ?? []).map((item: any) => [item.type, item.count])),
+        }),
+      })
       if (!aiRes.ok) {
+        const fallback = buildLocalAiNarration(dashboardData, reportData, monitoringData)
+        setAiNarration(fallback)
+        writeCachedAiNarration(fallback)
         return
       }
       const next = await aiRes.json()
-      setAiNarration(next)
-      writeCachedAiNarration(next)
+      const finalNarration = next?.fallbackUsed ? buildLocalAiNarration(dashboardData, reportData, monitoringData) : next
+      setAiNarration(finalNarration)
+      writeCachedAiNarration(finalNarration)
     } catch (e) {
       console.error('Admin AI summary fetch error:', e)
+      const fallback = buildLocalAiNarration(dashboardData, reportData, monitoringData)
+      setAiNarration(fallback)
+      writeCachedAiNarration(fallback)
     } finally {
       setAiLoading(false)
     }
@@ -139,25 +207,44 @@ export default function AdminDashboard() {
     const base    = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
     const headers = { Authorization: `Bearer ${token}` }
     try {
-      const [mRes, reqRes, rRes] = await Promise.all([
+      const [mRes, reqRes, rRes, monRes] = await Promise.all([
         fetch(`${base}/admin/dashboard/summary`, { headers }),
         fetch(`${base}/admin/requests`,          { headers }),
         fetch(`${base}/admin/reports`,           { headers }),
+        fetch(`${base}/admin/system/snapshot`,   { headers }),
       ])
-      if (mRes.ok)   setMetrics(await mRes.json())
+      let nextMetrics: any = null
+      let nextRecent: any[] = []
+      let nextReports: any = null
+      let nextMonitoring: any = null
+
+      if (mRes.ok) {
+        nextMetrics = await mRes.json()
+        setMetrics(nextMetrics)
+      }
       if (reqRes.ok) {
         const all: any[] = await reqRes.json()
-        setRecent(all.slice(0, 6))
+        nextRecent = all.slice(0, 6)
+        setRecent(nextRecent)
       }
-      if (rRes.ok) setReports(await rRes.json())
+      if (rRes.ok) {
+        nextReports = await rRes.json()
+        setReports(nextReports)
+      }
+      if (monRes.ok) {
+        nextMonitoring = await monRes.json()
+        setMonitoring(nextMonitoring)
+      }
+
+      if (nextMetrics) {
+        void fetchAiNarration(base, headers, nextMetrics, nextReports, nextRecent, nextMonitoring)
+      }
     } catch (e) {
       console.error('Dashboard fetch error:', e)
     } finally {
       setLoading(false)
       setRefreshing(false)
     }
-
-    void fetchAiNarration(base, headers, silent)
   }
 
   useEffect(() => { void fetchAll() }, [])
@@ -197,6 +284,7 @@ export default function AdminDashboard() {
       || req.assignedTo?.email
       || '—'
   }
+  const monitoringSummary = getMonitoringSummary(monitoring)
 
   return (
     <div className="p-6 space-y-6 max-w-6xl mx-auto">
@@ -208,9 +296,19 @@ export default function AdminDashboard() {
           <p className="text-sm text-muted-foreground mt-0.5">{today} · {t('dashboard.subtitle')}</p>
         </div>
         <div className="flex items-center gap-2">
-          <span className="hidden sm:flex items-center gap-1.5 text-xs text-emerald-700 font-semibold bg-emerald-50 dark:bg-emerald-950/30 dark:text-emerald-400 px-3 py-1.5 rounded-full border border-emerald-200 dark:border-emerald-800 shadow-sm">
-            <Zap className="size-3 fill-emerald-500 text-emerald-500" />
-            {t('dashboard.systemHealthy')}
+          <span className={cn(
+            'hidden sm:flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full border shadow-sm',
+            monitoringSummary.status === 'problem'
+              ? 'text-red-700 bg-red-50 dark:bg-red-950/30 dark:text-red-400 border-red-200 dark:border-red-800'
+              : monitoringSummary.status === 'warning'
+                ? 'text-amber-700 bg-amber-50 dark:bg-amber-950/30 dark:text-amber-400 border-amber-200 dark:border-amber-800'
+                : 'text-emerald-700 bg-emerald-50 dark:bg-emerald-950/30 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800',
+          )}>
+            <Zap className={cn(
+              'size-3',
+              monitoringSummary.status === 'problem' ? 'text-red-500' : monitoringSummary.status === 'warning' ? 'text-amber-500' : 'fill-emerald-500 text-emerald-500',
+            )} />
+            {monitoringSummary.status === 'problem' ? 'Problem detected' : monitoringSummary.status === 'warning' ? 'Warnings' : t('dashboard.systemHealthy')}
           </span>
           <Button
             size="sm" variant="outline"
@@ -259,7 +357,7 @@ export default function AdminDashboard() {
       )}
 
       {/* ── Today's Activity Strip ─────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         {[
           {
             label: t('dashboard.todayRequests'),
@@ -268,6 +366,22 @@ export default function AdminDashboard() {
             gradient: 'from-primary/10 to-primary/5',
             border: 'border-primary/20',
             iconCls: 'text-primary',
+          },
+          {
+            label: 'Urgent requests',
+            value: m.urgentRequests ?? 0,
+            icon: AlertTriangle,
+            gradient: (m.urgentRequests ?? 0) > 0 ? 'from-red-500/10 to-red-500/5' : 'from-muted/30 to-muted/10',
+            border: (m.urgentRequests ?? 0) > 0 ? 'border-red-500/20' : 'border-border',
+            iconCls: (m.urgentRequests ?? 0) > 0 ? 'text-red-600' : 'text-muted-foreground',
+          },
+          {
+            label: 'Urgent IT',
+            value: m.urgentItTickets ?? 0,
+            icon: Activity,
+            gradient: (m.urgentItTickets ?? 0) > 0 ? 'from-orange-500/10 to-orange-500/5' : 'from-muted/30 to-muted/10',
+            border: (m.urgentItTickets ?? 0) > 0 ? 'border-orange-500/20' : 'border-border',
+            iconCls: (m.urgentItTickets ?? 0) > 0 ? 'text-orange-600' : 'text-muted-foreground',
           },
           {
             label: t('dashboard.todayReservations'),
@@ -343,7 +457,7 @@ export default function AdminDashboard() {
           {
             label: t('dashboard.approvalRate'),
             value: `${approvalRate}%`,
-            sub: t('dashboard.approvedTotalDecisions'),
+            sub: `${m.approvedEndRequests ?? 0} APPROVED_END / ${m.totalRequests ?? 0} total`,
             accent: 'bg-emerald-500',
             icon: CheckSquare,
             iconCls: approvalColor,
