@@ -150,7 +150,7 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="tr" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning>
       <head>
         {/* Prevent theme flash by reading the theme cookie before hydration. */}
         <script dangerouslySetInnerHTML={{ __html: `(function(){

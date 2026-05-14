@@ -7,10 +7,10 @@ import {
   FileText, Users, CheckSquare, Activity, CheckCircle2, Loader2,
   Workflow, BarChart3, AlertTriangle, Ticket, CalendarDays,
   BookMarked, Clock, TrendingUp, ArrowRight, ShieldCheck, Monitor,
-  RefreshCw,
+  RefreshCw, Zap,
 } from 'lucide-react'
 import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, CartesianGrid,
 } from 'recharts'
 import { cn } from '@/lib/utils'
 import { getToken } from '@/lib/auth'
@@ -51,6 +51,13 @@ const PRIORITY_DOT: Record<string, string> = {
   LOW:      'bg-slate-400',
 }
 
+const PRIORITY_RING: Record<string, string> = {
+  CRITICAL: 'ring-red-300',
+  HIGH:     'ring-orange-300',
+  MEDIUM:   'ring-amber-200',
+  LOW:      'ring-slate-300',
+}
+
 function useTimeAgo() {
   const { t } = useI18n()
   return (date: string) => {
@@ -63,6 +70,23 @@ function useTimeAgo() {
     if (hours < 24) return t('dashboard.hoursAgo', { n: hours })
     return t('dashboard.daysAgo', { n: days })
   }
+}
+
+function ApprovalRing({ rate }: { rate: number }) {
+  const r = 32
+  const circ = 2 * Math.PI * r
+  const dash = Math.min(rate / 100, 1) * circ
+  const color = rate >= 70 ? '#10b981' : rate >= 40 ? '#f59e0b' : '#ef4444'
+  return (
+    <svg width="80" height="80" viewBox="0 0 80 80" className="-rotate-90">
+      <circle cx="40" cy="40" r={r} fill="none" stroke="currentColor" strokeWidth="8" className="text-muted/30" />
+      <circle
+        cx="40" cy="40" r={r} fill="none" stroke={color} strokeWidth="8"
+        strokeDasharray={`${dash} ${circ}`} strokeLinecap="round"
+        style={{ transition: 'stroke-dasharray 0.8s ease' }}
+      />
+    </svg>
+  )
 }
 
 export default function AdminDashboard() {
@@ -158,7 +182,10 @@ export default function AdminDashboard() {
   if (loading) {
     return (
       <div className="flex h-[80vh] items-center justify-center">
-        <Loader2 className="size-8 animate-spin text-primary" />
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="size-8 animate-spin text-primary" />
+          <p className="text-sm text-muted-foreground animate-pulse">Loading dashboard…</p>
+        </div>
       </div>
     )
   }
@@ -176,41 +203,56 @@ export default function AdminDashboard() {
 
   const today = new Date().toLocaleDateString('tr-TR', { weekday: 'long', day: 'numeric', month: 'long' })
 
+  const approvalRate = m.approvalRate ?? 0
+  const approvalColor =
+    approvalRate >= 70 ? 'text-emerald-600' :
+    approvalRate >= 40 ? 'text-amber-600'   : 'text-red-600'
+
   return (
     <div className="p-6 space-y-6 max-w-6xl mx-auto">
 
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold text-foreground">{t('dashboard.title')}</h1>
+          <h1 className="text-2xl font-black tracking-tight text-foreground">{t('dashboard.title')}</h1>
           <p className="text-sm text-muted-foreground mt-0.5">{today} · {t('dashboard.subtitle')}</p>
         </div>
         <div className="flex items-center gap-2">
-          <span className="hidden sm:flex items-center gap-1.5 text-xs text-emerald-600 font-medium bg-emerald-50 dark:bg-emerald-950/30 px-3 py-1.5 rounded-full border border-emerald-200 dark:border-emerald-800">
-            <CheckCircle2 className="size-3" />
+          <span className="hidden sm:flex items-center gap-1.5 text-xs text-emerald-700 font-semibold bg-emerald-50 dark:bg-emerald-950/30 dark:text-emerald-400 px-3 py-1.5 rounded-full border border-emerald-200 dark:border-emerald-800 shadow-sm">
+            <Zap className="size-3 fill-emerald-500 text-emerald-500" />
             {t('dashboard.systemHealthy')}
           </span>
-          <Button size="sm" variant="outline" className="gap-1.5 h-8 text-xs" onClick={() => void fetchAll(true)} disabled={refreshing}>
+          <Button
+            size="sm" variant="outline"
+            className="gap-1.5 h-8 text-xs border-border/60 shadow-sm hover:shadow"
+            onClick={() => void fetchAll(true)}
+            disabled={refreshing}
+          >
             <RefreshCw className={cn('size-3.5', refreshing && 'animate-spin')} />
             {t('common.refresh')}
           </Button>
         </div>
       </div>
 
-      {/* ── Today banner ───────────────────────────────────────────────────── */}
+      {/* ── AI Summary Banner ──────────────────────────────────────────────── */}
       {(aiLoading || aiNarration?.summary) && (
-        <div className="rounded-xl border border-primary/15 bg-gradient-to-r from-primary/5 via-background to-emerald-500/5 p-4 shadow-sm">
-          <div className="flex items-center gap-2">
-            <BarChart3 className="size-4 text-primary" />
-            <h2 className="text-sm font-semibold text-foreground">{t('dashboard.aiSummary')}</h2>
+        <div className="rounded-2xl border border-primary/15 bg-gradient-to-r from-primary/5 via-background to-emerald-500/5 p-5 shadow-sm">
+          <div className="flex items-center gap-2 mb-1">
+            <div className="size-7 rounded-lg bg-primary/10 flex items-center justify-center">
+              <BarChart3 className="size-4 text-primary" />
+            </div>
+            <h2 className="text-sm font-bold text-foreground">{t('dashboard.aiSummary')}</h2>
           </div>
           {aiNarration?.summary ? (
             <>
-              <p className="mt-2 text-sm text-foreground">{aiNarration.summary}</p>
+              <p className="mt-2 text-sm text-foreground/80 leading-relaxed">{aiNarration.summary}</p>
               {Array.isArray(aiNarration.highlights) && aiNarration.highlights.length > 0 && (
                 <div className="mt-3 grid gap-2 sm:grid-cols-3">
                   {aiNarration.highlights.slice(0, 3).map((highlight: string) => (
-                    <div key={highlight} className="rounded-lg border border-border/70 bg-background/80 px-3 py-2 text-xs text-muted-foreground">
+                    <div
+                      key={highlight}
+                      className="rounded-xl border border-border/60 bg-background/70 backdrop-blur-sm px-3 py-2.5 text-xs text-muted-foreground leading-relaxed"
+                    >
                       {highlight}
                     </div>
                   ))}
@@ -226,18 +268,55 @@ export default function AdminDashboard() {
         </div>
       )}
 
+      {/* ── Today's Activity Strip ─────────────────────────────────────────── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: t('dashboard.todayRequests'),     value: m.todayRequests     ?? 0, icon: FileText,     cls: 'text-primary' },
-          { label: t('dashboard.todayReservations'), value: m.todayReservations ?? 0, icon: BookMarked,   cls: 'text-emerald-600' },
-          { label: t('dashboard.todayAppointments'), value: m.todayAppointments ?? 0, icon: CalendarDays, cls: 'text-blue-600' },
-          { label: t('dashboard.overdue'),           value: m.overdueRequests   ?? 0, icon: AlertTriangle, cls: m.overdueRequests > 0 ? 'text-red-600' : 'text-muted-foreground' },
-        ].map(({ label, value, icon: Icon, cls }) => (
-          <div key={label} className="bg-card border border-border rounded-lg p-3.5 flex items-center gap-3 shadow-sm">
-            <Icon className={cn('size-4 flex-shrink-0', cls)} />
+          {
+            label: t('dashboard.todayRequests'),
+            value: m.todayRequests ?? 0,
+            icon: FileText,
+            gradient: 'from-primary/10 to-primary/5',
+            border: 'border-primary/20',
+            iconCls: 'text-primary',
+          },
+          {
+            label: t('dashboard.todayReservations'),
+            value: m.todayReservations ?? 0,
+            icon: BookMarked,
+            gradient: 'from-emerald-500/10 to-emerald-500/5',
+            border: 'border-emerald-500/20',
+            iconCls: 'text-emerald-600',
+          },
+          {
+            label: t('dashboard.todayAppointments'),
+            value: m.todayAppointments ?? 0,
+            icon: CalendarDays,
+            gradient: 'from-blue-500/10 to-blue-500/5',
+            border: 'border-blue-500/20',
+            iconCls: 'text-blue-600',
+          },
+          {
+            label: t('dashboard.overdue'),
+            value: m.overdueRequests ?? 0,
+            icon: AlertTriangle,
+            gradient: (m.overdueRequests ?? 0) > 0 ? 'from-red-500/10 to-red-500/5' : 'from-muted/30 to-muted/10',
+            border: (m.overdueRequests ?? 0) > 0 ? 'border-red-500/20' : 'border-border',
+            iconCls: (m.overdueRequests ?? 0) > 0 ? 'text-red-600' : 'text-muted-foreground',
+          },
+        ].map(({ label, value, icon: Icon, gradient, border, iconCls }) => (
+          <div
+            key={label}
+            className={cn(
+              'bg-gradient-to-br rounded-xl p-4 border shadow-sm flex items-center gap-3',
+              gradient, border,
+            )}
+          >
+            <div className="size-9 rounded-xl bg-background/60 border border-white/20 flex items-center justify-center flex-shrink-0 shadow-sm">
+              <Icon className={cn('size-4', iconCls)} />
+            </div>
             <div>
-              <p className={cn('text-lg font-bold', cls)}>{value}</p>
-              <p className="text-[11px] text-muted-foreground leading-tight">{label}</p>
+              <p className={cn('text-xl font-black leading-none', iconCls)}>{value}</p>
+              <p className="text-[11px] text-muted-foreground leading-tight mt-0.5 font-medium">{label}</p>
             </div>
           </div>
         ))}
@@ -245,60 +324,103 @@ export default function AdminDashboard() {
 
       {/* ── Main KPI row ───────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <MetricCard
-          title={t('dashboard.totalRequests')}
-          value={(m.totalRequests ?? 0).toLocaleString()}
-          description={t('dashboard.allTime')}
-          icon={<FileText className="size-4" />}
-        />
-        <MetricCard
-          title={t('dashboard.openRequests')}
-          value={m.openRequests ?? 0}
-          description={t('dashboard.awaitingAction')}
-          icon={<Activity className="size-4" />}
-          valueClassName={m.openRequests > 0 ? 'text-amber-600' : undefined}
-        />
-        <MetricCard
-          title={t('dashboard.activeUsers')}
-          value={(m.activeUsers ?? 0).toLocaleString()}
-          description={t('dashboard.ofTotal', { total: (m.totalUsers ?? 0).toLocaleString() })}
-          icon={<Users className="size-4" />}
-        />
-        <MetricCard
-          title={t('dashboard.approvalRate')}
-          value={`${m.approvalRate ?? 0}%`}
-          description={t('dashboard.approvedTotalDecisions')}
-          icon={<CheckSquare className="size-4" />}
-          valueClassName={
-            (m.approvalRate ?? 0) >= 70 ? 'text-emerald-600'
-            : (m.approvalRate ?? 0) >= 40 ? 'text-amber-600'
-            : 'text-red-600'
-          }
-        />
+        {[
+          {
+            label: t('dashboard.totalRequests'),
+            value: (m.totalRequests ?? 0).toLocaleString(),
+            sub: t('dashboard.allTime'),
+            accent: 'bg-primary',
+            icon: FileText,
+            iconCls: 'text-primary',
+          },
+          {
+            label: t('dashboard.openRequests'),
+            value: m.openRequests ?? 0,
+            sub: t('dashboard.awaitingAction'),
+            accent: 'bg-amber-500',
+            icon: Activity,
+            iconCls: (m.openRequests ?? 0) > 0 ? 'text-amber-600' : 'text-muted-foreground',
+            valueCls: (m.openRequests ?? 0) > 0 ? 'text-amber-600' : undefined,
+          },
+          {
+            label: t('dashboard.activeUsers'),
+            value: (m.activeUsers ?? 0).toLocaleString(),
+            sub: t('dashboard.ofTotal', { total: (m.totalUsers ?? 0).toLocaleString() }),
+            accent: 'bg-blue-500',
+            icon: Users,
+            iconCls: 'text-blue-600',
+          },
+          {
+            label: t('dashboard.approvalRate'),
+            value: `${approvalRate}%`,
+            sub: t('dashboard.approvedTotalDecisions'),
+            accent: approvalRate >= 70 ? 'bg-emerald-500' : approvalRate >= 40 ? 'bg-amber-500' : 'bg-red-500',
+            icon: CheckSquare,
+            iconCls: approvalColor,
+            valueCls: approvalColor,
+          },
+        ].map(({ label, value, sub, accent, icon: Icon, iconCls, valueCls }) => (
+          <div
+            key={label}
+            className="bg-card border border-border rounded-xl p-5 shadow-sm relative overflow-hidden group hover:shadow-md transition-shadow"
+          >
+            <div className={cn('absolute left-0 inset-y-0 w-1 rounded-l-xl', accent)} />
+            <div className="flex items-start justify-between pl-3">
+              <div className="flex-1">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{label}</p>
+                <p className={cn('text-3xl font-black text-foreground mt-1.5 leading-none', valueCls)}>{value}</p>
+                <p className="text-[11px] text-muted-foreground mt-1.5 font-medium">{sub}</p>
+              </div>
+              <div className={cn(
+                'size-9 rounded-xl flex items-center justify-center bg-muted/50 flex-shrink-0 ml-2',
+              )}>
+                <Icon className={cn('size-4', iconCls)} />
+              </div>
+            </div>
+          </div>
+        ))}
       </div>
 
       {/* ── Charts + ticket row ─────────────────────────────────────────────── */}
       <div className="grid lg:grid-cols-3 gap-5">
 
-        {/* Requests by Status */}
-        <div className="lg:col-span-2 bg-card border border-border rounded-lg shadow-sm p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-semibold text-foreground">{t('dashboard.requestsByStatus')}</h2>
-            <Link href="/admin/requests" className="text-xs text-primary hover:underline flex items-center gap-0.5">
+        {/* Requests by Status Bar Chart */}
+        <div className="lg:col-span-2 bg-card border border-border rounded-2xl shadow-sm p-5">
+          <div className="flex items-center justify-between mb-5">
+            <div>
+              <h2 className="text-sm font-bold text-foreground">{t('dashboard.requestsByStatus')}</h2>
+              <p className="text-xs text-muted-foreground mt-0.5">{t('dashboard.allTime')}</p>
+            </div>
+            <Link
+              href="/admin/requests"
+              className="text-xs text-primary hover:text-primary/80 font-semibold flex items-center gap-1 bg-primary/5 hover:bg-primary/10 px-3 py-1.5 rounded-lg transition-colors"
+            >
               {t('common.viewAll')} <ArrowRight className="size-3" />
             </Link>
           </div>
           {rbs.length > 0 ? (
             <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={rbs} barSize={22}>
-                <XAxis dataKey="status" tick={{ fontSize: 10 }} axisLine={false} tickLine={false}
-                  tickFormatter={(v) => v.replace(/_/g, ' ').slice(0, 10)} />
-                <YAxis tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
-                <Tooltip
-                  contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid oklch(0.9 0.01 264)' }}
-                  cursor={{ fill: 'oklch(0.94 0.01 264 / 0.4)' }}
+              <BarChart data={rbs} barSize={24} margin={{ top: 4, right: 4, bottom: 0, left: -10 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.88 0.01 264 / 0.5)" vertical={false} />
+                <XAxis
+                  dataKey="status"
+                  tick={{ fontSize: 10, fill: 'oklch(0.55 0.02 264)' }}
+                  axisLine={false} tickLine={false}
+                  tickFormatter={(v) => v.replace(/_/g, ' ').slice(0, 10)}
                 />
-                <Bar dataKey="count" name={t('dashboard.totalRequests')} radius={[4, 4, 0, 0]}>
+                <YAxis
+                  tick={{ fontSize: 11, fill: 'oklch(0.55 0.02 264)' }}
+                  axisLine={false} tickLine={false}
+                />
+                <Tooltip
+                  contentStyle={{
+                    fontSize: 12, borderRadius: 10,
+                    border: '1px solid oklch(0.9 0.01 264)',
+                    boxShadow: '0 4px 16px oklch(0 0 0 / 0.08)',
+                  }}
+                  cursor={{ fill: 'oklch(0.94 0.01 264 / 0.4)', radius: 6 }}
+                />
+                <Bar dataKey="count" name={t('dashboard.totalRequests')} radius={[6, 6, 0, 0]}>
                   {rbs.map((entry, i) => (
                     <Cell key={i} fill={STATUS_COLORS[entry.status] ?? '#6366f1'} />
                   ))}
@@ -306,45 +428,81 @@ export default function AdminDashboard() {
               </BarChart>
             </ResponsiveContainer>
           ) : (
-            <div className="flex items-center justify-center h-[220px] text-muted-foreground text-sm">{t('dashboard.noData')}</div>
+            <div className="flex flex-col items-center justify-center h-[220px] text-muted-foreground gap-2">
+              <BarChart3 className="size-8 opacity-20" />
+              <p className="text-sm">{t('dashboard.noData')}</p>
+            </div>
           )}
         </div>
 
-        {/* Right column: approval donut + open tickets */}
+        {/* Right column: approval ring + open tickets */}
         <div className="space-y-4">
-          {/* Approval Rate mini gauge */}
-          <div className="bg-card border border-border rounded-lg shadow-sm p-5">
-            <h2 className="text-sm font-semibold text-foreground mb-3">{t('dashboard.approvalRate')}</h2>
-            <div className="flex items-center gap-4">
-              <div className="relative size-[72px] flex-shrink-0">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={approvalData} layout="vertical" barSize={12} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
-                    <Bar dataKey="value" radius={[0, 4, 4, 0]}>
-                      {approvalData.map((d, i) => <Cell key={i} fill={d.fill} />)}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
+          {/* Approval Rate Donut */}
+          <div className="bg-card border border-border rounded-2xl shadow-sm p-5">
+            <h2 className="text-sm font-bold text-foreground">{t('dashboard.approvalRate')}</h2>
+            <p className="text-xs text-muted-foreground mt-0.5 mb-4">{t('dashboard.ofTotalDecisions')}</p>
+            <div className="flex items-center gap-5">
+              <div className="relative flex-shrink-0">
+                <ApprovalRing rate={approvalRate} />
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className={cn('text-[13px] font-black leading-none rotate-90', approvalColor)}>
+                    {approvalRate}
+                    <span className="text-[9px] font-semibold">%</span>
+                  </span>
+                </div>
               </div>
-              <div>
-                <p className="text-3xl font-bold text-foreground">{m.approvalRate ?? 0}<span className="text-base font-normal text-muted-foreground">%</span></p>
-                <p className="text-xs text-muted-foreground">{t('dashboard.ofTotalDecisions')}</p>
+              <div className="space-y-2">
+                <div>
+                  <p className={cn('text-3xl font-black leading-none', approvalColor)}>
+                    {approvalRate}
+                    <span className="text-base font-semibold text-muted-foreground ml-0.5">%</span>
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-1.5">
+                    <span className="size-2 rounded-full bg-emerald-500 flex-shrink-0" />
+                    <span className="text-[11px] text-muted-foreground">Approved</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="size-2 rounded-full bg-red-400 flex-shrink-0" />
+                    <span className="text-[11px] text-muted-foreground">Rejected</span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Open IT tickets */}
-          <div className="bg-card border border-border rounded-lg shadow-sm p-5">
+          {/* Open IT Tickets */}
+          <div className="bg-card border border-border rounded-2xl shadow-sm p-5">
             <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-semibold text-foreground">{t('dashboard.itTickets')}</h2>
-              <Link href="/admin/requests" className="text-xs text-primary hover:underline">{t('common.view')}</Link>
+              <div>
+                <h2 className="text-sm font-bold text-foreground">{t('dashboard.itTickets')}</h2>
+                <p className="text-xs text-muted-foreground mt-0.5">{t('dashboard.openTickets')}</p>
+              </div>
+              <Link
+                href="/admin/requests"
+                className="text-xs text-primary font-semibold hover:underline bg-primary/5 hover:bg-primary/10 px-2.5 py-1.5 rounded-lg transition-colors"
+              >
+                {t('common.view')}
+              </Link>
             </div>
             <div className="flex items-end gap-3">
-              <p className={cn('text-3xl font-bold', (m.openTickets ?? 0) > 0 ? 'text-red-600' : 'text-foreground')}>
+              <p className={cn(
+                'text-4xl font-black leading-none',
+                (m.openTickets ?? 0) > 0 ? 'text-red-500' : 'text-foreground'
+              )}>
                 {m.openTickets ?? 0}
               </p>
-              <div className="pb-0.5">
-                <p className="text-xs text-muted-foreground">{t('dashboard.openTickets')}</p>
-                <p className="text-xs text-muted-foreground">{t('dashboard.ofTotalTickets', { total: r.totalTickets ?? 0 })}</p>
+              <div className="pb-1 space-y-0.5">
+                <p className="text-xs font-medium text-muted-foreground">
+                  {t('dashboard.ofTotalTickets', { total: r.totalTickets ?? 0 })}
+                </p>
+                {(m.openTickets ?? 0) > 0 && (
+                  <p className="text-[10px] font-semibold text-red-500 flex items-center gap-1">
+                    <AlertTriangle className="size-2.5" />
+                    Needs attention
+                  </p>
+                )}
               </div>
             </div>
           </div>
@@ -353,22 +511,48 @@ export default function AdminDashboard() {
 
       {/* ── Request by Type ─────────────────────────────────────────────────── */}
       {rbt.length > 0 && (
-        <div className="bg-card border border-border rounded-lg shadow-sm p-5">
-          <h2 className="text-sm font-semibold text-foreground mb-4">{t('dashboard.requestsByType')}</h2>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="bg-card border border-border rounded-2xl shadow-sm p-5">
+          <div className="flex items-center justify-between mb-5">
+            <div>
+              <h2 className="text-sm font-bold text-foreground">{t('dashboard.requestsByType')}</h2>
+              <p className="text-xs text-muted-foreground mt-0.5">Top {Math.min(rbt.length, 8)} request categories</p>
+            </div>
+          </div>
+          <div className="space-y-3">
             {rbt.slice(0, 8).map((item, i) => {
               const max = rbt[0]?.count ?? 1
               const pct = Math.round((item.count / max) * 100)
-              const colors = ['bg-primary', 'bg-emerald-500', 'bg-amber-500', 'bg-purple-500', 'bg-blue-500', 'bg-red-500', 'bg-pink-500', 'bg-cyan-500']
+              const colorMap = [
+                { bar: 'bg-primary',     badge: 'bg-primary/10 text-primary' },
+                { bar: 'bg-emerald-500', badge: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400' },
+                { bar: 'bg-amber-500',   badge: 'bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400' },
+                { bar: 'bg-purple-500',  badge: 'bg-purple-50 text-purple-700 dark:bg-purple-950/30 dark:text-purple-400' },
+                { bar: 'bg-blue-500',    badge: 'bg-blue-50 text-blue-700 dark:bg-blue-950/30 dark:text-blue-400' },
+                { bar: 'bg-red-500',     badge: 'bg-red-50 text-red-700 dark:bg-red-950/30 dark:text-red-400' },
+                { bar: 'bg-pink-500',    badge: 'bg-pink-50 text-pink-700 dark:bg-pink-950/30 dark:text-pink-400' },
+                { bar: 'bg-cyan-500',    badge: 'bg-cyan-50 text-cyan-700 dark:bg-cyan-950/30 dark:text-cyan-400' },
+              ]
+              const c = colorMap[i % colorMap.length]
               return (
-                <div key={item.type} className="space-y-1.5">
-                  <div className="flex justify-between text-xs">
-                    <span className="text-foreground font-medium truncate">{item.type}</span>
-                    <span className="text-muted-foreground ml-2">{item.count}</span>
+                <div key={item.type} className="flex items-center gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-xs font-semibold text-foreground truncate max-w-[200px]">{item.type}</span>
+                      <span className={cn(
+                        'text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 ml-2',
+                        c.badge,
+                      )}>
+                        {item.count}
+                      </span>
+                    </div>
+                    <div className="h-2 bg-muted rounded-full overflow-hidden">
+                      <div
+                        className={cn('h-full rounded-full transition-all duration-700', c.bar)}
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
                   </div>
-                  <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                    <div className={cn('h-full rounded-full', colors[i % colors.length])} style={{ width: `${pct}%` }} />
-                  </div>
+                  <span className="text-[10px] text-muted-foreground font-medium w-8 text-right flex-shrink-0">{pct}%</span>
                 </div>
               )
             })}
@@ -377,90 +561,134 @@ export default function AdminDashboard() {
       )}
 
       {/* ── Recent Requests ─────────────────────────────────────────────────── */}
-      <div className="bg-card border border-border rounded-lg shadow-sm overflow-hidden">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-          <h2 className="text-sm font-semibold text-foreground">{t('dashboard.recentRequests')}</h2>
-          <Link href="/admin/requests" className="text-xs text-primary hover:underline flex items-center gap-0.5">
+      <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border bg-muted/20">
+          <div>
+            <h2 className="text-sm font-bold text-foreground">{t('dashboard.recentRequests')}</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">{recent.length} most recent</p>
+          </div>
+          <Link
+            href="/admin/requests"
+            className="text-xs text-primary font-semibold flex items-center gap-1 bg-primary/5 hover:bg-primary/10 px-3 py-1.5 rounded-lg transition-colors"
+          >
             {t('dashboard.allRequests')} <ArrowRight className="size-3" />
           </Link>
         </div>
         {recent.length > 0 ? (
           <table className="w-full text-xs">
             <thead>
-              <tr className="bg-muted/40 border-b border-border">
-                <th className="text-left py-2.5 px-5 font-medium text-muted-foreground">{t('dashboard.colRequest')}</th>
-                <th className="text-left py-2.5 px-3 font-medium text-muted-foreground hidden sm:table-cell">{t('dashboard.colType')}</th>
-                <th className="text-left py-2.5 px-3 font-medium text-muted-foreground hidden md:table-cell">{t('dashboard.colRequester')}</th>
-                <th className="text-left py-2.5 px-3 font-medium text-muted-foreground">{t('dashboard.colStatus')}</th>
-                <th className="text-left py-2.5 px-3 font-medium text-muted-foreground hidden lg:table-cell">{t('dashboard.colAssignee')}</th>
-                <th className="text-right py-2.5 px-5 font-medium text-muted-foreground">{t('dashboard.colWhen')}</th>
+              <tr className="border-b border-border/60">
+                <th className="text-left py-3 px-5 font-semibold text-muted-foreground text-[11px] uppercase tracking-wide">{t('dashboard.colRequest')}</th>
+                <th className="text-left py-3 px-3 font-semibold text-muted-foreground text-[11px] uppercase tracking-wide hidden sm:table-cell">{t('dashboard.colType')}</th>
+                <th className="text-left py-3 px-3 font-semibold text-muted-foreground text-[11px] uppercase tracking-wide hidden md:table-cell">{t('dashboard.colRequester')}</th>
+                <th className="text-left py-3 px-3 font-semibold text-muted-foreground text-[11px] uppercase tracking-wide">{t('dashboard.colStatus')}</th>
+                <th className="text-left py-3 px-3 font-semibold text-muted-foreground text-[11px] uppercase tracking-wide hidden lg:table-cell">{t('dashboard.colAssignee')}</th>
+                <th className="text-right py-3 px-5 font-semibold text-muted-foreground text-[11px] uppercase tracking-wide">{t('dashboard.colWhen')}</th>
               </tr>
             </thead>
             <tbody>
-              {recent.map((req) => (
-                <tr
-                  key={req.id}
-                  className="border-b border-border/50 hover:bg-muted/20 transition-colors cursor-pointer"
-                  onClick={() => router.push(`/admin/requests/${req.id}`)}
-                >
-                  <td className="py-2.5 px-5">
-                    <div className="flex items-center gap-2">
-                      <span className={cn('size-1.5 rounded-full flex-shrink-0', PRIORITY_DOT[req.priority] ?? 'bg-slate-400')} />
-                      <div>
-                        <span className="font-medium text-foreground">
-                          {req.title ?? req.requestNo}
-                        </span>
-                        <p className="text-muted-foreground text-[10px]">{req.requestNo}</p>
+              {recent.map((req, idx) => {
+                const statusColor = STATUS_COLORS[req.status]
+                return (
+                  <tr
+                    key={req.id}
+                    className="border-b border-border/40 hover:bg-muted/25 transition-colors cursor-pointer group"
+                    onClick={() => router.push(`/admin/requests/${req.id}`)}
+                    style={{ borderLeft: `3px solid ${statusColor ?? '#e2e8f0'}` }}
+                  >
+                    <td className="py-3 px-5">
+                      <div className="flex items-center gap-2.5">
+                        <span
+                          className={cn(
+                            'size-2 rounded-full flex-shrink-0 ring-2 ring-offset-1 ring-offset-background',
+                            PRIORITY_DOT[req.priority] ?? 'bg-slate-400',
+                            PRIORITY_RING[req.priority] ?? 'ring-slate-300',
+                          )}
+                        />
+                        <div>
+                          <span className="font-semibold text-foreground group-hover:text-primary transition-colors">
+                            {req.title ?? req.requestNo}
+                          </span>
+                          <p className="text-muted-foreground text-[10px] font-mono mt-0.5">{req.requestNo}</p>
+                        </div>
                       </div>
-                    </div>
-                  </td>
-                  <td className="py-2.5 px-3 text-muted-foreground hidden sm:table-cell truncate max-w-[120px]">
-                    {req.typeName ?? req.type}
-                  </td>
-                  <td className="py-2.5 px-3 text-muted-foreground hidden md:table-cell">
-                    {req.submittedByName}
-                  </td>
-                  <td className="py-2.5 px-3">
-                    <span className={cn(
-                      'inline-flex items-center text-[10px] font-semibold px-2 py-0.5 rounded-full border',
-                      STATUS_BADGE[req.status] ?? 'bg-muted text-muted-foreground border-border'
-                    )}>
-                      {req.status.replace(/_/g, ' ')}
-                    </span>
-                  </td>
-                  <td className="py-2.5 px-3 text-muted-foreground hidden lg:table-cell">
-                    {req.assignedToName ?? '—'}
-                  </td>
-                  <td className="py-2.5 px-5 text-right text-muted-foreground">
-                    {timeAgo(req.createdAt)}
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="py-3 px-3 text-muted-foreground hidden sm:table-cell truncate max-w-[120px]">
+                      {req.typeName ?? req.type}
+                    </td>
+                    <td className="py-3 px-3 text-muted-foreground hidden md:table-cell">
+                      {req.submittedByName}
+                    </td>
+                    <td className="py-3 px-3">
+                      <span className={cn(
+                        'inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded-full border',
+                        STATUS_BADGE[req.status] ?? 'bg-muted text-muted-foreground border-border'
+                      )}>
+                        {req.status.replace(/_/g, ' ')}
+                      </span>
+                    </td>
+                    <td className="py-3 px-3 text-muted-foreground hidden lg:table-cell">
+                      {req.assignedToName ?? '—'}
+                    </td>
+                    <td className="py-3 px-5 text-right text-muted-foreground font-medium">
+                      {timeAgo(req.createdAt)}
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         ) : (
-          <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-            <FileText className="size-7 opacity-30 mb-2" />
-            <p className="text-sm">{t('dashboard.noRequests')}</p>
+          <div className="flex flex-col items-center justify-center py-16 text-muted-foreground gap-3">
+            <div className="size-14 rounded-2xl bg-muted/50 flex items-center justify-center">
+              <FileText className="size-7 opacity-40" />
+            </div>
+            <p className="text-sm font-medium">{t('dashboard.noRequests')}</p>
           </div>
         )}
       </div>
 
-      {/* ── Quick links ─────────────────────────────────────────────────────── */}
+      {/* ── Quick Links ─────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { labelKey: 'nav.users',      href: '/admin/users',      icon: Users,       color: 'bg-blue-50 text-blue-600 dark:bg-blue-950/30' },
-          { labelKey: 'nav.requests',   href: '/admin/requests',   icon: FileText,    color: 'bg-indigo-50 text-indigo-600 dark:bg-indigo-950/30' },
-          { labelKey: 'nav.workflows',  href: '/admin/workflows',  icon: Workflow,    color: 'bg-purple-50 text-purple-600 dark:bg-purple-950/30' },
-          { labelKey: 'nav.monitoring', href: '/admin/monitoring', icon: Monitor,     color: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30' },
-        ].map(({ labelKey, href, icon: Icon, color }) => (
+          {
+            labelKey: 'nav.users',
+            href: '/admin/users',
+            icon: Users,
+            iconBg: 'bg-blue-100 dark:bg-blue-950/40',
+            iconCls: 'text-blue-600 dark:text-blue-400',
+          },
+          {
+            labelKey: 'nav.requests',
+            href: '/admin/requests',
+            icon: FileText,
+            iconBg: 'bg-indigo-100 dark:bg-indigo-950/40',
+            iconCls: 'text-indigo-600 dark:text-indigo-400',
+          },
+          {
+            labelKey: 'nav.workflows',
+            href: '/admin/workflows',
+            icon: Workflow,
+            iconBg: 'bg-purple-100 dark:bg-purple-950/40',
+            iconCls: 'text-purple-600 dark:text-purple-400',
+          },
+          {
+            labelKey: 'nav.monitoring',
+            href: '/admin/monitoring',
+            icon: Monitor,
+            iconBg: 'bg-emerald-100 dark:bg-emerald-950/40',
+            iconCls: 'text-emerald-600 dark:text-emerald-400',
+          },
+        ].map(({ labelKey, href, icon: Icon, iconBg, iconCls }) => (
           <Link key={href} href={href}>
-            <div className="bg-card border border-border rounded-lg p-4 flex items-center gap-3 hover:shadow-md transition-all cursor-pointer group">
-              <div className={cn('size-9 rounded-lg flex items-center justify-center flex-shrink-0', color)}>
-                <Icon className="size-4" />
+            <div className="bg-card border border-border rounded-2xl p-4 flex items-center gap-3 hover:border-primary/50 hover:shadow-md transition-all cursor-pointer group shadow-sm">
+              <div className={cn('size-10 rounded-xl flex items-center justify-center flex-shrink-0', iconBg)}>
+                <Icon className={cn('size-5', iconCls)} />
               </div>
-              <span className="text-sm font-medium text-foreground group-hover:text-primary transition-colors">{t(labelKey)}</span>
-              <ArrowRight className="size-3.5 text-muted-foreground ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
+              <span className="text-sm font-bold text-foreground group-hover:text-primary transition-colors flex-1">
+                {t(labelKey)}
+              </span>
+              <ArrowRight className="size-4 text-muted-foreground/50 group-hover:text-primary group-hover:translate-x-0.5 transition-all opacity-0 group-hover:opacity-100" />
             </div>
           </Link>
         ))}

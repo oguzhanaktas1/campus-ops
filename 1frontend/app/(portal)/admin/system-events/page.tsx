@@ -1,12 +1,14 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { Clock, AlertTriangle, AlertCircle, Info, Loader2, RefreshCw } from 'lucide-react'
+import { Clock, AlertTriangle, AlertCircle, Info, Loader2, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { getToken } from '@/lib/auth'
 import { useI18n } from '@/lib/i18n'
+
+const PAGE_SIZE = 20
 
 interface SystemEvent {
   id: string
@@ -52,6 +54,46 @@ function relativeTime(d: string): string {
   return `${days} day${days === 1 ? '' : 's'} ago`
 }
 
+function PaginationBar({ page, totalPages, onChange }: { page: number; totalPages: number; onChange: (p: number) => void }) {
+  if (totalPages <= 1) return null
+  const getPages = (): (number | '...')[] => {
+    const pages: (number | '...')[] = []
+    for (let i = 1; i <= totalPages; i++) {
+      if (i === 1 || i === totalPages || Math.abs(i - page) <= 1) {
+        pages.push(i)
+      } else if (pages[pages.length - 1] !== '...') {
+        pages.push('...')
+      }
+    }
+    return pages
+  }
+  return (
+    <div className="flex items-center justify-center gap-1">
+      <Button variant="outline" size="icon" className="size-8" disabled={page === 1} onClick={() => onChange(page - 1)}>
+        <ChevronLeft className="size-4" />
+      </Button>
+      {getPages().map((p, i) =>
+        p === '...' ? (
+          <span key={`e-${i}`} className="px-2 text-xs text-muted-foreground">…</span>
+        ) : (
+          <Button
+            key={p}
+            variant={p === page ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => onChange(p as number)}
+            className="min-w-[32px] h-8 text-xs"
+          >
+            {p}
+          </Button>
+        )
+      )}
+      <Button variant="outline" size="icon" className="size-8" disabled={page === totalPages} onClick={() => onChange(page + 1)}>
+        <ChevronRight className="size-4" />
+      </Button>
+    </div>
+  )
+}
+
 const SEVERITIES = ['INFO', 'WARNING', 'ERROR', 'CRITICAL'] as const
 
 export default function AdminSystemEventsPage() {
@@ -61,6 +103,7 @@ export default function AdminSystemEventsPage() {
   const [severityFilter, setSeverityFilter] = useState('all')
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [, setTick] = useState(0)
+  const [page, setPage] = useState(1)
 
   const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
 
@@ -81,11 +124,7 @@ export default function AdminSystemEventsPage() {
 
   useEffect(() => {
     fetchEvents()
-    // Auto-refresh every 30 seconds
-    const interval = setInterval(() => {
-      fetchEvents()
-    }, 30000)
-    // Tick every minute for relative timestamps
+    const interval = setInterval(() => { fetchEvents() }, 30000)
     const tickInterval = setInterval(() => setTick(t => t + 1), 60000)
     return () => {
       clearInterval(interval)
@@ -93,7 +132,12 @@ export default function AdminSystemEventsPage() {
     }
   }, [fetchEvents])
 
+  // Reset page when filter changes
+  useEffect(() => { setPage(1) }, [severityFilter])
+
   const filtered = events
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE)
+  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
   if (isLoading) {
     return (
@@ -147,7 +191,10 @@ export default function AdminSystemEventsPage() {
         ))}
       </div>
 
-      <p className="text-xs text-muted-foreground font-medium">{t('systemEvents.eventsCount', { count: filtered.length })}</p>
+      <p className="text-xs text-muted-foreground font-medium">
+        {t('systemEvents.eventsCount', { count: filtered.length })}
+        {totalPages > 1 && ` — page ${page} of ${totalPages}`}
+      </p>
 
       {/* Table */}
       <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
@@ -163,7 +210,7 @@ export default function AdminSystemEventsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {filtered.map(e => (
+              {paginated.map(e => (
                 <>
                   <tr
                     key={e.id}
@@ -240,6 +287,16 @@ export default function AdminSystemEventsPage() {
             </div>
           )}
         </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="border-t border-border px-5 py-3 flex items-center justify-between gap-4">
+            <span className="text-xs text-muted-foreground">
+              {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filtered.length)} / {filtered.length}
+            </span>
+            <PaginationBar page={page} totalPages={totalPages} onChange={setPage} />
+          </div>
+        )}
       </div>
     </div>
   )

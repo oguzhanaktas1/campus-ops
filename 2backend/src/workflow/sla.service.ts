@@ -522,8 +522,6 @@ export class SlaService {
   }
 
   async getAdminOverview() {
-    await this.runSlaSweep();
-
     const [eventCounts, recentEvents, activePolicies] = await Promise.all([
       this.prisma.slaEvent.groupBy({
         by: ['eventType'],

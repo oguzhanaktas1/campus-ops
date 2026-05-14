@@ -53,6 +53,12 @@ export function I18nProvider({ children, translations, defaultLocale = 'tr' }: I
     }
   }, [])
 
+  useEffect(() => {
+    if (typeof document !== 'undefined') {
+      document.documentElement.lang = locale
+    }
+  }, [locale])
+
   const t = useCallback((key: string, params?: Record<string, string | number>): string => {
     const dict = translations[locale]
     const value = getNestedValue(dict, key)

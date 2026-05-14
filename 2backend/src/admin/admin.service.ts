@@ -1963,8 +1963,6 @@ export class AdminService {
     const limit = Math.min(100, Math.max(1, opts.limit ?? 20));
     const skip = (page - 1) * limit;
 
-    await this.slaService.runSlaSweep();
-
     const [data, total] = await Promise.all([
       this.prisma.slaPolicy.findMany({
         include: { requestType: { select: { id: true, name: true, key: true } } },

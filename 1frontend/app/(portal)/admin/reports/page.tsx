@@ -53,17 +53,26 @@ const STATUS_BADGE: Record<string, string> = {
 }
 
 const BAR_COLORS = [
-  'bg-primary', 'bg-emerald-500', 'bg-amber-500', 'bg-purple-500',
-  'bg-blue-500', 'bg-red-500', 'bg-pink-500', 'bg-cyan-500',
+  'bg-gradient-to-r from-indigo-600 to-indigo-400',
+  'bg-gradient-to-r from-emerald-600 to-emerald-400',
+  'bg-gradient-to-r from-amber-600 to-amber-400',
+  'bg-gradient-to-r from-purple-600 to-purple-400',
+  'bg-gradient-to-r from-blue-600 to-blue-400',
+  'bg-gradient-to-r from-red-600 to-red-400',
+  'bg-gradient-to-r from-pink-600 to-pink-400',
+  'bg-gradient-to-r from-cyan-600 to-cyan-400',
 ]
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-function StatCard({ icon, label, value, sub, accent }: {
-  icon: React.ReactNode; label: string; value: string | number; sub?: string; accent?: string
+function StatCard({ icon, label, value, sub, accent, accentColor }: {
+  icon: React.ReactNode; label: string; value: string | number; sub?: string; accent?: string; accentColor?: string
 }) {
   return (
-    <div className="bg-card border border-border rounded-lg p-5 shadow-sm flex items-start justify-between gap-3">
+    <div className={cn(
+      'bg-gradient-to-br from-card to-muted/10 border border-border rounded-lg p-5 shadow-sm flex items-start justify-between gap-3 border-l-4',
+      accentColor ?? 'border-l-primary'
+    )}>
       <div>
         <p className="text-xs text-muted-foreground font-medium mb-1">{label}</p>
         <p className={cn('text-2xl font-bold text-foreground', accent)}>{value}</p>
@@ -97,7 +106,7 @@ function ProgressRow({ label, count, max, colorClass, badge }: {
           <span className="text-sm font-bold text-foreground w-8 text-right">{count}</span>
         </div>
       </div>
-      <div className="h-2 bg-muted rounded-full overflow-hidden">
+      <div className="h-2.5 bg-muted rounded-full overflow-hidden">
         <div className={cn('h-full rounded-full transition-all duration-500', colorClass)} style={{ width: `${pct}%` }} />
       </div>
     </div>
@@ -107,10 +116,13 @@ function ProgressRow({ label, count, max, colorClass, badge }: {
 function Section({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) {
   return (
     <div>
-      <h2 className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-3 flex items-center gap-2">
-        <span className="text-muted-foreground/70">{icon}</span>
-        {title}
-      </h2>
+      <div className="flex items-center gap-3 mb-4">
+        <div className="size-8 rounded-lg bg-muted flex items-center justify-center text-muted-foreground">
+          {icon}
+        </div>
+        <h2 className="text-sm font-bold text-foreground uppercase tracking-wider">{title}</h2>
+        <div className="flex-1 h-px bg-border" />
+      </div>
       {children}
     </div>
   )
@@ -209,18 +221,21 @@ export default function AdminReportsPage() {
 
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-bold text-foreground">{t('reports.title')}</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            {t('reports.subtitle')}
-          </p>
+        <div className="flex items-center gap-3">
+          <div className="size-10 rounded-xl bg-primary/10 flex items-center justify-center">
+            <BarChart2 className="size-5 text-primary" />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold text-foreground">{t('reports.title')}</h1>
+            <p className="text-sm text-muted-foreground mt-0.5">{t('reports.subtitle')}</p>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <Button size="sm" variant="outline" className="gap-1.5 h-8 text-xs" onClick={() => void fetchReport(true)} disabled={refreshing}>
             <RefreshCw className={cn('size-3.5', refreshing && 'animate-spin')} />
             {t('common.refresh')}
           </Button>
-          <Button size="sm" variant="outline" className="gap-1.5 h-8 text-xs" onClick={() => exportCSV(data)}>
+          <Button size="sm" className="gap-1.5 h-8 text-xs bg-primary hover:bg-primary/90" onClick={() => exportCSV(data)}>
             <Download className="size-3.5" />
             {t('reports.download')}
           </Button>
@@ -229,17 +244,19 @@ export default function AdminReportsPage() {
 
       {/* Health summary bar */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800 rounded-lg p-3.5 flex items-center gap-2.5">
+        <div className="bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800 border-t-2 border-t-emerald-500 rounded-lg p-3.5 flex items-center gap-2.5 shadow-sm">
           <CheckCircle2 className="size-4 text-emerald-600 flex-shrink-0" />
           <div>
             <p className="text-base font-bold text-emerald-700 dark:text-emerald-400">{resolveRate}%</p>
             <p className="text-[11px] text-emerald-600/80 dark:text-emerald-500">{t('reports.resolutionRate')}</p>
           </div>
         </div>
-        <div className={cn('border rounded-lg p-3.5 flex items-center gap-2.5',
+        <div className={cn(
+          'border rounded-lg p-3.5 flex items-center gap-2.5 shadow-sm border-t-2',
           (data.overdueRequests ?? 0) > 0
-            ? 'bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800'
-            : 'bg-muted/30 border-border')}>
+            ? 'bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800 border-t-red-500'
+            : 'bg-muted/30 border-border border-t-slate-300'
+        )}>
           <AlertTriangle className={cn('size-4 flex-shrink-0', (data.overdueRequests ?? 0) > 0 ? 'text-red-600' : 'text-muted-foreground')} />
           <div>
             <p className={cn('text-base font-bold', (data.overdueRequests ?? 0) > 0 ? 'text-red-700 dark:text-red-400' : 'text-foreground')}>
@@ -248,7 +265,7 @@ export default function AdminReportsPage() {
             <p className="text-[11px] text-muted-foreground">{t('reports.overdue')}</p>
           </div>
         </div>
-        <div className="bg-card border border-border rounded-lg p-3.5 flex items-center gap-2.5">
+        <div className="bg-card border border-border border-t-2 border-t-primary rounded-lg p-3.5 flex items-center gap-2.5 shadow-sm">
           <Clock className="size-4 text-primary flex-shrink-0" />
           <div>
             <p className="text-base font-bold text-foreground">
@@ -257,8 +274,8 @@ export default function AdminReportsPage() {
             <p className="text-[11px] text-muted-foreground">{t('reports.avgResolution')}</p>
           </div>
         </div>
-        <div className="bg-card border border-border rounded-lg p-3.5 flex items-center gap-2.5">
-          <Users className="size-4 text-primary flex-shrink-0" />
+        <div className="bg-card border border-border border-t-2 border-t-purple-500 rounded-lg p-3.5 flex items-center gap-2.5 shadow-sm">
+          <Users className="size-4 text-purple-500 flex-shrink-0" />
           <div>
             <p className="text-base font-bold text-foreground">{data.totalUsers.toLocaleString()}</p>
             <p className="text-[11px] text-muted-foreground">{t('reports.totalUsers')}</p>
@@ -267,15 +284,19 @@ export default function AdminReportsPage() {
       </div>
 
       {/* ── Requests ──────────────────────────────────────────────────────────── */}
-      <Section title={t('reports.requests')} icon={<FileText className="size-3.5" />}>
+      <Section title={t('reports.requests')} icon={<FileText className="size-4" />}>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-          <StatCard icon={<FileText    className="size-5" />} label={t('reports.total')}      value={(data.totalRequests    ?? 0).toLocaleString()} />
-          <StatCard icon={<TrendingUp  className="size-5" />} label={t('reports.open')}       value={data.openRequests      ?? 0} sub={t('reports.awaitingAction')}
-            accent={(data.openRequests ?? 0) > 0 ? 'text-amber-600' : undefined} />
-          <StatCard icon={<CheckCircle2 className="size-5" />} label={t('reports.resolved')}  value={data.resolvedRequests  ?? 0} sub={t('reports.ofTotal', { rate: resolveRate })}
-            accent="text-emerald-600" />
+          <StatCard icon={<FileText    className="size-5" />} label={t('reports.total')}           value={(data.totalRequests    ?? 0).toLocaleString()}
+            accentColor="border-l-primary" />
+          <StatCard icon={<TrendingUp  className="size-5" />} label={t('reports.open')}            value={data.openRequests      ?? 0} sub={t('reports.awaitingAction')}
+            accent={(data.openRequests ?? 0) > 0 ? 'text-amber-600' : undefined}
+            accentColor="border-l-amber-500" />
+          <StatCard icon={<CheckCircle2 className="size-5" />} label={t('reports.resolved')}      value={data.resolvedRequests  ?? 0} sub={t('reports.ofTotal', { rate: resolveRate })}
+            accent="text-emerald-600"
+            accentColor="border-l-emerald-500" />
           <StatCard icon={<Clock       className="size-5" />} label={t('reports.avgResolution')}  value={data.avgResolutionDays != null ? `${data.avgResolutionDays}d` : '—'}
-            sub={t('reports.daysToClose')} />
+            sub={t('reports.daysToClose')}
+            accentColor="border-l-indigo-500" />
         </div>
 
         <div className="grid lg:grid-cols-2 gap-5">
@@ -290,7 +311,7 @@ export default function AdminReportsPage() {
                     label={row.status.replace(/_/g, ' ')}
                     count={row.count}
                     max={maxStatus}
-                    colorClass="bg-primary"
+                    colorClass="bg-gradient-to-r from-indigo-600 to-indigo-400"
                     badge={row.status}
                   />
                 ))}
@@ -319,13 +340,16 @@ export default function AdminReportsPage() {
       </Section>
 
       {/* ── IT Tickets ────────────────────────────────────────────────────────── */}
-      <Section title={t('reports.itTickets')} icon={<Ticket className="size-3.5" />}>
+      <Section title={t('reports.itTickets')} icon={<Ticket className="size-4" />}>
         <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
-          <StatCard icon={<Ticket       className="size-5" />} label="Total"    value={(data.totalTickets ?? 0).toLocaleString()} />
+          <StatCard icon={<Ticket       className="size-5" />} label="Total"    value={(data.totalTickets ?? 0).toLocaleString()}
+            accentColor="border-l-primary" />
           <StatCard icon={<XCircle      className="size-5" />} label="Open"     value={data.openTickets   ?? 0} sub="Unresolved"
-            accent={(data.openTickets ?? 0) > 0 ? 'text-red-600' : undefined} />
+            accent={(data.openTickets ?? 0) > 0 ? 'text-red-600' : undefined}
+            accentColor="border-l-red-500" />
           <StatCard icon={<CheckCircle2 className="size-5" />} label="Resolved" value={Math.max(0, (data.totalTickets ?? 0) - (data.openTickets ?? 0))}
-            sub={`${ticketResolveRate}% of total`} accent="text-emerald-600" />
+            sub={`${ticketResolveRate}% of total`} accent="text-emerald-600"
+            accentColor="border-l-emerald-500" />
         </div>
 
         {data.ticketsByStatus?.length > 0 && (
@@ -348,12 +372,16 @@ export default function AdminReportsPage() {
       </Section>
 
       {/* ── Operations ────────────────────────────────────────────────────────── */}
-      <Section title={t('reports.operations')} icon={<BarChart2 className="size-3.5" />}>
+      <Section title={t('reports.operations')} icon={<BarChart2 className="size-4" />}>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatCard icon={<BookMarked   className="size-5" />} label="Total Reservations"  value={(data.totalReservations ?? 0).toLocaleString()} />
-          <StatCard icon={<CalendarDays className="size-5" />} label="Total Appointments"  value={(data.totalAppointments ?? 0).toLocaleString()} />
-          <StatCard icon={<Users        className="size-5" />} label={t('reports.totalUsers')}         value={(data.totalUsers        ?? 0).toLocaleString()} />
-          <StatCard icon={<FileText     className="size-5" />} label="All Requests"        value={(data.totalRequests     ?? 0).toLocaleString()} />
+          <StatCard icon={<BookMarked   className="size-5" />} label="Total Reservations" value={(data.totalReservations ?? 0).toLocaleString()}
+            accentColor="border-l-emerald-500" />
+          <StatCard icon={<CalendarDays className="size-5" />} label="Total Appointments" value={(data.totalAppointments ?? 0).toLocaleString()}
+            accentColor="border-l-indigo-500" />
+          <StatCard icon={<Users        className="size-5" />} label={t('reports.totalUsers')}        value={(data.totalUsers        ?? 0).toLocaleString()}
+            accentColor="border-l-purple-500" />
+          <StatCard icon={<FileText     className="size-5" />} label="All Requests"       value={(data.totalRequests     ?? 0).toLocaleString()}
+            accentColor="border-l-amber-500" />
         </div>
       </Section>
 
@@ -367,7 +395,7 @@ export default function AdminReportsPage() {
         </div>
         <table className="w-full text-xs">
           <thead>
-            <tr className="bg-muted/40 border-b border-border">
+            <tr className="bg-primary/5 border-b border-border">
               <th className="text-left py-2.5 px-5 font-medium text-muted-foreground">{t('reports.colName')}</th>
               <th className="text-right py-2.5 px-5 font-medium text-muted-foreground">{t('reports.colPeriod')}</th>
             </tr>
@@ -385,9 +413,12 @@ export default function AdminReportsPage() {
               { label: 'Total Reservations', value: (data.totalReservations ?? 0).toLocaleString() },
               { label: 'Total Appointments', value: (data.totalAppointments ?? 0).toLocaleString() },
             ].map((row, i) => (
-              <tr key={row.label} className={cn('border-b border-border/50', i % 2 === 0 ? '' : 'bg-muted/10')}>
+              <tr key={row.label} className={cn(
+                'border-b border-border/50 border-l-2',
+                i % 2 === 0 ? 'bg-muted/20 border-l-primary' : 'border-l-transparent'
+              )}>
                 <td className="py-2.5 px-5 text-muted-foreground">{row.label}</td>
-                <td className="py-2.5 px-5 text-right font-semibold text-foreground">{row.value}</td>
+                <td className="py-2.5 px-5 text-right font-bold text-primary">{row.value}</td>
               </tr>
             ))}
           </tbody>

@@ -1,14 +1,16 @@
 'use client'
 
 import { useEffect, useState, useMemo } from 'react'
-import { StatusBadge, PriorityBadge } from '@/components/status-badge'
+import { StatusBadge } from '@/components/status-badge'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { Search, FileText, Trash2, Loader2, AlertTriangle, ArrowRight, CheckSquare, Square } from 'lucide-react'
+import { Search, FileText, Trash2, Loader2, AlertTriangle, ArrowRight, CheckSquare, Square, ChevronLeft, ChevronRight } from 'lucide-react'
 import { toast } from 'sonner'
 import Link from 'next/link'
 import { useI18n } from '@/lib/i18n'
+
+const PAGE_SIZE = 20
 
 function useRequestTypeLabel() {
   const { t } = useI18n()
@@ -22,6 +24,46 @@ function useRequestTypeLabel() {
   }
 }
 
+function PaginationBar({ page, totalPages, onChange }: { page: number; totalPages: number; onChange: (p: number) => void }) {
+  if (totalPages <= 1) return null
+  const getPages = (): (number | '...')[] => {
+    const pages: (number | '...')[] = []
+    for (let i = 1; i <= totalPages; i++) {
+      if (i === 1 || i === totalPages || Math.abs(i - page) <= 1) {
+        pages.push(i)
+      } else if (pages[pages.length - 1] !== '...') {
+        pages.push('...')
+      }
+    }
+    return pages
+  }
+  return (
+    <div className="flex items-center justify-center gap-1 pt-4 pb-2">
+      <Button variant="outline" size="icon" className="size-8" disabled={page === 1} onClick={() => onChange(page - 1)}>
+        <ChevronLeft className="size-4" />
+      </Button>
+      {getPages().map((p, i) =>
+        p === '...' ? (
+          <span key={`e-${i}`} className="px-2 text-xs text-muted-foreground">…</span>
+        ) : (
+          <Button
+            key={p}
+            variant={p === page ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => onChange(p as number)}
+            className="min-w-[32px] h-8 text-xs"
+          >
+            {p}
+          </Button>
+        )
+      )}
+      <Button variant="outline" size="icon" className="size-8" disabled={page === totalPages} onClick={() => onChange(page + 1)}>
+        <ChevronRight className="size-4" />
+      </Button>
+    </div>
+  )
+}
+
 export default function AdminRequestsPage() {
   const { t } = useI18n()
   const getRequestTypeLabel = useRequestTypeLabel()
@@ -30,8 +72,8 @@ export default function AdminRequestsPage() {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [typeFilter, setTypeFilter] = useState('all')
-  
-  // 🔥 TOPLU SEÇİM STATE'LERİ 🔥
+  const [page, setPage] = useState(1)
+
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [isDeleting, setIsDeleting] = useState(false)
   const [showConfirmModal, setShowConfirmModal] = useState(false)
@@ -53,7 +95,6 @@ export default function AdminRequestsPage() {
 
   useEffect(() => { fetchRequests() }, [])
 
-  // TOPLU SİLME FONKSİYONU
   const handleBulkDelete = async () => {
     setIsDeleting(true)
     try {
@@ -61,9 +102,9 @@ export default function AdminRequestsPage() {
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
       const res = await fetch(`${backendUrl}/admin/requests/bulk-delete`, {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}` 
+          Authorization: `Bearer ${token}`
         },
         body: JSON.stringify({ ids: selectedIds })
       })
@@ -99,6 +140,12 @@ export default function AdminRequestsPage() {
     })
   }, [requests, search, statusFilter, typeFilter])
 
+  // Reset to page 1 on filter / search change
+  useEffect(() => { setPage(1) }, [search, statusFilter, typeFilter])
+
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE)
+  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+
   const requestTypes = useMemo(() => {
     const map = new Map<string, string>()
     for (const request of requests) {
@@ -109,12 +156,11 @@ export default function AdminRequestsPage() {
     return Array.from(map.entries()).sort((a, b) => a[1].localeCompare(b[1]))
   }, [requests])
 
-  // HEPSİNİ SEÇ / KALDIR
   const toggleSelectAll = () => {
-    if (selectedIds.length === filtered.length) {
-      setSelectedIds([])
+    if (paginated.every(r => selectedIds.includes(r.id))) {
+      setSelectedIds(prev => prev.filter(id => !paginated.map(r => r.id).includes(id)))
     } else {
-      setSelectedIds(filtered.map(r => r.id))
+      setSelectedIds(prev => Array.from(new Set([...prev, ...paginated.map(r => r.id)])))
     }
   }
 
@@ -122,12 +168,14 @@ export default function AdminRequestsPage() {
     setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id])
   }
 
+  const allPageSelected = paginated.length > 0 && paginated.every(r => selectedIds.includes(r.id))
+
   if (isLoading) return <div className="h-[80vh] flex items-center justify-center"><Loader2 className="size-10 animate-spin text-primary" /></div>
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto pb-20 relative">
-      
-      {/* ONAY MODALI */}
+
+      {/* Confirm Delete Modal */}
       {showConfirmModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
           <div className="bg-background border border-border rounded-xl p-6 max-w-sm w-full shadow-2xl animate-in zoom-in-95 duration-200">
@@ -148,7 +196,7 @@ export default function AdminRequestsPage() {
         </div>
       )}
 
-      {/* TOPBAR & BULK ACTIONS */}
+      {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-black tracking-tight text-foreground uppercase flex items-center gap-3">
@@ -156,8 +204,6 @@ export default function AdminRequestsPage() {
           </h1>
           <p className="text-sm text-muted-foreground">{t('requests.subtitle', { count: requests.length })}</p>
         </div>
-
-        {/* 🔥 SEÇİLEN VARSA ÇIKAN BUTON 🔥 */}
         {selectedIds.length > 0 && (
           <Button
             variant="destructive"
@@ -170,7 +216,7 @@ export default function AdminRequestsPage() {
         )}
       </div>
 
-      {/* SEARCH & FILTERS */}
+      {/* Search & Filters */}
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4 bg-muted/20 p-4 rounded-xl border border-border">
         <div className="md:col-span-2 relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
@@ -199,9 +245,7 @@ export default function AdminRequestsPage() {
         >
           <option value="all">{t('requests.allTypes')}</option>
           {requestTypes.map(([key, label]) => (
-            <option key={key} value={key}>
-              {label}
-            </option>
+            <option key={key} value={key}>{label}</option>
           ))}
         </select>
         <div className="flex items-center justify-center text-xs font-bold text-muted-foreground bg-background border border-border rounded-md uppercase">
@@ -209,18 +253,18 @@ export default function AdminRequestsPage() {
         </div>
       </div>
 
-      {/* TABLE */}
+      {/* Table */}
       <div className="bg-card border border-border rounded-xl shadow-xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left border-collapse">
             <thead className="bg-muted/50 text-muted-foreground border-b border-border">
               <tr>
                 <th className="px-5 py-4 w-10">
-                  <button 
+                  <button
                     onClick={toggleSelectAll}
                     className="flex items-center justify-center hover:text-primary transition-colors"
                   >
-                    {selectedIds.length === filtered.length && filtered.length > 0 ? (
+                    {allPageSelected ? (
                       <CheckSquare className="size-5 text-primary" />
                     ) : (
                       <Square className="size-5" />
@@ -235,12 +279,12 @@ export default function AdminRequestsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {filtered.map((req) => (
-                <tr 
-                  key={req.id} 
+              {paginated.map((req) => (
+                <tr
+                  key={req.id}
                   className={cn(
-                    "hover:bg-muted/30 transition-colors group",
-                    selectedIds.includes(req.id) && "bg-primary/5"
+                    'hover:bg-muted/30 transition-colors group',
+                    selectedIds.includes(req.id) && 'bg-primary/5'
                   )}
                 >
                   <td className="px-5 py-4">
@@ -281,9 +325,26 @@ export default function AdminRequestsPage() {
                   </td>
                 </tr>
               ))}
+              {paginated.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="text-center py-16 text-sm text-muted-foreground">
+                    {t('common.noResults')}
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="border-t border-border px-5 py-3 flex items-center justify-between gap-4">
+            <span className="text-xs text-muted-foreground">
+              {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filtered.length)} / {filtered.length}
+            </span>
+            <PaginationBar page={page} totalPages={totalPages} onChange={setPage} />
+          </div>
+        )}
       </div>
     </div>
   )

@@ -4,6 +4,8 @@ import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 import { useI18n } from '@/lib/i18n'
 import {
+  ChevronLeft,
+  ChevronRight,
   ExternalLink,
   Filter,
   Loader2,
@@ -27,6 +29,8 @@ import {
   type WorkflowRequestType,
   type WorkflowStep,
 } from '@/lib/admin-workflow'
+
+const PAGE_SIZE = 10
 
 type WorkflowInstanceRecord = {
   workflowId: string
@@ -66,6 +70,46 @@ function getTimelineStepState(record: WorkflowInstanceRecord, stepId: string) {
   }
 }
 
+function PaginationBar({ page, totalPages, onChange }: { page: number; totalPages: number; onChange: (p: number) => void }) {
+  if (totalPages <= 1) return null
+  const getPages = (): (number | '...')[] => {
+    const pages: (number | '...')[] = []
+    for (let i = 1; i <= totalPages; i++) {
+      if (i === 1 || i === totalPages || Math.abs(i - page) <= 1) {
+        pages.push(i)
+      } else if (pages[pages.length - 1] !== '...') {
+        pages.push('...')
+      }
+    }
+    return pages
+  }
+  return (
+    <div className="flex items-center justify-center gap-1">
+      <Button variant="outline" size="icon" className="size-8" disabled={page === 1} onClick={() => onChange(page - 1)}>
+        <ChevronLeft className="size-4" />
+      </Button>
+      {getPages().map((p, i) =>
+        p === '...' ? (
+          <span key={`e-${i}`} className="px-2 text-xs text-muted-foreground">…</span>
+        ) : (
+          <Button
+            key={p}
+            variant={p === page ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => onChange(p as number)}
+            className="min-w-[32px] h-8 text-xs"
+          >
+            {p}
+          </Button>
+        )
+      )}
+      <Button variant="outline" size="icon" className="size-8" disabled={page === totalPages} onClick={() => onChange(page + 1)}>
+        <ChevronRight className="size-4" />
+      </Button>
+    </div>
+  )
+}
+
 export default function AdminWorkflowInstancesPage() {
   const { t } = useI18n()
   const [workflowDetails, setWorkflowDetails] = useState<WorkflowDetail[]>([])
@@ -74,6 +118,7 @@ export default function AdminWorkflowInstancesPage() {
   const [requestTypeFilter, setRequestTypeFilter] = useState('all')
   const [workflowFilter, setWorkflowFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [page, setPage] = useState(1)
 
   useEffect(() => {
     const load = async () => {
@@ -101,13 +146,11 @@ export default function AdminWorkflowInstancesPage() {
 
   const requestTypeOptions = useMemo(() => {
     const seen = new Map<string, WorkflowRequestType>()
-
     workflowDetails.forEach((workflow) => {
       workflow.requestTypes?.forEach((type) => {
         seen.set(type.id, type)
       })
     })
-
     return Array.from(seen.values()).sort((a, b) => a.name.localeCompare(b.name))
   }, [workflowDetails])
 
@@ -159,6 +202,12 @@ export default function AdminWorkflowInstancesPage() {
       return matchesSearch && matchesRequestType && matchesWorkflow && matchesStatus
     })
   }, [records, requestTypeFilter, search, statusFilter, workflowFilter])
+
+  // Reset page on filter change
+  useEffect(() => { setPage(1) }, [search, requestTypeFilter, workflowFilter, statusFilter])
+
+  const totalPages = Math.ceil(filteredRecords.length / PAGE_SIZE)
+  const paginatedRecords = filteredRecords.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
   const totals = useMemo(
     () => ({
@@ -274,7 +323,9 @@ export default function AdminWorkflowInstancesPage() {
         </div>
 
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
-          <span>{filteredRecords.length} instance shown</span>
+          <span>
+            {filteredRecords.length} instance{filteredRecords.length !== 1 ? 's' : ''} — page {page} of {Math.max(1, totalPages)}
+          </span>
           <button
             type="button"
             onClick={() => {
@@ -301,264 +352,261 @@ export default function AdminWorkflowInstancesPage() {
             </p>
           </div>
         ) : (
-          filteredRecords.map((record) => {
-            const { instance } = record
+          <>
+            {paginatedRecords.map((record) => {
+              const { instance } = record
 
-            return (
-              <details
-                key={instance.id}
-                className="group rounded-xl border border-border bg-card shadow-sm"
-              >
-                <summary className="cursor-pointer list-none p-4 marker:hidden">
-                  <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Link
-                          href={`/admin/requests/${instance.request.id}`}
-                          className="text-sm font-semibold text-foreground hover:text-primary"
-                        >
-                          {instance.request.requestNo}
-                        </Link>
-                        <span className="text-sm text-muted-foreground">/</span>
-                        <p className="truncate text-sm text-foreground">
-                          {instance.request.title}
-                        </p>
-                      </div>
+              return (
+                <details
+                  key={instance.id}
+                  className="group rounded-xl border border-border bg-card shadow-sm"
+                >
+                  <summary className="cursor-pointer list-none p-4 marker:hidden">
+                    <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Link
+                            href={`/admin/requests/${instance.request.id}`}
+                            className="text-sm font-semibold text-foreground hover:text-primary"
+                          >
+                            {instance.request.requestNo}
+                          </Link>
+                          <span className="text-sm text-muted-foreground">/</span>
+                          <p className="truncate text-sm text-foreground">
+                            {instance.request.title}
+                          </p>
+                        </div>
 
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        <Badge variant="outline">{record.workflowName}</Badge>
-                        <Badge variant="outline">
-                          Request {formatEnumLabel(instance.request.status)}
-                        </Badge>
-                        <Badge variant="outline">
-                          Instance {formatEnumLabel(instance.status)}
-                        </Badge>
-                        <Badge
-                          className={cn(
-                            'border-transparent',
-                            instance.isOverdue
-                              ? 'bg-red-100 text-red-700'
-                              : 'bg-emerald-100 text-emerald-700',
-                          )}
-                        >
-                          {instance.isOverdue ? 'Overdue' : 'On Track'}
-                        </Badge>
-                        {record.requestTypes.map((type) => (
-                          <Badge key={type.id} variant="secondary">
-                            {type.name}
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          <Badge variant="outline">{record.workflowName}</Badge>
+                          <Badge variant="outline">
+                            Request {formatEnumLabel(instance.request.status)}
                           </Badge>
-                        ))}
+                          <Badge variant="outline">
+                            Instance {formatEnumLabel(instance.status)}
+                          </Badge>
+                          <Badge
+                            className={cn(
+                              'border-transparent',
+                              instance.isOverdue
+                                ? 'bg-red-100 text-red-700'
+                                : 'bg-emerald-100 text-emerald-700',
+                            )}
+                          >
+                            {instance.isOverdue ? 'Overdue' : 'On Track'}
+                          </Badge>
+                          {record.requestTypes.map((type) => (
+                            <Badge key={type.id} variant="secondary">
+                              {type.name}
+                            </Badge>
+                          ))}
+                        </div>
+
+                        <div className="mt-3 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2 xl:grid-cols-4">
+                          <p>{t('workflows.colRequest')}: <span className="text-foreground">{instance.request.requesterName}</span></p>
+                          <p>Assignee: <span className="text-foreground">{instance.request.currentAssigneeName ?? 'Unassigned'}</span></p>
+                          <p>{t('workflows.colCurrentStep')}: <span className="text-foreground">{instance.currentStep?.stepName ?? 'Terminal'}</span></p>
+                          <p>{t('workflows.colStarted')}: <span className="text-foreground">{formatDate(instance.startedAt)}</span></p>
+                        </div>
                       </div>
 
-                      <div className="mt-3 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2 xl:grid-cols-4">
-                        <p>{t('workflows.colRequest')}: <span className="text-foreground">{instance.request.requesterName}</span></p>
-                        <p>Assignee: <span className="text-foreground">{instance.request.currentAssigneeName ?? 'Unassigned'}</span></p>
-                        <p>{t('workflows.colCurrentStep')}: <span className="text-foreground">{instance.currentStep?.stepName ?? 'Terminal'}</span></p>
-                        <p>{t('workflows.colStarted')}: <span className="text-foreground">{formatDate(instance.startedAt)}</span></p>
+                      <div className="grid min-w-[220px] gap-2 text-xs text-muted-foreground sm:grid-cols-3 xl:grid-cols-1">
+                        <div className="rounded-lg bg-muted/20 px-3 py-2">
+                          <p>Total Age</p>
+                          <p className="mt-1 text-sm font-medium text-foreground">
+                            {formatDuration(instance.totalAgeMinutes)}
+                          </p>
+                        </div>
+                        <div className="rounded-lg bg-muted/20 px-3 py-2">
+                          <p>Step Age</p>
+                          <p className="mt-1 text-sm font-medium text-foreground">
+                            {formatDuration(instance.currentStepAgeMinutes)}
+                          </p>
+                        </div>
+                        <div className="rounded-lg bg-muted/20 px-3 py-2">
+                          <p>Idle</p>
+                          <p className="mt-1 text-sm font-medium text-foreground">
+                            {formatDuration(instance.inactiveMinutes)}
+                          </p>
+                        </div>
                       </div>
                     </div>
+                  </summary>
 
-                    <div className="grid min-w-[220px] gap-2 text-xs text-muted-foreground sm:grid-cols-3 xl:grid-cols-1">
-                      <div className="rounded-lg bg-muted/20 px-3 py-2">
-                        <p>Total Age</p>
-                        <p className="mt-1 text-sm font-medium text-foreground">
-                          {formatDuration(instance.totalAgeMinutes)}
-                        </p>
-                      </div>
-                      <div className="rounded-lg bg-muted/20 px-3 py-2">
-                        <p>Step Age</p>
-                        <p className="mt-1 text-sm font-medium text-foreground">
-                          {formatDuration(instance.currentStepAgeMinutes)}
-                        </p>
-                      </div>
-                      <div className="rounded-lg bg-muted/20 px-3 py-2">
-                        <p>Idle</p>
-                        <p className="mt-1 text-sm font-medium text-foreground">
-                          {formatDuration(instance.inactiveMinutes)}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </summary>
-
-                <div className="border-t border-border px-4 pb-4 pt-4">
-                  <div className="grid gap-4 xl:grid-cols-[minmax(0,1.25fr)_minmax(0,0.9fr)]">
-                    <div className="space-y-4">
-                      <div className="rounded-lg border border-border bg-muted/10 p-4">
-                        <div className="grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
-                          <p>Workflow: <span className="text-foreground">{record.workflowName}</span></p>
-                          <p>Workflow Key: <span className="font-mono text-foreground">{record.workflowKey}</span></p>
-                          <p>Ended At: <span className="text-foreground">{formatDate(instance.endedAt)}</span></p>
-                          <p>Priority: <span className="text-foreground">{formatEnumLabel(instance.request.priority)}</span></p>
-                        </div>
-                      </div>
-
-                      {instance.request.sla && (
-                        <div className="rounded-lg border border-border p-4">
-                          <h3 className="text-sm font-semibold text-foreground">SLA Snapshot</h3>
-                          <div className="mt-3 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
-                            <p>Due At: <span className="text-foreground">{formatDate(instance.request.sla.dueAt)}</span></p>
-                            <p>First Response: <span className="text-foreground">{formatEnumLabel(instance.request.sla.firstResponseState)}</span></p>
-                            <p>Resolution: <span className="text-foreground">{formatEnumLabel(instance.request.sla.resolutionState)}</span></p>
-                            <p>Escalated: <span className="text-foreground">{instance.request.sla.escalationTriggered ? 'Yes' : 'No'}</span></p>
-                            <p>Step Overdues: <span className="text-foreground">{instance.request.sla.stepOverdueCount ?? 0}</span></p>
+                  <div className="border-t border-border px-4 pb-4 pt-4">
+                    <div className="grid gap-4 xl:grid-cols-[minmax(0,1.25fr)_minmax(0,0.9fr)]">
+                      <div className="space-y-4">
+                        <div className="rounded-lg border border-border bg-muted/10 p-4">
+                          <div className="grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
+                            <p>Workflow: <span className="text-foreground">{record.workflowName}</span></p>
+                            <p>Workflow Key: <span className="font-mono text-foreground">{record.workflowKey}</span></p>
+                            <p>Ended At: <span className="text-foreground">{formatDate(instance.endedAt)}</span></p>
+                            <p>Priority: <span className="text-foreground">{formatEnumLabel(instance.request.priority)}</span></p>
                           </div>
                         </div>
-                      )}
 
-                      {instance.activeAssignment && (
-                        <div className="rounded-lg border border-border p-4">
-                          <h3 className="text-sm font-semibold text-foreground">Active Assignment</h3>
-                          <div className="mt-3 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
-                            <p>Assigned To: <span className="text-foreground">{instance.activeAssignment.assignedToName}</span></p>
-                            <p>Assigned By: <span className="text-foreground">{instance.activeAssignment.assignedByName ?? 'System'}</span></p>
-                            <p>Assigned At: <span className="text-foreground">{formatDate(instance.activeAssignment.assignedAt)}</span></p>
-                            <p>Assignment Age: <span className="text-foreground">{formatDuration(instance.activeAssignment.assignedAgeMinutes)}</span></p>
+                        {instance.request.sla && (
+                          <div className="rounded-lg border border-border p-4">
+                            <h3 className="text-sm font-semibold text-foreground">SLA Snapshot</h3>
+                            <div className="mt-3 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
+                              <p>Due At: <span className="text-foreground">{formatDate(instance.request.sla.dueAt)}</span></p>
+                              <p>First Response: <span className="text-foreground">{formatEnumLabel(instance.request.sla.firstResponseState)}</span></p>
+                              <p>Resolution: <span className="text-foreground">{formatEnumLabel(instance.request.sla.resolutionState)}</span></p>
+                              <p>Escalated: <span className="text-foreground">{instance.request.sla.escalationTriggered ? 'Yes' : 'No'}</span></p>
+                              <p>Step Overdues: <span className="text-foreground">{instance.request.sla.stepOverdueCount ?? 0}</span></p>
+                            </div>
                           </div>
-                        </div>
-                      )}
+                        )}
 
-                      {instance.request.ticketLifecycle ? (
-                        <div className="rounded-lg border border-border p-4">
-                          <h3 className="text-sm font-semibold text-foreground">Ticket Lifecycle</h3>
-                          <div className="mt-3 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
-                            <p>Ticket Status: <span className="text-foreground">{formatEnumLabel(instance.request.ticketLifecycle.status)}</span></p>
-                            <p>Opened By: <span className="text-foreground">{instance.request.ticketLifecycle.openedBy ?? 'N/A'}</span></p>
-                            <p>Opened At: <span className="text-foreground">{formatDate(instance.request.ticketLifecycle.openedAt)}</span></p>
-                            <p>Resolved By: <span className="text-foreground">{instance.request.ticketLifecycle.resolvedBy ?? 'N/A'}</span></p>
-                            <p>Resolved At: <span className="text-foreground">{formatDate(instance.request.ticketLifecycle.resolvedAt)}</span></p>
-                            <p>Closed By: <span className="text-foreground">{instance.request.ticketLifecycle.closedBy ?? 'N/A'}</span></p>
-                            <p>Closed At: <span className="text-foreground">{formatDate(instance.request.ticketLifecycle.closedAt)}</span></p>
-                            <p>Reopened Count: <span className="text-foreground">{instance.request.ticketLifecycle.reopenedCount ?? 0}</span></p>
+                        {instance.activeAssignment && (
+                          <div className="rounded-lg border border-border p-4">
+                            <h3 className="text-sm font-semibold text-foreground">Active Assignment</h3>
+                            <div className="mt-3 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
+                              <p>Assigned To: <span className="text-foreground">{instance.activeAssignment.assignedToName}</span></p>
+                              <p>Assigned By: <span className="text-foreground">{instance.activeAssignment.assignedByName ?? 'System'}</span></p>
+                              <p>Assigned At: <span className="text-foreground">{formatDate(instance.activeAssignment.assignedAt)}</span></p>
+                              <p>Assignment Age: <span className="text-foreground">{formatDuration(instance.activeAssignment.assignedAgeMinutes)}</span></p>
+                            </div>
                           </div>
-                          {instance.request.ticketLifecycle.stages?.length ? (
-                            <div className="mt-3 space-y-2">
-                              {instance.request.ticketLifecycle.stages.map((stage) => (
-                                <div key={stage.key} className="rounded-md bg-muted/20 p-3 text-xs text-muted-foreground">
-                                  <div className="flex items-center justify-between gap-2">
-                                    <p className="font-medium text-foreground">{stage.label}</p>
-                                    <span>{formatDate(stage.at)}</span>
+                        )}
+
+                        {instance.request.ticketLifecycle ? (
+                          <div className="rounded-lg border border-border p-4">
+                            <h3 className="text-sm font-semibold text-foreground">Ticket Lifecycle</h3>
+                            <div className="mt-3 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
+                              <p>Ticket Status: <span className="text-foreground">{formatEnumLabel(instance.request.ticketLifecycle.status)}</span></p>
+                              <p>Opened By: <span className="text-foreground">{instance.request.ticketLifecycle.openedBy ?? 'N/A'}</span></p>
+                              <p>Opened At: <span className="text-foreground">{formatDate(instance.request.ticketLifecycle.openedAt)}</span></p>
+                              <p>Resolved By: <span className="text-foreground">{instance.request.ticketLifecycle.resolvedBy ?? 'N/A'}</span></p>
+                              <p>Resolved At: <span className="text-foreground">{formatDate(instance.request.ticketLifecycle.resolvedAt)}</span></p>
+                              <p>Closed By: <span className="text-foreground">{instance.request.ticketLifecycle.closedBy ?? 'N/A'}</span></p>
+                              <p>Closed At: <span className="text-foreground">{formatDate(instance.request.ticketLifecycle.closedAt)}</span></p>
+                              <p>Reopened Count: <span className="text-foreground">{instance.request.ticketLifecycle.reopenedCount ?? 0}</span></p>
+                            </div>
+                            {instance.request.ticketLifecycle.stages?.length ? (
+                              <div className="mt-3 space-y-2">
+                                {instance.request.ticketLifecycle.stages.map((stage) => (
+                                  <div key={stage.key} className="rounded-md bg-muted/20 p-3 text-xs text-muted-foreground">
+                                    <div className="flex items-center justify-between gap-2">
+                                      <p className="font-medium text-foreground">{stage.label}</p>
+                                      <span>{formatDate(stage.at)}</span>
+                                    </div>
+                                    <p className="mt-1">By <span className="text-foreground">{stage.by ?? 'N/A'}</span></p>
+                                    {stage.note ? <p className="mt-1 text-foreground">{stage.note}</p> : null}
                                   </div>
-                                  <p className="mt-1">By <span className="text-foreground">{stage.by ?? 'N/A'}</span></p>
-                                  {stage.note ? (
-                                    <p className="mt-1 text-foreground">{stage.note}</p>
-                                  ) : null}
+                                ))}
+                              </div>
+                            ) : null}
+                          </div>
+                        ) : null}
+
+                        <div className="rounded-lg border border-border p-4">
+                          <h3 className="text-sm font-semibold text-foreground">Step Timeline</h3>
+                          <div className="mt-3 space-y-3">
+                            {record.workflowSteps
+                              .slice()
+                              .sort((a, b) => a.stepOrder - b.stepOrder)
+                              .map((workflowStep, index) => {
+                                const timeline = getTimelineStepState(record, workflowStep.id)
+                                return (
+                                  <div key={workflowStep.id} className="flex gap-3">
+                                    <div className="flex flex-col items-center">
+                                      <div className="flex size-7 items-center justify-center rounded-full bg-primary/10 text-[11px] font-semibold text-primary">
+                                        {index + 1}
+                                      </div>
+                                      {index < record.workflowSteps.length - 1 && (
+                                        <div className="mt-1 h-full w-px bg-border" />
+                                      )}
+                                    </div>
+                                    <div className="min-w-0 flex-1 rounded-lg bg-muted/10 p-3 text-xs text-muted-foreground">
+                                      <div className="flex flex-wrap items-center justify-between gap-2">
+                                        <p className="font-medium text-foreground">{workflowStep.stepName}</p>
+                                        <Badge className={cn('border-transparent', timeline.className)}>
+                                          {timeline.label}
+                                        </Badge>
+                                      </div>
+                                      <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                                        <p>Type: <span className="text-foreground">{formatEnumLabel(workflowStep.stepType)}</span></p>
+                                        <p>Assigned To: <span className="text-foreground">{timeline.step?.assignedTo?.fullName ?? 'Queue'}</span></p>
+                                        <p>Started: <span className="text-foreground">{formatDate(timeline.step?.startedAt)}</span></p>
+                                        <p>Due: <span className="text-foreground">{formatDate(timeline.step?.dueAt)}</span></p>
+                                        <p>Completed: <span className="text-foreground">{formatDate(timeline.step?.completedAt)}</span></p>
+                                        <p>Action: <span className="text-foreground">{formatEnumLabel(timeline.step?.actionTaken)}</span></p>
+                                      </div>
+                                      {timeline.step?.actionBy && (
+                                        <p className="mt-2">
+                                          Action By: <span className="text-foreground">{timeline.step.actionBy.fullName}</span>
+                                        </p>
+                                      )}
+                                    </div>
+                                  </div>
+                                )
+                              })}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-4">
+                        <div className="rounded-lg border border-border p-4">
+                          <h3 className="text-sm font-semibold text-foreground">Approval Timeline</h3>
+                          {instance.approvalTimeline.length === 0 ? (
+                            <p className="mt-3 text-xs text-muted-foreground">
+                              No approval action recorded yet.
+                            </p>
+                          ) : (
+                            <div className="mt-3 space-y-3">
+                              {instance.approvalTimeline.map((action) => (
+                                <div key={action.id} className="rounded-lg bg-muted/10 p-3 text-xs text-muted-foreground">
+                                  <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <Badge variant="outline">{formatEnumLabel(action.actionType)}</Badge>
+                                    <span>{formatDate(action.createdAt)}</span>
+                                  </div>
+                                  <p className="mt-2">By <span className="text-foreground">{action.actionBy.fullName}</span></p>
+                                  {action.decisionNote && (
+                                    <p className="mt-2 rounded-md bg-background px-2 py-2 text-foreground">
+                                      {action.decisionNote}
+                                    </p>
+                                  )}
                                 </div>
                               ))}
                             </div>
-                          ) : null}
+                          )}
                         </div>
-                      ) : null}
 
-                      <div className="rounded-lg border border-border p-4">
-                        <h3 className="text-sm font-semibold text-foreground">Step Timeline</h3>
-                        <div className="mt-3 space-y-3">
-                          {record.workflowSteps
-                            .slice()
-                            .sort((a, b) => a.stepOrder - b.stepOrder)
-                            .map((workflowStep, index) => {
-                              const timeline = getTimelineStepState(record, workflowStep.id)
-
-                              return (
-                                <div key={workflowStep.id} className="flex gap-3">
-                                  <div className="flex flex-col items-center">
-                                    <div className="flex size-7 items-center justify-center rounded-full bg-primary/10 text-[11px] font-semibold text-primary">
-                                      {index + 1}
-                                    </div>
-                                    {index < record.workflowSteps.length - 1 && (
-                                      <div className="mt-1 h-full w-px bg-border" />
-                                    )}
-                                  </div>
-
-                                  <div className="min-w-0 flex-1 rounded-lg bg-muted/10 p-3 text-xs text-muted-foreground">
-                                    <div className="flex flex-wrap items-center justify-between gap-2">
-                                      <p className="font-medium text-foreground">
-                                        {workflowStep.stepName}
-                                      </p>
-                                      <Badge className={cn('border-transparent', timeline.className)}>
-                                        {timeline.label}
-                                      </Badge>
-                                    </div>
-
-                                    <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                                      <p>Type: <span className="text-foreground">{formatEnumLabel(workflowStep.stepType)}</span></p>
-                                      <p>Assigned To: <span className="text-foreground">{timeline.step?.assignedTo?.fullName ?? 'Queue'}</span></p>
-                                      <p>Started: <span className="text-foreground">{formatDate(timeline.step?.startedAt)}</span></p>
-                                      <p>Due: <span className="text-foreground">{formatDate(timeline.step?.dueAt)}</span></p>
-                                      <p>Completed: <span className="text-foreground">{formatDate(timeline.step?.completedAt)}</span></p>
-                                      <p>Action: <span className="text-foreground">{formatEnumLabel(timeline.step?.actionTaken)}</span></p>
-                                    </div>
-
-                                    {timeline.step?.actionBy && (
-                                      <p className="mt-2">
-                                        Action By: <span className="text-foreground">{timeline.step.actionBy.fullName}</span>
-                                      </p>
-                                    )}
-                                  </div>
-                                </div>
-                              )
-                            })}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="space-y-4">
-                      <div className="rounded-lg border border-border p-4">
-                        <h3 className="text-sm font-semibold text-foreground">Approval Timeline</h3>
-                        {instance.approvalTimeline.length === 0 ? (
-                          <p className="mt-3 text-xs text-muted-foreground">
-                            No approval action recorded yet.
-                          </p>
-                        ) : (
-                          <div className="mt-3 space-y-3">
-                            {instance.approvalTimeline.map((action) => (
-                              <div
-                                key={action.id}
-                                className="rounded-lg bg-muted/10 p-3 text-xs text-muted-foreground"
-                              >
-                                <div className="flex flex-wrap items-center justify-between gap-2">
-                                  <Badge variant="outline">
-                                    {formatEnumLabel(action.actionType)}
-                                  </Badge>
-                                  <span>{formatDate(action.createdAt)}</span>
-                                </div>
-                                <p className="mt-2">
-                                  By <span className="text-foreground">{action.actionBy.fullName}</span>
-                                </p>
-                                {action.decisionNote && (
-                                  <p className="mt-2 rounded-md bg-background px-2 py-2 text-foreground">
-                                    {action.decisionNote}
-                                  </p>
-                                )}
-                              </div>
-                            ))}
+                        <div className="rounded-lg border border-border p-4">
+                          <h3 className="text-sm font-semibold text-foreground">Quick Actions</h3>
+                          <div className="mt-3 flex flex-col gap-2">
+                            <Button asChild variant="outline" className="justify-between">
+                              <Link href={`/admin/requests/${instance.request.id}`}>
+                                Open request detail
+                                <ExternalLink className="size-4" />
+                              </Link>
+                            </Button>
+                            <Button asChild variant="outline" className="justify-between">
+                              <Link href={`/admin/workflows/${record.workflowId}`}>
+                                Open workflow detail
+                                <ExternalLink className="size-4" />
+                              </Link>
+                            </Button>
                           </div>
-                        )}
-                      </div>
-
-                      <div className="rounded-lg border border-border p-4">
-                        <h3 className="text-sm font-semibold text-foreground">Quick Actions</h3>
-                        <div className="mt-3 flex flex-col gap-2">
-                          <Button asChild variant="outline" className="justify-between">
-                            <Link href={`/admin/requests/${instance.request.id}`}>
-                              Open request detail
-                              <ExternalLink className="size-4" />
-                            </Link>
-                          </Button>
-                          <Button asChild variant="outline" className="justify-between">
-                            <Link href={`/admin/workflows/${record.workflowId}`}>
-                              Open workflow detail
-                              <ExternalLink className="size-4" />
-                            </Link>
-                          </Button>
                         </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              </details>
-            )
-          })
+                </details>
+              )
+            })}
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between rounded-xl border border-border bg-card px-5 py-3">
+                <span className="text-xs text-muted-foreground">
+                  {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filteredRecords.length)} / {filteredRecords.length}
+                </span>
+                <PaginationBar page={page} totalPages={totalPages} onChange={setPage} />
+              </div>
+            )}
+          </>
         )}
       </section>
     </div>

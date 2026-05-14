@@ -531,10 +531,10 @@ export class WorkflowService {
     return this.cacheService.getOrSet(key, CacheTtls.workflowOverview, async () => {
       await this.slaService.runSlaSweep();
 
-      const now = new Date();
-      const wf = await this.prisma.workflowDefinition.findUnique({
-        where: { id },
-        include: {
+      const [wf, activeInstances, completedInstances, overdueInstances] = await Promise.all([
+        this.prisma.workflowDefinition.findUnique({
+          where: { id },
+          include: {
           steps: {
             orderBy: { stepOrder: 'asc' },
             include: {
@@ -559,298 +559,27 @@ export class WorkflowService {
             select: { id: true, key: true, name: true, category: true },
             orderBy: { name: 'asc' },
           },
-          instances: {
-            orderBy: { startedAt: 'desc' },
-            take: 50,
-            include: {
-              currentStep: { select: { id: true, stepKey: true, stepName: true, stepType: true } },
-              request: {
-                select: {
-                  id: true,
-                  requestNo: true,
-                  title: true,
-                  status: true,
-                  priority: true,
-                  createdAt: true,
-                  updatedAt: true,
-                  submittedAt: true,
-                  dueAt: true,
-                  slaEvents: {
-                    orderBy: { occurredAt: 'desc' },
-                    select: {
-                      id: true,
-                      eventType: true,
-                      occurredAt: true,
-                      resolvedAt: true,
-                    },
-                  },
-                  requester: {
-                    select: {
-                      id: true,
-                      email: true,
-                      profile: { select: { fullName: true, studentNumber: true, staffNumber: true } },
-                    },
-                  },
-                  currentAssignee: {
-                    select: {
-                      id: true,
-                      email: true,
-                      profile: { select: { fullName: true, title: true } },
-                    },
-                  },
-                  assignments: {
-                    orderBy: { assignedAt: 'desc' },
-                    select: {
-                      id: true,
-                      assignedAt: true,
-                      unassignedAt: true,
-                      isActive: true,
-                      assignmentNote: true,
-                      assignedTo: {
-                        select: {
-                          id: true,
-                          email: true,
-                          profile: { select: { fullName: true, title: true } },
-                        },
-                      },
-                      assignedBy: {
-                        select: {
-                          id: true,
-                          email: true,
-                          profile: { select: { fullName: true } },
-                        },
-                      },
-                    },
-                  },
-                  statusHistory: {
-                    orderBy: { changedAt: 'asc' },
-                    select: {
-                      id: true,
-                      oldStatus: true,
-                      newStatus: true,
-                      changeReason: true,
-                      changedAt: true,
-                      changedBy: {
-                        select: {
-                          id: true,
-                          email: true,
-                          profile: { select: { fullName: true } },
-                        },
-                      },
-                    },
-                  },
-                  approvalActions: {
-                    orderBy: { createdAt: 'desc' },
-                    select: {
-                      id: true,
-                      actionType: true,
-                      decisionNote: true,
-                      createdAt: true,
-                      actionBy: {
-                        select: {
-                          id: true,
-                          email: true,
-                          profile: { select: { fullName: true } },
-                        },
-                      },
-                    },
-                  },
-                  itTicket: {
-                    select: {
-                      id: true,
-                      ticketStatus: true,
-                      category: true,
-                      subcategory: true,
-                      affectedSystem: true,
-                      locationText: true,
-                      resolutionSummary: true,
-                      resolvedAt: true,
-                      closedAt: true,
-                      reopenedCount: true,
-                      createdAt: true,
-                      reportedBy: {
-                        select: {
-                          id: true,
-                          email: true,
-                          profile: { select: { fullName: true } },
-                        },
-                      },
-                    },
-                  },
-                },
-              },
-              instanceSteps: {
-                orderBy: { createdAt: 'asc' },
-                include: {
-                  workflowStep: {
-                    select: {
-                      id: true,
-                      stepKey: true,
-                      stepName: true,
-                      stepOrder: true,
-                      stepType: true,
-                    },
-                  },
-                  assignedTo: {
-                    select: {
-                      id: true,
-                      email: true,
-                      profile: { select: { fullName: true, title: true } },
-                    },
-                  },
-                  actionBy: {
-                    select: {
-                      id: true,
-                      email: true,
-                      profile: { select: { fullName: true } },
-                    },
-                  },
-                },
-              },
-            },
-          },
           _count: { select: { instances: true, requestTypes: true } },
         },
-      });
+        }),
+        this.prisma.workflowInstance.count({ where: { workflowDefinitionId: id, status: 'ACTIVE' } }),
+        this.prisma.workflowInstance.count({ where: { workflowDefinitionId: id, status: 'COMPLETED' } }),
+        this.prisma.workflowInstance.count({
+          where: { workflowDefinitionId: id, instanceSteps: { some: { isOverdue: true, status: 'PENDING' } } },
+        }),
+      ]);
       if (!wf) throw new NotFoundException('Workflow not found.');
 
-      const instances = wf.instances.map((instance) => {
-      const pendingStep =
-        instance.instanceSteps.find((step) => step.status === 'PENDING') ?? null;
-      const activeAssignment =
-        instance.request.assignments.find((assignment) => assignment.isActive) ?? null;
-
-      return {
-        id: instance.id,
-        status: instance.status,
-        startedAt: instance.startedAt,
-        endedAt: instance.endedAt,
-        currentStep: instance.currentStep,
-        totalAgeMinutes: this.minutesBetween(
-          instance.startedAt,
-          instance.endedAt ?? now,
-        ),
-        currentStepAgeMinutes: pendingStep
-          ? this.minutesBetween(pendingStep.startedAt ?? pendingStep.createdAt, now)
-          : null,
-        inactiveMinutes: this.minutesBetween(instance.request.updatedAt, now),
-        isOverdue:
-          Boolean(pendingStep?.dueAt && pendingStep.dueAt < now) ||
-          Boolean(pendingStep?.isOverdue),
-        request: {
-          ...instance.request,
-          requesterName:
-            instance.request.requester.profile?.fullName ??
-            instance.request.requester.email,
-          currentAssigneeName:
-            instance.request.currentAssignee?.profile?.fullName ??
-            instance.request.currentAssignee?.email ??
-            null,
-          sla: {
-            dueAt: instance.request.dueAt,
-            firstResponseState:
-              instance.request.slaEvents.find((event) =>
-                ['FIRST_RESPONSE_MET', 'FIRST_RESPONSE_BREACHED'].includes(
-                  event.eventType,
-                ),
-              )?.eventType ??
-              (instance.request.slaEvents.some(
-                (event) => event.eventType === 'FIRST_RESPONSE_STARTED',
-              )
-                ? 'FIRST_RESPONSE_STARTED'
-                : null),
-            resolutionState:
-              instance.request.slaEvents.find((event) =>
-                ['RESOLUTION_MET', 'RESOLUTION_BREACHED'].includes(
-                  event.eventType,
-                ),
-              )?.eventType ??
-              (instance.request.slaEvents.some(
-                (event) => event.eventType === 'RESOLUTION_STARTED',
-              )
-                ? 'RESOLUTION_STARTED'
-                : null),
-            escalationTriggered: instance.request.slaEvents.some(
-              (event) => event.eventType === 'ESCALATION_TRIGGERED',
-            ),
-            stepOverdueCount: instance.request.slaEvents.filter(
-              (event) => event.eventType === 'STEP_OVERDUE',
-            ).length,
-          },
-          ticketLifecycle: this.buildTicketLifecycle(instance.request),
-        },
-        activeAssignment: activeAssignment
-          ? {
-              ...activeAssignment,
-              assignedToName:
-                activeAssignment.assignedTo.profile?.fullName ??
-                activeAssignment.assignedTo.email,
-              assignedByName:
-                activeAssignment.assignedBy?.profile?.fullName ??
-                activeAssignment.assignedBy?.email ??
-                null,
-              assignedAgeMinutes: this.minutesBetween(
-                activeAssignment.assignedAt,
-                activeAssignment.unassignedAt ?? now,
-              ),
-            }
-          : null,
-        instanceSteps: instance.instanceSteps.map((step) => ({
-          id: step.id,
-          status: step.status,
-          startedAt: step.startedAt,
-          completedAt: step.completedAt,
-          dueAt: step.dueAt,
-          isOverdue: step.isOverdue || Boolean(step.dueAt && step.dueAt < now),
-          actionTaken: step.actionTaken,
-          actionNote: step.actionNote,
-          ageMinutes: this.minutesBetween(step.startedAt ?? step.createdAt, step.completedAt ?? now),
-          workflowStep: step.workflowStep,
-          assignedTo: step.assignedTo
-            ? {
-                id: step.assignedTo.id,
-                fullName:
-                  step.assignedTo.profile?.fullName ?? step.assignedTo.email,
-                email: step.assignedTo.email,
-                title: step.assignedTo.profile?.title ?? null,
-              }
-            : null,
-          actionBy: step.actionBy
-            ? {
-                id: step.actionBy.id,
-                fullName:
-                  step.actionBy.profile?.fullName ?? step.actionBy.email,
-                email: step.actionBy.email,
-              }
-            : null,
-        })),
-        approvalTimeline: instance.request.approvalActions.map((action) => ({
-          id: action.id,
-          actionType: action.actionType,
-          decisionNote: action.decisionNote,
-          createdAt: action.createdAt,
-          actionBy: {
-            id: action.actionBy.id,
-            fullName: action.actionBy.profile?.fullName ?? action.actionBy.email,
-            email: action.actionBy.email,
-          },
-        })),
-      };
-    });
 
       return {
         ...wf,
         metrics: {
           totalInstances: wf._count.instances,
           requestTypeCount: wf._count.requestTypes,
-          activeInstances: instances.filter((instance) => instance.status === 'ACTIVE')
-            .length,
-          completedInstances: instances.filter(
-            (instance) => instance.status === 'COMPLETED',
-          ).length,
-          overdueInstances: instances.filter((instance) => instance.isOverdue).length,
+          activeInstances,
+          completedInstances,
+          overdueInstances,
         },
-        instances,
       };
     });
   }

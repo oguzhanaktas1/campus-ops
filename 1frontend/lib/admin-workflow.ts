@@ -62,92 +62,6 @@ export type WorkflowRequestType = {
   category?: string | null
 }
 
-export type WorkflowInstance = {
-  id: string
-  status: string
-  startedAt: string
-  endedAt?: string | null
-  totalAgeMinutes?: number | null
-  currentStepAgeMinutes?: number | null
-  inactiveMinutes?: number | null
-  isOverdue: boolean
-  currentStep?:
-    | {
-        id: string
-        stepKey?: string | null
-        stepName?: string | null
-        stepType?: string | null
-      }
-    | null
-  request: {
-    id: string
-    requestNo: string
-    title: string
-    status: string
-    priority: string
-    requesterName: string
-    currentAssigneeName?: string | null
-    ticketLifecycle?: {
-      status: string
-      openedAt?: string | null
-      openedBy?: string | null
-      resolvedAt?: string | null
-      resolvedBy?: string | null
-      closedAt?: string | null
-      closedBy?: string | null
-      reopenedCount?: number
-      stages?: Array<{
-        key: string
-        label: string
-        at?: string | null
-        by?: string | null
-        note?: string | null
-      }>
-    } | null
-    sla?: {
-      dueAt?: string | null
-      firstResponseState?: string | null
-      resolutionState?: string | null
-      escalationTriggered?: boolean
-      stepOverdueCount?: number
-    }
-  }
-  activeAssignment?: {
-    assignedAt: string
-    assignedToName: string
-    assignedByName?: string | null
-    assignedAgeMinutes?: number | null
-  } | null
-  approvalTimeline: Array<{
-    id: string
-    actionType: string
-    createdAt: string
-    actionBy: { fullName: string }
-    decisionNote?: string | null
-  }>
-  instanceSteps: Array<{
-    id: string
-    status: string
-    startedAt?: string | null
-    completedAt?: string | null
-    dueAt?: string | null
-    isOverdue: boolean
-    actionTaken?: string | null
-    workflowStep: {
-      id: string
-      stepName: string
-      stepType: string
-    }
-    assignedTo?: {
-      fullName: string
-      email: string
-    } | null
-    actionBy?: {
-      fullName: string
-    } | null
-  }>
-}
-
 export type WorkflowDetail = WorkflowSummary & {
   steps: WorkflowStep[]
   transitions: WorkflowTransition[]
@@ -159,7 +73,6 @@ export type WorkflowDetail = WorkflowSummary & {
     overdueInstances: number
   }
   requestTypes?: WorkflowRequestType[]
-  instances: WorkflowInstance[]
   _count?: { instances: number }
 }
 
