@@ -1,4 +1,4 @@
-import {
+﻿import {
   Controller,
   Get,
   Post,
@@ -12,6 +12,7 @@ import {
   Delete,
   BadRequestException,
   Put,
+  Query,
 } from '@nestjs/common';
 import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { StudentService } from './student.service';
@@ -20,8 +21,9 @@ import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { CreateInternshipDto } from './dto/create-internship.dto';
 import { CreateGenericRequestDto } from './dto/create-generic-request.dto';
-import { Query } from '@nestjs/common';
 import { extractUserId } from '../core/auth/extract-user-id';
+import { RateLimitGuard } from '../infrastructure/rate-limit/rate-limit.guard';
+import { Throttle } from '../infrastructure/rate-limit/rate-limit.decorator';
 import {
   MAX_MULTI_FILE_COUNT,
   MAX_SINGLE_FILE_BYTES,
@@ -36,7 +38,7 @@ export interface RequestWithUser extends Request {
 }
 
 @Controller('student')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, RateLimitGuard)
 @Roles('STUDENT')
 export class StudentController {
   constructor(private readonly studentService: StudentService) {}
@@ -55,6 +57,7 @@ export class StudentController {
   }
 
   @Post('requests')
+  @Throttle({ limit: 5, windowSeconds: 60, keyType: 'user', namespace: 'upload:request' })
   @UseInterceptors(
     FilesInterceptor('attachments', MAX_MULTI_FILE_COUNT, {
       limits: { fileSize: MAX_SINGLE_FILE_BYTES, files: MAX_MULTI_FILE_COUNT },
@@ -77,8 +80,8 @@ export class StudentController {
     return this.studentService.getRequestById(extractUserId(req), id);
   }
 
-  // 🔥 ÖĞRENCİ REVİZE GÖNDERME ENDPOINTİ 🔥
   @Put('requests/:id')
+  @Throttle({ limit: 5, windowSeconds: 60, keyType: 'user', namespace: 'upload:revision' })
   @UseInterceptors(
     FilesInterceptor('attachments', MAX_MULTI_FILE_COUNT, {
       limits: { fileSize: MAX_SINGLE_FILE_BYTES, files: MAX_MULTI_FILE_COUNT },
@@ -109,8 +112,6 @@ export class StudentController {
     );
   }
 
-  // ─── INTERNSHIP DEDICATED ENDPOINTS ──────────────────────────────────────
-
   @Get('internships')
   getInternships(@Request() req: RequestWithUser) {
     return this.studentService.getInternships(extractUserId(req));
@@ -136,6 +137,7 @@ export class StudentController {
 
   @Post('requests/:id/comments')
   @Roles('STUDENT', 'FACULTY', 'STAFF', 'ADMIN')
+  @Throttle({ limit: 20, windowSeconds: 60, keyType: 'user', namespace: 'req:comment' })
   addComment(
     @Request() req: RequestWithUser,
     @Param('id') id: string,
@@ -169,6 +171,7 @@ export class StudentController {
   }
 
   @Post('upload')
+  @Throttle({ limit: 10, windowSeconds: 60, keyType: 'user', namespace: 'upload:general' })
   @UseInterceptors(
     FileInterceptor('file', {
       limits: { fileSize: MAX_SINGLE_FILE_BYTES, files: 1 },
@@ -189,13 +192,11 @@ export class StudentController {
     return this.studentService.deleteFile(extractUserId(req), id);
   }
 
-  // 🔥 ÖĞRENCİ BİLDİRİM ENDPOİNTLERİ 🔥
   @Get('notifications')
   getNotifications(@Request() req: RequestWithUser) {
     return this.studentService.getNotifications(extractUserId(req));
   }
 
-  // 🔥 BİLDİRİM SİLME ENDPOINTİ 🔥
   @Delete('notifications')
   deleteNotifications(
     @Request() req: RequestWithUser,
@@ -216,8 +217,6 @@ export class StudentController {
   markAllNotificationsAsRead(@Request() req: RequestWithUser) {
     return this.studentService.markAllNotificationsAsRead(extractUserId(req));
   }
-
-  // 🔥 SETTINGS (AYARLAR) ENDPOINTLERİ 🔥
 
   @Get('preferences')
   getPreferences(@Request() req: RequestWithUser) {

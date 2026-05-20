@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+﻿import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -28,6 +28,7 @@ import { RedisModule } from './infrastructure/redis/redis.module';
 import { CacheModule } from './infrastructure/cache/cache.module';
 import { QueueModule } from './infrastructure/queue/queue.module';
 import { RabbitmqModule } from './infrastructure/rabbitmq/rabbitmq.module';
+import { RateLimitModule } from './infrastructure/rate-limit/rate-limit.module';
 import { FilesModule } from './files/files.module';
 import { OrganizerModule } from './organizer/organizer.module';
 import { AiModule } from './modules/ai/ai.module';
@@ -39,6 +40,7 @@ import { AiModule } from './modules/ai/ai.module';
     CacheModule,
     QueueModule,
     RabbitmqModule,
+    RateLimitModule,
     FilesModule,
     AiModule,
     PrismaModule,

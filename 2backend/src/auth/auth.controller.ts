@@ -32,7 +32,6 @@ export class AuthController {
     if (typeof forwardedFor === 'string' && forwardedFor.length > 0) {
       return forwardedFor.split(',')[0].trim();
     }
-
     return request.ip ?? 'unknown';
   }
 
@@ -48,25 +47,21 @@ export class AuthController {
     const ipKey = `login:ip:${ip}`;
     const userKey = `login:email:${normalizedEmail}`;
 
-    this.authRateLimitService.assertAllowed(ipKey);
-    this.authRateLimitService.assertAllowed(userKey);
+    await this.authRateLimitService.assertAllowed(ipKey);
+    await this.authRateLimitService.assertAllowed(userKey);
 
     try {
       const result = await this.authService.login(dto.email, dto.password, {
         ipAddress: ip,
         userAgent: request.headers['user-agent'] ?? 'unknown',
       });
-      response.cookie(
-        AUTH_COOKIE_NAME,
-        result.access_token,
-        getCookieOptions(),
-      );
-      this.authRateLimitService.clear(ipKey);
-      this.authRateLimitService.clear(userKey);
+      response.cookie(AUTH_COOKIE_NAME, result.access_token, getCookieOptions());
+      await this.authRateLimitService.clear(ipKey);
+      await this.authRateLimitService.clear(userKey);
       return result;
     } catch (error) {
-      this.authRateLimitService.recordFailure(ipKey);
-      this.authRateLimitService.recordFailure(userKey);
+      await this.authRateLimitService.recordFailure(ipKey);
+      await this.authRateLimitService.recordFailure(userKey);
       throw error;
     }
   }
@@ -78,22 +73,18 @@ export class AuthController {
     @Body() dto: RegisterDto,
   ) {
     const ipKey = `register:ip:${this.getClientIp(request)}`;
-    this.authRateLimitService.assertAllowed(ipKey);
+    await this.authRateLimitService.assertAllowed(ipKey);
 
     try {
       const result = await this.authService.register(dto, {
         ipAddress: this.getClientIp(request),
         userAgent: request.headers['user-agent'] ?? 'unknown',
       });
-      response.cookie(
-        AUTH_COOKIE_NAME,
-        result.access_token,
-        getCookieOptions(),
-      );
-      this.authRateLimitService.clear(ipKey);
+      response.cookie(AUTH_COOKIE_NAME, result.access_token, getCookieOptions());
+      await this.authRateLimitService.clear(ipKey);
       return result;
     } catch (error) {
-      this.authRateLimitService.recordFailure(ipKey);
+      await this.authRateLimitService.recordFailure(ipKey);
       throw error;
     }
   }

@@ -1,4 +1,4 @@
-import {
+﻿import {
   Controller,
   Get,
   Post,
@@ -14,6 +14,8 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { CreateRequestDto } from './dto/create-request.dto';
 import { AddCommentDto } from './dto/add-comment.dto';
 import { ProcessActionDto } from '../workflow/dto/process-action.dto';
+import { RateLimitGuard } from '../infrastructure/rate-limit/rate-limit.guard';
+import { Throttle } from '../infrastructure/rate-limit/rate-limit.decorator';
 
 interface ReqUser {
   userId: string;
@@ -21,12 +23,13 @@ interface ReqUser {
 }
 
 @Controller('requests')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RateLimitGuard)
 export class RequestsController {
   constructor(private readonly requestsService: RequestsService) {}
 
   /** POST /requests — create a generic request (any authenticated role) */
   @Post()
+  @Throttle({ limit: 10, windowSeconds: 60, keyType: 'user', namespace: 'req:create' })
   create(@CurrentUser() user: ReqUser, @Body() dto: CreateRequestDto) {
     return this.requestsService.create(user.userId, dto);
   }
@@ -53,8 +56,6 @@ export class RequestsController {
     return this.requestsService.findById(user.userId, user.roles, id);
   }
 
-  // ─── Actions ──────────────────────────────────────────────────────────────
-
   /** POST /requests/:id/actions — approve / reject / revision / cancel */
   @Post(':id/actions')
   processAction(
@@ -65,10 +66,9 @@ export class RequestsController {
     return this.requestsService.processAction(user.userId, user.roles, requestId, dto);
   }
 
-  // ─── Comments ─────────────────────────────────────────────────────────────
-
   /** POST /requests/:id/comments */
   @Post(':id/comments')
+  @Throttle({ limit: 20, windowSeconds: 60, keyType: 'user', namespace: 'req:comment' })
   addComment(
     @CurrentUser() user: ReqUser,
     @Param('id') requestId: string,
@@ -82,8 +82,6 @@ export class RequestsController {
   getComments(@CurrentUser() user: ReqUser, @Param('id') requestId: string) {
     return this.requestsService.getComments(user.userId, user.roles, requestId);
   }
-
-  // ─── Watchers ─────────────────────────────────────────────────────────────
 
   /** POST /requests/:id/watchers  body: { userId } */
   @Post(':id/watchers')
