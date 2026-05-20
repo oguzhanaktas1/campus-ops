@@ -319,166 +319,172 @@ export class SlaService {
   async runSlaSweep() {
     const now = new Date();
 
-    await this.prisma.$transaction(
-      async (tx) => {
-      const overdueSteps = await tx.workflowInstanceStep.findMany({
-        where: {
-          status: 'PENDING',
-          completedAt: null,
-          dueAt: { lt: now },
-          isOverdue: false,
+    // Overdue steps: read without a transaction, process each independently.
+    // markStepOverdue is idempotent (checks isOverdue before writing) so
+    // partial failure on one step doesn't affect the rest.
+    const overdueSteps = await this.prisma.workflowInstanceStep.findMany({
+      where: {
+        status: 'PENDING',
+        completedAt: null,
+        dueAt: { lt: now },
+        isOverdue: false,
+      },
+      select: { id: true },
+    });
+
+    for (const step of overdueSteps) {
+      try {
+        await this.markStepOverdue(this.prisma, step.id);
+      } catch {
+        // Non-blocking: stale step won't re-trigger since isOverdue guard runs next sweep.
+      }
+    }
+
+    // Open requests: read without a transaction, process each independently.
+    const openRequests = await this.prisma.request.findMany({
+      where: {
+        status: { notIn: TERMINAL_REQUEST_STATUSES },
+      },
+      select: {
+        id: true,
+        requestNo: true,
+        title: true,
+        status: true,
+        requestTypeId: true,
+        priority: true,
+        currentAssigneeUserId: true,
+      },
+    });
+
+    for (const request of openRequests) {
+      try {
+        await this.sweepRequestSla(request, now);
+      } catch {
+        // Non-blocking: failed request won't block others.
+      }
+    }
+  }
+
+  private async sweepRequestSla(
+    request: {
+      id: string;
+      requestNo: string;
+      title: string;
+      status: string;
+      requestTypeId: string;
+      priority: PriorityLevel;
+      currentAssigneeUserId: string | null;
+    },
+    now: Date,
+  ) {
+    const db = this.prisma;
+    const policy = await this.resolvePolicy(db, request.requestTypeId, request.priority);
+    if (!policy) return;
+
+    const firstResponseStarted = await db.slaEvent.findFirst({
+      where: {
+        requestId: request.id,
+        slaPolicyId: policy.id,
+        eventType: 'FIRST_RESPONSE_STARTED',
+        resolvedAt: null,
+      },
+    });
+
+    if (
+      firstResponseStarted &&
+      policy.firstResponseMinutes &&
+      this.addMinutes(firstResponseStarted.occurredAt, policy.firstResponseMinutes)! < now
+    ) {
+      await this.closeStartedEventWithOutcome(
+        db,
+        request.id,
+        policy.id,
+        'FIRST_RESPONSE_STARTED',
+        'FIRST_RESPONSE_BREACHED',
+      );
+    }
+
+    const resolutionStarted = await db.slaEvent.findFirst({
+      where: {
+        requestId: request.id,
+        slaPolicyId: policy.id,
+        eventType: 'RESOLUTION_STARTED',
+        resolvedAt: null,
+      },
+    });
+
+    if (
+      resolutionStarted &&
+      policy.resolutionMinutes &&
+      this.addMinutes(resolutionStarted.occurredAt, policy.resolutionMinutes)! < now
+    ) {
+      await this.closeStartedEventWithOutcome(
+        db,
+        request.id,
+        policy.id,
+        'RESOLUTION_STARTED',
+        'RESOLUTION_BREACHED',
+      );
+    }
+
+    if (!policy.escalationMinutes || !resolutionStarted) return;
+
+    const existingEscalation = await db.slaEvent.findFirst({
+      where: {
+        requestId: request.id,
+        slaPolicyId: policy.id,
+        eventType: 'ESCALATION_TRIGGERED',
+      },
+    });
+
+    if (existingEscalation) return;
+
+    const shouldEscalate =
+      this.addMinutes(resolutionStarted.occurredAt, policy.escalationMinutes)! < now;
+
+    if (!shouldEscalate) return;
+
+    await db.slaEvent.create({
+      data: {
+        requestId: request.id,
+        slaPolicyId: policy.id,
+        eventType: 'ESCALATION_TRIGGERED',
+      },
+    });
+
+    await db.systemEvent.create({
+      data: {
+        eventKey: 'SLA_ESCALATION_TRIGGERED',
+        severity: 'warning',
+        sourceService: 'workflow',
+        entityType: 'Request',
+        entityId: request.id,
+        message: `${request.requestNo} exceeded escalation threshold.`,
+      },
+    });
+
+    if (request.currentAssigneeUserId) {
+      await db.requestComment.create({
+        data: {
+          requestId: request.id,
+          userId: request.currentAssigneeUserId,
+          commentText:
+            'SLA escalation triggered because the request has not been processed within the escalation threshold.',
+          isInternal: true,
         },
-        select: { id: true },
       });
 
-      for (const step of overdueSteps) {
-        await this.markStepOverdue(tx, step.id);
-      }
-
-      const openRequests = await tx.request.findMany({
-        where: {
-          status: { notIn: TERMINAL_REQUEST_STATUSES },
-        },
-        select: {
-          id: true,
-          requestNo: true,
-          title: true,
-          status: true,
-          requestTypeId: true,
-          priority: true,
-          currentAssigneeUserId: true,
+      await db.notification.create({
+        data: {
+          userId: request.currentAssigneeUserId,
+          requestId: request.id,
+          type: 'IN_APP',
+          title: 'SLA Escalation Triggered',
+          message: `${request.requestNo} requires attention. No action has been taken within the escalation threshold.`,
+          actionUrl: `/staff/requests/${request.id}`,
         },
       });
-
-      for (const request of openRequests) {
-        const policy = await this.resolvePolicy(
-          tx,
-          request.requestTypeId,
-          request.priority,
-        );
-
-        if (!policy) continue;
-
-        const firstResponseStarted = await tx.slaEvent.findFirst({
-          where: {
-            requestId: request.id,
-            slaPolicyId: policy.id,
-            eventType: 'FIRST_RESPONSE_STARTED',
-            resolvedAt: null,
-          },
-        });
-
-        if (
-          firstResponseStarted &&
-          policy.firstResponseMinutes &&
-          this.addMinutes(
-            firstResponseStarted.occurredAt,
-            policy.firstResponseMinutes,
-          )! < now
-        ) {
-          await this.closeStartedEventWithOutcome(
-            tx,
-            request.id,
-            policy.id,
-            'FIRST_RESPONSE_STARTED',
-            'FIRST_RESPONSE_BREACHED',
-          );
-        }
-
-        const resolutionStarted = await tx.slaEvent.findFirst({
-          where: {
-            requestId: request.id,
-            slaPolicyId: policy.id,
-            eventType: 'RESOLUTION_STARTED',
-            resolvedAt: null,
-          },
-        });
-
-        if (
-          resolutionStarted &&
-          policy.resolutionMinutes &&
-          this.addMinutes(
-            resolutionStarted.occurredAt,
-            policy.resolutionMinutes,
-          )! < now
-        ) {
-          await this.closeStartedEventWithOutcome(
-            tx,
-            request.id,
-            policy.id,
-            'RESOLUTION_STARTED',
-            'RESOLUTION_BREACHED',
-          );
-        }
-
-        if (!policy.escalationMinutes) continue;
-
-        const existingEscalation = await tx.slaEvent.findFirst({
-          where: {
-            requestId: request.id,
-            slaPolicyId: policy.id,
-            eventType: 'ESCALATION_TRIGGERED',
-          },
-        });
-
-        if (existingEscalation || !resolutionStarted) continue;
-
-        const shouldEscalate =
-          this.addMinutes(
-            resolutionStarted.occurredAt,
-            policy.escalationMinutes,
-          )! < now;
-
-        if (!shouldEscalate) continue;
-
-        await tx.slaEvent.create({
-          data: {
-            requestId: request.id,
-            slaPolicyId: policy.id,
-            eventType: 'ESCALATION_TRIGGERED',
-          },
-        });
-
-        await tx.systemEvent.create({
-          data: {
-            eventKey: 'SLA_ESCALATION_TRIGGERED',
-            severity: 'warning',
-            sourceService: 'workflow',
-            entityType: 'Request',
-            entityId: request.id,
-            message: `${request.requestNo} exceeded escalation threshold.`,
-          },
-        });
-
-        if (request.currentAssigneeUserId) {
-          await tx.requestComment.create({
-            data: {
-              requestId: request.id,
-              userId: request.currentAssigneeUserId,
-              commentText:
-                'SLA escalation triggered because the request has not been processed within the escalation threshold.',
-              isInternal: true,
-            },
-          });
-
-          await tx.notification.create({
-            data: {
-              userId: request.currentAssigneeUserId,
-              requestId: request.id,
-              type: 'IN_APP',
-              title: 'SLA Escalation Triggered',
-              message: `${request.requestNo} requires attention. No action has been taken within the escalation threshold.`,
-              actionUrl: '/staff/inbox',
-            },
-          });
-        }
-      }
-      },
-      {
-        // Sweep işlemi çok sayıda request içerebilir; timeout artırıldı
-        timeout: 60_000,
-      },
-    );
+    }
   }
 
   async getSLAEvents(opts: { page?: number; limit?: number } = {}) {

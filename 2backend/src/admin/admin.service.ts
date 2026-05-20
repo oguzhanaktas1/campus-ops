@@ -1074,6 +1074,7 @@ export class AdminService {
       ),
       comments: request.comments.map((c) => ({
         id: c.id,
+        authorId: c.user.id,
         author: c.user.profile?.fullName || c.user.email,
         authorRole: c.user.primaryRoles[0]?.role?.name.toLowerCase(),
         content: c.commentText,

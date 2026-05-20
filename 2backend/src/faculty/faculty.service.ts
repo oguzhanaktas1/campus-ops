@@ -6,7 +6,9 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  Optional,
 } from '@nestjs/common';
+import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../core/prisma/prisma.service';
 import { SlaService } from '../workflow/sla.service';
 import { WorkflowEngineService } from '../workflow/workflow-engine.service';
@@ -75,6 +77,7 @@ export class FacultyService {
     private cacheService: CacheService,
     private filesService: FilesService,
     private workflowEngine: WorkflowEngineService,
+    @Optional() private notificationsService?: NotificationsService,
   ) {}
 
   private definedData(data: Record<string, any>): Record<string, any> {
@@ -545,6 +548,14 @@ export class FacultyService {
       ),
     ]);
 
+    this.notificationsService?.emitToast(request.requesterUserId, {
+      title: notifTitle,
+      message: `Your request "${request.title}" has been marked as ${newStatus}.${data.comment ? ` Faculty Note: ${data.comment}` : ''}`,
+      type: 'IN_APP',
+      requestId: request.id,
+      actionUrl: `/student/requests/${request.id}`,
+    });
+
     return result;
   }
 
@@ -866,6 +877,7 @@ export class FacultyService {
       ),
       comments: request.comments.map((c) => ({
         id: c.id,
+        authorId: c.user.id,
         author: c.user.profile?.fullName || c.user.email,
         authorRole: c.user.primaryRoles[0]?.role?.name.toLowerCase(),
         content: c.commentText,
@@ -1133,6 +1145,7 @@ export class FacultyService {
       ),
       comments: (r.request as any).comments.map((c: any) => ({
         id: c.id,
+        authorId: c.user?.id ?? null,
         author: c.user?.profile?.fullName ?? c.user?.email ?? 'Unknown',
         authorRole: c.user?.primaryRoles?.[0]?.role?.name?.toLowerCase() ?? 'unknown',
         content: c.commentText,

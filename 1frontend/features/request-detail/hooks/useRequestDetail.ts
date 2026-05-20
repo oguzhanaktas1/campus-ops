@@ -114,15 +114,16 @@ export function useRequestDetail(requestId: string, portal: RequestPortal) {
       setRefreshTick((t) => t + 1)
     }
 
-    // Re-join room after reconnect so the server-side room membership is restored
-    socket.on('connect', joinRoom)
+    // 'connected' is the server's ack emitted after handleConnection finishes auth+room setup.
+    // Using it instead of 'connect' avoids the race where client.data.user is not yet set.
+    socket.on('connected', joinRoom)
     socket.on('request.status.changed', onStatusChanged)
     socket.on('request.comment.created', onCommentCreated)
     socket.on('workflow.step.changed', onWorkflowStepChanged)
 
     return () => {
       socket.emit('request.leave', { requestId })
-      socket.off('connect', joinRoom)
+      socket.off('connected', joinRoom)
       socket.off('request.status.changed', onStatusChanged)
       socket.off('request.comment.created', onCommentCreated)
       socket.off('workflow.step.changed', onWorkflowStepChanged)

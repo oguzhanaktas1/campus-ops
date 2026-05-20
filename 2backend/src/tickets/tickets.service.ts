@@ -41,7 +41,7 @@ import {
 import { RabbitmqPublisher } from '../infrastructure/rabbitmq/rabbitmq.publisher';
 import { RoutingKeys } from '../infrastructure/rabbitmq/routing-keys';
 import { AiClientService } from '../modules/ai/ai-client.service';
-import type { RealtimeService } from '../realtime/realtime.service';
+import { RealtimeService } from '../realtime/realtime.service';
 
 const IT_REQUEST_TYPE_KEY = 'IT_SUPPORT';
 

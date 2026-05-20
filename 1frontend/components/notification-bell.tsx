@@ -84,13 +84,13 @@ export function NotificationBell({ role = 'student' }: NotificationBellProps) {
         })
       }
     }
-    // On reconnect, fetch missed notifications
+    // Re-fetch on reconnect to catch any missed notifications
     const onReconnect = () => { void fetchNotifications() }
     socket.on('notification.created', handler)
-    socket.on('connect', onReconnect)
+    socket.on('connected', onReconnect)
     return () => {
       socket.off('notification.created', handler)
-      socket.off('connect', onReconnect)
+      socket.off('connected', onReconnect)
     }
   }, [socket])
 

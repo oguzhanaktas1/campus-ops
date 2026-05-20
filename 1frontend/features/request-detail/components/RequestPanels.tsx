@@ -491,6 +491,9 @@ function canCurrentUserDecide(detail: RequestDetailViewModel) {
   const user = getStoredUser()
   if (!user?.id) return false
 
+  // Requesters never get decision buttons — they have their own UI (revise/track)
+  if (detail.requester?.id === user.id) return false
+
   const userRoles = new Set((user.roles ?? []).map(normalizeRole))
   const assignments = Array.isArray((detail.raw as any).assignments)
     ? ((detail.raw as any).assignments as any[])

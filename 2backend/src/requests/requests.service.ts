@@ -24,7 +24,7 @@ import {
 import { RabbitmqPublisher } from '../infrastructure/rabbitmq/rabbitmq.publisher';
 import { OutboxService } from '../infrastructure/rabbitmq/outbox.service';
 import { RoutingKeys } from '../infrastructure/rabbitmq/routing-keys';
-import type { RealtimeService } from '../realtime/realtime.service';
+import { RealtimeService } from '../realtime/realtime.service';
 
 const OPEN_STATUSES: RequestStatus[] = ['SUBMITTED', 'IN_REVIEW', 'WAITING_APPROVAL'];
 const INTERNAL_ROLES = ['STAFF', 'FACULTY', 'ADMIN'];
@@ -667,6 +667,11 @@ export class RequestsService {
       include: {
         watchers: true,
         assignments: { where: { isActive: true } },
+        requester: {
+          select: {
+            primaryRoles: { select: { role: { select: { name: true } } }, take: 1 },
+          },
+        },
       },
     });
     if (!req) throw new NotFoundException('Request not found.');
@@ -721,6 +726,10 @@ export class RequestsService {
       // Request sahibi yorum atan kişi değilse bildirim gönder
       if (req.requesterUserId !== userId) {
         const label = (req as any).title ?? (req as any).requestNo ?? 'your request';
+        const requesterRoleName = ((req as any).requester?.primaryRoles?.[0]?.role?.name ?? 'STUDENT').toUpperCase();
+        const portalMap: Record<string, string> = { ADMIN: 'admin', FACULTY: 'faculty', STAFF: 'staff', STUDENT: 'student', ORGANIZER: 'organizer' };
+        const requesterPortal = portalMap[requesterRoleName] ?? 'student';
+        const actionUrl = `/${requesterPortal}/requests/${requestId}`;
         await this.prisma.notification.create({
           data: {
             userId: req.requesterUserId,
@@ -728,7 +737,7 @@ export class RequestsService {
             title: 'New comment on your request',
             message: `A new comment was added to "${label}".`,
             requestId,
-            actionUrl: null,
+            actionUrl,
           },
         });
         this.realtimeService?.emitToUser(req.requesterUserId, 'notification.created', {
@@ -736,6 +745,7 @@ export class RequestsService {
           message: `A new comment was added to "${label}".`,
           type: 'IN_APP',
           requestId,
+          actionUrl,
           isRead: false,
           createdAt: new Date().toISOString(),
         });

@@ -28,9 +28,9 @@ interface StaffListShellProps {
   subtitle?: string
   actionButton?: React.ReactNode
 
-  tabs: StaffListTab[]
-  activeTab: string
-  onTabChange: (key: string) => void
+  tabs?: StaffListTab[]
+  activeTab?: string
+  onTabChange?: (key: string) => void
 
   search: string
   onSearchChange: (v: string) => void
@@ -64,7 +64,7 @@ export function StaffListShell({
   subtitle,
   actionButton,
   tabs,
-  activeTab,
+  activeTab = '',
   onTabChange,
   search,
   onSearchChange,
@@ -113,11 +113,12 @@ export function StaffListShell({
       </div>
 
       {/* ── Tabs ──────────────────────────────────────────────── */}
+      {tabs && tabs.length > 0 && (
       <div className="flex items-center gap-0 border-b border-border overflow-x-auto">
         {tabs.map((tab) => (
           <button
             key={tab.key}
-            onClick={() => { onTabChange(tab.key); onPageChange(1) }}
+            onClick={() => { onTabChange?.(tab.key); onPageChange(1) }}
             className={cn(
               'px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px whitespace-nowrap',
               activeTab === tab.key
@@ -143,6 +144,7 @@ export function StaffListShell({
           </button>
         ))}
       </div>
+      )}
 
       {/* ── Search + Filters ──────────────────────────────────── */}
       <div className="space-y-2">

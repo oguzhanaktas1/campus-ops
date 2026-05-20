@@ -3,7 +3,7 @@ import { NotificationStatus, NotificationType } from '@prisma/client';
 import { CacheService } from '../infrastructure/cache/cache.service';
 import { CacheKeys, CacheTtls } from '../infrastructure/cache/cache-keys';
 import { PrismaService } from '../core/prisma/prisma.service';
-import type { RealtimeService } from '../realtime/realtime.service';
+import { RealtimeService } from '../realtime/realtime.service';
 
 export interface CreateNotificationDto {
   userId: string;
@@ -105,6 +105,18 @@ export class NotificationsService {
     });
     await this.cacheService.del(CacheKeys.notificationsUnread(userId));
     return result;
+  }
+
+  emitToast(userId: string, data: { title: string; message: string; type?: string; requestId?: string; actionUrl?: string | null }) {
+    this.realtimeService?.emitToUser(userId, 'notification.created', {
+      title: data.title,
+      message: data.message,
+      type: data.type ?? 'IN_APP',
+      requestId: data.requestId ?? null,
+      actionUrl: data.actionUrl ?? null,
+      isRead: false,
+      createdAt: new Date().toISOString(),
+    });
   }
 
   async createNotification(dto: CreateNotificationDto) {

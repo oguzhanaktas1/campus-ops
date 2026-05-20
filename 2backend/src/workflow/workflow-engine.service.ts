@@ -16,7 +16,7 @@ import { ProcessActionDto } from './dto/process-action.dto';
 import { SlaService } from './sla.service';
 import { RabbitmqPublisher } from '../infrastructure/rabbitmq/rabbitmq.publisher';
 import { RoutingKeys } from '../infrastructure/rabbitmq/routing-keys';
-import type { RealtimeService } from '../realtime/realtime.service';
+import { RealtimeService } from '../realtime/realtime.service';
 
 const TERMINAL_STATUSES: RequestStatus[] = [
   'APPROVED',
@@ -193,7 +193,9 @@ export class WorkflowEngineService {
         request.dynamicData,
         'calendar.managerUserId',
       );
-      return typeof managerUserId === 'string' ? [managerUserId] : [];
+      // Calendar-based appointment workflows store the manager explicitly;
+      // for all other workflow types (IT, procurement, etc.) fall through to role-based assignment.
+      if (typeof managerUserId === 'string') return [managerUserId];
     }
 
     if (step.stepKey === 'TARGET_REVIEW') {
@@ -381,14 +383,27 @@ export class WorkflowEngineService {
     );
 
     if (assignedUserIds.length > 0) {
+      // Determine portal URL per user based on their primary role
+      const userRoles = await tx.userRole.findMany({
+        where: { userId: { in: assignedUserIds } },
+        select: { userId: true, role: { select: { name: true } } },
+      });
+      const rolePortalMap: Record<string, string> = { ADMIN: 'admin', FACULTY: 'faculty', STAFF: 'staff', ORGANIZER: 'organizer' };
+      const userPortalMap: Record<string, string> = {};
+      for (const ur of userRoles) {
+        if (!userPortalMap[ur.userId]) {
+          userPortalMap[ur.userId] = rolePortalMap[(ur.role.name ?? '').toUpperCase()] ?? 'staff';
+        }
+      }
+
       await tx.notification.createMany({
-        data: assignedUserIds.map((userId) => ({
-          userId,
+        data: assignedUserIds.map((uid) => ({
+          userId: uid,
           requestId: request.id,
           type: 'IN_APP',
           title: 'Request Assigned',
           message: `${request.requestNo} is waiting at "${step.stepName}".`,
-          actionUrl: '/staff/inbox',
+          actionUrl: `/${userPortalMap[uid] ?? 'staff'}/requests/${request.id}`,
         })),
         skipDuplicates: false,
       });
@@ -878,6 +893,8 @@ export class WorkflowEngineService {
           assignedPublishRef.data = {
             assigneeUserIds: resolvedIds,
             stepCode: nextStep.stepKey,
+            stepName: nextStep.stepName,
+            requestNo: request.requestNo,
             workflowInstanceId: workflowInstance.id,
             requestType: (request as any).requestType?.key ?? '',
           };
@@ -964,6 +981,18 @@ export class WorkflowEngineService {
           stepCode:           apd.stepCode,
           assigneeUserId,
           triggeredByUserId:  userId,
+        });
+
+        // Real-time toast for the assigned user
+        this.realtimeService?.emitToUser(assigneeUserId, 'notification.created', {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+          title: 'Request Assigned',
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+          message: `${apd.requestNo as string} is waiting at "${apd.stepName as string}".`,
+          type: 'IN_APP',
+          requestId,
+          isRead: false,
+          createdAt: new Date().toISOString(),
         });
       }
     }

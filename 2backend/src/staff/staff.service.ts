@@ -5,7 +5,9 @@ import {
   BadRequestException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
+import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../core/prisma/prisma.service';
 import { RequestStatus, Prisma, AuditActionType } from '@prisma/client'; // 🔥 AuditActionType Eklendi
 import * as bcrypt from 'bcrypt';
@@ -38,6 +40,7 @@ export class StaffService {
     private prisma: PrismaService,
     private slaService: SlaService,
     private cacheService: CacheService,
+    @Optional() private notificationsService?: NotificationsService,
   ) {}
 
   // 1. DASHBOARD METRICS
@@ -953,7 +956,7 @@ export class StaffService {
           type: 'IN_APP',
           title: 'Request Assigned',
           message: `${request.requestNo} has been assigned to you.`,
-          actionUrl: '/staff/inbox',
+          actionUrl: `/staff/requests/${requestId}`,
         },
       });
 
@@ -969,6 +972,14 @@ export class StaffService {
       });
 
       return updated;
+    });
+
+    this.notificationsService?.emitToast(assigneeUserId, {
+      title: 'Request Assigned',
+      message: `${request.requestNo} has been assigned to you.`,
+      type: 'IN_APP',
+      requestId,
+      actionUrl: `/staff/requests/${requestId}`,
     });
 
     return updatedRequest;

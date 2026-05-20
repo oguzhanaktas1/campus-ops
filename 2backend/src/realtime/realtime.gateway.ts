@@ -133,7 +133,11 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     @ConnectedSocket() client: Socket,
     @MessageBody() body: { requestId: string },
   ) {
-    const user = client.data.user as SocketUser;
+    const user = client.data.user as SocketUser | undefined;
+    if (!user) {
+      client.emit('error', { message: 'Not authenticated.' });
+      return;
+    }
 
     const canView = await this.canViewRequest(user, body.requestId);
     if (!canView) {
@@ -150,6 +154,8 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     @ConnectedSocket() client: Socket,
     @MessageBody() body: { requestId: string },
   ) {
+    const user = client.data.user as SocketUser | undefined;
+    if (!user) return;
     await client.leave(RealtimeRooms.request(body.requestId));
     client.emit('request.left', { requestId: body.requestId });
   }

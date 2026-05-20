@@ -279,12 +279,18 @@ function workflowStepTiming(
   tt: (key: string, fallback: string, params?: Record<string, string | number>) => string,
 ) {
   if (step.completedAt || step.actedAt) {
-    return tt('detail.doneAt', 'Done {{date}}', { date: formatWorkflowDate(step.completedAt ?? step.actedAt) })
+    const dateStr = formatWorkflowDate(step.completedAt ?? step.actedAt)
+    return tt('detail.doneAt', `Done ${dateStr}`, { date: dateStr })
   }
 
   if (step.dueAt) {
     const remaining = formatRemaining(step.dueAt, tt)
     if (remaining) return remaining
+  }
+
+  if (step.startedAt && (step.status === 'active' || step.status === 'warning' || step.isCurrent)) {
+    const dateStr = formatWorkflowDate(step.startedAt)
+    return tt('detail.since', `Since ${dateStr}`, { date: dateStr })
   }
 
   return null
