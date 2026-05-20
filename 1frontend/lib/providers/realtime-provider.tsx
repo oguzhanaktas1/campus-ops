@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useEffect, useRef, useState } from 'react';
+import { createContext, useContext, useEffect, useState } from 'react';
 import type { Socket } from 'socket.io-client';
 import { getSocket, disconnectSocket } from '@/lib/socket';
 import { getToken } from '@/lib/auth';
@@ -16,28 +16,29 @@ const RealtimeContext = createContext<RealtimeContextValue>({
 });
 
 export function RealtimeProvider({ children }: { children: React.ReactNode }) {
+  const [socket, setSocket] = useState<Socket | null>(null);
   const [connected, setConnected] = useState(false);
-  const socketRef = useRef<Socket | null>(null);
 
   useEffect(() => {
     const token = getToken();
     if (!token) return;
 
     const sock = getSocket(token);
-    socketRef.current = sock;
+    setSocket(sock);
 
-    sock.on('connected', () => setConnected(true));
+    sock.on('connect', () => setConnected(true));
     sock.on('disconnect', () => setConnected(false));
     sock.on('connect_error', () => setConnected(false));
 
     return () => {
       disconnectSocket();
+      setSocket(null);
       setConnected(false);
     };
   }, []);
 
   return (
-    <RealtimeContext.Provider value={{ socket: socketRef.current, connected }}>
+    <RealtimeContext.Provider value={{ socket, connected }}>
       {children}
     </RealtimeContext.Provider>
   );

@@ -3,6 +3,7 @@ import {
   NotFoundException,
   ForbiddenException,
   BadRequestException,
+  Optional,
 } from '@nestjs/common';
 import { PrismaService } from '../core/prisma/prisma.service';
 import {
@@ -15,6 +16,7 @@ import { ProcessActionDto } from './dto/process-action.dto';
 import { SlaService } from './sla.service';
 import { RabbitmqPublisher } from '../infrastructure/rabbitmq/rabbitmq.publisher';
 import { RoutingKeys } from '../infrastructure/rabbitmq/routing-keys';
+import type { RealtimeService } from '../realtime/realtime.service';
 
 const TERMINAL_STATUSES: RequestStatus[] = [
   'APPROVED',
@@ -61,6 +63,7 @@ export class WorkflowEngineService {
     private prisma: PrismaService,
     private slaService: SlaService,
     private mq: RabbitmqPublisher,
+    @Optional() private realtimeService?: RealtimeService,
   ) {}
 
   private getJsonPathValue(
@@ -720,9 +723,12 @@ export class WorkflowEngineService {
         }
       }
 
-      const nextStatus = nextStep
-        ? this.mapStepTypeToStatus(nextStep.stepType, mapped.terminalStatus)
-        : mapped.terminalStatus;
+      const nextStatus =
+        dto.action === 'revision'
+          ? RequestStatus.REVISION_REQUESTED
+          : nextStep
+            ? this.mapStepTypeToStatus(nextStep.stepType, mapped.terminalStatus)
+            : mapped.terminalStatus;
       const isRevisionHold =
         dto.action === 'revision' && !nextStep && Boolean(workflowInstance);
 
@@ -893,6 +899,22 @@ export class WorkflowEngineService {
         nextStep: shouldContinue ? nextStep?.stepName ?? null : null,
       };
     });
+
+    // ── Real-time WebSocket — workflow/status değişimini anlık ilet ──────────
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+    const emitStatus = (txResult as any).status as string | undefined;
+    if (emitStatus) {
+      this.realtimeService?.emitToRequest(requestId, 'request.status.changed', {
+        requestId,
+        status: emitStatus,
+      });
+      this.realtimeService?.emitToRequest(requestId, 'workflow.step.changed', {
+        requestId,
+        status: emitStatus,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+        nextStep: (txResult as any).nextStep ?? null,
+      });
+    }
 
     // ── workflow.assigned event — transaction dışında publish ──────────────
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment

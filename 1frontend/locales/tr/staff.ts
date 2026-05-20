@@ -228,6 +228,7 @@ const tr = {
     pendingApproval: 'Onay Bekliyor',
     capacity: 'Kapasite: {{count}}',
     decline: 'Reddet',
+    reservationRequests: 'Rezervasyon Talepleri',
     reservationSubtitle: 'Oda ve kaynak rezervasyon taleplerini yönetin',
     reservationsLoadFail: 'Rezervasyonlar yüklenemedi.',
     reservations: 'Rezervasyonlar',

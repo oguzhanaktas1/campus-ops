@@ -581,36 +581,40 @@ export class FacultyService {
   }
 
   // 4. GET SINGLE REQUEST DETAIL
-  async getRequestDetail(userId: string, requestId: string) {
+  async getRequestDetail(userId: string, requestId: string, roles: string[] = []) {
     const version = await this.cacheService.getVersion(
       CacheKeys.version(`request:detail:${requestId}`),
     );
     const cacheKey = `faculty:request:detail:${requestId}:v${version}:v2`;
     return this.cacheService.getOrSet(cacheKey, CacheTtls.long, async () => {
-    // Resolve the faculty member's scoped facultyId for broad access checks
-    const userProfile = await this.prisma.userProfile.findUnique({
-      where: { userId },
-      select: { facultyId: true },
-    });
-    const userFacultyId = userProfile?.facultyId ?? null;
+    const isFaculty = roles.includes('FACULTY');
 
-    const accessOR: any[] = [
-      { requesterUserId: userId },
-      { currentAssigneeUserId: userId },
-      { assignments: { some: { assignedToUserId: userId } } },
-      { approvalActions: { some: { actionByUserId: userId } } },
-      // Appointment requests where the faculty member is the target
-      { appointmentRequest: { targetUserId: userId } },
-      // Workflow steps directly assigned to the faculty member
-      { workflowInstance: { instanceSteps: { some: { assignedToUserId: userId } } } },
-    ];
-    if (userFacultyId) {
-      // Any request belonging to the faculty member's faculty scope
-      accessOR.push({ facultyId: userFacultyId });
+    let whereClause: any;
+    if (isFaculty) {
+      whereClause = { id: requestId };
+    } else {
+      const userProfile = await this.prisma.userProfile.findUnique({
+        where: { userId },
+        select: { facultyId: true },
+      });
+      const userFacultyId = userProfile?.facultyId ?? null;
+
+      const accessOR: any[] = [
+        { requesterUserId: userId },
+        { currentAssigneeUserId: userId },
+        { assignments: { some: { assignedToUserId: userId } } },
+        { approvalActions: { some: { actionByUserId: userId } } },
+        { appointmentRequest: { targetUserId: userId } },
+        { workflowInstance: { instanceSteps: { some: { assignedToUserId: userId } } } },
+      ];
+      if (userFacultyId) {
+        accessOR.push({ facultyId: userFacultyId });
+      }
+      whereClause = { id: requestId, OR: accessOR };
     }
 
     const request = await this.prisma.request.findFirst({
-      where: { id: requestId, OR: accessOR },
+      where: whereClause,
       include: {
         requester: {
           include: {

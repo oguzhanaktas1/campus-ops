@@ -717,6 +717,29 @@ export class RequestsService {
         requestId,
         comment: response,
       });
+
+      // Request sahibi yorum atan kişi değilse bildirim gönder
+      if (req.requesterUserId !== userId) {
+        const label = (req as any).title ?? (req as any).requestNo ?? 'your request';
+        await this.prisma.notification.create({
+          data: {
+            userId: req.requesterUserId,
+            type: 'IN_APP',
+            title: 'New comment on your request',
+            message: `A new comment was added to "${label}".`,
+            requestId,
+            actionUrl: null,
+          },
+        });
+        this.realtimeService?.emitToUser(req.requesterUserId, 'notification.created', {
+          title: 'New comment on your request',
+          message: `A new comment was added to "${label}".`,
+          type: 'IN_APP',
+          requestId,
+          isRead: false,
+          createdAt: new Date().toISOString(),
+        });
+      }
     }
 
     return response;

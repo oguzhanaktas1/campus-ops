@@ -26,6 +26,7 @@ const STATUS_TABS = [
   { id: 'submitted', labelKey: 'requests.submitted' },
   { id: 'in_review', labelKey: 'requests.inReview' },
   { id: 'waiting_approval', labelKey: 'requests.waitingApproval' },
+  { id: 'revision_requested', labelKey: 'requests.revisionRequested' },
   { id: 'approved', labelKey: 'requests.approved' },
   { id: 'rejected', labelKey: 'requests.rejected' },
   { id: 'completed', labelKey: 'requests.completed' },

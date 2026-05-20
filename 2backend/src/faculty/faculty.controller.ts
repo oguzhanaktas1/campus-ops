@@ -52,7 +52,7 @@ export class FacultyController {
   @Get('requests/:id')
   getRequestDetail(@Request() req: any, @Param('id') id: string) {
     const userId = req.user?.userId || req.user?.id;
-    return this.facultyService.getRequestDetail(userId, id);
+    return this.facultyService.getRequestDetail(userId, id, req.user?.roles ?? []);
   }
 
   @Put('requests/:id')

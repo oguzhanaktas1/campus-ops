@@ -85,6 +85,8 @@ export function RequestCommentsPanel({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const tt = useOptionalT()
 
+  const currentUser = getStoredUser()
+
   const handleAddComment = async (text: string) => {
     const token = getToken()
     const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000'
@@ -111,6 +113,7 @@ export function RequestCommentsPanel({
         ...detail.comments,
         {
           id: String(created.id ?? `tmp-${Date.now()}`),
+          authorId: created.user?.id ?? currentUser?.id ?? null,
           author:
             created.author?.fullName ??
             created.author?.email ??
@@ -141,6 +144,7 @@ export function RequestCommentsPanel({
       <CardContent>
         <CommentThread
           comments={detail.comments as any}
+          currentUserId={currentUser?.id ?? null}
           onAddComment={handleAddComment}
         />
       </CardContent>

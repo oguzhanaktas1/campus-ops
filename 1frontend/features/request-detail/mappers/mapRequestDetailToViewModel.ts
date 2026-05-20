@@ -11,6 +11,7 @@ function fallbackId() {
 function toComment(comment: any) {
   return {
     id: String(comment.id),
+    authorId: comment.user?.id ?? comment.authorId ?? null,
     author:
       comment.author?.fullName ??
       comment.author?.email ??

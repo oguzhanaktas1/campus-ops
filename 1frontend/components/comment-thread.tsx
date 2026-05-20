@@ -5,7 +5,6 @@ import { cn } from '@/lib/utils'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
-import type { Comment } from '@/lib/mock-data'
 import { useOptionalT } from '@/lib/optional-t'
 
 function formatTimestamp(ts: string) {
@@ -26,13 +25,23 @@ function getInitials(name: string) {
     .slice(0, 2)
 }
 
+interface CommentItem {
+  id: string
+  authorId?: string | null
+  author: string
+  authorRole: string
+  content: string
+  createdAt: string
+}
+
 interface CommentThreadProps {
-  comments: Comment[]
+  comments: CommentItem[]
+  currentUserId?: string | null
   className?: string
   onAddComment?: (text: string) => void
 }
 
-export function CommentThread({ comments, className, onAddComment }: CommentThreadProps) {
+export function CommentThread({ comments, currentUserId, className, onAddComment }: CommentThreadProps) {
   const [newComment, setNewComment] = useState('')
   const tt = useOptionalT()
 
@@ -42,37 +51,72 @@ export function CommentThread({ comments, className, onAddComment }: CommentThre
     setNewComment('')
   }
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault()
+      handleSubmit()
+    }
+  }
+
   return (
-    <div className={cn('space-y-4', className)}>
+    <div className={cn('flex flex-col gap-3', className)}>
       {comments.length === 0 ? (
-        <p className="text-sm text-muted-foreground text-center py-4">{tt('detail.noCommentsYet', 'No comments yet.')}</p>
+        <p className="text-sm text-muted-foreground text-center py-4">
+          {tt('detail.noCommentsYet', 'No comments yet.')}
+        </p>
       ) : (
-        comments.map((comment) => (
-          <div key={comment.id} className="flex gap-3">
-            <Avatar className="size-8 flex-shrink-0 mt-0.5">
-              <AvatarFallback className="text-xs bg-primary/10 text-primary">
-                {getInitials(comment.author)}
-              </AvatarFallback>
-            </Avatar>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1 flex-wrap">
-                <span className="text-sm font-medium text-foreground">{comment.author}</span>
-                <span className="text-xs text-muted-foreground capitalize">{comment.authorRole}</span>
-                <span className="text-xs text-muted-foreground">{formatTimestamp(comment.createdAt)}</span>
-              </div>
-              <div className="bg-muted/50 rounded-lg px-3 py-2">
-                <p className="text-sm text-foreground leading-relaxed">{comment.content}</p>
+        comments.map((comment) => {
+          const isMine = !!currentUserId && comment.authorId === currentUserId
+          return (
+            <div
+              key={comment.id}
+              className={cn('flex gap-2 max-w-[85%]', isMine ? 'self-end flex-row-reverse' : 'self-start')}
+            >
+              <Avatar className="size-7 flex-shrink-0 mt-0.5">
+                <AvatarFallback
+                  className={cn(
+                    'text-xs',
+                    isMine
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-primary/10 text-primary',
+                  )}
+                >
+                  {getInitials(comment.author)}
+                </AvatarFallback>
+              </Avatar>
+              <div className={cn('min-w-0', isMine ? 'items-end' : 'items-start', 'flex flex-col')}>
+                <div
+                  className={cn(
+                    'flex items-center gap-1.5 mb-1 flex-wrap text-xs text-muted-foreground',
+                    isMine ? 'flex-row-reverse' : '',
+                  )}
+                >
+                  <span className="font-medium text-foreground">{isMine ? tt('detail.you', 'You') : comment.author}</span>
+                  <span className="capitalize">{comment.authorRole}</span>
+                  <span>{formatTimestamp(comment.createdAt)}</span>
+                </div>
+                <div
+                  className={cn(
+                    'rounded-2xl px-3.5 py-2 text-sm leading-relaxed break-words',
+                    isMine
+                      ? 'bg-primary/20 text-foreground rounded-tr-sm'
+                      : 'bg-muted/60 text-foreground rounded-tl-sm',
+                  )}
+                >
+                  {comment.content}
+                </div>
               </div>
             </div>
-          </div>
-        ))
+          )
+        })
       )}
       {onAddComment && (
-        <div className="border-t border-border pt-4 space-y-2">
+        <div className="border-t border-border pt-4 space-y-2 mt-1">
           <Textarea
-            placeholder={tt('detail.addCommentPlaceholder', 'Add a comment...')}
+            placeholder={tt('detail.addCommentPlaceholder', 'Add a comment... (Ctrl+Enter to send)')}
             value={newComment}
             onChange={(e) => setNewComment(e.target.value)}
+            onKeyDown={handleKeyDown}
             className="min-h-[80px] resize-none"
           />
           <Button size="sm" onClick={handleSubmit} disabled={!newComment.trim()}>

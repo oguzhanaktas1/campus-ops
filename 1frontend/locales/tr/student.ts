@@ -76,6 +76,7 @@ const tr: StudentTranslations = {
     submitted: 'Gönderildi',
     inReview: 'İncelemede',
     waitingApproval: 'Onay Bekliyor',
+    revisionRequested: 'Revizyon İstendi',
     approved: 'Onaylandı',
     rejected: 'Reddedildi',
     completed: 'Tamamlandı',

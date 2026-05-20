@@ -21,6 +21,7 @@ export interface RequestAttachment {
 
 export interface RequestComment {
   id: string
+  authorId?: string | null
   author: string
   authorRole: string
   content: string

@@ -228,6 +228,7 @@ const en = {
     pendingApproval: 'Pending Approval',
     capacity: 'Capacity: {{count}}',
     decline: 'Decline',
+    reservationRequests: 'Reservation Requests',
     reservationSubtitle: 'Manage room and resource reservation requests',
     reservationsLoadFail: 'Failed to load reservations.',
     reservations: 'Reservations',

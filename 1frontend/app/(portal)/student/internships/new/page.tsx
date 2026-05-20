@@ -56,6 +56,13 @@ export default function NewInternshipPage() {
       startLabel: 'Baslangic tarihi',
       endLabel: 'Bitis tarihi',
     })
+    if (!error && nextForm.startDate && nextForm.endDate) {
+      const diff = Math.round(
+        (new Date(nextForm.endDate).getTime() - new Date(nextForm.startDate).getTime()) /
+          (1000 * 60 * 60 * 24),
+      )
+      nextForm.durationDays = diff > 0 ? String(diff) : ''
+    }
     setForm(nextForm)
     setDateError(error)
     if (error) toast.error(error)
@@ -242,15 +249,20 @@ export default function NewInternshipPage() {
               />
             </div>
             <div className="space-y-1.5">
-              <Label>{t('forms.durationDays')}</Label>
+              <Label>
+                {t('forms.durationDays')}
+                <span className="ml-1.5 text-xs text-muted-foreground font-normal">(auto)</span>
+              </Label>
               <Input
                 type="number"
                 min={1}
                 value={form.durationDays}
+                readOnly={!!(form.startDate && form.endDate)}
                 onChange={(e) =>
                   setForm({ ...form, durationDays: e.target.value })
                 }
                 placeholder={t('forms.durationPlaceholder')}
+                className={form.startDate && form.endDate ? 'bg-muted/50 cursor-default' : ''}
               />
             </div>
             <div className="flex flex-col justify-end space-y-1.5">

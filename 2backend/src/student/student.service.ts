@@ -1555,6 +1555,7 @@ export class StudentService {
       comments:
         (request as any).comments?.map((c: any) => ({
           id: c.id,
+          authorId: c.user?.id ?? null,
           author: c.user?.profile?.fullName || c.user?.email || 'İsimsiz',
           authorRole:
             c.user?.primaryRoles?.[0]?.role?.name?.toLowerCase() || 'student',

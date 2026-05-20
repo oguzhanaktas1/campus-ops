@@ -85,13 +85,8 @@ function FacultyLayoutInner({ children }: { children: React.ReactNode }) {
 
   const navItems: NavItem[] = [
     { label: t('nav.dashboard'), href: "/faculty/dashboard", icon: LayoutDashboard },
-    {
-      label: t('nav.approvals'), href: "/faculty/approvals", icon: CheckSquare,
-      children: [
-        { label: t('nav.approvals'), href: "/faculty/approvals" },
-        { label: t('nav.requests'), href: "/faculty/requests" },
-      ],
-    },
+    { label: t('nav.approvals'), href: "/faculty/approvals", icon: CheckSquare },
+    { label: t('nav.requests'), href: "/faculty/requests", icon: FileText },
     { label: t('nav.internships'), href: "/faculty/internships", icon: Briefcase },
     { label: t('nav.appointments'), href: "/faculty/appointments", icon: CalendarDays },
     { label: t('nav.events'), href: "/faculty/events", icon: PartyPopper },

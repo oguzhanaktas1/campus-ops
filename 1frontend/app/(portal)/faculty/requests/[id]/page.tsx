@@ -77,11 +77,6 @@ export default function FacultyRequestDetailRoute() {
   return (
     <div className="min-h-full bg-muted/10">
       <div className="mx-auto max-w-7xl space-y-6 p-6 pb-20">
-        <div className="flex items-center justify-end gap-4">
-          <p className="text-xs text-muted-foreground">
-            {t('detail.facultyRequestDetail')}
-          </p>
-        </div>
 
         <div className="rounded-2xl border bg-card p-5 shadow-sm">
           <RequestHeader detail={detail} backHref={backHref} />

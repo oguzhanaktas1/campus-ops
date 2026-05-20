@@ -76,6 +76,7 @@ const en: StudentTranslations = {
     submitted: 'Submitted',
     inReview: 'In Review',
     waitingApproval: 'Waiting Approval',
+    revisionRequested: 'Revision Requested',
     approved: 'Approved',
     rejected: 'Rejected',
     completed: 'Completed',
