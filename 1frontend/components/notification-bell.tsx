@@ -84,8 +84,14 @@ export function NotificationBell({ role = 'student' }: NotificationBellProps) {
         })
       }
     }
+    // On reconnect, fetch missed notifications
+    const onReconnect = () => { void fetchNotifications() }
     socket.on('notification.created', handler)
-    return () => { socket.off('notification.created', handler) }
+    socket.on('connect', onReconnect)
+    return () => {
+      socket.off('notification.created', handler)
+      socket.off('connect', onReconnect)
+    }
   }, [socket])
 
   const toggleSelection = (e: React.MouseEvent, id: string) => {

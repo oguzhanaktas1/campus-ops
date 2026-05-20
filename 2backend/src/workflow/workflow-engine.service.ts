@@ -708,18 +708,36 @@ export class WorkflowEngineService {
       if (
         dto.action === 'submit' &&
         request.status === RequestStatus.REVISION_REQUESTED &&
-        nextStep &&
         workflowInstance
       ) {
+        // Find the most recent step that requested revision, ordered by creation time
+        // (completedAt is null for isRevisionHold cases so it's unreliable as sort key)
         const revisionInstanceStep = await tx.workflowInstanceStep.findFirst({
           where: {
             workflowInstanceId: workflowInstance.id,
             actionTaken: WorkflowActionType.REQUEST_REVISION,
           },
-          orderBy: { completedAt: 'desc' },
+          orderBy: { createdAt: 'desc' },
         });
-        if (revisionInstanceStep?.actionByUserId) {
-          nextStep = { ...nextStep, assignedUserId: revisionInstanceStep.actionByUserId };
+        if (revisionInstanceStep) {
+          const revisionWorkflowStep = await tx.workflowStep.findUnique({
+            where: { id: revisionInstanceStep.workflowStepId },
+            select: {
+              id: true,
+              stepKey: true,
+              stepName: true,
+              stepType: true,
+              assignedRoleId: true,
+              assignedUnitId: true,
+              slaHours: true,
+            },
+          });
+          if (revisionWorkflowStep) {
+            nextStep = {
+              ...revisionWorkflowStep,
+              assignedUserId: revisionInstanceStep.actionByUserId,
+            };
+          }
         }
       }
 
@@ -775,6 +793,18 @@ export class WorkflowEngineService {
         ],
         skipDuplicates: true,
       });
+
+      if (pendingStep && isRevisionHold) {
+        // Record who requested the revision so resubmit routing can find the correct reviewer
+        await tx.workflowInstanceStep.update({
+          where: { id: pendingStep.id },
+          data: {
+            actionTaken: mapped.wfAction,
+            actionByUserId: userId,
+            actionNote: dto.comment ?? null,
+          },
+        });
+      }
 
       if (pendingStep && !isRevisionHold) {
         if (pendingStep.dueAt && pendingStep.dueAt < new Date()) {

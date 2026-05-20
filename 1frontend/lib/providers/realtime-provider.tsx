@@ -26,9 +26,15 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     const sock = getSocket(token);
     setSocket(sock);
 
+    // Socket may already be connected (singleton reuse)
+    if (sock.connected) setConnected(true);
+
     sock.on('connect', () => setConnected(true));
     sock.on('disconnect', () => setConnected(false));
-    sock.on('connect_error', () => setConnected(false));
+    sock.on('connect_error', (err) => {
+      console.warn('[realtime] connect_error:', err.message);
+      setConnected(false);
+    });
 
     return () => {
       disconnectSocket();

@@ -75,7 +75,8 @@ export function useRequestDetail(requestId: string, portal: RequestPortal) {
   useEffect(() => {
     if (!requestId || !socket) return
 
-    socket.emit('request.join', { requestId })
+    const joinRoom = () => socket.emit('request.join', { requestId })
+    joinRoom()
 
     const onStatusChanged = (payload: any) => {
       const data = payload?.data ?? payload
@@ -109,17 +110,19 @@ export function useRequestDetail(requestId: string, portal: RequestPortal) {
       })
     }
 
-    // Workflow adım değişiminde tam refetch yaparak workflow steps'i güncelle
     const onWorkflowStepChanged = () => {
       setRefreshTick((t) => t + 1)
     }
 
+    // Re-join room after reconnect so the server-side room membership is restored
+    socket.on('connect', joinRoom)
     socket.on('request.status.changed', onStatusChanged)
     socket.on('request.comment.created', onCommentCreated)
     socket.on('workflow.step.changed', onWorkflowStepChanged)
 
     return () => {
       socket.emit('request.leave', { requestId })
+      socket.off('connect', joinRoom)
       socket.off('request.status.changed', onStatusChanged)
       socket.off('request.comment.created', onCommentCreated)
       socket.off('workflow.step.changed', onWorkflowStepChanged)

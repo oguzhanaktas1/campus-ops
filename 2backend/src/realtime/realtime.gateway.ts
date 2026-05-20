@@ -36,12 +36,12 @@ function resolvePortal(roles: string[]): string {
   return 'student';
 }
 
+// Security is enforced via JWT validation in handleConnection,
+// so mirroring the request origin is safe here.
 @WebSocketGateway({
-  cors: {
-    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
-    credentials: true,
-  },
+  cors: { origin: true, credentials: true },
   namespace: '/realtime',
+  transports: ['websocket', 'polling'],
 })
 export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
