@@ -2,32 +2,33 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
-import { PartyPopper, Loader2, AlertCircle, CheckCircle, XCircle } from 'lucide-react'
+import { PartyPopper, CheckCircle, XCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { getToken } from '@/lib/auth'
 import { useI18n } from '@/lib/i18n'
+import { StaffListShell } from '@/components/staff/staff-list-shell'
+import { StaffRequestRow, formatDate } from '@/components/staff/staff-request-row'
 
-const STATUS_BADGE: Record<string, string> = {
-  SUBMITTED:  'bg-blue-50 text-blue-700 border-blue-200',
-  IN_REVIEW:  'bg-yellow-50 text-yellow-700 border-yellow-200',
-  APPROVED:   'bg-green-50 text-green-700 border-green-200',
-  REJECTED:   'bg-red-50 text-red-700 border-red-200',
-  COMPLETED:  'bg-gray-50 text-gray-500 border-gray-200',
-}
+const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000'
+const PAGE_SIZE = 20
+const ALL_STATUSES = ['SUBMITTED', 'IN_REVIEW', 'APPROVED', 'REJECTED', 'COMPLETED']
 
 export default function FacultyEventsPage() {
   const { t } = useI18n()
   const [events, setEvents] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [filter, setFilter] = useState('all')
+  const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
   const [actionId, setActionId] = useState<string | null>(null)
   const [note, setNote] = useState('')
+  const [activeStatus, setActiveStatus] = useState('')
+  const [activePriority, setActivePriority] = useState('')
 
   const fetchEvents = useCallback(async () => {
     try {
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
-      const res = await fetch(`${backendUrl}/events`, {
+      const res = await fetch(`${BACKEND}/events`, {
         headers: { Authorization: `Bearer ${getToken()}` },
       })
       if (res.ok) setEvents(await res.json())
@@ -38,126 +39,129 @@ export default function FacultyEventsPage() {
     }
   }, [t])
 
-  useEffect(() => { fetchEvents() }, [fetchEvents])
+  useEffect(() => { void fetchEvents() }, [fetchEvents])
 
   const updateStatus = async (id: string, status: string) => {
     try {
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
-      const res = await fetch(`${backendUrl}/events/${id}/status`, {
+      const res = await fetch(`${BACKEND}/events/${id}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
         body: JSON.stringify({ status, note }),
       })
       if (!res.ok) throw new Error()
-      toast.success(`Event request ${status.toLowerCase()}.`)
+      toast.success(`Event ${status.toLowerCase()}.`)
       setActionId(null)
       setNote('')
-      fetchEvents()
+      void fetchEvents()
     } catch {
       toast.error(t('events.loadFail'))
     }
   }
 
-  if (isLoading) return (
-    <div className="flex h-[60vh] items-center justify-center">
-      <Loader2 className="size-8 animate-spin text-primary" />
-    </div>
-  )
+  const byStatus = filter === 'all' ? events : events.filter((e) => e.status === filter)
 
-  const pending = events.filter((e) => e.status === 'SUBMITTED' || e.status === 'IN_REVIEW')
-  const others = events.filter((e) => e.status !== 'SUBMITTED' && e.status !== 'IN_REVIEW')
+  const filtered = byStatus.filter((e) => {
+    if (activeStatus && e.status !== activeStatus) return false
+    if (activePriority && e.priority !== activePriority) return false
+    if (!search) return true
+    const q = search.toLowerCase()
+    return (
+      e.eventName?.toLowerCase().includes(q) ||
+      e.requestNo?.toLowerCase().includes(q) ||
+      e.requesterName?.toLowerCase().includes(q) ||
+      e.eventType?.toLowerCase().includes(q)
+    )
+  })
+
+  const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+
+  const tabs = [
+    { key: 'all', label: t('common.all'), count: events.length },
+    ...ALL_STATUSES.map((s) => ({
+      key: s,
+      label: s.replace(/_/g, ' '),
+      count: events.filter((e) => e.status === s).length,
+    })).filter((tab) => tab.count > 0),
+  ]
 
   return (
-    <div className="p-6 max-w-4xl mx-auto space-y-6 pb-20">
-      <div>
-        <h1 className="text-xl font-bold flex items-center gap-2"><PartyPopper className="size-5 text-primary" /> {t('events.title')}</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">{t('events.subtitle', { count: events.length })}</p>
-      </div>
-
-      {pending.length > 0 && (
-        <section className="space-y-3">
-          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">{t('common.pending')} ({pending.length})</h2>
-          <div className="bg-card border border-border rounded-xl shadow-sm divide-y divide-border overflow-hidden">
-            {pending.map((ev) => (
-              <div key={ev.id} className="px-5 py-4 space-y-3">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold truncate">{ev.eventName}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {ev.requestNo} · {ev.eventType} · {ev.requesterName}
-                      {ev.startAt && ` · ${new Date(ev.startAt).toLocaleDateString()}`}
-                      {ev.expectedAttendance && ` · ~${ev.expectedAttendance} attendees`}
-                    </p>
-                  </div>
-                  <span className={cn('text-xs font-semibold px-2 py-0.5 rounded-full border shrink-0', STATUS_BADGE[ev.status])}>
-                    {ev.status?.replace(/_/g, ' ')}
-                  </span>
-                </div>
-
-                {actionId === ev.id ? (
-                  <div className="space-y-2">
-                    <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} placeholder={t('approvals.notesPlaceholder')}
-                      className="w-full bg-background border border-input rounded-md px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring resize-none" />
-                    <div className="flex gap-2">
-                      <Button asChild size="sm" variant="outline">
-                        <Link href={`/faculty/requests/${ev.id}?from=/faculty/events`}>
-                          {t('events.viewDetail')}
-                        </Link>
-                      </Button>
-                      <Button size="sm" className="gap-1.5 bg-green-600 hover:bg-green-700" onClick={() => updateStatus(ev.id, 'APPROVED')}>
-                        <CheckCircle className="size-3.5" /> {t('common.approve')}
-                      </Button>
-                      <Button size="sm" variant="destructive" className="gap-1.5" onClick={() => updateStatus(ev.id, 'REJECTED')}>
-                        <XCircle className="size-3.5" /> {t('common.reject')}
-                      </Button>
-                      <Button size="sm" variant="ghost" onClick={() => { setActionId(null); setNote('') }}>{t('common.cancel')}</Button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex shrink-0 gap-2">
+    <StaffListShell
+      title={t('events.title')}
+      subtitle={t('events.subtitle', { count: events.length })}
+      tabs={tabs}
+      activeTab={filter}
+      onTabChange={(k) => { setFilter(k); setPage(1) }}
+      search={search}
+      onSearchChange={(v) => { setSearch(v); setPage(1) }}
+      searchPlaceholder={t('common.search')}
+      statusOptions={ALL_STATUSES}
+      activeStatus={activeStatus}
+      onStatusChange={(s) => { setActiveStatus(s); setPage(1) }}
+      activePriority={activePriority}
+      onPriorityChange={(p) => { setActivePriority(p); setPage(1) }}
+      isLoading={isLoading}
+      totalCount={filtered.length}
+      page={page}
+      pageSize={PAGE_SIZE}
+      onPageChange={setPage}
+      emptyIcon={<PartyPopper className="size-8" />}
+      emptyTitle={t('events.noEvents')}
+      emptyDesc={search ? undefined : undefined}
+    >
+      {paged.map((ev) => (
+        <div key={ev.id}>
+          <StaffRequestRow
+            href={`/faculty/requests/${ev.id}?from=/faculty/events`}
+            title={ev.eventName || 'Event Request'}
+            requestNo={ev.requestNo}
+            badge={ev.eventType}
+            metaLeft={[
+              ev.requesterName,
+              ev.startAt ? formatDate(ev.startAt) : undefined,
+              ev.expectedAttendance ? `~${ev.expectedAttendance} attendees` : undefined,
+            ]}
+            status={ev.status}
+          />
+          {['SUBMITTED', 'IN_REVIEW'].includes(ev.status) && (
+            <div className="px-5 pb-3">
+              {actionId === ev.id ? (
+                <div className="space-y-2">
+                  <textarea
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
+                    rows={2}
+                    placeholder={t('approvals.notesPlaceholder')}
+                    className="w-full bg-background border border-input rounded-md px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring resize-none"
+                  />
+                  <div className="flex gap-2">
                     <Button asChild size="sm" variant="outline">
                       <Link href={`/faculty/requests/${ev.id}?from=/faculty/events`}>
                         {t('events.viewDetail')}
                       </Link>
                     </Button>
-                    <Button size="sm" variant="outline" onClick={() => setActionId(ev.id)}>{t('common.confirm')}</Button>
+                    <Button size="sm" className="gap-1.5 bg-green-600 hover:bg-green-700"
+                      onClick={() => void updateStatus(ev.id, 'APPROVED')}>
+                      <CheckCircle className="size-3.5" /> {t('common.approve')}
+                    </Button>
+                    <Button size="sm" variant="destructive" className="gap-1.5"
+                      onClick={() => void updateStatus(ev.id, 'REJECTED')}>
+                      <XCircle className="size-3.5" /> {t('common.reject')}
+                    </Button>
+                    <Button size="sm" variant="ghost"
+                      onClick={() => { setActionId(null); setNote('') }}>
+                      {t('common.cancel')}
+                    </Button>
                   </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {others.length > 0 && (
-        <section className="space-y-3">
-          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">{t('events.pastDecisions')} ({others.length})</h2>
-          <div className="bg-card border border-border rounded-xl shadow-sm divide-y divide-border overflow-hidden">
-            {others.map((ev) => (
-              <Link
-                key={ev.id}
-                href={`/faculty/requests/${ev.id}?from=/faculty/events`}
-                className="flex items-center justify-between px-5 py-3.5 hover:bg-muted/20 transition-colors"
-              >
-                <div className="min-w-0">
-                  <p className="text-sm font-medium truncate">{ev.eventName}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">{ev.requestNo} · {ev.requesterName}</p>
                 </div>
-                <span className={cn('text-xs font-semibold px-2 py-0.5 rounded-full border shrink-0 ml-4', STATUS_BADGE[ev.status] ?? STATUS_BADGE.SUBMITTED)}>
-                  {ev.status?.replace(/_/g, ' ')}
-                </span>
-              </Link>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {events.length === 0 && (
-        <div className="py-16 flex flex-col items-center text-center opacity-50 bg-card border border-border rounded-xl">
-          <AlertCircle className="size-10 mb-3" />
-          <p className="text-sm font-medium">{t('events.noEvents')}</p>
+              ) : (
+                <Button size="sm" variant="outline" onClick={() => setActionId(ev.id)}>
+                  {t('common.confirm')}
+                </Button>
+              )}
+            </div>
+          )}
         </div>
-      )}
-    </div>
+      ))}
+    </StaffListShell>
   )
 }

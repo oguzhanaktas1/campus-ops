@@ -1,35 +1,33 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
-import { PartyPopper, Loader2, AlertCircle, CheckCircle, XCircle } from 'lucide-react'
+import { PartyPopper, CheckCircle, XCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { getToken } from '@/lib/auth'
 import { useI18n } from '@/lib/i18n'
+import { StaffListShell } from '@/components/staff/staff-list-shell'
+import { StaffRequestRow, formatDate } from '@/components/staff/staff-request-row'
 
-const STATUS_BADGE: Record<string, string> = {
-  SUBMITTED:  'bg-blue-50 text-blue-700 border-blue-200',
-  IN_REVIEW:  'bg-yellow-50 text-yellow-700 border-yellow-200',
-  APPROVED:   'bg-green-50 text-green-700 border-green-200',
-  REJECTED:   'bg-red-50 text-red-700 border-red-200',
-  COMPLETED:  'bg-gray-50 text-gray-500 border-gray-200',
-}
+const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000'
+const PAGE_SIZE = 20
+const ALL_STATUSES = ['SUBMITTED', 'IN_REVIEW', 'APPROVED', 'REJECTED', 'COMPLETED']
 
 export default function StaffEventsPage() {
-  const router = useRouter()
   const { t } = useI18n()
   const [events, setEvents] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [filter, setFilter] = useState('all')
+  const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
   const [actionId, setActionId] = useState<string | null>(null)
   const [note, setNote] = useState('')
-  const [filter, setFilter] = useState('all')
+  const [activeStatus, setActiveStatus] = useState('')
+  const [activePriority, setActivePriority] = useState('')
 
   const fetchEvents = useCallback(async () => {
     try {
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
-      const res = await fetch(`${backendUrl}/events`, {
+      const res = await fetch(`${BACKEND}/events`, {
         headers: { Authorization: `Bearer ${getToken()}` },
       })
       if (res.ok) setEvents(await res.json())
@@ -40,12 +38,11 @@ export default function StaffEventsPage() {
     }
   }, [t])
 
-  useEffect(() => { fetchEvents() }, [fetchEvents])
+  useEffect(() => { void fetchEvents() }, [fetchEvents])
 
   const updateStatus = async (id: string, status: string) => {
     try {
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
-      const res = await fetch(`${backendUrl}/events/${id}/status`, {
+      const res = await fetch(`${BACKEND}/events/${id}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
         body: JSON.stringify({ status, note }),
@@ -54,87 +51,111 @@ export default function StaffEventsPage() {
       toast.success(t('pages.eventUpdateSuccess'))
       setActionId(null)
       setNote('')
-      fetchEvents()
+      void fetchEvents()
     } catch {
       toast.error(t('pages.eventUpdateFail'))
     }
   }
 
-  const filtered = filter === 'all' ? events : events.filter((e) => e.status === filter)
+  const byStatus = filter === 'all' ? events : events.filter((e) => e.status === filter)
 
-  if (isLoading) return (
-    <div className="flex h-[60vh] items-center justify-center">
-      <Loader2 className="size-8 animate-spin text-primary" />
-    </div>
-  )
+  const filtered = byStatus.filter((e) => {
+    if (activeStatus && e.status !== activeStatus) return false
+    if (activePriority && e.priority !== activePriority) return false
+    if (!search) return true
+    const q = search.toLowerCase()
+    return (
+      e.eventName?.toLowerCase().includes(q) ||
+      e.requestNo?.toLowerCase().includes(q) ||
+      e.requesterName?.toLowerCase().includes(q) ||
+      e.eventType?.toLowerCase().includes(q)
+    )
+  })
+
+  const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+
+  const tabs = [
+    { key: 'all', label: t('common.all'), count: events.length },
+    ...ALL_STATUSES.map((s) => ({
+      key: s,
+      label: s.replace(/_/g, ' '),
+      count: events.filter((e) => e.status === s).length,
+    })).filter((tab) => tab.count > 0),
+  ]
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-6 pb-20">
-      <div>
-        <h1 className="text-xl font-bold flex items-center gap-2"><PartyPopper className="size-5 text-primary" /> {t('pages.eventRequests')}</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">{t('pages.eventRequestsSubtitle')}</p>
-      </div>
-
-      <div className="flex gap-2 flex-wrap">
-        {['all', 'SUBMITTED', 'IN_REVIEW', 'APPROVED', 'REJECTED'].map((s) => (
-          <button key={s} onClick={() => setFilter(s)}
-            className={cn('text-xs px-3 py-1.5 rounded-full border font-semibold transition-colors',
-              filter === s ? 'bg-foreground text-background border-foreground' : 'bg-background text-muted-foreground border-border hover:border-foreground')}>
-            {s === 'all' ? t('common.all') : s.replace(/_/g, ' ')}
-          </button>
-        ))}
-      </div>
-
-      <div className="bg-card border border-border rounded-xl shadow-sm divide-y divide-border overflow-hidden">
-        {filtered.length === 0 ? (
-          <div className="py-16 flex flex-col items-center text-center opacity-50">
-            <AlertCircle className="size-10 mb-3" />
-            <p className="text-sm font-medium">{t('pages.noEventRequests')}</p>
-          </div>
-        ) : (
-          filtered.map((ev) => (
-            <div
-              key={ev.id}
-              onClick={() => router.push(`/staff/requests/events/${ev.id}`)}
-              className="px-5 py-4 space-y-3 cursor-pointer hover:bg-muted/20 transition-colors"
-            >
-              <div className="flex items-start justify-between gap-4">
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold truncate">{ev.eventName}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {ev.requestNo} · {ev.eventType} · {ev.requesterName}
-                    {ev.startAt && ` · ${new Date(ev.startAt).toLocaleDateString()}`}
-                    {ev.expectedAttendance && ` · ~${ev.expectedAttendance} people`}
-                  </p>
-                </div>
-                <span className={cn('text-xs font-semibold px-2 py-0.5 rounded-full border shrink-0', STATUS_BADGE[ev.status] ?? STATUS_BADGE.SUBMITTED)}>
-                  {ev.status?.replace(/_/g, ' ')}
-                </span>
-              </div>
-
-              {['SUBMITTED', 'IN_REVIEW'].includes(ev.status) && (
-                actionId === ev.id ? (
-                  <div className="space-y-2">
-                    <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} placeholder={t('common.noteOptional')}
-                      className="w-full bg-background border border-input rounded-md px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring resize-none" />
-                    <div className="flex gap-2 flex-wrap">
-                      <Button size="sm" className="gap-1.5 bg-green-600 hover:bg-green-700" onClick={(event) => { event.stopPropagation(); void updateStatus(ev.id, 'APPROVED') }}>
-                        <CheckCircle className="size-3.5" /> {t('common.approve')}
-                      </Button>
-                      <Button size="sm" variant="destructive" className="gap-1.5" onClick={(event) => { event.stopPropagation(); void updateStatus(ev.id, 'REJECTED') }}>
-                        <XCircle className="size-3.5" /> {t('common.reject')}
-                      </Button>
-                      <Button size="sm" variant="ghost" onClick={(event) => { event.stopPropagation(); setActionId(null); setNote('') }}>{t('common.cancel')}</Button>
-                    </div>
+    <StaffListShell
+      title={t('pages.eventRequests')}
+      subtitle={t('pages.eventRequestsSubtitle')}
+      tabs={tabs}
+      activeTab={filter}
+      onTabChange={setFilter}
+      search={search}
+      onSearchChange={setSearch}
+      searchPlaceholder={t('tickets.searchPlaceholder')}
+      statusOptions={ALL_STATUSES}
+      activeStatus={activeStatus}
+      onStatusChange={(s) => { setActiveStatus(s); setPage(1) }}
+      activePriority={activePriority}
+      onPriorityChange={(p) => { setActivePriority(p); setPage(1) }}
+      isLoading={isLoading}
+      totalCount={filtered.length}
+      page={page}
+      pageSize={PAGE_SIZE}
+      onPageChange={setPage}
+      emptyIcon={<PartyPopper className="size-8" />}
+      emptyTitle={t('pages.noEventRequests')}
+      emptyDesc={search ? t('tickets.searchHint') : undefined}
+    >
+      {paged.map((ev) => (
+        <div key={ev.id}>
+          <StaffRequestRow
+            href={`/staff/requests/events/${ev.id}`}
+            title={ev.eventName || 'Event Request'}
+            requestNo={ev.requestNo}
+            badge={ev.eventType}
+            metaLeft={[
+              ev.requesterName,
+              ev.startAt ? formatDate(ev.startAt) : undefined,
+              ev.expectedAttendance ? `~${ev.expectedAttendance} people` : undefined,
+            ]}
+            status={ev.status}
+          />
+          {['SUBMITTED', 'IN_REVIEW'].includes(ev.status) && (
+            <div className="px-5 pb-3">
+              {actionId === ev.id ? (
+                <div className="space-y-2">
+                  <textarea
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
+                    rows={2}
+                    placeholder={t('common.noteOptional')}
+                    className="w-full bg-background border border-input rounded-md px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring resize-none"
+                  />
+                  <div className="flex gap-2">
+                    <Button size="sm" className="gap-1.5 bg-green-600 hover:bg-green-700"
+                      onClick={() => void updateStatus(ev.id, 'APPROVED')}>
+                      <CheckCircle className="size-3.5" /> {t('common.approve')}
+                    </Button>
+                    <Button size="sm" variant="destructive" className="gap-1.5"
+                      onClick={() => void updateStatus(ev.id, 'REJECTED')}>
+                      <XCircle className="size-3.5" /> {t('common.reject')}
+                    </Button>
+                    <Button size="sm" variant="ghost"
+                      onClick={() => { setActionId(null); setNote('') }}>
+                      {t('common.cancel')}
+                    </Button>
                   </div>
-                ) : (
-                  <Button size="sm" variant="outline" onClick={(event) => { event.stopPropagation(); setActionId(ev.id) }}>{t('common.process')}</Button>
-                )
+                </div>
+              ) : (
+                <Button size="sm" variant="outline" onClick={() => setActionId(ev.id)}>
+                  {t('common.process')}
+                </Button>
               )}
             </div>
-          ))
-        )}
-      </div>
-    </div>
+          )}
+        </div>
+      ))}
+    </StaffListShell>
   )
 }

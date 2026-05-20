@@ -2,22 +2,15 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Input } from '@/components/ui/input'
-import { Badge } from '@/components/ui/badge'
-import { StatusBadge } from '@/components/status-badge'
-import { Search, Loader2, MessageSquare, AlertCircle, User, Clock, UserPlus } from 'lucide-react'
+import { FileText, UserPlus } from 'lucide-react'
 import { toast } from 'sonner'
-import { cn } from '@/lib/utils'
 import { useI18n } from '@/lib/i18n'
+import { StaffListShell } from '@/components/staff/staff-list-shell'
+import { StaffRequestRow, formatDate } from '@/components/staff/staff-request-row'
 
-function formatDate(d: string) {
-  if (!d) return ''
-  return new Date(d).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  })
-}
+const PAGE_SIZE = 20
+const TERMINAL = new Set(['APPROVED', 'REJECTED', 'COMPLETED', 'CLOSED', 'CANCELLED'])
+const REQUEST_STATUSES = ['SUBMITTED', 'IN_REVIEW', 'WAITING_APPROVAL', 'APPROVED', 'REJECTED', 'COMPLETED', 'CLOSED', 'CANCELLED']
 
 const categorySlugMap: Record<string, string> = {
   IT_SUPPORT: 'it-support',
@@ -27,29 +20,18 @@ const categorySlugMap: Record<string, string> = {
   STUDENT_LIFE: 'student-life',
 }
 
-const TABS = [
-  { id: 'active', labelKey: 'requests.active' },
-  { id: 'unassigned', labelKey: 'requests.needsAssignment' },
-  { id: 'all', labelKey: 'requests.allRequests' },
-  { id: 'closed', labelKey: 'requests.closed' },
-]
-
-const priorityClass: Record<string, string> = {
-  HIGH: 'border-red-200 text-red-600 bg-red-50',
-  URGENT: 'border-red-200 text-red-600 bg-red-50',
-  MEDIUM: 'border-amber-200 text-amber-600 bg-amber-50',
-  LOW: 'bg-muted text-muted-foreground',
-}
-
-const TERMINAL_STATUSES = new Set(['APPROVED', 'REJECTED', 'COMPLETED', 'CLOSED', 'CANCELLED'])
+type TabKey = 'active' | 'unassigned' | 'all' | 'closed'
 
 export default function StaffRequestsPage() {
   const { t } = useI18n()
   const router = useRouter()
   const [requests, setRequests] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<'all' | 'unassigned' | 'active' | 'closed'>('unassigned')
-  const [searchQuery, setSearchQuery] = useState('')
+  const [activeTab, setActiveTab] = useState<TabKey>('active')
+  const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
+  const [activeStatus, setActiveStatus] = useState('')
+  const [activePriority, setActivePriority] = useState('')
 
   useEffect(() => {
     const fetchRequests = async () => {
@@ -57,11 +39,9 @@ export default function StaffRequestsPage() {
       try {
         const token = localStorage.getItem('access_token')
         const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
-
         const res = await fetch(`${backendUrl}/staff/requests?filter=${activeTab}`, {
           headers: { Authorization: `Bearer ${token}` },
         })
-
         if (res.ok) setRequests(await res.json())
       } catch {
         toast.error(t('requests.loadFail'))
@@ -69,12 +49,19 @@ export default function StaffRequestsPage() {
         setIsLoading(false)
       }
     }
-
-    fetchRequests()
+    void fetchRequests()
   }, [activeTab, t])
 
-  const filteredRequests = requests.filter(r => {
-    const q = searchQuery.toLowerCase()
+  const allReqs = requests
+  const active = requests.filter((r) => !TERMINAL.has(r.status))
+  const unassigned = requests.filter((r) => !r.assignedTo && !TERMINAL.has(r.status))
+  const closed = requests.filter((r) => TERMINAL.has(r.status))
+
+  const filtered = allReqs.filter((r) => {
+    if (activeStatus && r.status !== activeStatus) return false
+    if (activePriority && r.priority !== activePriority) return false
+    if (!search) return true
+    const q = search.toLowerCase()
     return (
       r.title?.toLowerCase().includes(q) ||
       r.requestNo?.toLowerCase().includes(q) ||
@@ -83,130 +70,60 @@ export default function StaffRequestsPage() {
     )
   })
 
-  const handleRowClick = (req: any) => {
-    const slug = categorySlugMap[req.category] || 'general'
-    router.push(`/staff/requests/${slug}/${req.id}`)
-  }
+  const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+
+  const tabs = [
+    { key: 'active', label: t('requests.active'), count: allReqs.filter((r) => !TERMINAL.has(r.status)).length },
+    { key: 'unassigned', label: t('requests.needsAssignment'), count: allReqs.filter((r) => !r.assignedTo && !TERMINAL.has(r.status)).length },
+    { key: 'all', label: t('requests.allRequests'), count: allReqs.length },
+    { key: 'closed', label: t('requests.closed'), count: allReqs.filter((r) => TERMINAL.has(r.status)).length },
+  ]
 
   return (
-    <div className="p-6 max-w-4xl mx-auto space-y-5 pb-20">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
-        <div>
-          <h1 className="text-xl font-bold text-foreground">{t('requests.title')}</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            {t('requests.subtitle')}
-          </p>
-        </div>
-        <div className="relative w-full sm:w-64">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder={t('requests.searchPlaceholder')}
-            className="pl-9 h-9"
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
+    <StaffListShell
+      title={t('requests.title')}
+      subtitle={t('requests.subtitle')}
+      tabs={tabs}
+      activeTab={activeTab}
+      onTabChange={(k) => setActiveTab(k as TabKey)}
+      search={search}
+      onSearchChange={setSearch}
+      searchPlaceholder={t('requests.searchPlaceholder')}
+      statusOptions={REQUEST_STATUSES}
+      activeStatus={activeStatus}
+      onStatusChange={(s) => { setActiveStatus(s); setPage(1) }}
+      activePriority={activePriority}
+      onPriorityChange={(p) => { setActivePriority(p); setPage(1) }}
+      isLoading={isLoading}
+      totalCount={filtered.length}
+      page={page}
+      pageSize={PAGE_SIZE}
+      onPageChange={setPage}
+      emptyIcon={<FileText className="size-8" />}
+      emptyTitle={t('requests.noRequests')}
+      emptyDesc={search ? t('requests.searchHint') : t('requests.emptyHint')}
+    >
+      {paged.map((req) => {
+        const slug = categorySlugMap[req.category] || 'general'
+        const isUnassigned = !req.assignedTo && !TERMINAL.has(req.status)
+        return (
+          <StaffRequestRow
+            key={req.id}
+            href={`/staff/requests/${slug}/${req.id}`}
+            title={req.title}
+            requestNo={req.requestNo}
+            badge={req.typeName}
+            metaLeft={[
+              req.requesterName,
+              formatDate(req.createdAt),
+            ]}
+            assignee={req.assignedTo}
+            unassigned={isUnassigned}
+            status={req.status}
+            priority={req.priority}
           />
-        </div>
-      </div>
-
-      {/* Tabs */}
-      <div className="flex flex-wrap gap-1 bg-muted/50 p-1 rounded-lg border border-border w-fit">
-        {TABS.map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id as any)}
-            className={cn(
-              'px-3 py-1 text-sm font-medium rounded-md transition-all',
-              activeTab === tab.id
-                ? 'bg-background text-foreground shadow-sm ring-1 ring-border'
-                : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-            )}
-          >
-            {t(tab.labelKey)}
-          </button>
-        ))}
-      </div>
-
-      {/* List */}
-      {isLoading ? (
-        <div className="flex justify-center items-center py-20">
-          <Loader2 className="size-8 animate-spin text-primary" />
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {filteredRequests.map(req => (
-            <div
-              key={req.id}
-              onClick={() => handleRowClick(req)}
-              className="bg-card border border-border rounded-lg p-5 shadow-sm hover:border-primary/50 transition-colors cursor-pointer group"
-            >
-              <div className="flex items-start justify-between gap-2 flex-wrap mb-2">
-                <h3 className="text-base font-semibold text-foreground group-hover:text-primary transition-colors">
-                  {req.title}
-                </h3>
-                <div className="flex gap-2 shrink-0">
-                  {req.priority && (
-                    <Badge
-                      variant="outline"
-                      className={priorityClass[req.priority] || 'bg-muted text-muted-foreground'}
-                    >
-                      {req.priority}
-                    </Badge>
-                  )}
-                  <StatusBadge status={req.status} />
-                </div>
-              </div>
-
-              <div className="flex items-center gap-4 flex-wrap mt-3">
-                <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                  <Clock className="size-3.5" />
-                  {formatDate(req.createdAt)}
-                </span>
-
-                <span className="text-xs text-muted-foreground border-l border-border pl-4">
-                  {t('requests.type')}: <span className="font-medium text-foreground">{req.typeName}</span>
-                </span>
-
-                <span className="flex items-center gap-1 text-xs text-muted-foreground border-l border-border pl-4">
-                  <User className="size-3.5" />
-                  {t('requests.from')}{' '}
-                  <span className="font-medium text-foreground ml-1">{req.requesterName}</span>
-                </span>
-
-                {req.assignedTo ? (
-                  <span className="flex items-center gap-1 text-xs text-muted-foreground border-l border-border pl-4">
-                    <User className="size-3.5" />
-                    {t('requests.assignedTo')}{' '}
-                    <span className="font-medium text-foreground ml-1">{req.assignedTo}</span>
-                  </span>
-                ) : !TERMINAL_STATUSES.has(req.status) ? (
-                  <span className="flex items-center gap-1 text-xs text-amber-600 font-medium border-l border-border pl-4">
-                    <UserPlus className="size-3.5" /> {t('common.unassigned')}
-                  </span>
-                ) : null}
-
-                {req.commentCount > 0 && (
-                  <span className="flex items-center gap-1 text-xs text-primary font-medium border-l border-border pl-4">
-                    <MessageSquare className="size-3.5" /> {req.commentCount} {t('requests.comments')}
-                  </span>
-                )}
-              </div>
-            </div>
-          ))}
-
-          {filteredRequests.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-16 text-center bg-card border border-dashed rounded-lg">
-              <AlertCircle className="size-10 text-muted-foreground/50 mb-3" />
-              <h3 className="text-sm font-semibold text-foreground">{t('requests.noRequests')}</h3>
-              <p className="text-xs text-muted-foreground mt-1">
-                {searchQuery
-                  ? t('requests.searchHint')
-                  : t('requests.emptyHint')}
-              </p>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
+        )
+      })}
+    </StaffListShell>
   )
 }

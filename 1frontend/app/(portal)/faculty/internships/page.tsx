@@ -1,36 +1,21 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useEffect, useState, useCallback } from 'react'
+import { Briefcase, CheckCircle2, XCircle, Loader2, Eye } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { MetricCard } from '@/components/metric-card'
-import { EmptyState } from '@/components/empty-state'
-import { StatusBadge } from '@/components/status-badge'
-import {
-  Briefcase,
-  CheckCircle2,
-  XCircle,
-  Loader2,
-  Eye,
-  Filter,
-  ClipboardList,
-  Building2,
-} from 'lucide-react'
-import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { getToken } from '@/lib/auth'
 import { useI18n } from '@/lib/i18n'
+import { StaffListShell } from '@/components/staff/staff-list-shell'
+import { StaffRequestRow, formatDate } from '@/components/staff/staff-request-row'
+import { useRouter } from 'next/navigation'
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000'
-
-type FilterStatus = 'all' | 'pending' | 'approved' | 'rejected'
-
-function formatDate(d: string | Date | null) {
-  if (!d) return '—'
-  return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-}
-
+const PAGE_SIZE = 20
 const PENDING_STATUSES = ['SUBMITTED', 'IN_REVIEW', 'WAITING_APPROVAL']
+const ALL_STATUSES = ['SUBMITTED', 'IN_REVIEW', 'WAITING_APPROVAL', 'REVISION_REQUESTED', 'APPROVED', 'REJECTED', 'COMPLETED', 'CLOSED']
+
+type FilterKey = 'all' | 'pending' | 'approved' | 'rejected'
 
 export default function FacultyInternshipsPage() {
   const router = useRouter()
@@ -38,16 +23,13 @@ export default function FacultyInternshipsPage() {
   const [internships, setInternships] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [processingId, setProcessingId] = useState<string | null>(null)
-  const [activeFilter, setActiveFilter] = useState<FilterStatus>('all')
+  const [filter, setFilter] = useState<FilterKey>('all')
+  const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
+  const [activeStatus, setActiveStatus] = useState('')
+  const [activePriority, setActivePriority] = useState('')
 
-  const FILTER_TABS: { key: FilterStatus; label: string }[] = [
-    { key: 'all', label: t('internships.tabAll') },
-    { key: 'pending', label: t('internships.tabPending') },
-    { key: 'approved', label: t('internships.tabApproved') },
-    { key: 'rejected', label: t('internships.tabRejected') },
-  ]
-
-  const fetchInternships = async () => {
+  const fetchInternships = useCallback(async () => {
     try {
       const res = await fetch(`${BACKEND}/faculty/internships`, {
         headers: { Authorization: `Bearer ${getToken()}` },
@@ -59,19 +41,16 @@ export default function FacultyInternshipsPage() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [t])
 
-  useEffect(() => { void fetchInternships() }, [])
+  useEffect(() => { void fetchInternships() }, [fetchInternships])
 
   const handleAction = async (id: string, action: 'approve' | 'reject') => {
     setProcessingId(id)
     try {
       const res = await fetch(`${BACKEND}/faculty/requests/${id}/action`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${getToken()}`,
-        },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
         body: JSON.stringify({ action }),
       })
       if (res.ok) {
@@ -80,14 +59,7 @@ export default function FacultyInternshipsPage() {
         setInternships((prev) =>
           prev.map((r) =>
             r.id === id
-              ? {
-                  ...r,
-                  status: result.status ?? (action === 'approve' ? 'APPROVED' : 'REJECTED'),
-                  displayStatus: result.nextStep === 'Internship Coordinator Review'
-                    ? 'COORDINATOR_REVIEW'
-                    : result.status ?? (action === 'approve' ? 'APPROVED' : 'REJECTED'),
-                  canAct: false,
-                }
+              ? { ...r, status: result.status ?? (action === 'approve' ? 'APPROVED' : 'REJECTED'), canAct: false }
               : r,
           ),
         )
@@ -102,153 +74,104 @@ export default function FacultyInternshipsPage() {
     }
   }
 
-  const counts = {
-    total: internships.length,
-    pending: internships.filter((r) => PENDING_STATUSES.includes(r.status)).length,
-    approved: internships.filter((r) => r.status === 'APPROVED').length,
-    rejected: internships.filter((r) => r.status === 'REJECTED').length,
+  const pending = internships.filter((r) => PENDING_STATUSES.includes(r.status))
+
+  const byFilter = (items: any[]) => {
+    if (filter === 'all') return items
+    if (filter === 'pending') return items.filter((r) => PENDING_STATUSES.includes(r.status))
+    if (filter === 'approved') return items.filter((r) => r.status === 'APPROVED')
+    return items.filter((r) => r.status === 'REJECTED')
   }
 
-  const filtered = internships.filter((r) => {
-    if (activeFilter === 'all') return true
-    if (activeFilter === 'pending') return PENDING_STATUSES.includes(r.status)
-    if (activeFilter === 'approved') return r.status === 'APPROVED'
-    if (activeFilter === 'rejected') return r.status === 'REJECTED'
-    return true
+  const filtered = byFilter(internships).filter((r) => {
+    if (activeStatus && r.status !== activeStatus) return false
+    if (activePriority && r.priority !== activePriority) return false
+    if (!search) return true
+    const q = search.toLowerCase()
+    return (
+      (r.companyName ?? r.title ?? '').toLowerCase().includes(q) ||
+      r.requestNo?.toLowerCase().includes(q) ||
+      (r.submittedByName ?? r.studentName ?? '').toLowerCase().includes(q)
+    )
   })
 
-  if (isLoading) {
-    return (
-      <div className="h-[60vh] flex items-center justify-center">
-        <Loader2 className="size-8 animate-spin text-primary" />
-      </div>
-    )
-  }
+  const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+
+  const tabs = [
+    { key: 'all', label: t('common.all'), count: internships.length },
+    { key: 'pending', label: t('internships.tabPending'), count: pending.length },
+    { key: 'approved', label: t('common.approved'), count: internships.filter((r) => r.status === 'APPROVED').length },
+    { key: 'rejected', label: t('common.rejected'), count: internships.filter((r) => r.status === 'REJECTED').length },
+  ]
 
   return (
-    <div className="p-6 space-y-6 max-w-6xl mx-auto pb-20">
-      <div>
-        <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
-          <Briefcase className="size-5 text-primary" /> {t('internships.title')}
-        </h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
-          {t('internships.subtitle', { count: internships.length })}
-        </p>
-      </div>
-
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <MetricCard title={t('internships.totalApplications')} value={counts.total} icon={<ClipboardList className="size-4" />} footer={t('internships.allTime')} />
-        <MetricCard title={t('internships.pendingReview')} value={counts.pending} icon={<Loader2 className="size-4" />} valueClassName={counts.pending > 0 ? 'text-amber-600' : undefined} footer={t('internships.requiresAction')} />
-        <MetricCard title={t('internships.approvedCount')} value={counts.approved} icon={<CheckCircle2 className="size-4" />} valueClassName="text-emerald-600" footer={t('internships.allTime')} />
-        <MetricCard title={t('internships.rejectedCount')} value={counts.rejected} icon={<XCircle className="size-4" />} valueClassName={counts.rejected > 0 ? 'text-destructive' : undefined} footer={t('internships.allTime')} />
-      </div>
-
-      <div className="bg-card border border-border rounded-lg shadow-sm overflow-hidden">
-        <div className="flex items-center justify-between gap-4 px-5 py-3.5 border-b border-border flex-wrap">
-          <div className="flex items-center gap-1">
-            <Filter className="size-3.5 text-muted-foreground" />
-            <span className="text-xs font-medium text-muted-foreground">{t('common.filter')}:</span>
-            {FILTER_TABS.map((tab) => (
-              <button
-                key={tab.key}
-                onClick={() => setActiveFilter(tab.key)}
-                className={cn(
-                  'px-3 py-1 rounded-full text-xs font-medium transition-colors',
-                  activeFilter === tab.key
-                    ? 'bg-primary text-primary-foreground'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/50',
-                )}
-              >
-                {tab.label}
-              </button>
-            ))}
+    <StaffListShell
+      title={t('internships.title')}
+      subtitle={t('internships.subtitle', { count: internships.length })}
+      actionButton={
+        pending.length > 0 ? (
+          <span className="text-xs bg-amber-50 text-amber-700 border border-amber-200 font-semibold px-2.5 py-1 rounded-full self-center">
+            {pending.length} {t('common.pending')}
+          </span>
+        ) : undefined
+      }
+      tabs={tabs}
+      activeTab={filter}
+      onTabChange={(k) => { setFilter(k as FilterKey); setPage(1) }}
+      search={search}
+      onSearchChange={(v) => { setSearch(v); setPage(1) }}
+      searchPlaceholder={t('common.search')}
+      statusOptions={ALL_STATUSES}
+      activeStatus={activeStatus}
+      onStatusChange={(s) => { setActiveStatus(s); setPage(1) }}
+      activePriority={activePriority}
+      onPriorityChange={(p) => { setActivePriority(p); setPage(1) }}
+      isLoading={isLoading}
+      totalCount={filtered.length}
+      page={page}
+      pageSize={PAGE_SIZE}
+      onPageChange={setPage}
+      emptyIcon={<Briefcase className="size-8" />}
+      emptyTitle={t('internships.noInternships')}
+      emptyDesc={search ? t('internships.noInternshipsDesc') : undefined}
+    >
+      {paged.map((r) => {
+        const canAct = r.canAct === true && PENDING_STATUSES.includes(r.status)
+        const isProcessing = processingId === r.id
+        return (
+          <div key={r.id}>
+            <StaffRequestRow
+              href={`/faculty/requests/${r.id}?from=/faculty/internships`}
+              title={r.companyName ?? r.title ?? 'Internship Application'}
+              requestNo={r.requestNo}
+              badge={r.internshipType}
+              metaLeft={[
+                r.submittedByName ?? r.studentName,
+                r.startDate ? `Starts ${formatDate(r.startDate)}` : undefined,
+              ]}
+              status={r.status}
+            />
+            {canAct && (
+              <div className="px-5 pb-3 flex gap-2">
+                <Button size="sm" variant="outline" className="h-7 gap-1 text-xs"
+                  onClick={() => router.push(`/faculty/requests/${r.id}?from=/faculty/internships`)}>
+                  <Eye className="size-3" /> {t('common.view')}
+                </Button>
+                <Button size="sm" className="h-7 gap-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs"
+                  disabled={isProcessing} onClick={() => handleAction(r.id, 'approve')}>
+                  {isProcessing ? <Loader2 className="size-3 animate-spin" /> : <CheckCircle2 className="size-3" />}
+                  {t('common.approve')}
+                </Button>
+                <Button size="sm" variant="outline" className="h-7 gap-1 text-xs border-destructive/30 text-destructive hover:bg-destructive/10"
+                  disabled={isProcessing} onClick={() => handleAction(r.id, 'reject')}>
+                  {isProcessing ? <Loader2 className="size-3 animate-spin" /> : <XCircle className="size-3" />}
+                  {t('common.reject')}
+                </Button>
+              </div>
+            )}
           </div>
-          <span className="text-xs text-muted-foreground">{filtered.length} results</span>
-        </div>
-
-        {filtered.length === 0 ? (
-          <EmptyState
-            title={t('internships.noInternships')}
-            description={t('internships.noInternshipsDesc')}
-            icon={<Briefcase className="size-6" />}
-          />
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-muted/40 border-b border-border">
-                  {[
-                    t('internships.colStudent'),
-                    t('internships.colCompany'),
-                    t('common.type'),
-                    t('common.date'),
-                    t('common.date'),
-                    t('common.status'),
-                    t('common.actions'),
-                  ].map((h, i) => (
-                    <th key={i} className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {filtered.map((req) => {
-                  const canAct = req.canAct === true && PENDING_STATUSES.includes(req.status)
-                  const isProcessing = processingId === req.id
-
-                  return (
-                    <tr key={req.id} className="hover:bg-muted/20 transition-colors">
-                      <td className="px-5 py-4">
-                        <div className="flex items-center gap-2">
-                          <div className="size-7 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs font-bold flex-shrink-0">
-                            {req.submittedByName?.charAt(0) ?? 'S'}
-                          </div>
-                          <div>
-                            <p className="font-medium text-foreground">{req.submittedByName ?? t('common.unknown')}</p>
-                            {req.studentNumber && (
-                              <p className="text-[10px] text-muted-foreground">{req.studentNumber}</p>
-                            )}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-5 py-4">
-                        <div className="flex items-center gap-1.5 text-muted-foreground">
-                          <Building2 className="size-3.5 flex-shrink-0" />
-                          {req.companyName ?? '—'}
-                        </div>
-                      </td>
-                      <td className="px-5 py-4 text-muted-foreground text-xs">{req.internshipType}</td>
-                      <td className="px-5 py-4 text-muted-foreground text-xs">{formatDate(req.startDate)}</td>
-                      <td className="px-5 py-4 text-muted-foreground text-xs">{formatDate(req.endDate)}</td>
-                      <td className="px-5 py-4"><StatusBadge status={req.displayStatus ?? req.status} /></td>
-                      <td className="px-5 py-4">
-                        <div className="flex items-center gap-2">
-                          <Button size="sm" variant="outline" className="h-7 gap-1 text-xs" onClick={() => router.push(`/faculty/requests/${req.id}?from=/faculty/internships`)}>
-                            <Eye className="size-3" /> {t('common.view')}
-                          </Button>
-                          {canAct && (
-                            <>
-                              <Button size="sm" className="h-7 gap-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs" disabled={isProcessing} onClick={() => handleAction(req.id, 'approve')}>
-                                {isProcessing ? <Loader2 className="size-3 animate-spin" /> : <CheckCircle2 className="size-3" />}
-                                {t('common.approve')}
-                              </Button>
-                              <Button size="sm" variant="outline" className="h-7 gap-1 text-xs border-destructive/30 text-destructive hover:bg-destructive/10" disabled={isProcessing} onClick={() => handleAction(req.id, 'reject')}>
-                                {isProcessing ? <Loader2 className="size-3 animate-spin" /> : <XCircle className="size-3" />}
-                                {t('common.reject')}
-                              </Button>
-                            </>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-    </div>
+        )
+      })}
+    </StaffListShell>
   )
 }

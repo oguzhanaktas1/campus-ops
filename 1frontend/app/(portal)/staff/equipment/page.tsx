@@ -1,44 +1,32 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { StatusBadge } from '@/components/status-badge'
-import { cn } from '@/lib/utils'
-import {
-  Boxes,
-  Search,
-  Loader2,
-  Package,
-  ChevronRight,
-  AlertCircle,
-  CheckCircle2,
-  Clock,
-} from 'lucide-react'
+import { Package } from 'lucide-react'
 import { getToken } from '@/lib/auth'
 import { useI18n } from '@/lib/i18n'
+import { StaffListShell } from '@/components/staff/staff-list-shell'
+import { StaffRequestRow, formatDate } from '@/components/staff/staff-request-row'
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000'
+const PAGE_SIZE = 20
+const ALL_STATUSES = ['SUBMITTED', 'IN_REVIEW', 'WAITING_APPROVAL', 'APPROVED', 'REJECTED', 'COMPLETED', 'CLOSED']
 
-function formatDate(d: string | null) {
-  if (!d) return '—'
-  return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-}
-
-const STOCK_STATUS_CONFIG: Record<string, { labelKey: string; className: string }> = {
-  IN_STOCK:        { labelKey: 'pages.inStock',       className: 'text-emerald-600 bg-emerald-50 border-emerald-200' },
-  LOW_STOCK:       { labelKey: 'pages.lowStock',       className: 'text-amber-600 bg-amber-50 border-amber-200' },
-  OUT_OF_STOCK:    { labelKey: 'pages.outOfStock',    className: 'text-destructive bg-destructive/5 border-destructive/20' },
-  PROCUREMENT_REQ: { labelKey: 'pages.needsProcurement', className: 'text-blue-600 bg-blue-50 border-blue-200' },
+const STOCK_LABEL: Record<string, string> = {
+  IN_STOCK: 'In Stock',
+  LOW_STOCK: 'Low Stock',
+  OUT_OF_STOCK: 'Out of Stock',
+  PROCUREMENT_REQ: 'Needs Procurement',
 }
 
 export default function StaffEquipmentPage() {
-  const router = useRouter()
   const { t } = useI18n()
   const [requests, setRequests] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [filter, setFilter] = useState('all')
   const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
+  const [activeStatus, setActiveStatus] = useState('')
+  const [activePriority, setActivePriority] = useState('')
 
   const fetchInbox = useCallback(async () => {
     try {
@@ -55,152 +43,75 @@ export default function StaffEquipmentPage() {
 
   useEffect(() => { void fetchInbox() }, [fetchInbox])
 
-  const filtered = requests.filter(
-    (r) =>
-      search === '' ||
-      r.equipmentName?.toLowerCase().includes(search.toLowerCase()) ||
-      r.equipmentCategory?.toLowerCase().includes(search.toLowerCase()) ||
-      r.requesterName?.toLowerCase().includes(search.toLowerCase()),
-  )
+  const byStatus = filter === 'all' ? requests : requests.filter((r) => r.status === filter)
 
-  const counts = {
-    total: requests.length,
-    withStock: requests.filter((r) => r.stockCheckStatus === 'IN_STOCK').length,
-    needsProcurement: requests.filter((r) => r.procurementRequired).length,
-    urgent: requests.filter((r) => r.priority === 'URGENT' || r.priority === 'HIGH').length,
-  }
-
-  if (isLoading) {
+  const filtered = byStatus.filter((r) => {
+    if (activeStatus && r.status !== activeStatus) return false
+    if (activePriority && r.priority !== activePriority) return false
+    if (!search) return true
+    const q = search.toLowerCase()
     return (
-      <div className="flex h-[50vh] items-center justify-center">
-        <Loader2 className="size-8 animate-spin text-primary" />
-      </div>
+      r.equipmentName?.toLowerCase().includes(q) ||
+      r.equipmentCategory?.toLowerCase().includes(q) ||
+      r.requesterName?.toLowerCase().includes(q) ||
+      r.requestNo?.toLowerCase().includes(q)
     )
-  }
+  })
+
+  const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+
+  const tabs = [
+    { key: 'all', label: t('common.all'), count: requests.length },
+    ...ALL_STATUSES.map((s) => ({
+      key: s,
+      label: s.replace(/_/g, ' '),
+      count: requests.filter((r) => r.status === s).length,
+    })).filter((tab) => tab.count > 0),
+  ]
 
   return (
-    <div className="p-6 space-y-5 max-w-6xl mx-auto">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-bold text-foreground">{t('pages.equipmentRequests')}</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            {t('pages.equipmentSubtitle', { count: requests.length })}
-          </p>
-        </div>
-      </div>
-
-      {/* Quick stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        {[
-          { label: t('pages.totalOpen'), value: counts.total, icon: <Package className="size-4" />, className: '' },
-          { label: t('pages.inStock'), value: counts.withStock, icon: <CheckCircle2 className="size-4" />, className: 'text-emerald-600' },
-          { label: t('pages.needsProcurement'), value: counts.needsProcurement, icon: <AlertCircle className="size-4" />, className: 'text-amber-600' },
-          { label: t('pages.highPriority'), value: counts.urgent, icon: <Clock className="size-4" />, className: counts.urgent > 0 ? 'text-destructive' : '' },
-        ].map((s) => (
-          <div key={s.label} className="bg-card border border-border rounded-lg p-4">
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1">{s.icon}{s.label}</div>
-            <p className={cn('text-2xl font-bold', s.className || 'text-foreground')}>{s.value}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* Search */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-        <Input
-          placeholder={t('pages.equipmentSearchPlaceholder')}
-          className="pl-9"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-      </div>
-
-      {/* Table */}
-      <div className="bg-card border border-border rounded-lg shadow-sm overflow-hidden">
-        {filtered.length === 0 ? (
-          <div className="text-center py-12">
-            <Boxes className="size-8 text-muted-foreground/40 mx-auto mb-3" />
-            <p className="text-sm text-muted-foreground">
-              {search ? t('pages.noMatchingEquipment') : t('pages.noOpenEquipment')}
-            </p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border bg-muted/40">
-                  {[
-                    t('pages.equipment'),
-                    t('common.category'),
-                    t('pages.qty'),
-                    t('common.requester'),
-                    t('pages.neededFrom'),
-                    t('pages.stock'),
-                    t('common.status'),
-                    '',
-                  ].map((h) => (
-                    <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {filtered.map((req) => {
-                  const stockCfg = req.stockCheckStatus
-                    ? STOCK_STATUS_CONFIG[req.stockCheckStatus]
-                    : null
-
-                  return (
-                    <tr
-                      key={req.id}
-                      onClick={() => router.push(`/staff/requests/equipment/${req.id}`)}
-                      className="hover:bg-muted/20 transition-colors cursor-pointer"
-                    >
-                      <td className="px-4 py-3.5">
-                        <p className="font-medium text-foreground truncate max-w-[180px]">
-                          {req.equipmentName}
-                        </p>
-                        <p className="text-xs text-muted-foreground truncate">{req.requestNo}</p>
-                      </td>
-                      <td className="px-4 py-3.5">
-                        <span className="text-xs bg-muted px-2 py-0.5 rounded font-medium">
-                          {req.equipmentCategory}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3.5 text-center font-semibold">{req.quantity}</td>
-                      <td className="px-4 py-3.5 text-xs text-muted-foreground">
-                        {req.requesterName ?? '—'}
-                      </td>
-                      <td className="px-4 py-3.5 text-xs text-muted-foreground">
-                        {formatDate(req.neededFrom)}
-                      </td>
-                      <td className="px-4 py-3.5">
-                        {stockCfg ? (
-                          <span className={cn('text-[10px] font-bold px-2 py-0.5 rounded border', stockCfg.className)}>
-                            {t(stockCfg.labelKey)}
-                          </span>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">—</span>
-                        )}
-                        {req.procurementRequired && (
-                          <p className="text-[10px] text-amber-600 mt-0.5 font-medium">{t('pages.procurementReq')}</p>
-                        )}
-                      </td>
-                      <td className="px-4 py-3.5">
-                        <StatusBadge status={req.status} />
-                      </td>
-                      <td className="px-4 py-3.5">
-                        <Button variant="ghost" size="icon" className="size-7 pointer-events-none">
-                          <ChevronRight className="size-4" />
-                        </Button>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-    </div>
+    <StaffListShell
+      title={t('pages.equipmentRequests')}
+      subtitle={t('pages.equipmentSubtitle', { count: requests.length })}
+      tabs={tabs}
+      activeTab={filter}
+      onTabChange={setFilter}
+      search={search}
+      onSearchChange={setSearch}
+      searchPlaceholder={t('pages.equipmentSearchPlaceholder')}
+      statusOptions={ALL_STATUSES}
+      activeStatus={activeStatus}
+      onStatusChange={(s) => { setActiveStatus(s); setPage(1) }}
+      activePriority={activePriority}
+      onPriorityChange={(p) => { setActivePriority(p); setPage(1) }}
+      isLoading={isLoading}
+      totalCount={filtered.length}
+      page={page}
+      pageSize={PAGE_SIZE}
+      onPageChange={setPage}
+      emptyIcon={<Package className="size-8" />}
+      emptyTitle={search ? t('pages.noMatchingEquipment') : t('pages.noOpenEquipment')}
+    >
+      {paged.map((req) => {
+        const stockBadge = req.stockCheckStatus ? STOCK_LABEL[req.stockCheckStatus] : undefined
+        return (
+          <StaffRequestRow
+            key={req.id}
+            href={`/staff/requests/equipment/${req.id}`}
+            title={req.equipmentName || 'Equipment Request'}
+            requestNo={req.requestNo}
+            badge={req.equipmentCategory}
+            metaLeft={[
+              req.requesterName,
+              req.neededFrom ? `Needed: ${formatDate(req.neededFrom)}` : undefined,
+              stockBadge,
+              req.quantity ? `Qty: ${req.quantity}` : undefined,
+            ]}
+            status={req.status}
+            priority={req.priority}
+          />
+        )
+      })}
+    </StaffListShell>
   )
 }

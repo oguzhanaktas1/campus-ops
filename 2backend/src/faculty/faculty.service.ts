@@ -587,16 +587,30 @@ export class FacultyService {
     );
     const cacheKey = `faculty:request:detail:${requestId}:v${version}:v2`;
     return this.cacheService.getOrSet(cacheKey, CacheTtls.long, async () => {
+    // Resolve the faculty member's scoped facultyId for broad access checks
+    const userProfile = await this.prisma.userProfile.findUnique({
+      where: { userId },
+      select: { facultyId: true },
+    });
+    const userFacultyId = userProfile?.facultyId ?? null;
+
+    const accessOR: any[] = [
+      { requesterUserId: userId },
+      { currentAssigneeUserId: userId },
+      { assignments: { some: { assignedToUserId: userId } } },
+      { approvalActions: { some: { actionByUserId: userId } } },
+      // Appointment requests where the faculty member is the target
+      { appointmentRequest: { targetUserId: userId } },
+      // Workflow steps directly assigned to the faculty member
+      { workflowInstance: { instanceSteps: { some: { assignedToUserId: userId } } } },
+    ];
+    if (userFacultyId) {
+      // Any request belonging to the faculty member's faculty scope
+      accessOR.push({ facultyId: userFacultyId });
+    }
+
     const request = await this.prisma.request.findFirst({
-      where: {
-        id: requestId,
-        OR: [
-          { requesterUserId: userId },
-          { currentAssigneeUserId: userId },
-          { assignments: { some: { assignedToUserId: userId } } },
-          { approvalActions: { some: { actionByUserId: userId } } },
-        ],
-      },
+      where: { id: requestId, OR: accessOR },
       include: {
         requester: {
           include: {

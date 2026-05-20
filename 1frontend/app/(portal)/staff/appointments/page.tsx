@@ -1,38 +1,26 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import Link from 'next/link'
-import { CalendarDays, Loader2, AlertCircle } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { CalendarDays } from 'lucide-react'
 import { toast } from 'sonner'
 import { getToken } from '@/lib/auth'
 import { useI18n } from '@/lib/i18n'
+import { StaffListShell } from '@/components/staff/staff-list-shell'
+import { StaffRequestRow, formatDateTime } from '@/components/staff/staff-request-row'
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000'
-
-const STATUS_BADGE: Record<string, string> = {
-  SUBMITTED:        'bg-blue-50 text-blue-700 border-blue-200',
-  IN_REVIEW:        'bg-yellow-50 text-yellow-700 border-yellow-200',
-  WAITING_APPROVAL: 'bg-amber-50 text-amber-700 border-amber-200',
-  APPROVED:         'bg-green-50 text-green-700 border-green-200',
-  REJECTED:         'bg-red-50 text-red-700 border-red-200',
-  COMPLETED:        'bg-gray-50 text-gray-500 border-gray-200',
-  CANCELLED:        'bg-gray-50 text-gray-400 border-gray-200',
-}
-
-function fmtDT(d: any) {
-  if (!d) return '—'
-  return new Date(d).toLocaleString('en-US', {
-    weekday: 'short', month: 'short', day: 'numeric',
-    hour: '2-digit', minute: '2-digit',
-  })
-}
+const PAGE_SIZE = 20
+const ALL_STATUSES = ['SUBMITTED', 'IN_REVIEW', 'WAITING_APPROVAL', 'APPROVED', 'COMPLETED', 'REJECTED', 'CANCELLED']
 
 export default function StaffAppointmentsPage() {
   const { t } = useI18n()
   const [appointments, setAppointments] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [filter, setFilter] = useState('all')
+  const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
+  const [activeStatus, setActiveStatus] = useState('')
+  const [activePriority, setActivePriority] = useState('')
 
   const fetchAppointments = useCallback(async () => {
     try {
@@ -47,88 +35,83 @@ export default function StaffAppointmentsPage() {
     }
   }, [t])
 
-  useEffect(() => { fetchAppointments() }, [fetchAppointments])
-
-  const filtered = filter === 'all'
-    ? appointments
-    : appointments.filter((a) => a.status === filter)
+  useEffect(() => { void fetchAppointments() }, [fetchAppointments])
 
   const pending = appointments.filter((a) =>
     ['SUBMITTED', 'IN_REVIEW', 'WAITING_APPROVAL'].includes(a.status)
   )
 
-  if (isLoading) return (
-    <div className="flex h-[60vh] items-center justify-center">
-      <Loader2 className="size-8 animate-spin text-primary" />
-    </div>
-  )
+  const byStatus = filter === 'all' ? appointments : appointments.filter((a) => a.status === filter)
+
+  const filtered = byStatus.filter((a) => {
+    if (activeStatus && a.status !== activeStatus) return false
+    if (activePriority && a.priority !== activePriority) return false
+    if (!search) return true
+    const q = search.toLowerCase()
+    return (
+      a.topic?.toLowerCase().includes(q) ||
+      a.requestNo?.toLowerCase().includes(q) ||
+      a.requesterName?.toLowerCase().includes(q) ||
+      a.appointmentType?.toLowerCase().includes(q)
+    )
+  })
+
+  const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+
+  const tabs = [
+    { key: 'all', label: t('common.all'), count: appointments.length },
+    ...ALL_STATUSES.map((s) => ({
+      key: s,
+      label: s.replace(/_/g, ' '),
+      count: appointments.filter((a) => a.status === s).length,
+    })).filter((tab) => tab.count > 0),
+  ]
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-6 pb-20">
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-xl font-bold flex items-center gap-2">
-            <CalendarDays className="size-5 text-primary" /> {t('pages.appointmentRequests')}
-          </h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            {t('pages.appointmentSubtitle')}
-          </p>
-        </div>
-        {pending.length > 0 && (
-          <span className="text-xs bg-amber-50 text-amber-700 border border-amber-200 font-semibold px-2.5 py-1 rounded-full">
+    <StaffListShell
+      title={t('pages.appointmentRequests')}
+      subtitle={t('pages.appointmentSubtitle')}
+      actionButton={
+        pending.length > 0 ? (
+          <span className="text-xs bg-amber-50 text-amber-700 border border-amber-200 font-semibold px-2.5 py-1 rounded-full self-center">
             {t('pages.pendingCount', { count: pending.length })}
           </span>
-        )}
-      </div>
-
-      <div className="flex gap-2 flex-wrap">
-        {['all', 'SUBMITTED', 'IN_REVIEW', 'APPROVED', 'COMPLETED', 'REJECTED'].map((s) => (
-          <button
-            key={s}
-            onClick={() => setFilter(s)}
-            className={cn(
-              'text-xs px-3 py-1.5 rounded-full border font-semibold transition-colors',
-              filter === s
-                ? 'bg-foreground text-background border-foreground'
-                : 'bg-background text-muted-foreground border-border hover:border-foreground'
-            )}
-          >
-            {s === 'all' ? t('common.all') : s.replace(/_/g, ' ')}
-          </button>
-        ))}
-      </div>
-
-      <div className="bg-card border border-border rounded-xl shadow-sm divide-y divide-border overflow-hidden">
-        {filtered.length === 0 ? (
-          <div className="py-16 flex flex-col items-center text-center opacity-50">
-            <AlertCircle className="size-10 mb-3" />
-            <p className="text-sm font-medium">{t('pages.appointmentEmpty')}</p>
-          </div>
-        ) : (
-          filtered.map((a) => (
-            <Link
-              key={a.id}
-              href={`/staff/requests/appointments/${a.id}`}
-              className="flex items-center justify-between px-5 py-4 hover:bg-muted/20 transition-colors"
-            >
-              <div className="min-w-0">
-                <p className="text-sm font-semibold truncate">{a.topic || 'Appointment Request'}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  {a.requestNo} · {a.requesterName}
-                  {a.appointmentType && ` · ${a.appointmentType}`}
-                  {a.preferredStartAt && ` · ${fmtDT(a.preferredStartAt)}`}
-                </p>
-              </div>
-              <span className={cn(
-                'text-xs font-semibold px-2 py-0.5 rounded-full border shrink-0 ml-4',
-                STATUS_BADGE[a.status] ?? STATUS_BADGE.SUBMITTED
-              )}>
-                {a.status?.replace(/_/g, ' ')}
-              </span>
-            </Link>
-          ))
-        )}
-      </div>
-    </div>
+        ) : undefined
+      }
+      tabs={tabs}
+      activeTab={filter}
+      onTabChange={setFilter}
+      search={search}
+      onSearchChange={setSearch}
+      searchPlaceholder={t('tickets.searchPlaceholder')}
+      statusOptions={ALL_STATUSES}
+      activeStatus={activeStatus}
+      onStatusChange={(s) => { setActiveStatus(s); setPage(1) }}
+      activePriority={activePriority}
+      onPriorityChange={(p) => { setActivePriority(p); setPage(1) }}
+      isLoading={isLoading}
+      totalCount={filtered.length}
+      page={page}
+      pageSize={PAGE_SIZE}
+      onPageChange={setPage}
+      emptyIcon={<CalendarDays className="size-8" />}
+      emptyTitle={t('pages.appointmentEmpty')}
+      emptyDesc={search ? t('tickets.searchHint') : undefined}
+    >
+      {paged.map((a) => (
+        <StaffRequestRow
+          key={a.id}
+          href={`/staff/requests/appointments/${a.id}`}
+          title={a.topic || 'Appointment Request'}
+          requestNo={a.requestNo}
+          badge={a.appointmentType}
+          metaLeft={[
+            a.requesterName,
+            a.preferredStartAt ? formatDateTime(a.preferredStartAt) : undefined,
+          ]}
+          status={a.status}
+        />
+      ))}
+    </StaffListShell>
   )
 }

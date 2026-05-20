@@ -1,214 +1,127 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { StatusBadge } from '@/components/status-badge'
-import { EmptyState } from '@/components/empty-state'
-import { CalendarDays, Filter, Loader2, BookOpen, ChevronRight, Clock, MapPin } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { BookOpen } from 'lucide-react'
 import { toast } from 'sonner'
 import { getToken } from '@/lib/auth'
 import { useI18n } from '@/lib/i18n'
+import { StaffListShell } from '@/components/staff/staff-list-shell'
+import { StaffRequestRow, formatDateTime } from '@/components/staff/staff-request-row'
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000'
-
-interface ReservationRequest {
-  id: string
-  reservationRequestId: string
-  requestNo: string
-  title: string
-  status: string
-  reservationStatus: string
-  priority: string
-  eventName: string
-  startAt: string
-  endAt: string
-  resource: { id: string; name: string; resourceType: string } | null
-  requesterName: string
-  createdAt: string
-}
+const PAGE_SIZE = 20
+const ALL_STATUSES = ['SUBMITTED', 'IN_REVIEW', 'PENDING', 'WAITING_APPROVAL', 'APPROVED', 'COMPLETED', 'REJECTED', 'CANCELLED']
 
 type FilterStatus = 'all' | 'pending' | 'approved' | 'rejected'
 
-const FILTER_TABS: { key: FilterStatus }[] = [
-  { key: 'all' },
-  { key: 'pending' },
-  { key: 'approved' },
-  { key: 'rejected' },
-]
-
-function formatDate(d: string) {
-  if (!d) return '—'
-  return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-}
-
-function formatTime(d: string) {
-  if (!d) return ''
-  return new Date(d).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
-}
-
 export default function StaffReservationsPage() {
-  const router = useRouter()
   const { t } = useI18n()
-  const [reservations, setReservations] = useState<ReservationRequest[]>([])
+  const [reservations, setReservations] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [activeFilter, setActiveFilter] = useState<FilterStatus>('all')
+  const [filter, setFilter] = useState<FilterStatus>('all')
+  const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
+  const [activeStatus, setActiveStatus] = useState('')
+  const [activePriority, setActivePriority] = useState('')
 
   useEffect(() => {
-    const fetch_ = async () => {
+    const load = async () => {
       try {
         const res = await fetch(`${BACKEND}/room-reservation-requests`, {
           headers: { Authorization: `Bearer ${getToken()}` },
         })
         if (res.ok) setReservations(await res.json())
-        else setReservations([])
       } catch {
-        toast.error(t('pages.reservationsLoadFail'))
-        setReservations([])
+        toast.error(t('pages.reservationLoadFail'))
       } finally {
         setIsLoading(false)
       }
     }
-    void fetch_()
+    void load()
   }, [t])
 
-  const filtered = reservations.filter((r) => {
-    if (activeFilter === 'all') return true
-    const s = (r.reservationStatus ?? r.status ?? '').toLowerCase()
-    if (activeFilter === 'pending') return ['pending', 'submitted'].includes(s)
-    if (activeFilter === 'approved') return s === 'approved'
-    if (activeFilter === 'rejected') return s === 'rejected'
-    return true
-  })
-
-  if (isLoading) {
-    return (
-      <div className="h-[60vh] flex items-center justify-center">
-        <Loader2 className="size-8 animate-spin text-primary" />
-      </div>
+  const byFilter = (items: any[]) => {
+    if (filter === 'all') return items
+    if (filter === 'pending') return items.filter((r) =>
+      ['SUBMITTED', 'IN_REVIEW', 'PENDING', 'WAITING_APPROVAL'].includes(r.status ?? r.reservationStatus)
     )
+    if (filter === 'approved') return items.filter((r) =>
+      ['APPROVED', 'COMPLETED'].includes(r.status ?? r.reservationStatus)
+    )
+    return items.filter((r) => ['REJECTED', 'CANCELLED'].includes(r.status ?? r.reservationStatus))
   }
 
+  const filtered = byFilter(reservations).filter((r) => {
+    if (activeStatus && (r.status ?? r.reservationStatus) !== activeStatus) return false
+    if (activePriority && r.priority !== activePriority) return false
+    if (!search) return true
+    const q = search.toLowerCase()
+    return (
+      (r.title ?? r.eventName ?? '').toLowerCase().includes(q) ||
+      r.requestNo?.toLowerCase().includes(q) ||
+      r.requesterName?.toLowerCase().includes(q) ||
+      r.resource?.name?.toLowerCase().includes(q)
+    )
+  })
+
+  const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+
+  const pending = reservations.filter((r) =>
+    ['SUBMITTED', 'IN_REVIEW', 'PENDING', 'WAITING_APPROVAL'].includes(r.status ?? r.reservationStatus)
+  )
+  const approved = reservations.filter((r) =>
+    ['APPROVED', 'COMPLETED'].includes(r.status ?? r.reservationStatus)
+  )
+  const rejected = reservations.filter((r) =>
+    ['REJECTED', 'CANCELLED'].includes(r.status ?? r.reservationStatus)
+  )
+
+  const tabs = [
+    { key: 'all', label: t('common.all'), count: reservations.length },
+    { key: 'pending', label: t('common.pending'), count: pending.length },
+    { key: 'approved', label: t('common.approved'), count: approved.length },
+    { key: 'rejected', label: t('common.rejected'), count: rejected.length },
+  ]
+
   return (
-    <div className="p-6 space-y-6 max-w-6xl mx-auto pb-20">
-      <div>
-        <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
-          <CalendarDays className="size-5 text-primary" /> {t('pages.reservations')}
-        </h1>
-        <p className="text-sm text-muted-foreground mt-0.5">{t('pages.reservationSubtitle')}</p>
-      </div>
-
-      <div className="bg-card border border-border rounded-lg shadow-sm overflow-hidden">
-        {/* Filter bar */}
-        <div className="flex items-center justify-between gap-4 px-5 py-3.5 border-b border-border flex-wrap">
-          <div className="flex items-center gap-1">
-            <Filter className="size-3.5 text-muted-foreground mr-1" />
-            {FILTER_TABS.map((tab) => {
-              const count =
-                tab.key === 'all'
-                  ? reservations.length
-                  : reservations.filter((r) => {
-                      const s = (r.reservationStatus ?? r.status ?? '').toLowerCase()
-                      if (tab.key === 'pending') return ['pending', 'submitted'].includes(s)
-                      return s === tab.key
-                    }).length
-              return (
-                <button
-                  key={tab.key}
-                  onClick={() => setActiveFilter(tab.key)}
-                  className={cn(
-                    'px-3 py-1 rounded-full text-xs font-medium transition-colors flex items-center gap-1.5',
-                    activeFilter === tab.key
-                      ? 'bg-primary text-primary-foreground'
-                      : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
-                  )}
-                >
-                  {tab.key === 'all' ? t('common.all') : tab.key === 'pending' ? t('common.pending') : tab.key === 'approved' ? t('common.approved') : t('common.rejected')}
-                  {count > 0 && (
-                    <span className={cn(
-                      'text-[9px] font-bold px-1 rounded-full',
-                      activeFilter === tab.key
-                        ? 'bg-primary-foreground/20 text-primary-foreground'
-                        : 'bg-muted text-muted-foreground'
-                    )}>
-                      {count}
-                    </span>
-                  )}
-                </button>
-              )
-            })}
-          </div>
-          <span className="text-xs text-muted-foreground">{t('common.records', { count: filtered.length })}</span>
-        </div>
-
-        {filtered.length === 0 ? (
-          <EmptyState
-            title={t('pages.noReservations')}
-            description={t('pages.noReservationsDesc')}
-            icon={<BookOpen className="size-6" />}
-          />
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-muted/40 border-b border-border">
-                  <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">{t('pages.requestNo')}</th>
-                  <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">{t('pages.roomResource')}</th>
-                  <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider hidden md:table-cell">{t('common.requester')}</th>
-                  <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider hidden lg:table-cell">{t('pages.dateTime')}</th>
-                  <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">{t('common.status')}</th>
-                  <th className="sr-only">{t('common.actions')}</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {filtered.map((req) => (
-                  <tr
-                    key={req.id}
-                    onClick={() => router.push(`/staff/requests/reservations/${req.id}`)}
-                    className="hover:bg-muted/20 transition-colors cursor-pointer"
-                  >
-                    <td className="px-5 py-4">
-                      <span className="font-mono text-xs font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded">
-                        {req.requestNo}
-                      </span>
-                    </td>
-                    <td className="px-5 py-4">
-                      <p className="font-medium text-foreground">{req.eventName ?? req.title}</p>
-                      {req.resource?.name && (
-                        <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
-                          <MapPin className="size-3" />{req.resource.name}
-                        </p>
-                      )}
-                    </td>
-                    <td className="px-5 py-4 hidden md:table-cell">
-                      <div className="flex items-center gap-2">
-                        <div className="size-6 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs font-bold flex-shrink-0">
-                          {req.requesterName?.charAt(0) || 'U'}
-                        </div>
-                        <span className="text-muted-foreground">{req.requesterName || 'Unknown'}</span>
-                      </div>
-                    </td>
-                    <td className="px-5 py-4 hidden lg:table-cell text-muted-foreground text-xs whitespace-nowrap">
-                      {req.startAt && (
-                        <span className="flex items-center gap-1">
-                          <Clock className="size-3" />
-                          {formatDate(req.startAt)} · {formatTime(req.startAt)} – {formatTime(req.endAt)}
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-5 py-4">
-                      <StatusBadge status={req.reservationStatus ?? req.status} />
-                    </td>
-                    <td className="px-5 py-4">
-                      <ChevronRight className="size-4 text-muted-foreground" />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-    </div>
+    <StaffListShell
+      title={t('pages.reservationRequests')}
+      subtitle={t('pages.reservationSubtitle')}
+      tabs={tabs}
+      activeTab={filter}
+      onTabChange={(k) => setFilter(k as FilterStatus)}
+      search={search}
+      onSearchChange={setSearch}
+      searchPlaceholder={t('tickets.searchPlaceholder')}
+      statusOptions={ALL_STATUSES}
+      activeStatus={activeStatus}
+      onStatusChange={(s) => { setActiveStatus(s); setPage(1) }}
+      activePriority={activePriority}
+      onPriorityChange={(p) => { setActivePriority(p); setPage(1) }}
+      isLoading={isLoading}
+      totalCount={filtered.length}
+      page={page}
+      pageSize={PAGE_SIZE}
+      onPageChange={setPage}
+      emptyIcon={<BookOpen className="size-8" />}
+      emptyTitle={t('pages.noReservations')}
+      emptyDesc={search ? t('tickets.searchHint') : undefined}
+    >
+      {paged.map((r) => (
+        <StaffRequestRow
+          key={r.id}
+          href={`/staff/requests/reservations/${r.id}`}
+          title={r.title ?? r.eventName ?? 'Reservation Request'}
+          requestNo={r.requestNo}
+          badge={r.resource?.name}
+          metaLeft={[
+            r.requesterName,
+            r.startAt ? formatDateTime(r.startAt) : undefined,
+          ]}
+          status={r.status ?? r.reservationStatus}
+          priority={r.priority}
+        />
+      ))}
+    </StaffListShell>
   )
 }

@@ -1,35 +1,30 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
-import { ShieldCheck, Loader2, AlertCircle, CheckCircle, XCircle } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { cn } from '@/lib/utils'
+import { ShieldCheck } from 'lucide-react'
 import { toast } from 'sonner'
 import { getToken } from '@/lib/auth'
 import { useI18n } from '@/lib/i18n'
+import { StaffListShell } from '@/components/staff/staff-list-shell'
+import { StaffRequestRow } from '@/components/staff/staff-request-row'
 
-const STATUS_BADGE: Record<string, string> = {
-  SUBMITTED:  'bg-blue-50 text-blue-700 border-blue-200',
-  IN_REVIEW:  'bg-yellow-50 text-yellow-700 border-yellow-200',
-  APPROVED:   'bg-green-50 text-green-700 border-green-200',
-  REJECTED:   'bg-red-50 text-red-700 border-red-200',
-  COMPLETED:  'bg-gray-50 text-gray-500 border-gray-200',
-}
+const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000'
+const PAGE_SIZE = 20
+const ALL_STATUSES = ['SUBMITTED', 'IN_REVIEW', 'APPROVED', 'REJECTED', 'COMPLETED']
 
 export default function StaffAccessRequestsPage() {
-  const router = useRouter()
   const { t } = useI18n()
   const [requests, setRequests] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [actionId, setActionId] = useState<string | null>(null)
-  const [note, setNote] = useState('')
   const [filter, setFilter] = useState('all')
+  const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
+  const [activeStatus, setActiveStatus] = useState('')
+  const [activePriority, setActivePriority] = useState('')
 
   const fetchRequests = useCallback(async () => {
     try {
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
-      const res = await fetch(`${backendUrl}/access-requests`, {
+      const res = await fetch(`${BACKEND}/access-requests`, {
         headers: { Authorization: `Bearer ${getToken()}` },
       })
       if (res.ok) setRequests(await res.json())
@@ -40,83 +35,69 @@ export default function StaffAccessRequestsPage() {
     }
   }, [t])
 
-  useEffect(() => { fetchRequests() }, [fetchRequests])
+  useEffect(() => { void fetchRequests() }, [fetchRequests])
 
-  const updateStatus = async (id: string, status: string) => {
-    try {
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
-      const res = await fetch(`${backendUrl}/access-requests/${id}/status`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
-        body: JSON.stringify({ status, note }),
-      })
-      if (!res.ok) throw new Error()
-      toast.success(t('pages.accessUpdateSuccess'))
-      setActionId(null)
-      setNote('')
-      fetchRequests()
-    } catch {
-      toast.error(t('pages.accessUpdateFail'))
-    }
-  }
+  const byStatus = filter === 'all' ? requests : requests.filter((r) => r.status === filter)
 
-  const filtered = filter === 'all' ? requests : requests.filter((r) => r.status === filter)
+  const filtered = byStatus.filter((r) => {
+    if (activeStatus && r.status !== activeStatus) return false
+    if (activePriority && r.priority !== activePriority) return false
+    if (!search) return true
+    const q = search.toLowerCase()
+    return (
+      r.targetResource?.toLowerCase().includes(q) ||
+      r.requestNo?.toLowerCase().includes(q) ||
+      r.requesterName?.toLowerCase().includes(q) ||
+      r.accessType?.toLowerCase().includes(q)
+    )
+  })
 
-  if (isLoading) return (
-    <div className="flex h-[60vh] items-center justify-center">
-      <Loader2 className="size-8 animate-spin text-primary" />
-    </div>
-  )
+  const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+
+  const tabs = [
+    { key: 'all', label: t('common.all'), count: requests.length },
+    ...ALL_STATUSES.map((s) => ({
+      key: s,
+      label: s.replace(/_/g, ' '),
+      count: requests.filter((r) => r.status === s).length,
+    })).filter((tab) => tab.count > 0),
+  ]
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-6 pb-20">
-      <div>
-        <h1 className="text-xl font-bold flex items-center gap-2"><ShieldCheck className="size-5 text-primary" /> {t('pages.accessRequests')}</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">{t('pages.accessSubtitle')}</p>
-      </div>
-
-      <div className="flex gap-2 flex-wrap">
-        {['all', 'SUBMITTED', 'IN_REVIEW', 'APPROVED', 'REJECTED'].map((s) => (
-          <button key={s} onClick={() => setFilter(s)}
-            className={cn('text-xs px-3 py-1.5 rounded-full border font-semibold transition-colors',
-              filter === s ? 'bg-foreground text-background border-foreground' : 'bg-background text-muted-foreground border-border hover:border-foreground')}>
-            {s === 'all' ? t('common.all') : s.replace(/_/g, ' ')}
-          </button>
-        ))}
-      </div>
-
-      <div className="bg-card border border-border rounded-xl shadow-sm divide-y divide-border overflow-hidden">
-        {filtered.length === 0 ? (
-          <div className="py-16 flex flex-col items-center text-center opacity-50">
-            <AlertCircle className="size-10 mb-3" />
-            <p className="text-sm font-medium">{t('pages.noAccessRequests')}</p>
-          </div>
-        ) : (
-          filtered.map((r) => (
-            <div
-              key={r.id}
-              onClick={() => router.push(`/staff/requests/access-requests/${r.id}`)}
-              className="px-5 py-4 space-y-3 cursor-pointer hover:bg-muted/20 transition-colors"
-            >
-              <div className="flex items-start justify-between gap-4">
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold truncate">{r.targetResource}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {r.requestNo} · {r.accessType} · {r.requesterName}
-                  </p>
-                  {r.justification && (
-                    <p className="text-xs text-muted-foreground mt-1 italic truncate max-w-md">"{r.justification}"</p>
-                  )}
-                </div>
-                <span className={cn('text-xs font-semibold px-2 py-0.5 rounded-full border shrink-0', STATUS_BADGE[r.status] ?? STATUS_BADGE.SUBMITTED)}>
-                  {r.status?.replace(/_/g, ' ')}
-                </span>
-              </div>
-
-            </div>
-          ))
-        )}
-      </div>
-    </div>
+    <StaffListShell
+      title={t('pages.accessRequests')}
+      subtitle={t('pages.accessSubtitle')}
+      tabs={tabs}
+      activeTab={filter}
+      onTabChange={setFilter}
+      search={search}
+      onSearchChange={setSearch}
+      searchPlaceholder={t('tickets.searchPlaceholder')}
+      statusOptions={ALL_STATUSES}
+      activeStatus={activeStatus}
+      onStatusChange={(s) => { setActiveStatus(s); setPage(1) }}
+      activePriority={activePriority}
+      onPriorityChange={(p) => { setActivePriority(p); setPage(1) }}
+      isLoading={isLoading}
+      totalCount={filtered.length}
+      page={page}
+      pageSize={PAGE_SIZE}
+      onPageChange={setPage}
+      emptyIcon={<ShieldCheck className="size-8" />}
+      emptyTitle={t('pages.noAccessRequests')}
+      emptyDesc={search ? t('tickets.searchHint') : undefined}
+    >
+      {paged.map((r) => (
+        <StaffRequestRow
+          key={r.id}
+          href={`/staff/requests/access-requests/${r.id}`}
+          title={r.targetResource || 'Access Request'}
+          requestNo={r.requestNo}
+          badge={r.accessType}
+          metaLeft={[r.requesterName, r.justification ? `"${r.justification.slice(0, 60)}…"` : undefined]}
+          status={r.status}
+        />
+      ))}
+    </StaffListShell>
   )
 }
