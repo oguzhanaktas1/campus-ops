@@ -29,6 +29,7 @@ import {
 import AuthGuard from "@/components/AuthGuard/auth-guard";
 import { PortalAssistant } from "@/components/ai/portal-assistant";
 import { fetchProfile, getStoredUser, getToken } from "@/lib/auth";
+import { RealtimeProvider } from "@/lib/providers/realtime-provider";
 
 function StudentLayoutInner({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<any>(null);
@@ -160,7 +161,9 @@ export default function StudentLayout({
 }) {
   return (
     <StudentI18nProvider>
-      <StudentLayoutInner>{children}</StudentLayoutInner>
+      <RealtimeProvider>
+        <StudentLayoutInner>{children}</StudentLayoutInner>
+      </RealtimeProvider>
     </StudentI18nProvider>
   );
 }

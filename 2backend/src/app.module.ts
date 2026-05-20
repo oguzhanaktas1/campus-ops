@@ -32,6 +32,7 @@ import { RateLimitModule } from './infrastructure/rate-limit/rate-limit.module';
 import { FilesModule } from './files/files.module';
 import { OrganizerModule } from './organizer/organizer.module';
 import { AiModule } from './modules/ai/ai.module';
+import { RealtimeModule } from './realtime/realtime.module';
 
 @Module({
   imports: [
@@ -43,6 +44,7 @@ import { AiModule } from './modules/ai/ai.module';
     RateLimitModule,
     FilesModule,
     AiModule,
+    RealtimeModule,
     PrismaModule,
     AuthModule,
     NotificationsModule,

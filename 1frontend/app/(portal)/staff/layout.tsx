@@ -28,6 +28,7 @@ import {
 import AuthGuard from "@/components/AuthGuard/auth-guard";
 import { PortalAssistant } from "@/components/ai/portal-assistant";
 import { fetchProfile, getStoredUser } from "@/lib/auth";
+import { RealtimeProvider } from "@/lib/providers/realtime-provider";
 import { StaffI18nProvider } from "@/components/staff/staff-i18n-provider";
 import { useI18n } from "@/lib/i18n";
 
@@ -134,7 +135,9 @@ function StaffLayoutInner({
 export default function StaffLayout({ children }: { children: React.ReactNode }) {
   return (
     <StaffI18nProvider>
-      <StaffLayoutInner>{children}</StaffLayoutInner>
+      <RealtimeProvider>
+        <StaffLayoutInner>{children}</StaffLayoutInner>
+      </RealtimeProvider>
     </StaffI18nProvider>
   );
 }

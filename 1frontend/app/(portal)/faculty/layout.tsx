@@ -27,6 +27,7 @@ import {
 import AuthGuard from "@/components/AuthGuard/auth-guard";
 import { PortalAssistant } from "@/components/ai/portal-assistant";
 import { fetchProfile, getStoredUser, getToken } from "@/lib/auth";
+import { RealtimeProvider } from "@/lib/providers/realtime-provider";
 import { FacultyI18nProvider } from "@/components/faculty/faculty-i18n-provider";
 import { useI18n } from "@/lib/i18n";
 
@@ -141,7 +142,9 @@ function FacultyLayoutInner({ children }: { children: React.ReactNode }) {
 export default function FacultyLayout({ children }: { children: React.ReactNode }) {
   return (
     <FacultyI18nProvider>
-      <FacultyLayoutInner>{children}</FacultyLayoutInner>
+      <RealtimeProvider>
+        <FacultyLayoutInner>{children}</FacultyLayoutInner>
+      </RealtimeProvider>
     </FacultyI18nProvider>
   );
 }

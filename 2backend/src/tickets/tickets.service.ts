@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import {
   ApprovalAction,
@@ -40,6 +41,7 @@ import {
 import { RabbitmqPublisher } from '../infrastructure/rabbitmq/rabbitmq.publisher';
 import { RoutingKeys } from '../infrastructure/rabbitmq/routing-keys';
 import { AiClientService } from '../modules/ai/ai-client.service';
+import type { RealtimeService } from '../realtime/realtime.service';
 
 const IT_REQUEST_TYPE_KEY = 'IT_SUPPORT';
 
@@ -98,6 +100,7 @@ export class TicketsService {
     private filesService: FilesService,
     private mq: RabbitmqPublisher,
     private aiClientService: AiClientService,
+    @Optional() private realtimeService?: RealtimeService,
   ) {}
 
   private hasAnyRole(roles: string[], allowed: string[]) {
@@ -1634,6 +1637,19 @@ export class TicketsService {
     });
 
     await this.touchTicketCaches(requestId);
+
+    this.realtimeService?.emitToUser(dto.assignedItUserId, 'ticket.assigned', {
+      requestId,
+      ticketId: ticket.id,
+      assignedItUserId: dto.assignedItUserId,
+    });
+
+    this.realtimeService?.emitToRole('STAFF', 'ticket.status.changed', {
+      requestId,
+      ticketId: ticket.id,
+      ticketStatus: result.ticketStatus,
+    });
+
     return result;
   }
 

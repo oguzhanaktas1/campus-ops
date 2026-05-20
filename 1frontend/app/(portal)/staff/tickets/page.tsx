@@ -20,6 +20,7 @@ import { getStoredUser, getToken } from '@/lib/auth'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { useI18n } from '@/lib/i18n'
+import { getActiveSocket } from '@/lib/socket'
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000'
 
@@ -102,6 +103,30 @@ export default function StaffTicketsPage() {
   }, [t])
 
   useEffect(() => { void fetchTickets() }, [fetchTickets])
+
+  useEffect(() => {
+    const sock = getActiveSocket()
+    if (!sock) return
+
+    const refresh = () => { void fetchTickets() }
+    const onSlaBreached = (payload: any) => {
+      const data = payload?.data ?? payload
+      toast.warning(`SLA ihlali: ${data?.message ?? 'Bir ticket SLA süresini aştı'}`)
+      void fetchTickets()
+    }
+
+    sock.on('ticket.assigned', refresh)
+    sock.on('ticket.status.changed', refresh)
+    sock.on('sla.breached', onSlaBreached)
+    sock.on('sla.warning', refresh)
+
+    return () => {
+      sock.off('ticket.assigned', refresh)
+      sock.off('ticket.status.changed', refresh)
+      sock.off('sla.breached', onSlaBreached)
+      sock.off('sla.warning', refresh)
+    }
+  }, [fetchTickets])
 
   const allTickets = [...activeTickets, ...completedTickets]
   const unassigned = activeTickets.filter((t) => !getAssignee(t))

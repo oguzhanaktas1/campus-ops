@@ -12,6 +12,7 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { cn } from '@/lib/utils'
 import { useOptionalT } from '@/lib/optional-t'
+import { getActiveSocket } from '@/lib/socket'
 
 function timeAgo(ts: string, tt: (key: string, fallback: string, params?: Record<string, string | number>) => string) {
   if (!ts) return ''
@@ -66,6 +67,20 @@ export function NotificationBell({ role = 'student' }: NotificationBellProps) {
   useEffect(() => {
     fetchNotifications()
     const interval = setInterval(fetchNotifications, 30000)
+
+    const sock = getActiveSocket()
+    if (sock) {
+      const handler = (payload: any) => {
+        const notif = payload?.data ?? payload
+        setNotifications(prev => [{ ...notif, isRead: false }, ...prev])
+      }
+      sock.on('notification.created', handler)
+      return () => {
+        clearInterval(interval)
+        sock.off('notification.created', handler)
+      }
+    }
+
     return () => clearInterval(interval)
   }, [role])
 

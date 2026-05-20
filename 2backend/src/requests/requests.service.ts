@@ -6,6 +6,7 @@ import {
   NotFoundException,
   ForbiddenException,
   ConflictException,
+  Optional,
 } from '@nestjs/common';
 import { PrismaService } from '../core/prisma/prisma.service';
 import { PriorityLevel, RequestStatus } from '@prisma/client';
@@ -23,6 +24,7 @@ import {
 import { RabbitmqPublisher } from '../infrastructure/rabbitmq/rabbitmq.publisher';
 import { OutboxService } from '../infrastructure/rabbitmq/outbox.service';
 import { RoutingKeys } from '../infrastructure/rabbitmq/routing-keys';
+import type { RealtimeService } from '../realtime/realtime.service';
 
 const OPEN_STATUSES: RequestStatus[] = ['SUBMITTED', 'IN_REVIEW', 'WAITING_APPROVAL'];
 const INTERNAL_ROLES = ['STAFF', 'FACULTY', 'ADMIN'];
@@ -100,6 +102,7 @@ export class RequestsService {
     private filesService: FilesService,
     private mq: RabbitmqPublisher,
     private outbox: OutboxService,
+    @Optional() private realtimeService?: RealtimeService,
   ) {}
 
   private assertRequestAccess(req: any, userId: string, roles: string[]) {
@@ -708,6 +711,13 @@ export class RequestsService {
     await this.cacheService.bumpVersion(
       CacheKeys.version(`request:detail:${requestId}`),
     );
+
+    if (!comment.isInternal) {
+      this.realtimeService?.emitToRequest(requestId, 'request.comment.created', {
+        requestId,
+        comment: response,
+      });
+    }
 
     return response;
   }

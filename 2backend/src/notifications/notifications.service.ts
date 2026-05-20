@@ -1,8 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { NotificationStatus, NotificationType } from '@prisma/client';
 import { CacheService } from '../infrastructure/cache/cache.service';
 import { CacheKeys, CacheTtls } from '../infrastructure/cache/cache-keys';
 import { PrismaService } from '../core/prisma/prisma.service';
+import type { RealtimeService } from '../realtime/realtime.service';
 
 export interface CreateNotificationDto {
   userId: string;
@@ -18,6 +19,7 @@ export class NotificationsService {
   constructor(
     private prisma: PrismaService,
     private cacheService: CacheService,
+    @Optional() private realtimeService?: RealtimeService,
   ) {}
 
   async getMyNotifications(userId: string) {
@@ -119,6 +121,16 @@ export class NotificationsService {
         },
       });
       await this.cacheService.incr(CacheKeys.notificationsUnread(dto.userId));
+
+      this.realtimeService?.emitToUser(dto.userId, 'notification.created', {
+        id: notification.id,
+        title: notification.title,
+        message: notification.message,
+        type: notification.type,
+        actionUrl: notification.actionUrl,
+        createdAt: notification.createdAt,
+      });
+
       return notification;
     } catch {
       // Non-blocking

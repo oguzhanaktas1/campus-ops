@@ -26,6 +26,7 @@ import {
 import AuthGuard from "@/components/AuthGuard/auth-guard";
 import { PortalAssistant } from "@/components/ai/portal-assistant";
 import { fetchProfile, getStoredUser } from "@/lib/auth";
+import { RealtimeProvider } from "@/lib/providers/realtime-provider";
 
 function AdminLayoutInner({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<any>(null);
@@ -183,7 +184,9 @@ export default function AdminLayout({
 }) {
   return (
     <AdminI18nProvider>
-      <AdminLayoutInner>{children}</AdminLayoutInner>
+      <RealtimeProvider>
+        <AdminLayoutInner>{children}</AdminLayoutInner>
+      </RealtimeProvider>
     </AdminI18nProvider>
   );
 }

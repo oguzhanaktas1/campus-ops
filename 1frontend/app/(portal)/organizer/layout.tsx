@@ -21,6 +21,7 @@ import {
 import AuthGuard from "@/components/AuthGuard/auth-guard";
 import { PortalAssistant } from "@/components/ai/portal-assistant";
 import { fetchProfile, getStoredUser, getToken } from "@/lib/auth";
+import { RealtimeProvider } from "@/lib/providers/realtime-provider";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { OrganizerI18nProvider } from "@/components/organizer/organizer-i18n-provider";
 import { useI18n } from "@/lib/i18n";
@@ -124,7 +125,9 @@ function OrganizerLayoutInner({
 export default function OrganizerLayout({ children }: { children: React.ReactNode }) {
   return (
     <OrganizerI18nProvider>
-      <OrganizerLayoutInner>{children}</OrganizerLayoutInner>
+      <RealtimeProvider>
+        <OrganizerLayoutInner>{children}</OrganizerLayoutInner>
+      </RealtimeProvider>
     </OrganizerI18nProvider>
   );
 }

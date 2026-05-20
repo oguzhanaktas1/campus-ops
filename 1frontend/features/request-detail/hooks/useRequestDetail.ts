@@ -8,6 +8,7 @@ import type {
   RequestDetailViewModel,
   RequestPortal,
 } from '@/features/request-detail/types'
+import { getActiveSocket } from '@/lib/socket'
 
 async function fetchJson(url: string, token: string) {
   const response = await fetch(url, {
@@ -71,6 +72,41 @@ export function useRequestDetail(requestId: string, portal: RequestPortal) {
       isCancelled = true
     }
   }, [portal, requestId])
+
+  // WebSocket: join request room and listen for live updates
+  useEffect(() => {
+    if (!requestId) return
+
+    const sock = getActiveSocket()
+    if (!sock) return
+
+    sock.emit('request.join', { requestId })
+
+    const onStatusChanged = (payload: any) => {
+      const data = payload?.data ?? payload
+      setDetail((prev) => prev ? { ...prev, status: data.status ?? prev.status } : prev)
+    }
+
+    const onCommentCreated = (payload: any) => {
+      const comment = payload?.data?.comment ?? payload
+      if (!comment?.id) return
+      setDetail((prev) => {
+        if (!prev) return prev
+        const alreadyExists = prev.comments?.some((c: any) => c.id === comment.id)
+        if (alreadyExists) return prev
+        return { ...prev, comments: [...(prev.comments ?? []), comment] }
+      })
+    }
+
+    sock.on('request.status.changed', onStatusChanged)
+    sock.on('request.comment.created', onCommentCreated)
+
+    return () => {
+      sock.emit('request.leave', { requestId })
+      sock.off('request.status.changed', onStatusChanged)
+      sock.off('request.comment.created', onCommentCreated)
+    }
+  }, [requestId])
 
   return { detail, isLoading, setDetail }
 }

@@ -14,6 +14,7 @@ import {
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { getToken } from '@/lib/auth'
+import { getActiveSocket } from '@/lib/socket'
 import { StatusBadge, PriorityBadge } from '@/components/status-badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -121,6 +122,19 @@ export default function FacultyApprovalsPage() {
     }
 
     void fetchPendingRequests()
+
+    const sock = getActiveSocket()
+    if (sock) {
+      const refresh = () => void fetchPendingRequests()
+      sock.on('approval.created', refresh)
+      sock.on('approval.completed', refresh)
+      sock.on('request.status.changed', refresh)
+      return () => {
+        sock.off('approval.created', refresh)
+        sock.off('approval.completed', refresh)
+        sock.off('request.status.changed', refresh)
+      }
+    }
   }, [initialSelectedId])
 
   useEffect(() => {
