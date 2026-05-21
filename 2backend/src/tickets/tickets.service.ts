@@ -1305,7 +1305,10 @@ export class TicketsService {
     if (filters?.assignedItUserId !== undefined) {
       where.assignedItUserId = filters.assignedItUserId || null;
     } else if (roles.includes('IT_AGENT') && !this.canManageTicket(roles)) {
-      where.assignedItUserId = userId;
+      where.OR = [
+        { assignedItUserId: userId },
+        { request: { assignments: { some: { assignedToUserId: userId, isActive: true } } } },
+      ];
     }
 
     const version = await this.cacheService.getVersion(
