@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import {
   CheckCircle2,
@@ -67,6 +67,8 @@ export default function FacultyApprovalsPage() {
   const [isQueueLoading, setIsQueueLoading] = useState(true)
   const [isProcessing, setIsProcessing] = useState(false)
   const [selectedId, setSelectedId] = useState<string | null>(initialSelectedId)
+  const [completedAction, setCompletedAction] = useState<ActionType>(null)
+  const dismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [comment, setComment] = useState('')
   const [aiEnabled, setAiEnabled] = useState(false)
   const [aiSummary, setAiSummary] = useState<{
@@ -76,6 +78,12 @@ export default function FacultyApprovalsPage() {
     fallbackUsed?: boolean
   } | null>(null)
   const [isAiLoading, setIsAiLoading] = useState(false)
+
+  useEffect(() => {
+    return () => {
+      if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current)
+    }
+  }, [])
 
   const { detail, isLoading, setDetail } = useRequestDetail(
     selectedId ?? '',
@@ -246,15 +254,18 @@ export default function FacultyApprovalsPage() {
         throw new Error(errorData?.message || t(`approvals.fail${action.charAt(0).toUpperCase() + action.slice(1)}`))
       }
 
-      const successKey = action === 'approve' ? 'successApprove' : action === 'reject' ? 'successReject' : 'successRevision'
-      toast.success(t(`approvals.${successKey}`))
       setComment('')
+      setCompletedAction(action)
 
-      setPending((prev) => {
-        const next = prev.filter((item) => item.id !== selectedId)
-        setSelectedId(next[0]?.id ?? null)
-        return next
-      })
+      if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current)
+      dismissTimerRef.current = setTimeout(() => {
+        setCompletedAction(null)
+        setPending((prev) => {
+          const next = prev.filter((item) => item.id !== selectedId)
+          setSelectedId(next[0]?.id ?? null)
+          return next
+        })
+      }, 1800)
     } catch (error) {
       const failKey = action === 'approve' ? 'failApprove' : action === 'reject' ? 'failReject' : 'failRevision'
       toast.error(
@@ -357,6 +368,7 @@ export default function FacultyApprovalsPage() {
                 <div className="space-y-6">
                   <FacultyDecisionPanel
                     detailStatus={detail.status}
+                    completedAction={completedAction}
                     submittedByName={
                       detail.requester?.fullName ??
                       selectedSummary?.submittedByName ??
@@ -466,6 +478,7 @@ function ApprovalAiSummaryCard({
 
 function FacultyDecisionPanel({
   detailStatus,
+  completedAction,
   submittedByName,
   requestTypeName,
   comment,
@@ -474,6 +487,7 @@ function FacultyDecisionPanel({
   onAction,
 }: {
   detailStatus: string
+  completedAction: ActionType
   submittedByName: string
   requestTypeName: string
   comment: string
@@ -482,9 +496,15 @@ function FacultyDecisionPanel({
   onAction: (action: ActionType) => void
 }) {
   const { t } = useI18n()
-  const isLocked = ['APPROVED', 'REJECTED', 'REVISION_REQUESTED'].includes(
-    detailStatus,
-  )
+  const isLocked = ['APPROVED', 'REJECTED', 'REVISION_REQUESTED'].includes(detailStatus)
+
+  const completedConfig = completedAction === 'approve'
+    ? { label: t('approvals.successApprove'), className: 'border-emerald-200 bg-emerald-50 text-emerald-800', icon: <CheckCircle2 className="size-5 text-emerald-600" /> }
+    : completedAction === 'reject'
+      ? { label: t('approvals.successReject'), className: 'border-red-200 bg-red-50 text-red-800', icon: <XCircle className="size-5 text-red-500" /> }
+      : completedAction === 'revision'
+        ? { label: t('approvals.successRevision'), className: 'border-amber-200 bg-amber-50 text-amber-800', icon: <RotateCcw className="size-5 text-amber-600" /> }
+        : null
 
   return (
     <Card>
@@ -494,12 +514,15 @@ function FacultyDecisionPanel({
       <CardContent className="space-y-4">
         <div className="rounded-lg border bg-muted/30 p-3 text-sm">
           <p className="font-medium text-foreground">{requestTypeName}</p>
-          <p className="mt-1 text-muted-foreground">
-            {submittedByName}
-          </p>
+          <p className="mt-1 text-muted-foreground">{submittedByName}</p>
         </div>
 
-        {isLocked ? (
+        {completedConfig ? (
+          <div className={`flex items-center gap-3 rounded-lg border p-4 text-sm font-medium ${completedConfig.className}`}>
+            {completedConfig.icon}
+            {completedConfig.label}
+          </div>
+        ) : isLocked ? (
           <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
             {t('common.completed')}
           </div>

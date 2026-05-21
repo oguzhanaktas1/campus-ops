@@ -108,7 +108,7 @@ export function buildWorkflowSummary(
   const steps = (workflowInstance.workflowDefinition?.steps ?? [])
     .filter((step: any) => shouldDisplayStep(step, requestStatus))
     .map((step: any) => {
-      const instanceStep = workflowInstance.instanceSteps?.find(
+      const instanceStep = workflowInstance.instanceSteps?.findLast(
         (item: any) => item.workflowStepId === step.id,
       );
       const isCurrent = step.id === workflowInstance.currentStepId;
