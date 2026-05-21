@@ -9,6 +9,12 @@ services:
       PUBLIC_API_URL: https://api.campusflow.com.tr
       RABBITMQ_MGMT_PUBLIC: https://mq.campusflow.com.tr
 
+  ai-service:
+    environment:
+      OLLAMA_BASE_URL: http://188.132.177.60:11434
+      AI_DEFAULT_MODEL: gemma4:e2b
+      AI_FALLBACK_MODEL: llama3.2:1b
+
   frontend:
     build:
       context: ./1frontend

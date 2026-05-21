@@ -1498,7 +1498,10 @@ export class FacultyService {
       if (revisionAction?.actionByUserId) {
         await tx.request.update({
           where: { id: requestId },
-          data: { currentAssigneeUserId: revisionAction.actionByUserId },
+          data: {
+            status: RequestStatus.IN_REVIEW,
+            currentAssigneeUserId: revisionAction.actionByUserId,
+          },
         });
 
         const prevAssignment = await tx.requestAssignment.findFirst({
