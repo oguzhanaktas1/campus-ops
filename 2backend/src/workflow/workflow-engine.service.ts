@@ -17,6 +17,8 @@ import { SlaService } from './sla.service';
 import { RabbitmqPublisher } from '../infrastructure/rabbitmq/rabbitmq.publisher';
 import { RoutingKeys } from '../infrastructure/rabbitmq/routing-keys';
 import { RealtimeService } from '../realtime/realtime.service';
+import { CacheService } from '../infrastructure/cache/cache.service';
+import { CacheKeys } from '../infrastructure/cache/cache-keys';
 
 const TERMINAL_STATUSES: RequestStatus[] = [
   'APPROVED',
@@ -64,6 +66,7 @@ export class WorkflowEngineService {
     private slaService: SlaService,
     private mq: RabbitmqPublisher,
     @Optional() private realtimeService?: RealtimeService,
+    @Optional() private cacheService?: CacheService,
   ) {}
 
   private getJsonPathValue(
@@ -946,6 +949,10 @@ export class WorkflowEngineService {
         nextStep: shouldContinue ? nextStep?.stepName ?? null : null,
       };
     });
+
+    // ── Cache invalidation — tüm portal detay cache'lerini geçersiz kıl ──────
+    void this.cacheService?.bumpVersion(CacheKeys.version(`request:detail:${requestId}`));
+    void this.cacheService?.bumpVersion(CacheKeys.version('faculty:approvals:list'));
 
     // ── Real-time WebSocket — workflow/status değişimini anlık ilet ──────────
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
