@@ -913,40 +913,18 @@ export class TicketsService {
       requestNo = makeRequestNo();
     }
 
-    const aiTriage = await this.aiClientService.post(
-      '/triage/ticket',
-      {
-        title: dto.title,
-        description: dto.description ?? dto.title,
-        requester_faculty: dto.facultyId ?? null,
-        requester_department: dto.departmentId ?? null,
-        source_channel: 'portal',
-        similar_resolutions: [],
-      },
-      {
-        requestType: 'IT_TICKET',
-        category: dto.category,
-        priority: dto.priority ?? 'MEDIUM',
-        suggestedUnit: 'IT',
-        summary: dto.title,
-        missingFields: [],
-        confidence: 0.25,
-        fallbackUsed: true,
-      },
-    );
-
-    const category =
-      ['general', 'other', 'unspecified'].includes(dto.category.toLowerCase()) &&
-      typeof aiTriage.category === 'string'
-        ? aiTriage.category
-        : dto.category;
-
-    const priority =
-      dto.priority ??
-      (typeof aiTriage.priority === 'string' &&
-      Object.values(PriorityLevel).includes(aiTriage.priority as PriorityLevel)
-        ? (aiTriage.priority as PriorityLevel)
-        : PriorityLevel.MEDIUM);
+    const category = dto.category;
+    const priority = dto.priority ?? PriorityLevel.MEDIUM;
+    const initialAiTriage = {
+      requestType: 'IT_TICKET',
+      category,
+      priority,
+      suggestedUnit: 'IT',
+      summary: dto.title,
+      missingFields: [],
+      confidence: 0.0,
+      fallbackUsed: true,
+    };
 
     const created = await this.prisma.$transaction(async (tx) => {
       const req = await tx.request.create({
@@ -962,9 +940,7 @@ export class TicketsService {
           facultyId: dto.facultyId ?? null,
           departmentId: dto.departmentId ?? null,
           unitId: dto.unitId ?? null,
-          dynamicData: {
-            aiTriage,
-          },
+          dynamicData: { aiTriage: initialAiTriage },
         },
       });
 
@@ -1011,12 +987,69 @@ export class TicketsService {
         requestId: req.id,
         ticketId: ticket.id,
         requestNo: req.requestNo,
-        aiTriage,
       };
     });
 
     await this.touchTicketCaches(created.requestId);
+
+    // AI triage runs in background — does not block ticket creation response
+    void this.runAiTriageBackground(created.requestId, dto);
+
     return created;
+  }
+
+  private async runAiTriageBackground(requestId: string, dto: CreateItTicketDto) {
+    try {
+      const aiTriage = await this.aiClientService.post(
+        '/triage/ticket',
+        {
+          title: dto.title,
+          description: dto.description ?? dto.title,
+          requester_faculty: dto.facultyId ?? null,
+          requester_department: dto.departmentId ?? null,
+          source_channel: 'portal',
+          similar_resolutions: [],
+        },
+        {
+          requestType: 'IT_TICKET',
+          category: dto.category,
+          priority: dto.priority ?? 'MEDIUM',
+          suggestedUnit: 'IT',
+          summary: dto.title,
+          missingFields: [],
+          confidence: 0.25,
+          fallbackUsed: true,
+        },
+      );
+
+      const aiCategory =
+        ['general', 'other', 'unspecified'].includes(dto.category.toLowerCase()) &&
+        typeof aiTriage.category === 'string'
+          ? (aiTriage.category as string)
+          : dto.category;
+
+      const aiPriority =
+        dto.priority ??
+        (typeof aiTriage.priority === 'string' &&
+        Object.values(PriorityLevel).includes(aiTriage.priority as PriorityLevel)
+          ? (aiTriage.priority as PriorityLevel)
+          : PriorityLevel.MEDIUM);
+
+      await this.prisma.$transaction([
+        this.prisma.request.update({
+          where: { id: requestId },
+          data: { priority: aiPriority, dynamicData: { aiTriage } },
+        }),
+        this.prisma.itTicket.update({
+          where: { requestId },
+          data: { category: aiCategory },
+        }),
+      ]);
+
+      await this.touchTicketCaches(requestId);
+    } catch {
+      // AI triage failure is non-fatal; ticket was already created with user values
+    }
   }
 
   async submit(userId: string, requestId: string) {

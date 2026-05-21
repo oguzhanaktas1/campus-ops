@@ -12,7 +12,7 @@ services:
   ai-service:
     environment:
       OLLAMA_BASE_URL: http://188.132.177.60:11434
-      AI_DEFAULT_MODEL: gemma4:e2b
+      AI_DEFAULT_MODEL: qwen2.5:3b-instruct
       AI_FALLBACK_MODEL: llama3.2:1b
 
   frontend:
