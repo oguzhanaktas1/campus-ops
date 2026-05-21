@@ -1,8 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { CalendarDays, CheckCircle2, XCircle, Loader2 } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { CalendarDays } from 'lucide-react'
 import { toast } from 'sonner'
 import { getToken } from '@/lib/auth'
 import { useI18n } from '@/lib/i18n'
@@ -23,7 +22,6 @@ export default function FacultyAppointmentsPage() {
   const { t } = useI18n()
   const [appointments, setAppointments] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [processingId, setProcessingId] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<TabKey>('all')
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
@@ -46,31 +44,6 @@ export default function FacultyAppointmentsPage() {
   }, [t])
 
   useEffect(() => { void fetchAppointments() }, [fetchAppointments])
-
-  const handleAction = async (id: string, action: 'CONFIRM' | 'DECLINE') => {
-    setProcessingId(id)
-    try {
-      const endpoint = action === 'CONFIRM' ? 'confirm' : 'decline'
-      const res = await fetch(`${BACKEND}/appointment-requests/${id}/${endpoint}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
-        body: JSON.stringify({}),
-      })
-      if (res.ok) {
-        toast.success(action === 'CONFIRM' ? t('appointments.confirmSuccess') : t('appointments.declineSuccess'))
-        setAppointments((prev) =>
-          prev.map((a) => a.id === id ? { ...a, status: action === 'CONFIRM' ? 'APPROVED' : 'REJECTED' } : a),
-        )
-      } else {
-        const err = await res.json().catch(() => ({}))
-        toast.error((err as any)?.message || t('appointments.actionFail'))
-      }
-    } catch {
-      toast.error(t('appointments.actionFail'))
-    } finally {
-      setProcessingId(null)
-    }
-  }
 
   const pending = appointments.filter((a) => PENDING_STATUSES.includes(a.status?.toUpperCase()))
   const confirmed = appointments.filter((a) => CONFIRMED_STATUSES.includes(a.status?.toUpperCase()))
@@ -139,40 +112,21 @@ export default function FacultyAppointmentsPage() {
         t('appointments.noRequests')
       }
     >
-      {paged.map((apt) => {
-        const isPending = PENDING_STATUSES.includes(apt.status?.toUpperCase())
-        const isProcessing = processingId === apt.id
-        return (
-          <div key={apt.id}>
-            <StaffRequestRow
-              href={`/faculty/requests/${apt.id}?from=/faculty/appointments`}
-              title={apt.topic || 'Appointment Request'}
-              requestNo={apt.requestNo}
-              badge={apt.appointmentType}
-              metaLeft={[
-                apt.requester?.fullName ?? apt.requesterName ?? 'Unknown',
-                apt.preferredStartAt ? formatDateTime(apt.preferredStartAt) : undefined,
-                apt.durationMin ? `${apt.durationMin} min` : undefined,
-              ]}
-              status={apt.status}
-            />
-            {isPending && (
-              <div className="px-5 pb-3 flex gap-2">
-                <Button size="sm" className="h-7 gap-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs"
-                  disabled={isProcessing} onClick={() => handleAction(apt.id, 'CONFIRM')}>
-                  {isProcessing ? <Loader2 className="size-3 animate-spin" /> : <CheckCircle2 className="size-3" />}
-                  {t('appointments.confirmBtn')}
-                </Button>
-                <Button size="sm" variant="outline" className="h-7 gap-1 text-xs border-destructive/30 text-destructive hover:bg-destructive/10"
-                  disabled={isProcessing} onClick={() => handleAction(apt.id, 'DECLINE')}>
-                  {isProcessing ? <Loader2 className="size-3 animate-spin" /> : <XCircle className="size-3" />}
-                  {t('appointments.declineBtn')}
-                </Button>
-              </div>
-            )}
-          </div>
-        )
-      })}
+      {paged.map((apt) => (
+        <StaffRequestRow
+          key={apt.id}
+          href={`/faculty/requests/${apt.id}?from=/faculty/appointments`}
+          title={apt.topic || 'Appointment Request'}
+          requestNo={apt.requestNo}
+          badge={apt.appointmentType}
+          metaLeft={[
+            apt.requester?.fullName ?? apt.requesterName ?? 'Unknown',
+            apt.preferredStartAt ? formatDateTime(apt.preferredStartAt) : undefined,
+            apt.durationMin ? `${apt.durationMin} min` : undefined,
+          ]}
+          status={apt.status}
+        />
+      ))}
     </StaffListShell>
   )
 }

@@ -28,6 +28,8 @@ import { getStoredUser, getToken } from '@/lib/auth'
 import { mapRequestDetailToViewModel } from '@/features/request-detail/mappers/mapRequestDetailToViewModel'
 import type { RequestDetailViewModel } from '@/features/request-detail/types'
 import { useOptionalT } from '@/lib/optional-t'
+import { StatusBadge } from '@/components/status-badge'
+import { cn } from '@/lib/utils'
 
 export function RequestAttachmentsPanel({
   detail,
@@ -313,10 +315,11 @@ export function RequestActionPanel({
         </CardHeader>
         <CardContent className="space-y-3">
           {detail.status === 'REVISION_REQUESTED' ? (
-            <Button asChild className="w-full">
+            <Button asChild variant="outline" className="w-full gap-2 border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100 hover:text-amber-800">
               <Link
                 href={`/student/requests/${detail.id}/edit?type=${detail.requestType.key}`}
               >
+                <RotateCcw className="size-4" />
                 {tt('detail.reviseSubmission', 'Revise Submission')}
               </Link>
             </Button>
@@ -337,10 +340,11 @@ export function RequestActionPanel({
         </CardHeader>
         <CardContent className="space-y-3">
           {detail.status === 'REVISION_REQUESTED' ? (
-            <Button asChild className="w-full">
+            <Button asChild variant="outline" className="w-full gap-2 border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100 hover:text-amber-800">
               <Link
                 href={`/organizer/requests/${detail.id}/edit?type=${detail.requestType.key}`}
               >
+                <RotateCcw className="size-4" />
                 {tt('detail.reviseSubmission', 'Revise Submission')}
               </Link>
             </Button>
@@ -361,8 +365,9 @@ export function RequestActionPanel({
             <CardTitle>{tt('detail.actions', 'Actions')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <Button asChild className="w-full">
+            <Button asChild variant="outline" className="w-full gap-2 border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100 hover:text-amber-800">
               <Link href={`/faculty/requests/${detail.id}/edit`}>
+                <RotateCcw className="size-4" />
                 {tt('detail.reviseSubmission', 'Revise Submission')}
               </Link>
             </Button>
@@ -412,8 +417,9 @@ export function RequestActionPanel({
           <CardTitle>{tt('detail.actions', 'Actions')}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          <Button asChild className="w-full">
+          <Button asChild variant="outline" className="w-full gap-2 border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100 hover:text-amber-800">
             <Link href={`/staff/requests/${categorySlug}/${detail.id}/edit`}>
+              <RotateCcw className="size-4" />
               {tt('detail.reviseSubmission', 'Revise Submission')}
             </Link>
           </Button>
@@ -425,7 +431,7 @@ export function RequestActionPanel({
     )
   }
 
-  if (isTerminal && detail.portal !== 'admin') {
+  if (isTerminal) {
     return <TerminalActionPanel detail={detail} />
   }
 
@@ -521,19 +527,30 @@ function canCurrentUserDecide(detail: RequestDetailViewModel) {
 
 function TerminalActionPanel({ detail }: { detail: RequestDetailViewModel }) {
   const tt = useOptionalT()
+  const status = detail.status.toUpperCase()
+  const isSuccess = ['APPROVED', 'COMPLETED', 'RESOLVED', 'SCHEDULED'].includes(status)
+  const isFailure = ['REJECTED', 'CANCELLED', 'EXPIRED'].includes(status)
+  const isClosed = status === 'CLOSED'
+
+  const containerClass = isSuccess
+    ? 'border-emerald-200 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/30'
+    : isFailure
+      ? 'border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950/30'
+      : isClosed
+        ? 'border-border bg-muted/40'
+        : 'border-border bg-muted/30'
+
   return (
     <Card>
       <CardHeader>
         <CardTitle>{tt('detail.actions', 'Actions')}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
-        <div className="rounded-lg border bg-muted/30 p-3">
+        <div className={cn('rounded-lg border p-3 space-y-2', containerClass)}>
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            {tt('detail.workflowCompleted', 'Workflow Completed')}
+            {tt('detail.workflowCompleted', 'Final Status')}
           </p>
-          <p className="mt-1 text-sm font-semibold text-foreground">
-            {detail.status.replace(/_/g, ' ')}
-          </p>
+          <StatusBadge status={detail.status} />
         </div>
         <p className="text-sm text-muted-foreground">
           {tt('detail.terminalWorkflowHelp', 'This request has reached a terminal workflow step. It cannot be reassigned or processed further.')}

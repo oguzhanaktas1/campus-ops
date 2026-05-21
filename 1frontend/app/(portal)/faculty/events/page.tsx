@@ -1,9 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import Link from 'next/link'
-import { PartyPopper, CheckCircle, XCircle } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { PartyPopper } from 'lucide-react'
 import { toast } from 'sonner'
 import { getToken } from '@/lib/auth'
 import { useI18n } from '@/lib/i18n'
@@ -21,8 +19,6 @@ export default function FacultyEventsPage() {
   const [filter, setFilter] = useState('all')
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
-  const [actionId, setActionId] = useState<string | null>(null)
-  const [note, setNote] = useState('')
   const [activeStatus, setActiveStatus] = useState('')
   const [activePriority, setActivePriority] = useState('')
 
@@ -40,23 +36,6 @@ export default function FacultyEventsPage() {
   }, [t])
 
   useEffect(() => { void fetchEvents() }, [fetchEvents])
-
-  const updateStatus = async (id: string, status: string) => {
-    try {
-      const res = await fetch(`${BACKEND}/events/${id}/status`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
-        body: JSON.stringify({ status, note }),
-      })
-      if (!res.ok) throw new Error()
-      toast.success(`Event ${status.toLowerCase()}.`)
-      setActionId(null)
-      setNote('')
-      void fetchEvents()
-    } catch {
-      toast.error(t('events.loadFail'))
-    }
-  }
 
   const byStatus = filter === 'all' ? events : events.filter((e) => e.status === filter)
 
@@ -79,7 +58,7 @@ export default function FacultyEventsPage() {
     { key: 'all', label: t('common.all'), count: events.length },
     ...ALL_STATUSES.map((s) => ({
       key: s,
-      label: s.replace(/_/g, ' '),
+      label: s.toLowerCase().replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
       count: events.filter((e) => e.status === s).length,
     })).filter((tab) => tab.count > 0),
   ]
@@ -106,61 +85,21 @@ export default function FacultyEventsPage() {
       onPageChange={setPage}
       emptyIcon={<PartyPopper className="size-8" />}
       emptyTitle={t('events.noEvents')}
-      emptyDesc={search ? undefined : undefined}
     >
       {paged.map((ev) => (
-        <div key={ev.id}>
-          <StaffRequestRow
-            href={`/faculty/requests/${ev.id}?from=/faculty/events`}
-            title={ev.eventName || 'Event Request'}
-            requestNo={ev.requestNo}
-            badge={ev.eventType}
-            metaLeft={[
-              ev.requesterName,
-              ev.startAt ? formatDate(ev.startAt) : undefined,
-              ev.expectedAttendance ? `~${ev.expectedAttendance} attendees` : undefined,
-            ]}
-            status={ev.status}
-          />
-          {['SUBMITTED', 'IN_REVIEW'].includes(ev.status) && (
-            <div className="px-5 pb-3">
-              {actionId === ev.id ? (
-                <div className="space-y-2">
-                  <textarea
-                    value={note}
-                    onChange={(e) => setNote(e.target.value)}
-                    rows={2}
-                    placeholder={t('approvals.notesPlaceholder')}
-                    className="w-full bg-background border border-input rounded-md px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring resize-none"
-                  />
-                  <div className="flex gap-2">
-                    <Button asChild size="sm" variant="outline">
-                      <Link href={`/faculty/requests/${ev.id}?from=/faculty/events`}>
-                        {t('events.viewDetail')}
-                      </Link>
-                    </Button>
-                    <Button size="sm" className="gap-1.5 bg-green-600 hover:bg-green-700"
-                      onClick={() => void updateStatus(ev.id, 'APPROVED')}>
-                      <CheckCircle className="size-3.5" /> {t('common.approve')}
-                    </Button>
-                    <Button size="sm" variant="destructive" className="gap-1.5"
-                      onClick={() => void updateStatus(ev.id, 'REJECTED')}>
-                      <XCircle className="size-3.5" /> {t('common.reject')}
-                    </Button>
-                    <Button size="sm" variant="ghost"
-                      onClick={() => { setActionId(null); setNote('') }}>
-                      {t('common.cancel')}
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <Button size="sm" variant="outline" onClick={() => setActionId(ev.id)}>
-                  {t('common.confirm')}
-                </Button>
-              )}
-            </div>
-          )}
-        </div>
+        <StaffRequestRow
+          key={ev.id}
+          href={`/faculty/requests/${ev.id}?from=/faculty/events`}
+          title={ev.eventName || 'Event Request'}
+          requestNo={ev.requestNo}
+          badge={ev.eventType}
+          metaLeft={[
+            ev.requesterName,
+            ev.startAt ? formatDate(ev.startAt) : undefined,
+            ev.expectedAttendance ? `~${ev.expectedAttendance} attendees` : undefined,
+          ]}
+          status={ev.status}
+        />
       ))}
     </StaffListShell>
   )

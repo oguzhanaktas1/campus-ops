@@ -33,6 +33,28 @@ const priorityConfig: Record<string, { label: string; className: string }> = {
   urgent: { label: 'Urgent', className: 'bg-red-50 text-red-700 border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-800' },
 }
 
+function formatUnknownStatus(safeStatus: string): { label: string; className: string } {
+  const label = safeStatus
+    .split('_')
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ')
+
+  const prefixColors: Array<[string, string]> = [
+    ['rejected', 'bg-red-50 text-red-700 border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-800'],
+    ['approved', 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800'],
+    ['completed', 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800'],
+    ['revision', 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/30 dark:text-orange-400 dark:border-orange-800'],
+    ['cancelled', 'bg-muted text-muted-foreground border-border'],
+    ['closed', 'bg-muted text-muted-foreground border-border'],
+    ['expired', 'bg-red-50 text-red-700 border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-800'],
+    ['submitted', 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-800'],
+    ['pending', 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-800'],
+  ]
+
+  const className = prefixColors.find(([prefix]) => safeStatus.startsWith(prefix))?.[1] ?? 'bg-muted text-muted-foreground border-border'
+  return { label, className }
+}
+
 interface StatusBadgeProps {
   status: string
   className?: string
@@ -43,11 +65,11 @@ export function StatusBadge({ status, className }: StatusBadgeProps) {
   const safeStatus = status?.toLowerCase() || 'pending'
   const config = statusConfig[safeStatus]
 
-  // Eğer veritabanına yeni bir statü eklersek ve buraya yazmayı unutursak, uygulamanın çökmesini engeller
   if (!config) {
+    const { label: unknownLabel, className: unknownClass } = formatUnknownStatus(safeStatus)
     return (
-      <Badge variant="outline" className={cn('text-xs font-medium', className)}>
-        {status || 'Unknown'}
+      <Badge variant="outline" className={cn('text-xs font-medium', unknownClass, className)}>
+        {unknownLabel}
       </Badge>
     )
   }

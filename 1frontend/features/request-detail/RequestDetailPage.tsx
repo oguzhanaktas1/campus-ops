@@ -46,26 +46,30 @@ export function RequestDetailPage({
   }
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6 p-6 pb-20">
-      <RequestHeader detail={detail} />
-
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_340px]">
-        <div className="space-y-6">
-          <WorkflowCurrentStepCard detail={detail} />
-          <RequestMetaCard detail={detail} />
-          <DomainDetailPanel detail={detail} />
-          <RequestAttachmentsPanel detail={detail} />
-          <RequestCommentsPanel
-            detail={detail}
-            onCommentAdded={(comments) => setDetail({ ...detail, comments })}
-          />
-          <RequestTimelineTabs detail={detail} />
+    <div className="min-h-full bg-muted/10">
+      <div className="mx-auto max-w-7xl space-y-6 p-6 pb-20">
+        <div className="rounded-2xl border bg-card p-5 shadow-sm">
+          <RequestHeader detail={detail} />
         </div>
 
-        <div className="space-y-6">
-          <RequestActionPanel detail={detail} onDetailChange={setDetail} />
-          <RequestQuickFactsCard detail={detail} />
-          <RelatedEntitiesCard detail={detail} />
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_340px]">
+          <div className="space-y-6">
+            <WorkflowCurrentStepCard detail={detail} />
+            <RequestMetaCard detail={detail} />
+            <DomainDetailPanel detail={detail} />
+            <RequestAttachmentsPanel detail={detail} />
+            <RequestCommentsPanel
+              detail={detail}
+              onCommentAdded={(comments) => setDetail({ ...detail, comments })}
+            />
+            <RequestTimelineTabs detail={detail} />
+          </div>
+
+          <div className="space-y-6">
+            <RequestActionPanel detail={detail} onDetailChange={setDetail} />
+            <RequestQuickFactsCard detail={detail} />
+            <RelatedEntitiesCard detail={detail} />
+          </div>
         </div>
       </div>
     </div>
