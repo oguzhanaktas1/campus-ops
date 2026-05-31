@@ -20,9 +20,14 @@ Browser
   |
   v
 Next.js Frontend (:3000)
-  |
-  v
+  |  \
+  |   WebSocket (socket.io-client)
+  |       |
+  v       v
 NestJS Backend API (:5000)
+  |  \
+  |   WebSocket Gateway (/realtime namespace, socket.io)
+  |
   |              |                 |
   |              |                 v
   |              |          FastAPI AI Service (:8010)
@@ -41,14 +46,14 @@ NestJS Backend API (:5000)
   +---- Redis (:6379)
 ```
 
-The primary data source is PostgreSQL. Redis is used for cache and queue infrastructure. RabbitMQ offloads domain events, notifications, emails, workflows, reminders, audits, files, documents, and report generation jobs to the worker service. The AI service is a separate FastAPI application called by the backend over the internal network.
+The primary data source is PostgreSQL. Redis is used for cache, session, and rate-limit state. RabbitMQ offloads domain events to the Python worker service. The AI service is a separate FastAPI application called by the backend over the internal network. A WebSocket gateway on the `/realtime` namespace pushes live updates (notifications, status changes, dashboard metrics) to connected clients.
 
 ## Services and Ports
 
 | Service | Description | Port |
 | --- | --- | --- |
 | `frontend` | Next.js web application | `3000` |
-| `backend` | NestJS API | `5000` |
+| `backend` | NestJS API + WebSocket gateway | `5000` |
 | `postgres` | PostgreSQL 16 | `5432` |
 | `redis` | Redis 7 | `6379` |
 | `rabbitmq` | RabbitMQ broker | `5672` |
@@ -80,7 +85,8 @@ Default URLs in development environment:
 - Recharts charts
 - React Hook Form form management
 - Zod validation schemas
-- Sonner and project toast components
+- Sonner toast notifications
+- socket.io-client `4.x` for real-time updates
 - date-fns date helpers
 - jsPDF and html2canvas PDF/export flows
 
@@ -92,9 +98,11 @@ Default URLs in development environment:
 - PostgreSQL
 - Redis, ioredis
 - RabbitMQ, `amqplib` and `amqp-connection-manager`
+- socket.io `4.x` + `@nestjs/websockets` + `@nestjs/platform-socket.io` for the realtime gateway
 - Passport JWT, `@nestjs/jwt`
 - bcrypt password hashing
 - class-validator and class-transformer DTO validation
+- Redis-backed rate limiting guard and decorator
 - Supabase client and storage integration
 - Jest test infrastructure
 
@@ -120,8 +128,10 @@ Default URLs in development environment:
 - Uvicorn
 - Pydantic settings
 - httpx
-- Ollama/local LLM runtime
-- Default model configured via env, development Docker Compose value uses `gemma4:e2b`
+- Ollama / local LLM runtime
+- Default model: `qwen2.5:3b-instruct`
+- Fallback model: `llama3.2:1b`
+- Routes: assistant chat, free-text request parser, IT ticket triage, approval summary, analytics summary, semantic ticket similarity
 
 ### Infrastructure
 
@@ -138,13 +148,32 @@ A user logs in through the Next.js frontend. The browser authenticates against t
 
 **Request flow.** When a user submits a request (e.g. an internship application, room reservation, or equipment request), the backend creates a `Request` record in PostgreSQL and immediately starts a `WorkflowInstance` for it. The workflow engine assigns the request to the appropriate reviewer role or user based on the request type. Each approver sees the request in their queue, takes an action (approve, reject, or request revision), and the workflow advances to the next step. Every status change is recorded in `RequestStatusHistory` and surfaced to the user as a timeline.
 
-**Async work.** After any meaningful state change — a new request, an approval, a rejection — the backend publishes a domain event to RabbitMQ. The Python worker service picks it up from the relevant queue and handles the side effects: sending notifications, dispatching emails, generating PDF documents, writing audit logs, and scheduling reminders. This keeps the backend response fast and decoupled from heavy I/O.
+**Real-time updates.** The backend hosts a WebSocket gateway on the `/realtime` namespace (socket.io). After authentication via JWT handshake, clients join role- and user-scoped rooms. When a request status changes, a notification is created, or a dashboard metric updates, the backend emits a socket event to the relevant room. This keeps the frontend in sync without polling.
 
-**AI assistant.** The frontend includes a role-aware AI assistant. When a user interacts with it, the backend forwards the message to the FastAPI AI service along with the user's role and context. The AI service calls a locally running Ollama LLM, generates a response, and returns it. The AI is also used for IT ticket triage, free-text request parsing, and approval summaries.
+**Async work.** After any meaningful state change the backend publishes a domain event to RabbitMQ. The Python worker service picks it up from the relevant queue and handles the side effects. Eight consumer queues are running:
 
-**Caching and SLA.** Redis caches frequently read data such as dashboard metrics and user sessions. A background SLA scheduler periodically checks open requests against defined SLA policies and flags overdue items.
+| Queue | Responsibility |
+| --- | --- |
+| `q.notifications` | In-app notification persistence and delivery |
+| `q.emails` | Transactional email dispatch |
+| `q.workflow` | Workflow step advancement and escalation |
+| `q.reminders` | Scheduled reminder delivery |
+| `q.audit` | Audit log writes |
+| `q.attachments` | File upload post-processing |
+| `q.documents` | Document generation (transcripts, certificates) |
+| `q.reports` | Async report snapshots and PDF export |
+
+A background `reminder_sweep` task (60 s interval) and a `cleanup_loop` task (24 s interval) also run inside the worker process.
+
+**AI assistant.** The frontend includes a role-aware AI assistant. When a user interacts with it, the backend forwards the message to the FastAPI AI service along with the user's role and context. The AI service calls a locally running Ollama instance using `qwen2.5:3b-instruct` as the primary model with `llama3.2:1b` as a fallback, generates a response, and returns it. The AI service is also used for IT ticket triage, free-text request parsing, approval summaries, and semantic ticket similarity matching.
+
+**Caching and SLA.** Redis caches frequently read data such as dashboard metrics and user sessions. A background SLA scheduler periodically checks open requests against defined SLA policies and flags overdue items, triggering escalation events through the workflow engine.
 
 **Data.** All persistent state lives in PostgreSQL. Prisma ORM manages the schema and migrations. File attachments are stored in Supabase Storage and referenced via `FileLink` records in the database.
+
+**Events and calendar.** The organizer portal manages event plans (`EventPlan`) through a multi-step creation request (`EventCreationRequest`) approval flow before publishing. Published events support student registration, attendance tracking, and calendar integration (ICS export). A `CalendarEvent` model aggregates appointments, reservations, and events into a unified calendar view per user.
+
+**AI knowledge base.** The backend maintains a `KnowledgeDocument` store with embedding references (`EmbeddingsIndexRef`) used to surface similar past tickets (`TicketSimilarityMatch`) when a new IT ticket is created, reducing duplicate support load.
 
 ## Security
 
@@ -153,10 +182,22 @@ Current security layers:
 - JWT-based authentication
 - Password hashing with bcrypt
 - Role/permission-based backend guard structure
+- Redis-backed rate limiting guard with per-endpoint `@RateLimit()` decorator applied to auth, request submission, and AI endpoints
 - Global DTO whitelist and non-whitelisted field rejection
+- WebSocket gateway JWT validation on handshake
 - CORS allowlist
 - Mutating request origin control in production
 - Basic security headers
 - Internal API key for AI service
 - RabbitMQ user/password protection
-- Audit, login history and system event records
+- Audit, login history, and system event records
+
+## Production
+
+In production the services are configured via `docker-compose.prod.yml`. Key differences from the development environment:
+
+- Backend and frontend are served under production domains (`api.campusflow.com.tr`, `campusflow.com.tr`)
+- The AI service connects to an external Ollama host rather than a local container
+- AI models remain `qwen2.5:3b-instruct` (default) and `llama3.2:1b` (fallback)
+- Load balancing and TLS termination are handled at the infrastructure layer in front of the Docker services
+- Redis rate-limit state and session cache persist across backend restarts
