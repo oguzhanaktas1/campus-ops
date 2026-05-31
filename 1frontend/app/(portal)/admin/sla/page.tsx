@@ -294,12 +294,12 @@ export default function AdminSLAPage() {
   const eventsEnd     = Math.min(eventsPage * PAGE_SIZE, eventsTotal)
 
   return (
-    <div className="p-6 space-y-6 max-w-5xl mx-auto pb-20">
+    <div className="p-6 space-y-5 max-w-5xl mx-auto pb-20">
 
       {/* Add/Edit Dialog */}
       {showDialog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="bg-background border border-border rounded-xl p-6 max-w-md w-full shadow-2xl space-y-4">
+          <div className="bg-background border border-border rounded-lg p-6 max-w-md w-full shadow-2xl space-y-4">
             <h2 className="text-base font-bold text-foreground">
               {editTarget ? t('sla.editPolicy') : t('sla.addPolicy')}
             </h2>
@@ -380,7 +380,7 @@ export default function AdminSLAPage() {
       {metricsLoading ? (
         <div className="grid gap-4 md:grid-cols-5">
           {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="rounded-xl border border-border bg-card p-4 shadow-sm animate-pulse h-20" />
+            <div key={i} className="rounded-lg border border-border bg-card p-4 shadow-sm animate-pulse h-20" />
           ))}
         </div>
       ) : metrics && (
@@ -392,7 +392,7 @@ export default function AdminSLAPage() {
             [t('sla.escalations'),              metrics.escalations,             metrics.escalations > 0 ? 'text-amber-600' : ''],
             [t('sla.stepOverdues'),            metrics.stepOverdues,            metrics.stepOverdues > 0 ? 'text-orange-600' : ''],
           ] as [string, number, string][]).map(([label, value, valClass]) => (
-            <div key={label} className="rounded-xl border border-border bg-card p-4 shadow-sm">
+            <div key={label} className="rounded-lg border border-border bg-card p-4 shadow-sm">
               <p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
               <p className={cn('mt-2 text-2xl font-semibold', valClass || 'text-foreground')}>{value}</p>
             </div>
@@ -434,7 +434,7 @@ export default function AdminSLAPage() {
               {t('sla.showingPolicies', { start: policiesStart, end: policiesEnd, total: policiesTotal })}
             </p>
           )}
-          <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
+          <div className="bg-card border border-border rounded-lg shadow-sm overflow-hidden">
             {policiesLoading && (
               <div className="flex items-center justify-center py-4 border-b border-border">
                 <Loader2 className="size-5 animate-spin text-primary" />
@@ -530,7 +530,7 @@ export default function AdminSLAPage() {
               {t('sla.showingEvents', { start: eventsStart, end: eventsEnd, total: eventsTotal })}
             </p>
           )}
-          <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
+          <div className="bg-card border border-border rounded-lg shadow-sm overflow-hidden">
             {eventsLoading && (
               <div className="flex items-center justify-center py-4 border-b border-border">
                 <Loader2 className="size-5 animate-spin text-primary" />

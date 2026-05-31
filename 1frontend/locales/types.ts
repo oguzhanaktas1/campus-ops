@@ -99,6 +99,7 @@ export interface AdminTranslations {
   requestTypes: Record<string, string>
   permissions: Record<string, string>
   events: Record<string, string>
+  pages: Record<string, string>
 }
 
 export interface StudentTranslations {

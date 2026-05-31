@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { getToken } from '@/lib/auth'
 import { useI18n } from '@/lib/i18n'
+import { RequestAttachments, uploadAttachments, AttachmentsState } from '@/components/student/request-attachments'
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000'
 
@@ -17,6 +18,7 @@ export default function NewStaffTicketPage() {
   const { t } = useI18n()
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [attachments, setAttachments] = useState<AttachmentsState>({ newFiles: [], linkedFileIds: [] })
   const [form, setForm] = useState({
     title: '',
     category: '',
@@ -31,13 +33,18 @@ export default function NewStaffTicketPage() {
     setIsSubmitting(true)
 
     try {
+      const uploadedIds = await uploadAttachments(attachments.newFiles)
+      const attachmentFileIds = [...attachments.linkedFileIds, ...uploadedIds]
       const res = await fetch(`${BACKEND}/it-tickets`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${getToken()}`,
         },
-        body: JSON.stringify(form),
+        body: JSON.stringify({
+          ...form,
+          ...(attachmentFileIds.length ? { attachmentFileIds } : {}),
+        }),
       })
 
       if (!res.ok) throw new Error()
@@ -132,6 +139,10 @@ export default function NewStaffTicketPage() {
             placeholder={t('tickets.descriptionPlaceholder')}
             rows={6}
           />
+        </div>
+
+        <div className="pt-2 border-t border-border">
+          <RequestAttachments onChange={setAttachments} />
         </div>
 
         <div className="flex justify-end">

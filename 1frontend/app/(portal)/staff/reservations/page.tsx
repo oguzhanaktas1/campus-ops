@@ -1,28 +1,36 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { BookOpen } from 'lucide-react'
+import Link from 'next/link'
+import { BookOpen, Loader2, Search, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Input } from '@/components/ui/input'
+import { cn } from '@/lib/utils'
+import { StatusBadge, PriorityBadge } from '@/components/status-badge'
 import { toast } from 'sonner'
 import { getToken } from '@/lib/auth'
 import { useI18n } from '@/lib/i18n'
-import { StaffListShell } from '@/components/staff/staff-list-shell'
-import { StaffRequestRow, formatDateTime } from '@/components/staff/staff-request-row'
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000'
 const PAGE_SIZE = 20
-const ALL_STATUSES = ['SUBMITTED', 'IN_REVIEW', 'PENDING', 'WAITING_APPROVAL', 'APPROVED', 'COMPLETED', 'REJECTED', 'CANCELLED']
 
-type FilterStatus = 'all' | 'pending' | 'approved' | 'rejected'
+const PENDING_STATUSES = new Set(['SUBMITTED', 'IN_REVIEW', 'PENDING', 'WAITING_APPROVAL'])
+const APPROVED_STATUSES = new Set(['APPROVED', 'COMPLETED'])
+const REJECTED_STATUSES = new Set(['REJECTED', 'CANCELLED'])
+
+function fmtDateTime(d: string | null | undefined) {
+  if (!d) return ''
+  return new Date(d).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+}
+
+type TabKey = '' | 'pending' | 'approved' | 'rejected'
 
 export default function StaffReservationsPage() {
   const { t } = useI18n()
   const [reservations, setReservations] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [filter, setFilter] = useState<FilterStatus>('all')
+  const [activeTab, setActiveTab] = useState<TabKey>('')
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
-  const [activeStatus, setActiveStatus] = useState('')
-  const [activePriority, setActivePriority] = useState('')
 
   useEffect(() => {
     const load = async () => {
@@ -31,8 +39,10 @@ export default function StaffReservationsPage() {
           headers: { Authorization: `Bearer ${getToken()}` },
         })
         if (res.ok) setReservations(await res.json())
+        else setReservations([])
       } catch {
         toast.error(t('pages.reservationLoadFail'))
+        setReservations([])
       } finally {
         setIsLoading(false)
       }
@@ -40,20 +50,20 @@ export default function StaffReservationsPage() {
     void load()
   }, [t])
 
-  const byFilter = (items: any[]) => {
-    if (filter === 'all') return items
-    if (filter === 'pending') return items.filter((r) =>
-      ['SUBMITTED', 'IN_REVIEW', 'PENDING', 'WAITING_APPROVAL'].includes(r.status ?? r.reservationStatus)
-    )
-    if (filter === 'approved') return items.filter((r) =>
-      ['APPROVED', 'COMPLETED'].includes(r.status ?? r.reservationStatus)
-    )
-    return items.filter((r) => ['REJECTED', 'CANCELLED'].includes(r.status ?? r.reservationStatus))
-  }
+  const getStatus = (r: any) => r.status ?? r.reservationStatus ?? ''
 
-  const filtered = byFilter(reservations).filter((r) => {
-    if (activeStatus && (r.status ?? r.reservationStatus) !== activeStatus) return false
-    if (activePriority && r.priority !== activePriority) return false
+  const tabs = [
+    { key: '' as TabKey, label: t('common.all'), count: reservations.length },
+    { key: 'pending' as TabKey, label: t('common.pending'), count: reservations.filter((r) => PENDING_STATUSES.has(getStatus(r))).length },
+    { key: 'approved' as TabKey, label: t('common.approved'), count: reservations.filter((r) => APPROVED_STATUSES.has(getStatus(r))).length },
+    { key: 'rejected' as TabKey, label: t('common.rejected'), count: reservations.filter((r) => REJECTED_STATUSES.has(getStatus(r))).length },
+  ]
+
+  const filtered = reservations.filter((r) => {
+    const s = getStatus(r)
+    if (activeTab === 'pending' && !PENDING_STATUSES.has(s)) return false
+    if (activeTab === 'approved' && !APPROVED_STATUSES.has(s)) return false
+    if (activeTab === 'rejected' && !REJECTED_STATUSES.has(s)) return false
     if (!search) return true
     const q = search.toLowerCase()
     return (
@@ -64,64 +74,101 @@ export default function StaffReservationsPage() {
     )
   })
 
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE)
   const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
-  const pending = reservations.filter((r) =>
-    ['SUBMITTED', 'IN_REVIEW', 'PENDING', 'WAITING_APPROVAL'].includes(r.status ?? r.reservationStatus)
-  )
-  const approved = reservations.filter((r) =>
-    ['APPROVED', 'COMPLETED'].includes(r.status ?? r.reservationStatus)
-  )
-  const rejected = reservations.filter((r) =>
-    ['REJECTED', 'CANCELLED'].includes(r.status ?? r.reservationStatus)
-  )
-
-  const tabs = [
-    { key: 'all', label: t('common.all'), count: reservations.length },
-    { key: 'pending', label: t('common.pending'), count: pending.length },
-    { key: 'approved', label: t('common.approved'), count: approved.length },
-    { key: 'rejected', label: t('common.rejected'), count: rejected.length },
-  ]
-
   return (
-    <StaffListShell
-      title={t('pages.reservationRequests')}
-      subtitle={t('pages.reservationSubtitle')}
-      tabs={tabs}
-      activeTab={filter}
-      onTabChange={(k) => setFilter(k as FilterStatus)}
-      search={search}
-      onSearchChange={setSearch}
-      searchPlaceholder={t('tickets.searchPlaceholder')}
-      statusOptions={ALL_STATUSES}
-      activeStatus={activeStatus}
-      onStatusChange={(s) => { setActiveStatus(s); setPage(1) }}
-      activePriority={activePriority}
-      onPriorityChange={(p) => { setActivePriority(p); setPage(1) }}
-      isLoading={isLoading}
-      totalCount={filtered.length}
-      page={page}
-      pageSize={PAGE_SIZE}
-      onPageChange={setPage}
-      emptyIcon={<BookOpen className="size-8" />}
-      emptyTitle={t('pages.noReservations')}
-      emptyDesc={search ? t('tickets.searchHint') : undefined}
-    >
-      {paged.map((r) => (
-        <StaffRequestRow
-          key={r.id}
-          href={`/staff/requests/reservations/${r.id}`}
-          title={r.title ?? r.eventName ?? 'Reservation Request'}
-          requestNo={r.requestNo}
-          badge={r.resource?.name}
-          metaLeft={[
-            r.requesterName,
-            r.startAt ? formatDateTime(r.startAt) : undefined,
-          ]}
-          status={r.status ?? r.reservationStatus}
-          priority={r.priority}
-        />
-      ))}
-    </StaffListShell>
+    <div className="p-6 max-w-4xl mx-auto space-y-5 pb-20">
+      <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
+        <div>
+          <h1 className="text-xl font-bold text-foreground">{t('pages.reservationRequests')}</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">{t('pages.reservationSubtitle')}</p>
+        </div>
+        <div className="relative w-full sm:w-64 shrink-0">
+          <Search className="absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
+          <Input
+            placeholder={t('common.search')}
+            className="pl-9 h-9"
+            value={search}
+            onChange={(e) => { setSearch(e.target.value); setPage(1) }}
+          />
+        </div>
+      </div>
+
+      <div className="flex flex-wrap gap-1 bg-muted/50 p-1 rounded-lg border border-border w-fit">
+        {tabs.map((tab) => (
+          <button
+            key={tab.key}
+            onClick={() => { setActiveTab(tab.key); setPage(1) }}
+            className={cn(
+              'px-3 py-1 text-sm font-medium rounded-md transition-all',
+              activeTab === tab.key
+                ? 'bg-background text-foreground shadow-sm ring-1 ring-border'
+                : 'text-muted-foreground hover:text-foreground hover:bg-muted',
+            )}
+          >
+            {tab.label}
+            {tab.count > 0 && <span className="ml-1.5 text-xs opacity-60">{tab.count}</span>}
+          </button>
+        ))}
+      </div>
+
+      <div className="bg-card border border-border rounded-lg shadow-sm overflow-hidden">
+        {isLoading ? (
+          <div className="flex justify-center items-center py-16">
+            <Loader2 className="size-8 animate-spin text-primary" />
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="flex flex-col items-center py-16 text-center">
+            <AlertCircle className="size-8 text-muted-foreground/40 mb-3" />
+            <p className="text-sm font-medium text-foreground">{t('pages.noReservations')}</p>
+          </div>
+        ) : (
+          <div className="divide-y divide-border">
+            {paged.map((r) => (
+              <Link
+                key={r.id}
+                href={`/staff/requests/reservations/${r.id}`}
+                className="flex items-start justify-between gap-4 px-5 py-4 hover:bg-muted/30 transition-colors"
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <p className="text-sm font-semibold text-foreground truncate">
+                      {r.title ?? r.eventName ?? 'Reservation Request'}
+                    </p>
+                    {r.requestNo && (
+                      <span className="text-xs text-muted-foreground font-mono shrink-0">{r.requestNo}</span>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+                    {r.requesterName && <span>{r.requesterName}</span>}
+                    {r.startAt && <span>{fmtDateTime(r.startAt)}</span>}
+                    {r.resource?.name && <span>{r.resource.name}</span>}
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <PriorityBadge priority={r.priority} />
+                  <StatusBadge status={getStatus(r)} />
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between text-sm text-muted-foreground">
+          <span>{((page - 1) * PAGE_SIZE) + 1}–{Math.min(page * PAGE_SIZE, filtered.length)} / {filtered.length}</span>
+          <div className="flex items-center gap-1">
+            <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} className="p-1.5 rounded hover:bg-muted disabled:opacity-30">
+              <ChevronLeft className="size-4" />
+            </button>
+            <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="p-1.5 rounded hover:bg-muted disabled:opacity-30">
+              <ChevronRight className="size-4" />
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
   )
 }

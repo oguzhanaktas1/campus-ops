@@ -13,6 +13,7 @@ import {
   validateDateWindow,
 } from '@/lib/date-time'
 import { useI18n } from '@/lib/i18n'
+import { RequestAttachments, uploadAttachments, AttachmentsState } from '@/components/student/request-attachments'
 
 const EVENT_TYPES = ['Conference', 'Workshop', 'Club Activity', 'Social Event', 'Sports', 'Cultural', 'Academic', 'Other']
 
@@ -21,6 +22,7 @@ export default function NewStudentEventPage() {
   const { t } = useI18n()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [dateError, setDateError] = useState<string | null>(null)
+  const [attachments, setAttachments] = useState<AttachmentsState>({ newFiles: [], linkedFileIds: [] })
   const minDateTime = getCurrentDateTimeInputValue()
   const [form, setForm] = useState({
     eventName: '',
@@ -72,6 +74,8 @@ export default function NewStudentEventPage() {
     }
     setIsSubmitting(true)
     try {
+      const uploadedIds = await uploadAttachments(attachments.newFiles)
+      const attachmentFileIds = [...attachments.linkedFileIds, ...uploadedIds]
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
       const res = await fetch(`${backendUrl}/events`, {
         method: 'POST',
@@ -80,6 +84,7 @@ export default function NewStudentEventPage() {
           ...form,
           expectedAttendance: parseInt(form.expectedAttendance),
           estimatedBudget: form.estimatedBudget ? parseFloat(form.estimatedBudget) : undefined,
+          ...(attachmentFileIds.length ? { attachmentFileIds } : {}),
         }),
       })
       if (!res.ok) throw new Error()
@@ -166,6 +171,10 @@ export default function NewStudentEventPage() {
               <Input type="number" min="0" step="0.01" placeholder="0.00" value={form.estimatedBudget} onChange={(e) => set('estimatedBudget', e.target.value)} />
             </div>
           )}
+        </div>
+
+        <div className="pt-4 border-t border-border">
+          <RequestAttachments onChange={setAttachments} />
         </div>
 
         <div className="flex justify-end gap-3 pt-2">

@@ -1,15 +1,17 @@
 'use client'
 
 import { useEffect, useState, useMemo } from 'react'
-import { StatusBadge } from '@/components/status-badge'
+import { StatusBadge, PriorityBadge } from '@/components/status-badge'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { Search, FileText, Trash2, Loader2, AlertTriangle, ArrowRight, CheckSquare, Square, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Search, Trash2, Loader2, AlertCircle, AlertTriangle, ChevronLeft, ChevronRight, CheckSquare, Square } from 'lucide-react'
 import { toast } from 'sonner'
 import Link from 'next/link'
+import { getToken } from '@/lib/auth'
 import { useI18n } from '@/lib/i18n'
 
+const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000'
 const PAGE_SIZE = 20
 
 function useRequestTypeLabel() {
@@ -24,44 +26,11 @@ function useRequestTypeLabel() {
   }
 }
 
-function PaginationBar({ page, totalPages, onChange }: { page: number; totalPages: number; onChange: (p: number) => void }) {
-  if (totalPages <= 1) return null
-  const getPages = (): (number | '...')[] => {
-    const pages: (number | '...')[] = []
-    for (let i = 1; i <= totalPages; i++) {
-      if (i === 1 || i === totalPages || Math.abs(i - page) <= 1) {
-        pages.push(i)
-      } else if (pages[pages.length - 1] !== '...') {
-        pages.push('...')
-      }
-    }
-    return pages
-  }
-  return (
-    <div className="flex items-center justify-center gap-1 pt-4 pb-2">
-      <Button variant="outline" size="icon" className="size-8" disabled={page === 1} onClick={() => onChange(page - 1)}>
-        <ChevronLeft className="size-4" />
-      </Button>
-      {getPages().map((p, i) =>
-        p === '...' ? (
-          <span key={`e-${i}`} className="px-2 text-xs text-muted-foreground">…</span>
-        ) : (
-          <Button
-            key={p}
-            variant={p === page ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => onChange(p as number)}
-            className="min-w-[32px] h-8 text-xs"
-          >
-            {p}
-          </Button>
-        )
-      )}
-      <Button variant="outline" size="icon" className="size-8" disabled={page === totalPages} onClick={() => onChange(page + 1)}>
-        <ChevronRight className="size-4" />
-      </Button>
-    </div>
-  )
+function getPageNumbers(current: number, total: number): (number | '...')[] {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1)
+  if (current <= 4) return [1, 2, 3, 4, 5, '...', total]
+  if (current >= total - 3) return [1, '...', total - 4, total - 3, total - 2, total - 1, total]
+  return [1, '...', current - 1, current, current + 1, '...', total]
 }
 
 export default function AdminRequestsPage() {
@@ -73,50 +42,42 @@ export default function AdminRequestsPage() {
   const [statusFilter, setStatusFilter] = useState('all')
   const [typeFilter, setTypeFilter] = useState('all')
   const [page, setPage] = useState(1)
-
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [isDeleting, setIsDeleting] = useState(false)
   const [showConfirmModal, setShowConfirmModal] = useState(false)
 
-  const fetchRequests = async () => {
-    try {
-      const token = localStorage.getItem('access_token')
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
-      const res = await fetch(`${backendUrl}/admin/requests`, {
-        headers: { Authorization: `Bearer ${token}` }
-      })
-      if (res.ok) setRequests(await res.json())
-    } catch (err) {
-      toast.error(t('requests.loadFail'))
-    } finally {
-      setIsLoading(false)
+  useEffect(() => {
+    const fetchRequests = async () => {
+      try {
+        const res = await fetch(`${BACKEND}/admin/requests`, {
+          headers: { Authorization: `Bearer ${getToken()}` },
+        })
+        if (res.ok) setRequests(await res.json())
+      } catch {
+        toast.error(t('requests.loadFail'))
+      } finally {
+        setIsLoading(false)
+      }
     }
-  }
-
-  useEffect(() => { fetchRequests() }, [])
+    void fetchRequests()
+  }, [])
 
   const handleBulkDelete = async () => {
     setIsDeleting(true)
     try {
-      const token = localStorage.getItem('access_token')
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
-      const res = await fetch(`${backendUrl}/admin/requests/bulk-delete`, {
+      const res = await fetch(`${BACKEND}/admin/requests/bulk-delete`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({ ids: selectedIds })
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
+        body: JSON.stringify({ ids: selectedIds }),
       })
-
       if (res.ok) {
         toast.success(t('requests.deleteSuccess', { count: selectedIds.length }))
-        setRequests(prev => prev.filter(r => !selectedIds.includes(r.id)))
+        setRequests((prev) => prev.filter((r) => !selectedIds.includes(r.id)))
         setSelectedIds([])
       } else {
         toast.error(t('requests.deleteFail'))
       }
-    } catch (err) {
+    } catch {
       toast.error(t('requests.networkError'))
     } finally {
       setIsDeleting(false)
@@ -124,23 +85,17 @@ export default function AdminRequestsPage() {
     }
   }
 
-  const filtered = useMemo(() => {
-    return requests.filter((r) => {
-      const matchesSearch =
-        search === '' ||
-        r.title.toLowerCase().includes(search.toLowerCase()) ||
-        r.submittedByName.toLowerCase().includes(search.toLowerCase()) ||
-        r.requestNo.toLowerCase().includes(search.toLowerCase())
-      const matchesStatus = statusFilter === 'all' || r.status.toLowerCase() === statusFilter.toLowerCase()
-      const matchesType =
-        typeFilter === 'all' ||
-        r.type === typeFilter ||
-        r.typeName?.toLowerCase() === typeFilter.toLowerCase()
-      return matchesSearch && matchesStatus && matchesType
-    })
-  }, [requests, search, statusFilter, typeFilter])
+  const filtered = useMemo(() => requests.filter((r) => {
+    const matchesSearch =
+      search === '' ||
+      r.title?.toLowerCase().includes(search.toLowerCase()) ||
+      r.submittedByName?.toLowerCase().includes(search.toLowerCase()) ||
+      r.requestNo?.toLowerCase().includes(search.toLowerCase())
+    const matchesStatus = statusFilter === 'all' || r.status?.toLowerCase() === statusFilter.toLowerCase()
+    const matchesType = typeFilter === 'all' || r.type === typeFilter || r.typeName?.toLowerCase() === typeFilter.toLowerCase()
+    return matchesSearch && matchesStatus && matchesType
+  }), [requests, search, statusFilter, typeFilter])
 
-  // Reset to page 1 on filter / search change
   useEffect(() => { setPage(1) }, [search, statusFilter, typeFilter])
 
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE)
@@ -148,34 +103,28 @@ export default function AdminRequestsPage() {
 
   const requestTypes = useMemo(() => {
     const map = new Map<string, string>()
-    for (const request of requests) {
-      if (request.type) {
-        map.set(request.type, getRequestTypeLabel(request))
-      }
+    for (const r of requests) {
+      if (r.type) map.set(r.type, getRequestTypeLabel(r))
     }
     return Array.from(map.entries()).sort((a, b) => a[1].localeCompare(b[1]))
   }, [requests])
 
+  const allPageSelected = paginated.length > 0 && paginated.every((r) => selectedIds.includes(r.id))
+
   const toggleSelectAll = () => {
-    if (paginated.every(r => selectedIds.includes(r.id))) {
-      setSelectedIds(prev => prev.filter(id => !paginated.map(r => r.id).includes(id)))
+    if (allPageSelected) {
+      setSelectedIds((prev) => prev.filter((id) => !paginated.some((r) => r.id === id)))
     } else {
-      setSelectedIds(prev => Array.from(new Set([...prev, ...paginated.map(r => r.id)])))
+      setSelectedIds((prev) => Array.from(new Set([...prev, ...paginated.map((r) => r.id)])))
     }
   }
 
-  const toggleSelect = (id: string) => {
-    setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id])
-  }
-
-  const allPageSelected = paginated.length > 0 && paginated.every(r => selectedIds.includes(r.id))
-
-  if (isLoading) return <div className="h-[80vh] flex items-center justify-center"><Loader2 className="size-10 animate-spin text-primary" /></div>
+  const toggleSelect = (id: string) =>
+    setSelectedIds((prev) => prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id])
 
   return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto pb-20 relative">
+    <div className="p-6 max-w-7xl mx-auto space-y-5 pb-20">
 
-      {/* Confirm Delete Modal */}
       {showConfirmModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
           <div className="bg-background border border-border rounded-xl p-6 max-w-sm w-full shadow-2xl animate-in zoom-in-95 duration-200">
@@ -196,50 +145,40 @@ export default function AdminRequestsPage() {
         </div>
       )}
 
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-black tracking-tight text-foreground uppercase flex items-center gap-3">
-            <FileText className="size-7 text-primary" /> {t('requests.title')}
-          </h1>
-          <p className="text-sm text-muted-foreground">{t('requests.subtitle', { count: requests.length })}</p>
+          <h1 className="text-xl font-bold text-foreground">{t('requests.title')}</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">{t('requests.subtitle', { count: requests.length })}</p>
         </div>
         {selectedIds.length > 0 && (
-          <Button
-            variant="destructive"
-            size="sm"
-            className="animate-in slide-in-from-right-4 gap-2 font-bold shadow-lg"
-            onClick={() => setShowConfirmModal(true)}
-          >
+          <Button variant="destructive" size="sm" className="gap-2 shrink-0" onClick={() => setShowConfirmModal(true)}>
             <Trash2 className="size-4" /> {t('common.deleteSelected')} ({selectedIds.length})
           </Button>
         )}
       </div>
 
-      {/* Search & Filters */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 bg-muted/20 p-4 rounded-xl border border-border">
-        <div className="md:col-span-2 relative">
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
           <Input
             placeholder={t('requests.searchPlaceholder')}
-            className="pl-9 bg-background"
+            className="pl-9"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
         <select
-          className="bg-background border border-input rounded-md px-3 text-sm focus:ring-2 focus:ring-primary outline-none h-10"
+          className="h-10 rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring shrink-0"
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
         >
           <option value="all">{t('requests.allStatuses')}</option>
-          <option value="SUBMITTED">{t('requests.statusSubmitted')}</option>
-          <option value="APPROVED">{t('requests.statusApproved')}</option>
-          <option value="REJECTED">{t('requests.statusRejected')}</option>
-          <option value="REVISION_REQUESTED">{t('requests.statusRevision')}</option>
+          {['SUBMITTED', 'IN_REVIEW', 'WAITING_APPROVAL', 'REVISION_REQUESTED', 'APPROVED', 'REJECTED', 'COMPLETED'].map((s) => (
+            <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>
+          ))}
         </select>
         <select
-          className="bg-background border border-input rounded-md px-3 text-sm focus:ring-2 focus:ring-primary outline-none h-10"
+          className="h-10 rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring shrink-0"
           value={typeFilter}
           onChange={(e) => setTypeFilter(e.target.value)}
         >
@@ -248,104 +187,90 @@ export default function AdminRequestsPage() {
             <option key={key} value={key}>{label}</option>
           ))}
         </select>
-        <div className="flex items-center justify-center text-xs font-bold text-muted-foreground bg-background border border-border rounded-md uppercase">
-          {filtered.length} {t('requests.visible')}
-        </div>
       </div>
 
-      {/* Table */}
-      <div className="bg-card border border-border rounded-xl shadow-xl overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left border-collapse">
-            <thead className="bg-muted/50 text-muted-foreground border-b border-border">
-              <tr>
-                <th className="px-5 py-4 w-10">
-                  <button
-                    onClick={toggleSelectAll}
-                    className="flex items-center justify-center hover:text-primary transition-colors"
-                  >
-                    {allPageSelected ? (
-                      <CheckSquare className="size-5 text-primary" />
-                    ) : (
-                      <Square className="size-5" />
-                    )}
-                  </button>
-                </th>
-                <th className="px-5 py-4 font-bold uppercase text-[10px] tracking-widest">{t('requests.colRequest')}</th>
-                <th className="px-5 py-4 font-bold uppercase text-[10px] tracking-widest">{t('requests.colType')}</th>
-                <th className="px-5 py-4 font-bold uppercase text-[10px] tracking-widest">{t('requests.colStudent')}</th>
-                <th className="px-5 py-4 font-bold uppercase text-[10px] tracking-widest">{t('requests.colStatus')}</th>
-                <th className="px-5 py-4 font-bold uppercase text-[10px] tracking-widest text-right">{t('requests.colLink')}</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {paginated.map((req) => (
-                <tr
-                  key={req.id}
-                  className={cn(
-                    'hover:bg-muted/30 transition-colors group',
-                    selectedIds.includes(req.id) && 'bg-primary/5'
-                  )}
-                >
-                  <td className="px-5 py-4">
-                    <button onClick={() => toggleSelect(req.id)}>
-                      {selectedIds.includes(req.id) ? (
-                        <CheckSquare className="size-5 text-primary animate-in zoom-in-50" />
-                      ) : (
-                        <Square className="size-5 text-muted-foreground/30 group-hover:text-muted-foreground" />
-                      )}
-                    </button>
-                  </td>
-                  <td className="px-5 py-4">
-                    <p className="font-bold text-foreground leading-none">{req.title}</p>
-                    <p className="text-[10px] font-mono text-muted-foreground mt-1.5">{req.requestNo}</p>
-                  </td>
-                  <td className="px-5 py-4">
-                    <span className="px-2 py-0.5 rounded bg-secondary text-[10px] font-bold text-secondary-foreground">
-                      {getRequestTypeLabel(req)}
-                    </span>
-                  </td>
-                  <td className="px-5 py-4">
-                    <div className="flex items-center gap-2">
-                      <div className="size-7 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-bold text-primary border border-primary/20">
-                        {req.submittedByName.charAt(0)}
-                      </div>
-                      <span className="text-xs font-medium">{req.submittedByName}</span>
-                    </div>
-                  </td>
-                  <td className="px-5 py-4">
-                    <StatusBadge status={req.status} />
-                  </td>
-                  <td className="px-5 py-4 text-right">
-                    <Link href={`/admin/requests/${req.id}`}>
-                      <Button variant="ghost" size="icon" className="size-8 group-hover:bg-primary group-hover:text-white transition-all">
-                        <ArrowRight className="size-4" />
-                      </Button>
-                    </Link>
-                  </td>
-                </tr>
-              ))}
-              {paginated.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="text-center py-16 text-sm text-muted-foreground">
-                    {t('common.noResults')}
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="relative border-t border-border px-5 py-3 flex items-center justify-center gap-4">
-            <span className="absolute left-5 text-xs text-muted-foreground">
-              {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filtered.length)} / {filtered.length}
-            </span>
-            <PaginationBar page={page} totalPages={totalPages} onChange={setPage} />
+      <div className="bg-card border border-border rounded-lg shadow-sm overflow-hidden">
+        {isLoading ? (
+          <div className="flex justify-center items-center py-16">
+            <Loader2 className="size-8 animate-spin text-primary" />
           </div>
+        ) : filtered.length === 0 ? (
+          <div className="flex flex-col items-center py-16 text-center">
+            <AlertCircle className="size-8 text-muted-foreground/40 mb-3" />
+            <p className="text-sm font-medium text-foreground">{t('common.noResults')}</p>
+            <p className="text-xs text-muted-foreground mt-1">{t('requests.adjustSearch')}</p>
+          </div>
+        ) : (
+          <>
+            <div className="flex items-center gap-3 px-5 py-3 border-b border-border bg-muted/20">
+              <button onClick={toggleSelectAll} className="flex items-center justify-center">
+                {allPageSelected
+                  ? <CheckSquare className="size-4 text-primary" />
+                  : <Square className="size-4 text-muted-foreground" />}
+              </button>
+              <span className="text-sm font-medium text-muted-foreground cursor-pointer select-none" onClick={toggleSelectAll}>
+                {allPageSelected ? t('pages.deselectAll') : t('pages.selectAll')}
+              </span>
+              <span className="ml-auto text-xs text-muted-foreground">
+                {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filtered.length)} / {filtered.length}
+              </span>
+            </div>
+            <div className="divide-y divide-border">
+              {paginated.map((req) => (
+                <div
+                  key={req.id}
+                  className={cn('flex items-stretch transition-colors', selectedIds.includes(req.id) ? 'bg-primary/5' : 'hover:bg-muted/30')}
+                >
+                  <div className="pl-5 py-4 flex items-start cursor-default">
+                    <button onClick={() => toggleSelect(req.id)} className="mt-0.5">
+                      {selectedIds.includes(req.id)
+                        ? <CheckSquare className="size-4 text-primary" />
+                        : <Square className="size-4 text-muted-foreground/40" />}
+                    </button>
+                  </div>
+                  <Link
+                    href={`/admin/requests/${req.id}`}
+                    className="flex-1 flex items-start justify-between gap-4 px-4 py-4"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold text-foreground truncate">{req.title}</p>
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-xs text-muted-foreground">
+                        <span className="font-mono">{req.requestNo}</span>
+                        <span className="bg-muted px-1.5 py-0.5 rounded text-[11px] font-medium">{getRequestTypeLabel(req)}</span>
+                        {req.submittedByName && <span>{req.submittedByName}</span>}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {req.priority && <PriorityBadge priority={req.priority} />}
+                      <StatusBadge status={req.status} />
+                    </div>
+                  </Link>
+                </div>
+              ))}
+            </div>
+          </>
         )}
       </div>
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-1">
+          <Button variant="outline" size="icon" className="size-8" disabled={page === 1} onClick={() => setPage((p) => p - 1)}>
+            <ChevronLeft className="size-4" />
+          </Button>
+          {getPageNumbers(page, totalPages).map((p, i) =>
+            p === '...' ? (
+              <span key={`e-${i}`} className="px-1 text-xs text-muted-foreground select-none">…</span>
+            ) : (
+              <Button key={p} variant={page === p ? 'default' : 'outline'} size="icon" className="size-8 text-xs" onClick={() => setPage(p as number)}>
+                {p}
+              </Button>
+            )
+          )}
+          <Button variant="outline" size="icon" className="size-8" disabled={page === totalPages} onClick={() => setPage((p) => p + 1)}>
+            <ChevronRight className="size-4" />
+          </Button>
+        </div>
+      )}
     </div>
   )
 }

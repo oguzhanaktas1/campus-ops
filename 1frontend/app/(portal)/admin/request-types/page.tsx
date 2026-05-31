@@ -141,13 +141,6 @@ export default function RequestTypesPage() {
       t.category.toLowerCase().includes(search.toLowerCase()),
   )
 
-  if (isLoading)
-    return (
-      <div className="flex h-[50vh] items-center justify-center">
-        <Loader2 className="size-8 animate-spin text-primary" />
-      </div>
-    )
-
   return (
     <div className="p-6 space-y-5 max-w-6xl mx-auto pb-20">
       <div className="flex items-start justify-between gap-4">
@@ -192,6 +185,12 @@ export default function RequestTypesPage() {
 
       {/* Table */}
       <div className="bg-card border border-border rounded-lg shadow-sm overflow-hidden">
+        {isLoading ? (
+          <div className="flex justify-center items-center py-16">
+            <Loader2 className="size-8 animate-spin text-primary" />
+          </div>
+        ) : (
+        <>
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border bg-muted/40">
@@ -269,6 +268,8 @@ export default function RequestTypesPage() {
             <FileCheck2 className="size-8 text-muted-foreground/40 mx-auto mb-3" />
             <p className="text-sm text-muted-foreground">{t('requestTypes.noTypes')}</p>
           </div>
+        )}
+        </>
         )}
       </div>
 

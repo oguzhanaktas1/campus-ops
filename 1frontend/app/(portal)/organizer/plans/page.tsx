@@ -2,53 +2,38 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { Plus, ClipboardList, Loader2, AlertCircle } from 'lucide-react'
+import { PlusCircle, Loader2, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { StatusBadge } from '@/components/status-badge'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { getToken } from '@/lib/auth'
 import { useI18n } from '@/lib/i18n'
 
-const STATUS_BADGE: Record<string, string> = {
-  DRAFT:                           'bg-gray-50 text-gray-600 border-gray-200',
-  IN_PREPARATION:                  'bg-blue-50 text-blue-700 border-blue-200',
-  WAITING_DEPENDENCIES:            'bg-yellow-50 text-yellow-700 border-yellow-200',
-  REGISTRATION_OPEN:               'bg-green-50 text-green-700 border-green-200',
-  REGISTRATION_CLOSED:             'bg-orange-50 text-orange-700 border-orange-200',
-  READY_FOR_EVENT_CREATION:        'bg-purple-50 text-purple-700 border-purple-200',
-  WAITING_EVENT_CREATION_APPROVAL: 'bg-indigo-50 text-indigo-700 border-indigo-200',
-  EVENT_CREATED:                   'bg-emerald-50 text-emerald-700 border-emerald-200',
-  CANCELLED:                       'bg-red-50 text-red-700 border-red-200',
-}
+const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000'
 
 const FILTERS = [
-  { labelKey: 'common.all', value: '' },
-  { labelKey: 'pages.draft', value: 'DRAFT' },
-  { labelKey: 'pages.inPreparation', value: 'IN_PREPARATION' },
-  { labelKey: 'pages.registrationOpen', value: 'REGISTRATION_OPEN' },
-  { labelKey: 'pages.ready', value: 'READY_FOR_EVENT_CREATION' },
-  { labelKey: 'common.cancelled', value: 'CANCELLED' },
+  { labelKey: 'common.all',              value: '' },
+  { labelKey: 'pages.draft',             value: 'DRAFT' },
+  { labelKey: 'pages.inPreparation',     value: 'IN_PREPARATION' },
+  { labelKey: 'pages.registrationOpen',  value: 'REGISTRATION_OPEN' },
+  { labelKey: 'pages.ready',             value: 'READY_FOR_EVENT_CREATION' },
+  { labelKey: 'common.cancelled',        value: 'CANCELLED' },
 ]
 
 export default function OrganizerPlansPage() {
   const { t } = useI18n()
   const [plans, setPlans] = useState<any[]>([])
-  const [filtered, setFiltered] = useState<any[]>([])
   const [activeFilter, setActiveFilter] = useState('')
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
     const fetchPlans = async () => {
       try {
-        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
-        const res = await fetch(`${backendUrl}/event-plans`, {
+        const res = await fetch(`${BACKEND}/event-plans`, {
           headers: { Authorization: `Bearer ${getToken()}` },
         })
-        if (res.ok) {
-          const data = await res.json()
-          setPlans(data)
-          setFiltered(data)
-        }
+        if (res.ok) setPlans(await res.json())
       } catch {
         toast.error(t('pages.plansLoadFail'))
       } finally {
@@ -58,45 +43,33 @@ export default function OrganizerPlansPage() {
     fetchPlans()
   }, [t])
 
-  useEffect(() => {
-    if (!activeFilter) {
-      setFiltered(plans)
-    } else {
-      setFiltered(plans.filter((p) => p.status === activeFilter))
-    }
-  }, [activeFilter, plans])
-
-  if (isLoading) return (
-    <div className="flex h-[60vh] items-center justify-center">
-      <Loader2 className="size-8 animate-spin text-primary" />
-    </div>
-  )
+  const filtered = activeFilter ? plans.filter((p) => p.status === activeFilter) : plans
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-6 pb-20">
-      <div className="flex items-center justify-between">
+    <div className="p-6 max-w-4xl mx-auto space-y-5 pb-20">
+      <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold flex items-center gap-2">
-            <ClipboardList className="size-5 text-primary" /> {t('nav.eventPlans')}
-          </h1>
+          <h1 className="text-xl font-bold text-foreground">{t('nav.eventPlans')}</h1>
           <p className="text-sm text-muted-foreground mt-0.5">{t('pages.plansSubtitle')}</p>
         </div>
-        <Link href="/organizer/plans/new">
-          <Button size="sm" className="gap-2"><Plus className="size-4" /> {t('common.newPlan')}</Button>
+        <Link href="/organizer/plans/new" className="shrink-0">
+          <Button size="sm" className="gap-1.5">
+            <PlusCircle className="size-3.5" />
+            {t('common.newPlan')}
+          </Button>
         </Link>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-1 bg-muted/50 p-1 rounded-lg border border-border w-fit">
         {FILTERS.map((f) => (
           <button
             key={f.value}
             onClick={() => setActiveFilter(f.value)}
             className={cn(
-              'text-xs px-3 py-1.5 rounded-full border transition-colors',
+              'px-3 py-1 text-sm font-medium rounded-md transition-all',
               activeFilter === f.value
-                ? 'bg-primary text-primary-foreground border-primary'
-                : 'bg-background border-border text-muted-foreground hover:bg-muted/50',
+                ? 'bg-background text-foreground shadow-sm ring-1 ring-border'
+                : 'text-muted-foreground hover:text-foreground hover:bg-muted',
             )}
           >
             {t(f.labelKey)}
@@ -104,11 +77,15 @@ export default function OrganizerPlansPage() {
         ))}
       </div>
 
-      <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
-        {filtered.length === 0 ? (
-          <div className="py-16 flex flex-col items-center text-center opacity-50">
-            <AlertCircle className="size-10 mb-3" />
-            <p className="text-sm font-medium">{t('pages.noPlans')}</p>
+      <div className="bg-card border border-border rounded-lg shadow-sm overflow-hidden">
+        {isLoading ? (
+          <div className="flex justify-center items-center py-16">
+            <Loader2 className="size-8 animate-spin text-primary" />
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="flex flex-col items-center py-16 text-center">
+            <AlertCircle className="size-8 text-muted-foreground/40 mb-3" />
+            <p className="text-sm font-medium text-foreground">{t('pages.noPlans')}</p>
             <p className="text-xs text-muted-foreground mt-1">{t('pages.noPlansDesc')}</p>
           </div>
         ) : (
@@ -117,22 +94,19 @@ export default function OrganizerPlansPage() {
               <Link
                 key={plan.id}
                 href={`/organizer/plans/${plan.id}`}
-                className="flex items-start justify-between px-5 py-4 hover:bg-muted/30 transition-colors"
+                className="flex items-start justify-between gap-4 px-5 py-4 hover:bg-muted/30 transition-colors"
               >
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-foreground">{plan.title}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {plan.eventType}
-                    {plan.tentativeStartAt && ` · ${new Date(plan.tentativeStartAt).toLocaleDateString()}`}
-                    {' · '}{t('pages.preregShort', { count: plan.preRegistrationCount, minimum: plan.minimumAttendance })}
-                  </p>
+                  <p className="text-sm font-semibold text-foreground truncate">{plan.title}</p>
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-xs text-muted-foreground">
+                    {plan.eventType && <span>{plan.eventType}</span>}
+                    {plan.tentativeStartAt && <span>{new Date(plan.tentativeStartAt).toLocaleDateString()}</span>}
+                    {plan.preRegistrationCount != null && (
+                      <span>{t('pages.preregShort', { count: plan.preRegistrationCount, minimum: plan.minimumAttendance })}</span>
+                    )}
+                  </div>
                 </div>
-                <span className={cn(
-                  'text-xs font-semibold px-2 py-0.5 rounded-full border ml-4 shrink-0',
-                  STATUS_BADGE[plan.status] ?? STATUS_BADGE.DRAFT,
-                )}>
-                  {plan.status?.replace(/_/g, ' ')}
-                </span>
+                <StatusBadge status={plan.status} />
               </Link>
             ))}
           </div>

@@ -16,6 +16,7 @@ const en: StudentTranslations = {
     all: 'All',
     active: 'Active',
     past: 'Past',
+    selected: 'selected',
   },
   nav: {
     dashboard: 'Dashboard',
@@ -431,6 +432,11 @@ const en: StudentTranslations = {
     priorityMedium: 'Medium',
     priorityHigh: 'High',
     priorityUrgent: 'Urgent',
+    selectFromMyFiles: 'Select from My Files',
+    searchFilesPickerPlaceholder: 'Search files...',
+    noFilesYet: 'No files uploaded yet.',
+    noFilesMatch: 'No matching files.',
+    doneBtn: 'Done',
   },
   messages: {
     loadAccessRequestsFail: 'Failed to load access requests.',

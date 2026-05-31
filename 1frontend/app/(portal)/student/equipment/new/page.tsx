@@ -15,6 +15,7 @@ import {
   validateDateWindow,
 } from '@/lib/date-time'
 import { useI18n } from '@/lib/i18n'
+import { RequestAttachments, uploadAttachments, AttachmentsState } from '@/components/student/request-attachments'
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000'
 
@@ -35,6 +36,7 @@ export default function NewStudentEquipmentPage() {
   const [isLoadingResources, setIsLoadingResources] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [dateError, setDateError] = useState<string | null>(null)
+  const [attachments, setAttachments] = useState<AttachmentsState>({ newFiles: [], linkedFileIds: [] })
   const minDate = getCurrentDateInputValue()
 
   const [form, setForm] = useState({
@@ -120,6 +122,8 @@ export default function NewStudentEquipmentPage() {
 
     setIsSubmitting(true)
     try {
+      const uploadedIds = await uploadAttachments(attachments.newFiles)
+      const attachmentFileIds = [...attachments.linkedFileIds, ...uploadedIds]
       const res = await fetch(`${BACKEND}/equipment-requests`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
@@ -132,6 +136,7 @@ export default function NewStudentEquipmentPage() {
           neededFrom: form.neededFrom || undefined,
           neededUntil: form.neededUntil || undefined,
           urgencyReason: form.urgencyReason.trim() || undefined,
+          ...(attachmentFileIds.length ? { attachmentFileIds } : {}),
         }),
       })
 
@@ -264,6 +269,10 @@ export default function NewStudentEquipmentPage() {
             value={form.urgencyReason}
             onChange={(e) => set('urgencyReason', e.target.value)}
           />
+        </div>
+
+        <div className="pt-2">
+          <RequestAttachments onChange={setAttachments} />
         </div>
 
         <div className="flex items-center gap-3 pt-4 border-t border-border">

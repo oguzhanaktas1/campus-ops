@@ -13,6 +13,7 @@ import {
   validateDateWindow,
 } from '@/lib/date-time'
 import { useI18n } from '@/lib/i18n'
+import { RequestAttachments, uploadAttachments, AttachmentsState } from '@/components/student/request-attachments'
 
 const ACCESS_TYPES = ['System / Portal', 'Lab Access', 'Network Resource', 'Software License', 'Campus Area', 'Other']
 
@@ -21,6 +22,7 @@ export default function NewStudentAccessRequestPage() {
   const { t } = useI18n()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [dateError, setDateError] = useState<string | null>(null)
+  const [attachments, setAttachments] = useState<AttachmentsState>({ newFiles: [], linkedFileIds: [] })
   const minDate = getCurrentDateInputValue()
   const [form, setForm] = useState({
     accessType: 'System / Portal',
@@ -66,6 +68,8 @@ export default function NewStudentAccessRequestPage() {
     }
     setIsSubmitting(true)
     try {
+      const uploadedIds = await uploadAttachments(attachments.newFiles)
+      const attachmentFileIds = [...attachments.linkedFileIds, ...uploadedIds]
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
       const res = await fetch(`${backendUrl}/access-requests`, {
         method: 'POST',
@@ -74,6 +78,7 @@ export default function NewStudentAccessRequestPage() {
           ...form,
           startAt: form.startAt || undefined,
           endAt: form.endAt || undefined,
+          ...(attachmentFileIds.length ? { attachmentFileIds } : {}),
         }),
       })
       if (!res.ok) throw new Error()
@@ -131,6 +136,10 @@ export default function NewStudentAccessRequestPage() {
           <textarea value={form.justification} onChange={(e) => set('justification', e.target.value)} rows={4}
             placeholder={t('forms.justificationPlaceholder')}
             className="w-full bg-background border border-input rounded-md px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring resize-none" />
+        </div>
+
+        <div className="pt-4 border-t border-border">
+          <RequestAttachments onChange={setAttachments} />
         </div>
 
         <div className="flex justify-end gap-3 pt-2">

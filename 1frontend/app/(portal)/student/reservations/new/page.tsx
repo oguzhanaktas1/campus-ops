@@ -31,6 +31,7 @@ import {
   validateDateWindow,
 } from '@/lib/date-time'
 import { useI18n } from '@/lib/i18n'
+import { RequestAttachments, uploadAttachments, AttachmentsState } from '@/components/student/request-attachments'
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000'
 
@@ -51,6 +52,7 @@ export default function NewReservationPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [conflicts, setConflicts] = useState<any[]>([])
   const [dateError, setDateError] = useState<string | null>(null)
+  const [attachments, setAttachments] = useState<AttachmentsState>({ newFiles: [], linkedFileIds: [] })
 
   const [form, setForm] = useState({
     resourceId: '',
@@ -122,6 +124,8 @@ export default function NewReservationPage() {
 
     setIsSubmitting(true)
     try {
+      const uploadedIds = await uploadAttachments(attachments.newFiles)
+      const attachmentFileIds = [...attachments.linkedFileIds, ...uploadedIds]
       const res = await fetch(`${BACKEND}/room-reservation-requests`, {
         method: 'POST',
         headers: {
@@ -139,6 +143,7 @@ export default function NewReservationPage() {
           requiresTechnicalSupport: form.requiresTechnicalSupport,
           setupNotes: form.setupNotes.trim() || undefined,
           description: form.description.trim() || undefined,
+          ...(attachmentFileIds.length ? { attachmentFileIds } : {}),
         }),
       })
 
@@ -326,6 +331,10 @@ export default function NewReservationPage() {
             value={form.setupNotes}
             onChange={(e) => set('setupNotes', e.target.value)}
           />
+        </div>
+
+        <div className="pt-2">
+          <RequestAttachments onChange={setAttachments} />
         </div>
 
         <div className="flex items-center gap-3 pt-4 border-t border-border">

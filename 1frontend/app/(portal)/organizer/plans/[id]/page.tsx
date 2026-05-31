@@ -66,15 +66,14 @@ export default function PlanDetailPage() {
   })
 
   const backend = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
-  const headers = { Authorization: `Bearer ${getToken()}` }
 
   const fetchPlan = useCallback(async () => {
+    const authHeaders = { Authorization: `Bearer ${getToken()}` }
     try {
-      const res = await fetch(`${backend}/event-plans/${id}`, { headers })
+      const res = await fetch(`${backend}/event-plans/${id}`, { headers: authHeaders })
       if (res.ok) {
         const data = await res.json()
         setPlan(data)
-        // Pre-fill ECR form from plan data
         setEcrForm((f) => ({
           ...f,
           title: data.title,
@@ -96,9 +95,11 @@ export default function PlanDetailPage() {
             ? new Date(data.registrationEndAt).toISOString().slice(0, 16)
             : '',
         }))
-      } else {
+      } else if (res.status === 404) {
         toast.error(t('pages.planNotFound'))
         router.push('/organizer/plans')
+      } else {
+        toast.error(t('pages.planLoadFail'))
       }
     } catch {
       toast.error(t('pages.planLoadFail'))
@@ -113,7 +114,7 @@ export default function PlanDetailPage() {
     try {
       const res = await fetch(`${backend}/event-plans/${id}`, {
         method: 'PATCH',
-        headers: { ...headers, 'Content-Type': 'application/json' },
+        headers: { Authorization: `Bearer ${getToken()}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: 'REGISTRATION_OPEN' }),
       })
       if (!res.ok) throw new Error()
@@ -129,7 +130,7 @@ export default function PlanDetailPage() {
     try {
       const res = await fetch(`${backend}/event-plans/${id}`, {
         method: 'DELETE',
-        headers: { ...headers, 'Content-Type': 'application/json' },
+        headers: { Authorization: `Bearer ${getToken()}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ reason: 'Cancelled by organizer.' }),
       })
       if (!res.ok) throw new Error()
@@ -151,7 +152,7 @@ export default function PlanDetailPage() {
     try {
       const res = await fetch(`${backend}/event-plans/${id}/creation-request`, {
         method: 'POST',
-        headers: { ...headers, 'Content-Type': 'application/json' },
+        headers: { Authorization: `Bearer ${getToken()}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...ecrForm,
           minimumAttendance: parseInt(ecrForm.minimumAttendance),
@@ -406,7 +407,7 @@ export default function PlanDetailPage() {
                 try {
                   const res = await fetch(`${backend}/event-plans/${id}/decisions`, {
                     method: 'POST',
-                    headers: { ...headers, 'Content-Type': 'application/json' },
+                    headers: { Authorization: `Bearer ${getToken()}`, 'Content-Type': 'application/json' },
                     body: JSON.stringify({ decisionType: 'EXTENDED_REGISTRATION', newRegistrationEndAt: newEnd }),
                   })
                   if (!res.ok) throw new Error()
@@ -422,7 +423,7 @@ export default function PlanDetailPage() {
                 try {
                   const res = await fetch(`${backend}/event-plans/${id}/decisions`, {
                     method: 'POST',
-                    headers: { ...headers, 'Content-Type': 'application/json' },
+                    headers: { Authorization: `Bearer ${getToken()}`, 'Content-Type': 'application/json' },
                     body: JSON.stringify({ decisionType: 'RESCHEDULED', newStartAt: newStart }),
                   })
                   if (!res.ok) throw new Error()

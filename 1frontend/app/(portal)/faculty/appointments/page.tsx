@@ -1,20 +1,26 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { CalendarDays } from 'lucide-react'
+import Link from 'next/link'
+import { CalendarDays, Loader2, Search, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Input } from '@/components/ui/input'
+import { cn } from '@/lib/utils'
+import { StatusBadge } from '@/components/status-badge'
 import { toast } from 'sonner'
 import { getToken } from '@/lib/auth'
 import { useI18n } from '@/lib/i18n'
-import { StaffListShell } from '@/components/staff/staff-list-shell'
-import { StaffRequestRow, formatDateTime } from '@/components/staff/staff-request-row'
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000'
 const PAGE_SIZE = 20
-const ALL_STATUSES = ['SUBMITTED', 'IN_REVIEW', 'WAITING_APPROVAL', 'APPROVED', 'CONFIRMED', 'REJECTED', 'CANCELLED', 'COMPLETED']
 
 const PENDING_STATUSES = ['SUBMITTED', 'IN_REVIEW', 'WAITING_APPROVAL']
 const CONFIRMED_STATUSES = ['APPROVED', 'CONFIRMED']
 const PAST_STATUSES = ['COMPLETED', 'REJECTED', 'CANCELLED']
+
+function fmtDateTime(d: string | null | undefined) {
+  if (!d) return ''
+  return new Date(d).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+}
 
 type TabKey = 'all' | 'requests' | 'confirmed' | 'past'
 
@@ -25,8 +31,6 @@ export default function FacultyAppointmentsPage() {
   const [activeTab, setActiveTab] = useState<TabKey>('all')
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
-  const [activeStatus, setActiveStatus] = useState('')
-  const [activePriority, setActivePriority] = useState('')
 
   const fetchAppointments = useCallback(async () => {
     try {
@@ -49,6 +53,13 @@ export default function FacultyAppointmentsPage() {
   const confirmed = appointments.filter((a) => CONFIRMED_STATUSES.includes(a.status?.toUpperCase()))
   const past = appointments.filter((a) => PAST_STATUSES.includes(a.status?.toUpperCase()))
 
+  const tabs = [
+    { key: 'all' as TabKey, label: t('common.all'), count: appointments.length },
+    { key: 'requests' as TabKey, label: t('appointments.tabRequests'), count: pending.length },
+    { key: 'confirmed' as TabKey, label: t('appointments.tabConfirmed'), count: confirmed.length },
+    { key: 'past' as TabKey, label: t('appointments.tabPast'), count: past.length },
+  ]
+
   const baseList =
     activeTab === 'requests' ? pending :
     activeTab === 'confirmed' ? confirmed :
@@ -56,8 +67,6 @@ export default function FacultyAppointmentsPage() {
     appointments
 
   const filtered = baseList.filter((a) => {
-    if (activeStatus && a.status?.toUpperCase() !== activeStatus) return false
-    if (activePriority && a.priority !== activePriority) return false
     if (!search) return true
     const q = search.toLowerCase()
     return (
@@ -68,65 +77,115 @@ export default function FacultyAppointmentsPage() {
     )
   })
 
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE)
   const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
-  const tabs = [
-    { key: 'all', label: t('common.all'), count: appointments.length },
-    { key: 'requests', label: t('appointments.tabRequests'), count: pending.length },
-    { key: 'confirmed', label: t('appointments.tabConfirmed'), count: confirmed.length },
-    { key: 'past', label: t('appointments.tabPast'), count: past.length },
-  ]
-
   return (
-    <StaffListShell
-      title={t('appointments.title')}
-      subtitle={t('appointments.subtitle')}
-      actionButton={
-        pending.length > 0 ? (
-          <span className="text-xs bg-amber-50 text-amber-700 border border-amber-200 font-semibold px-2.5 py-1 rounded-full self-center">
-            {pending.length} {t('common.pending')}
-          </span>
-        ) : undefined
-      }
-      tabs={tabs}
-      activeTab={activeTab}
-      onTabChange={(k) => { setActiveTab(k as TabKey); setPage(1) }}
-      search={search}
-      onSearchChange={(v) => { setSearch(v); setPage(1) }}
-      searchPlaceholder={t('common.search')}
-      statusOptions={ALL_STATUSES}
-      activeStatus={activeStatus}
-      onStatusChange={(s) => { setActiveStatus(s); setPage(1) }}
-      activePriority={activePriority}
-      onPriorityChange={(p) => { setActivePriority(p); setPage(1) }}
-      isLoading={isLoading}
-      totalCount={filtered.length}
-      page={page}
-      pageSize={PAGE_SIZE}
-      onPageChange={setPage}
-      emptyIcon={<CalendarDays className="size-8" />}
-      emptyTitle={
-        activeTab === 'requests' ? t('appointments.noRequests') :
-        activeTab === 'confirmed' ? t('appointments.noConfirmed') :
-        activeTab === 'past' ? t('appointments.noPast') :
-        t('appointments.noRequests')
-      }
-    >
-      {paged.map((apt) => (
-        <StaffRequestRow
-          key={apt.id}
-          href={`/faculty/requests/${apt.id}?from=/faculty/appointments`}
-          title={apt.topic || 'Appointment Request'}
-          requestNo={apt.requestNo}
-          badge={apt.appointmentType}
-          metaLeft={[
-            apt.requester?.fullName ?? apt.requesterName ?? 'Unknown',
-            apt.preferredStartAt ? formatDateTime(apt.preferredStartAt) : undefined,
-            apt.durationMin ? `${apt.durationMin} min` : undefined,
-          ]}
-          status={apt.status}
-        />
-      ))}
-    </StaffListShell>
+    <div className="p-6 max-w-4xl mx-auto space-y-5 pb-20">
+      <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
+        <div>
+          <h1 className="text-xl font-bold text-foreground">{t('appointments.title')}</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">{t('appointments.subtitle')}</p>
+        </div>
+        <div className="flex items-center gap-3 w-full sm:w-auto">
+          {pending.length > 0 && (
+            <span className="text-xs bg-amber-50 text-amber-700 border border-amber-200 font-semibold px-2.5 py-1 rounded-full whitespace-nowrap">
+              {pending.length} {t('common.pending')}
+            </span>
+          )}
+          <div className="relative w-full sm:w-64 shrink-0">
+            <Search className="absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
+            <Input
+              placeholder={t('common.search')}
+              className="pl-9 h-9"
+              value={search}
+              onChange={(e) => { setSearch(e.target.value); setPage(1) }}
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap gap-1 bg-muted/50 p-1 rounded-lg border border-border w-fit">
+        {tabs.map((tab) => (
+          <button
+            key={tab.key}
+            onClick={() => { setActiveTab(tab.key); setPage(1) }}
+            className={cn(
+              'px-3 py-1 text-sm font-medium rounded-md transition-all',
+              activeTab === tab.key
+                ? 'bg-background text-foreground shadow-sm ring-1 ring-border'
+                : 'text-muted-foreground hover:text-foreground hover:bg-muted',
+            )}
+          >
+            {tab.label}
+            {tab.count > 0 && <span className="ml-1.5 text-xs opacity-60">{tab.count}</span>}
+          </button>
+        ))}
+      </div>
+
+      <div className="bg-card border border-border rounded-lg shadow-sm overflow-hidden">
+        {isLoading ? (
+          <div className="flex justify-center items-center py-16">
+            <Loader2 className="size-8 animate-spin text-primary" />
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="flex flex-col items-center py-16 text-center">
+            <AlertCircle className="size-8 text-muted-foreground/40 mb-3" />
+            <p className="text-sm font-medium text-foreground">
+              {activeTab === 'requests' ? t('appointments.noRequests') :
+               activeTab === 'confirmed' ? t('appointments.noConfirmed') :
+               activeTab === 'past' ? t('appointments.noPast') :
+               t('appointments.noRequests')}
+            </p>
+          </div>
+        ) : (
+          <div className="divide-y divide-border">
+            {paged.map((apt) => (
+              <Link
+                key={apt.id}
+                href={`/faculty/requests/${apt.id}?from=/faculty/appointments`}
+                className="flex items-start justify-between gap-4 px-5 py-4 hover:bg-muted/30 transition-colors"
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <p className="text-sm font-semibold text-foreground truncate">
+                      {apt.topic || 'Appointment Request'}
+                    </p>
+                    {apt.requestNo && (
+                      <span className="text-xs text-muted-foreground font-mono shrink-0">{apt.requestNo}</span>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+                    {(apt.requester?.fullName ?? apt.requesterName) && (
+                      <span>{apt.requester?.fullName ?? apt.requesterName ?? 'Unknown'}</span>
+                    )}
+                    {apt.preferredStartAt && <span>{fmtDateTime(apt.preferredStartAt)}</span>}
+                    {apt.durationMin && <span>{apt.durationMin} min</span>}
+                    {apt.appointmentType && <span>{apt.appointmentType}</span>}
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <StatusBadge status={apt.status} />
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between text-sm text-muted-foreground">
+          <span>{((page - 1) * PAGE_SIZE) + 1}–{Math.min(page * PAGE_SIZE, filtered.length)} / {filtered.length}</span>
+          <div className="flex items-center gap-1">
+            <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} className="p-1.5 rounded hover:bg-muted disabled:opacity-30">
+              <ChevronLeft className="size-4" />
+            </button>
+            <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="p-1.5 rounded hover:bg-muted disabled:opacity-30">
+              <ChevronRight className="size-4" />
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
   )
 }

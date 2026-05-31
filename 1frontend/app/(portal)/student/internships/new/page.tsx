@@ -21,6 +21,7 @@ import {
   validateDateWindow,
 } from '@/lib/date-time'
 import { useI18n } from '@/lib/i18n'
+import { RequestAttachments, uploadAttachments, AttachmentsState } from '@/components/student/request-attachments'
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000'
 
@@ -32,6 +33,7 @@ export default function NewInternshipPage() {
   const { t } = useI18n()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [dateError, setDateError] = useState<string | null>(null)
+  const [attachments, setAttachments] = useState<AttachmentsState>({ newFiles: [], linkedFileIds: [] })
   const minDate = getCurrentDateInputValue()
 
   const [form, setForm] = useState({
@@ -93,6 +95,8 @@ export default function NewInternshipPage() {
 
     setIsSubmitting(true)
     try {
+      const uploadedIds = await uploadAttachments(attachments.newFiles)
+      const attachmentFileIds = [...attachments.linkedFileIds, ...uploadedIds]
       const res = await fetch(`${BACKEND}/student/internships`, {
         method: 'POST',
         headers: {
@@ -111,6 +115,7 @@ export default function NewInternshipPage() {
           endDate: form.endDate,
           durationDays: Number(form.durationDays) || 0,
           insuranceRequired: form.insuranceRequired,
+          ...(attachmentFileIds.length ? { attachmentFileIds } : {}),
         }),
       })
 
@@ -310,6 +315,10 @@ export default function NewInternshipPage() {
           <p className="text-sm text-muted-foreground">
             {t('forms.internshipRouteInfo')}
           </p>
+        </div>
+
+        <div className="rounded-lg border border-border bg-card p-5">
+          <RequestAttachments onChange={setAttachments} />
         </div>
 
         <div className="flex justify-end gap-3">

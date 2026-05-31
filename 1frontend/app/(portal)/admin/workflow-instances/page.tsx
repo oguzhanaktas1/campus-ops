@@ -219,16 +219,8 @@ export default function AdminWorkflowInstancesPage() {
     [records],
   )
 
-  if (isLoading) {
-    return (
-      <div className="flex h-[50vh] items-center justify-center">
-        <Loader2 className="size-8 animate-spin text-primary" />
-      </div>
-    )
-  }
-
   return (
-    <div className="mx-auto max-w-7xl space-y-6 p-6">
+    <div className="mx-auto max-w-7xl space-y-5 p-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <h1 className="text-xl font-bold text-foreground">{t('workflows.instancesTitle')}</h1>
@@ -251,14 +243,14 @@ export default function AdminWorkflowInstancesPage() {
           ['Completed', totals.completed],
           ['Overdue', totals.overdue],
         ].map(([label, value]) => (
-          <div key={label} className="rounded-xl border border-border bg-card p-4 shadow-sm">
+          <div key={label} className="rounded-lg border border-border bg-card p-4 shadow-sm">
             <p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
             <p className="mt-2 text-2xl font-semibold text-foreground">{value}</p>
           </div>
         ))}
       </div>
 
-      <section className="rounded-xl border border-border bg-card p-4 shadow-sm">
+      <section className="rounded-lg border border-border bg-card p-4 shadow-sm">
         <div className="flex items-center gap-2 text-sm font-medium text-foreground">
           <Filter className="size-4 text-primary" />
           Filters
@@ -343,8 +335,12 @@ export default function AdminWorkflowInstancesPage() {
       </section>
 
       <section className="space-y-4">
-        {filteredRecords.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-border bg-card p-12 text-center shadow-sm">
+        {isLoading ? (
+          <div className="flex justify-center items-center py-16 rounded-lg border border-border bg-card shadow-sm">
+            <Loader2 className="size-8 animate-spin text-primary" />
+          </div>
+        ) : filteredRecords.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-border bg-card p-12 text-center shadow-sm">
             <Workflow className="mx-auto mb-3 size-10 text-muted-foreground/30" />
             <p className="text-sm font-medium text-foreground">{t('workflows.noInstances')}</p>
             <p className="mt-1 text-xs text-muted-foreground">
@@ -359,7 +355,7 @@ export default function AdminWorkflowInstancesPage() {
               return (
                 <details
                   key={instance.id}
-                  className="group rounded-xl border border-border bg-card shadow-sm"
+                  className="group rounded-lg border border-border bg-card shadow-sm"
                 >
                   <summary className="cursor-pointer list-none p-4 marker:hidden">
                     <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
@@ -599,7 +595,7 @@ export default function AdminWorkflowInstancesPage() {
 
             {/* Pagination */}
             {totalPages > 1 && (
-              <div className="relative flex items-center justify-center rounded-xl border border-border bg-card px-5 py-3">
+              <div className="relative flex items-center justify-center rounded-lg border border-border bg-card px-5 py-3">
                 <span className="absolute left-5 text-xs text-muted-foreground">
                   {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filteredRecords.length)} / {filteredRecords.length}
                 </span>

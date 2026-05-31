@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { getToken } from '@/lib/auth'
 import { useI18n } from '@/lib/i18n'
+import { RequestAttachments, uploadAttachments, AttachmentsState } from '@/components/student/request-attachments'
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000'
 
@@ -28,6 +29,7 @@ export default function NewStudentProcurementPage() {
   const router = useRouter()
   const { t } = useI18n()
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [attachments, setAttachments] = useState<AttachmentsState>({ newFiles: [], linkedFileIds: [] })
   const [form, setForm] = useState({
     itemName: '',
     itemCategory: 'Laboratory Equipment',
@@ -75,6 +77,8 @@ export default function NewStudentProcurementPage() {
 
     setIsSubmitting(true)
     try {
+      const uploadedIds = await uploadAttachments(attachments.newFiles)
+      const attachmentFileIds = [...attachments.linkedFileIds, ...uploadedIds]
       const res = await fetch(`${BACKEND}/procurement`, {
         method: 'POST',
         headers: {
@@ -90,6 +94,7 @@ export default function NewStudentProcurementPage() {
           justification: form.justification.trim(),
           budgetCode: form.budgetCode.trim() || undefined,
           priority: form.priority,
+          ...(attachmentFileIds.length ? { attachmentFileIds } : {}),
         }),
       })
 
@@ -221,6 +226,10 @@ export default function NewStudentProcurementPage() {
             placeholder={t('forms.procurementJustificationPlaceholder')}
             className="w-full bg-background border border-input rounded-md px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring resize-none"
           />
+        </div>
+
+        <div className="pt-2">
+          <RequestAttachments onChange={setAttachments} />
         </div>
 
         <div className="flex items-center gap-3 pt-4 border-t border-border">

@@ -16,7 +16,7 @@ const en = {
     quoteAuthor: 'Dr. Margaret Liu',
     quoteRole: 'Provost, Westfield University',
     platform: 'Smart Campus Operations Platform',
-    emailPlaceholder: 'you@campus.edu.tr',
+    emailPlaceholder: 'name.surname@campusops.edu.tr',
     passwordPlaceholder: '••••••••',
     capsLock: 'Caps Lock is on',
     submit: 'Sign in',

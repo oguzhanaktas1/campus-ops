@@ -1,26 +1,32 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { CalendarDays } from 'lucide-react'
+import Link from 'next/link'
+import { CalendarDays, Loader2, Search, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Input } from '@/components/ui/input'
+import { cn } from '@/lib/utils'
+import { StatusBadge } from '@/components/status-badge'
 import { toast } from 'sonner'
 import { getToken } from '@/lib/auth'
 import { useI18n } from '@/lib/i18n'
-import { StaffListShell } from '@/components/staff/staff-list-shell'
-import { StaffRequestRow, formatDateTime } from '@/components/staff/staff-request-row'
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000'
 const PAGE_SIZE = 20
-const ALL_STATUSES = ['SUBMITTED', 'IN_REVIEW', 'WAITING_APPROVAL', 'APPROVED', 'COMPLETED', 'REJECTED', 'CANCELLED']
+
+const PENDING_STATUSES = ['SUBMITTED', 'IN_REVIEW', 'WAITING_APPROVAL']
+
+function fmtDateTime(d: string | null | undefined) {
+  if (!d) return ''
+  return new Date(d).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+}
 
 export default function StaffAppointmentsPage() {
   const { t } = useI18n()
   const [appointments, setAppointments] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [filter, setFilter] = useState('all')
+  const [activeTab, setActiveTab] = useState('')
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
-  const [activeStatus, setActiveStatus] = useState('')
-  const [activePriority, setActivePriority] = useState('')
 
   const fetchAppointments = useCallback(async () => {
     try {
@@ -28,8 +34,10 @@ export default function StaffAppointmentsPage() {
         headers: { Authorization: `Bearer ${getToken()}` },
       })
       if (res.ok) setAppointments(await res.json())
+      else setAppointments([])
     } catch {
       toast.error(t('pages.appointmentLoadFail'))
+      setAppointments([])
     } finally {
       setIsLoading(false)
     }
@@ -37,15 +45,16 @@ export default function StaffAppointmentsPage() {
 
   useEffect(() => { void fetchAppointments() }, [fetchAppointments])
 
-  const pending = appointments.filter((a) =>
-    ['SUBMITTED', 'IN_REVIEW', 'WAITING_APPROVAL'].includes(a.status)
-  )
+  const pending = appointments.filter((a) => PENDING_STATUSES.includes(a.status))
 
-  const byStatus = filter === 'all' ? appointments : appointments.filter((a) => a.status === filter)
+  const tabs = [
+    { key: '', label: t('common.all'), count: appointments.length },
+    { key: 'APPROVED', label: t('common.approved'), count: appointments.filter((a) => a.status === 'APPROVED').length },
+    { key: 'REJECTED', label: t('common.rejected'), count: appointments.filter((a) => a.status === 'REJECTED').length },
+  ]
 
-  const filtered = byStatus.filter((a) => {
-    if (activeStatus && a.status !== activeStatus) return false
-    if (activePriority && a.priority !== activePriority) return false
+  const filtered = appointments.filter((a) => {
+    if (activeTab && a.status !== activeTab) return false
     if (!search) return true
     const q = search.toLowerCase()
     return (
@@ -56,62 +65,107 @@ export default function StaffAppointmentsPage() {
     )
   })
 
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE)
   const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
-  const tabs = [
-    { key: 'all', label: t('common.all'), count: appointments.length },
-    ...ALL_STATUSES.map((s) => ({
-      key: s,
-      label: s.replace(/_/g, ' '),
-      count: appointments.filter((a) => a.status === s).length,
-    })).filter((tab) => tab.count > 0),
-  ]
-
   return (
-    <StaffListShell
-      title={t('pages.appointmentRequests')}
-      subtitle={t('pages.appointmentSubtitle')}
-      actionButton={
-        pending.length > 0 ? (
-          <span className="text-xs bg-amber-50 text-amber-700 border border-amber-200 font-semibold px-2.5 py-1 rounded-full self-center">
-            {t('pages.pendingCount', { count: pending.length })}
-          </span>
-        ) : undefined
-      }
-      tabs={tabs}
-      activeTab={filter}
-      onTabChange={setFilter}
-      search={search}
-      onSearchChange={setSearch}
-      searchPlaceholder={t('tickets.searchPlaceholder')}
-      statusOptions={ALL_STATUSES}
-      activeStatus={activeStatus}
-      onStatusChange={(s) => { setActiveStatus(s); setPage(1) }}
-      activePriority={activePriority}
-      onPriorityChange={(p) => { setActivePriority(p); setPage(1) }}
-      isLoading={isLoading}
-      totalCount={filtered.length}
-      page={page}
-      pageSize={PAGE_SIZE}
-      onPageChange={setPage}
-      emptyIcon={<CalendarDays className="size-8" />}
-      emptyTitle={t('pages.appointmentEmpty')}
-      emptyDesc={search ? t('tickets.searchHint') : undefined}
-    >
-      {paged.map((a) => (
-        <StaffRequestRow
-          key={a.id}
-          href={`/staff/requests/appointments/${a.id}`}
-          title={a.topic || 'Appointment Request'}
-          requestNo={a.requestNo}
-          badge={a.appointmentType}
-          metaLeft={[
-            a.requesterName,
-            a.preferredStartAt ? formatDateTime(a.preferredStartAt) : undefined,
-          ]}
-          status={a.status}
-        />
-      ))}
-    </StaffListShell>
+    <div className="p-6 max-w-4xl mx-auto space-y-5 pb-20">
+      <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
+        <div>
+          <h1 className="text-xl font-bold text-foreground">{t('pages.appointmentRequests')}</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">{t('pages.appointmentSubtitle')}</p>
+        </div>
+        <div className="flex items-center gap-3 w-full sm:w-auto">
+          {pending.length > 0 && (
+            <span className="text-xs bg-amber-50 text-amber-700 border border-amber-200 font-semibold px-2.5 py-1 rounded-full whitespace-nowrap">
+              {t('pages.pendingCount', { count: pending.length })}
+            </span>
+          )}
+          <div className="relative w-full sm:w-64 shrink-0">
+            <Search className="absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
+            <Input
+              placeholder={t('common.search')}
+              className="pl-9 h-9"
+              value={search}
+              onChange={(e) => { setSearch(e.target.value); setPage(1) }}
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap gap-1 bg-muted/50 p-1 rounded-lg border border-border w-fit">
+        {tabs.map((tab) => (
+          <button
+            key={tab.key}
+            onClick={() => { setActiveTab(tab.key); setPage(1) }}
+            className={cn(
+              'px-3 py-1 text-sm font-medium rounded-md transition-all',
+              activeTab === tab.key
+                ? 'bg-background text-foreground shadow-sm ring-1 ring-border'
+                : 'text-muted-foreground hover:text-foreground hover:bg-muted',
+            )}
+          >
+            {tab.label}
+            {tab.count > 0 && <span className="ml-1.5 text-xs opacity-60">{tab.count}</span>}
+          </button>
+        ))}
+      </div>
+
+      <div className="bg-card border border-border rounded-lg shadow-sm overflow-hidden">
+        {isLoading ? (
+          <div className="flex justify-center items-center py-16">
+            <Loader2 className="size-8 animate-spin text-primary" />
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="flex flex-col items-center py-16 text-center">
+            <AlertCircle className="size-8 text-muted-foreground/40 mb-3" />
+            <p className="text-sm font-medium text-foreground">{t('pages.appointmentEmpty')}</p>
+          </div>
+        ) : (
+          <div className="divide-y divide-border">
+            {paged.map((a) => (
+              <Link
+                key={a.id}
+                href={`/staff/requests/appointments/${a.id}`}
+                className="flex items-start justify-between gap-4 px-5 py-4 hover:bg-muted/30 transition-colors"
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <p className="text-sm font-semibold text-foreground truncate">
+                      {a.topic || 'Appointment Request'}
+                    </p>
+                    {a.requestNo && (
+                      <span className="text-xs text-muted-foreground font-mono shrink-0">{a.requestNo}</span>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+                    {a.requesterName && <span>{a.requesterName}</span>}
+                    {a.preferredStartAt && <span>{fmtDateTime(a.preferredStartAt)}</span>}
+                    {a.appointmentType && <span>{a.appointmentType}</span>}
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <StatusBadge status={a.status} />
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between text-sm text-muted-foreground">
+          <span>{((page - 1) * PAGE_SIZE) + 1}–{Math.min(page * PAGE_SIZE, filtered.length)} / {filtered.length}</span>
+          <div className="flex items-center gap-1">
+            <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} className="p-1.5 rounded hover:bg-muted disabled:opacity-30">
+              <ChevronLeft className="size-4" />
+            </button>
+            <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="p-1.5 rounded hover:bg-muted disabled:opacity-30">
+              <ChevronRight className="size-4" />
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
   )
 }

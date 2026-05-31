@@ -8,6 +8,7 @@ import Link from 'next/link'
 import { getToken } from '@/lib/auth'
 import { toast } from 'sonner'
 import { useI18n } from '@/lib/i18n'
+import { RequestAttachments, uploadAttachments, AttachmentsState } from '@/components/student/request-attachments'
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000'
 
@@ -16,6 +17,7 @@ export default function NewDocumentPage() {
   const searchParams = useSearchParams()
   const { t } = useI18n()
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [attachments, setAttachments] = useState<AttachmentsState>({ newFiles: [], linkedFileIds: [] })
 
   const [form, setForm] = useState({
     documentType: searchParams.get('type') ?? 'TRANSCRIPT',
@@ -34,6 +36,8 @@ export default function NewDocumentPage() {
     e.preventDefault()
     setIsSubmitting(true)
     try {
+      const uploadedIds = await uploadAttachments(attachments.newFiles)
+      const attachmentFileIds = [...attachments.linkedFileIds, ...uploadedIds]
       const res = await fetch(`${BACKEND}/document-requests`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
@@ -44,6 +48,7 @@ export default function NewDocumentPage() {
           deliveryMethod: form.deliveryMethod,
           deliveryAddress: form.deliveryAddress || null,
           description: form.description || null,
+          ...(attachmentFileIds.length ? { attachmentFileIds } : {}),
         }),
       })
       if (!res.ok) {
@@ -179,6 +184,11 @@ export default function NewDocumentPage() {
             placeholder={t('forms.additionalNotesPlaceholder')}
             className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-none"
           />
+        </div>
+
+        {/* Attachments */}
+        <div className="px-5 py-4">
+          <RequestAttachments onChange={setAttachments} />
         </div>
 
         {/* Submit */}

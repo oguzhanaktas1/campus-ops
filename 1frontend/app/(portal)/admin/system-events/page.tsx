@@ -139,19 +139,8 @@ export default function AdminSystemEventsPage() {
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE)
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
-  if (isLoading) {
-    return (
-      <div className="flex h-[60vh] items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 className="size-8 animate-spin text-primary" />
-          <p className="text-sm text-muted-foreground animate-pulse">{t('systemEvents.loading')}</p>
-        </div>
-      </div>
-    )
-  }
-
   return (
-    <div className="p-6 space-y-6 max-w-6xl mx-auto pb-20">
+    <div className="p-6 space-y-5 max-w-6xl mx-auto pb-20">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl font-bold text-foreground">{t('systemEvents.title')}</h1>
@@ -197,7 +186,13 @@ export default function AdminSystemEventsPage() {
       </p>
 
       {/* Table */}
-      <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
+      <div className="bg-card border border-border rounded-lg shadow-sm overflow-hidden">
+        {isLoading ? (
+          <div className="flex justify-center items-center py-16">
+            <Loader2 className="size-8 animate-spin text-primary" />
+          </div>
+        ) : (
+        <>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -296,6 +291,8 @@ export default function AdminSystemEventsPage() {
             </span>
             <PaginationBar page={page} totalPages={totalPages} onChange={setPage} />
           </div>
+        )}
+        </>
         )}
       </div>
     </div>

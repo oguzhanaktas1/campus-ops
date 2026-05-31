@@ -98,19 +98,8 @@ export default function AdminWebhookLogsPage() {
     return pages
   }
 
-  if (isLoading) {
-    return (
-      <div className="flex h-[60vh] items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 className="size-8 animate-spin text-primary" />
-          <p className="text-sm text-muted-foreground animate-pulse">{t('webhookLogs.loading')}</p>
-        </div>
-      </div>
-    )
-  }
-
   return (
-    <div className="p-6 space-y-6 max-w-6xl mx-auto pb-20">
+    <div className="p-6 space-y-5 max-w-6xl mx-auto pb-20">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl font-bold text-foreground">{t('webhookLogs.title')}</h1>
@@ -157,7 +146,13 @@ export default function AdminWebhookLogsPage() {
       <p className="text-xs text-muted-foreground font-medium">{t('webhookLogs.logEntries', { count: filtered.length })}</p>
 
       {/* Table */}
-      <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
+      <div className="bg-card border border-border rounded-lg shadow-sm overflow-hidden">
+        {isLoading ? (
+          <div className="flex justify-center items-center py-16">
+            <Loader2 className="size-8 animate-spin text-primary" />
+          </div>
+        ) : (
+        <>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -290,6 +285,8 @@ export default function AdminWebhookLogsPage() {
               </Button>
             </div>
           </div>
+        )}
+        </>
         )}
       </div>
     </div>

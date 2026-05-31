@@ -49,6 +49,7 @@ const en = {
     email: 'Email',
     phone: 'Phone',
     department: 'Department',
+    selected: 'selected',
   },
 
   nav: {
@@ -646,6 +647,15 @@ const en = {
     langTurkish: 'Turkish',
     copies: 'Number of Copies',
     additionalNotes: 'Additional Notes',
+    attachmentsOptional: 'Attachments (optional)',
+    dropFilesHere: 'Drop files here or',
+    browse: 'browse',
+    fileTypeHint: 'PDF, DOC, JPG up to 10MB',
+    selectFromMyFiles: 'Select from My Files',
+    searchFilesPlaceholder: 'Search files...',
+    noFilesYet: 'No files uploaded yet.',
+    noFilesMatch: 'No matching files.',
+    doneBtn: 'Done',
   },
 }
 

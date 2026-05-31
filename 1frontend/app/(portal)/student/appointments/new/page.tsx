@@ -16,6 +16,7 @@ import {
   validateDateWindow,
 } from '@/lib/date-time'
 import { useI18n } from '@/lib/i18n'
+import { RequestAttachments, uploadAttachments, AttachmentsState } from '@/components/student/request-attachments'
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000'
 const APPOINTMENT_TYPES = ['ACADEMIC', 'ADVISING', 'CONSULTATION', 'OFFICE_HOURS', 'OTHER']
@@ -29,6 +30,7 @@ export default function NewAppointmentPage() {
   const [isLoadingUsers, setIsLoadingUsers] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [dateError, setDateError] = useState<string | null>(null)
+  const [attachments, setAttachments] = useState<AttachmentsState>({ newFiles: [], linkedFileIds: [] })
   const [form, setForm] = useState({
     targetUserId: '',
     appointmentType: '',
@@ -101,6 +103,8 @@ export default function NewAppointmentPage() {
     }
     setIsSubmitting(true)
     try {
+      const uploadedIds = await uploadAttachments(attachments.newFiles)
+      const attachmentFileIds = [...attachments.linkedFileIds, ...uploadedIds]
       const res = await fetch(`${BACKEND}/appointment-requests`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
@@ -115,6 +119,7 @@ export default function NewAppointmentPage() {
           preferredEndAt: form.preferredEndAt
             ? new Date(form.preferredEndAt).toISOString()
             : undefined,
+          ...(attachmentFileIds.length ? { attachmentFileIds } : {}),
         }),
       })
       const data = await res.json()
@@ -258,6 +263,10 @@ export default function NewAppointmentPage() {
             value={form.details}
             onChange={(e) => set('details', e.target.value)}
           />
+        </div>
+
+        <div className="pt-2">
+          <RequestAttachments onChange={setAttachments} />
         </div>
 
         <div className="flex items-center gap-3 pt-4 border-t border-border">

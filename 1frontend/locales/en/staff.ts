@@ -38,6 +38,7 @@ const en = {
     open: 'Open',
     inProgress: 'In Progress',
     records: '{{count}} records',
+    selected: 'selected',
   },
   nav: {
     dashboard: 'Dashboard',
@@ -346,6 +347,17 @@ const en = {
     resolutionSummary: 'Resolution summary',
     resolveTicket: 'Resolve Ticket',
     escalate: 'Escalate',
+  },
+  forms: {
+    attachmentsOptional: 'Attachments (optional)',
+    dropFilesHere: 'Drop files here or',
+    browse: 'browse',
+    fileTypeHint: 'PDF, DOC, JPG up to 10MB',
+    selectFromMyFiles: 'Select from My Files',
+    searchFilesPlaceholder: 'Search files...',
+    noFilesYet: 'No files uploaded yet.',
+    noFilesMatch: 'No matching files.',
+    doneBtn: 'Done',
   },
 }
 

@@ -911,6 +911,11 @@ const en: AdminTranslations = {
     open: 'Open',
     noEvents: 'No event requests found.',
   },
+
+  pages: {
+    selectAll: 'Select All',
+    deselectAll: 'Deselect All',
+  },
 }
 
 export default en

@@ -10,6 +10,8 @@ import {
 import { AddUserModal } from '@/components/admin/add-user-modal'
 import { toast } from 'sonner'
 import jsPDF from 'jspdf'
+import { getToken } from '@/lib/auth'
+import { StatusBadge } from '@/components/status-badge'
 import { useI18n } from '@/lib/i18n'
 
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -26,15 +28,6 @@ const roleConfig: Record<Role, { label: string; icon: React.ReactNode; className
   staff:     { label: 'Staff',     icon: <Briefcase className="size-3.5" />,     className: 'text-amber-700 bg-amber-50 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-800' },
   admin:     { label: 'Admin',     icon: <ShieldCheck className="size-3.5" />,   className: 'text-indigo-700 bg-indigo-50 border-indigo-200 dark:bg-indigo-950/30 dark:text-indigo-400 dark:border-indigo-800' },
   organizer: { label: 'Organizer', icon: <Briefcase className="size-3.5" />,     className: 'text-fuchsia-700 bg-fuchsia-50 border-fuchsia-200 dark:bg-fuchsia-950/30 dark:text-fuchsia-400 dark:border-fuchsia-800' },
-}
-
-const StatusBadge = ({ status }: { status: string }) => {
-  const s = status?.toUpperCase() || 'UNKNOWN'
-  if (s === 'ACTIVE')    return <span className="px-2 py-1 rounded-md bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 text-[10px] font-bold tracking-wider">ACTIVE</span>
-  if (s === 'SUSPENDED') return <span className="px-2 py-1 rounded-md bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 border border-red-200 dark:border-red-800 text-[10px] font-bold tracking-wider">SUSPENDED</span>
-  if (s === 'INACTIVE')  return <span className="px-2 py-1 rounded-md bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300 border border-gray-200 dark:border-gray-700 text-[10px] font-bold tracking-wider">INACTIVE</span>
-  if (s === 'PENDING')   return <span className="px-2 py-1 rounded-md bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 border border-amber-200 dark:border-amber-800 text-[10px] font-bold tracking-wider">PENDING</span>
-  return <span className="px-2 py-1 rounded-md bg-muted text-muted-foreground text-[10px] font-bold tracking-wider">{s}</span>
 }
 
 interface DbUser {
@@ -84,7 +77,7 @@ export default function AdminUsersPage() {
   const load = useCallback(async (pg: number, q: string, role: RoleFilter) => {
     setIsLoading(true)
     try {
-      const token = localStorage.getItem('access_token')
+      const token = getToken()
       const params = new URLSearchParams({ page: String(pg), limit: String(PAGE_SIZE) })
       if (q)           params.set('search', q)
       if (role !== 'all') params.set('role', role)
@@ -144,7 +137,7 @@ export default function AdminUsersPage() {
     if (!userToDelete) return
     setIsDeleting(true)
     try {
-      const token = localStorage.getItem('access_token')
+      const token = getToken()
       await fetch(`${backendUrl}/admin/users/${userToDelete.id}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` },
@@ -164,7 +157,7 @@ export default function AdminUsersPage() {
     if (selectedIds.length === 0) return
     setIsDeleting(true)
     try {
-      const token = localStorage.getItem('access_token')
+      const token = getToken()
       await Promise.all(
         selectedIds.map((id) =>
           fetch(`${backendUrl}/admin/users/${id}`, {
@@ -256,10 +249,6 @@ export default function AdminUsersPage() {
   const { data: users, total, totalPages, roleCounts = {} } = result
   const start = (page - 1) * PAGE_SIZE + 1
   const end   = Math.min(page * PAGE_SIZE, total)
-
-  if (isLoading && users.length === 0) {
-    return <div className="flex h-[50vh] items-center justify-center"><Loader2 className="size-8 animate-spin text-primary" /></div>
-  }
 
   return (
     <div className="p-6 space-y-5 max-w-6xl mx-auto pb-20">
