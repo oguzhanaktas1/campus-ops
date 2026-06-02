@@ -44,7 +44,7 @@ export function MetricCard({
         )}
       </div>
       <div>
-        <p className={cn('text-2xl font-bold text-foreground tracking-tight', valueClassName)}>
+        <p className={cn('text-xl sm:text-2xl font-bold text-foreground tracking-tight', valueClassName)}>
           {value}
         </p>
         {description && (

@@ -20,9 +20,10 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
-import { Briefcase, Camera, Loader2, MapPin, UserCircle } from 'lucide-react'
+import { Briefcase, Camera, ChevronDown, Loader2, MapPin, UserCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { useI18n } from '@/lib/i18n'
+import { cn } from '@/lib/utils'
 
 interface Role {
   id: string
@@ -70,6 +71,7 @@ export function AddUserModal({
   const [isLoading, setIsLoading] = useState(false)
   const [isFetchingRoles, setIsFetchingRoles] = useState(false)
   const [formData, setFormData] = useState(EMPTY_FORM)
+  const [rolesDropdownOpen, setRolesDropdownOpen] = useState(false)
 
   const fetchRoles = async (): Promise<Role[]> => {
     try {
@@ -236,7 +238,7 @@ export function AddUserModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-[650px] max-h-[95vh] overflow-y-auto">
+      <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-[650px] max-h-[90vh] overflow-y-auto overflow-x-hidden">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             {userToEdit ? t('users.modalTitleEdit') : t('users.modalTitleCreate')}
@@ -297,7 +299,7 @@ export function AddUserModal({
               <h3 className="text-sm font-bold flex items-center gap-2 text-primary">
                 <UserCircle className="size-4" /> {t('users.modalSectionCredentials')}
               </h3>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-2">
                   <Label>{t('users.modalFirstName')}</Label>
                   <Input required value={formData.firstName} onChange={(e) => setFormData({ ...formData, firstName: e.target.value })} />
@@ -321,7 +323,7 @@ export function AddUserModal({
               <h3 className="text-sm font-bold flex items-center gap-2 text-amber-600">
                 <Briefcase className="size-4" /> {t('users.modalSectionRole')}
               </h3>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-2">
                   <Label>{t('users.modalPrimaryRole')}</Label>
                   <Select value={formData.primaryRoleId} onValueChange={handlePrimaryRoleChange} disabled={roles.length === 0}>
@@ -346,37 +348,62 @@ export function AddUserModal({
                   </Select>
                 </div>
 
-                <div className="space-y-2 col-span-2">
+                <div className="space-y-2 col-span-1 sm:col-span-2">
                   <Label>{t('users.modalAdditionalRoles')}</Label>
-                  <div className="grid grid-cols-2 gap-2 rounded-md border p-3">
-                    {roles
-                      .filter(
-                        (role) =>
-                          role.id !== formData.primaryRoleId &&
-                          !PRIMARY_ROLE_NAMES.includes(role.name.toUpperCase()),
-                      )
-                      .map((role) => (
-                        <label key={role.id} className="flex items-center gap-2 text-sm cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={formData.roleIds.includes(role.id)}
-                            onChange={() => toggleAdditionalRole(role.id)}
-                          />
-                          <span>{role.name}</span>
-                        </label>
-                      ))}
-                  </div>
+                  {(() => {
+                    const additionalRoles = roles.filter(
+                      (role) => role.id !== formData.primaryRoleId && !PRIMARY_ROLE_NAMES.includes(role.name.toUpperCase()),
+                    )
+                    const selectedNames = additionalRoles.filter((r) => formData.roleIds.includes(r.id)).map((r) => r.name)
+                    return (
+                      <div className="relative">
+                        <button
+                          type="button"
+                          className="w-full flex items-center justify-between h-10 rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                          onClick={() => setRolesDropdownOpen((o) => !o)}
+                        >
+                          <span className="truncate text-left">
+                            {selectedNames.length === 0
+                              ? <span className="text-muted-foreground">{t('users.modalSelectAdditionalRoles') ?? 'Optional additional roles'}</span>
+                              : selectedNames.join(', ')}
+                          </span>
+                          <ChevronDown className={cn('size-4 text-muted-foreground shrink-0 transition-transform', rolesDropdownOpen && 'rotate-180')} />
+                        </button>
+                        {rolesDropdownOpen && (
+                          <>
+                            <div className="fixed inset-0 z-40" onClick={() => setRolesDropdownOpen(false)} />
+                            <div className="absolute top-full left-0 right-0 z-50 mt-1 rounded-md border border-border bg-popover shadow-md">
+                              {additionalRoles.length === 0 ? (
+                                <p className="px-3 py-2 text-sm text-muted-foreground">{t('users.modalNoAdditionalRoles') ?? 'No additional roles available'}</p>
+                              ) : (
+                                additionalRoles.map((role) => (
+                                  <label key={role.id} className="flex items-center gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-muted/50">
+                                    <input
+                                      type="checkbox"
+                                      checked={formData.roleIds.includes(role.id)}
+                                      onChange={() => toggleAdditionalRole(role.id)}
+                                    />
+                                    <span>{role.name}</span>
+                                  </label>
+                                ))
+                              )}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )
+                  })()}
                 </div>
 
                 {formData.primaryRoleName !== 'ADMIN' && formData.primaryRoleName !== '' ? (
-                  <div className="space-y-2 col-span-2">
+                  <div className="space-y-2 col-span-1 sm:col-span-2">
                     <Label className="text-amber-600">{t('users.modalDepartment')}</Label>
                     <Input placeholder={t('users.modalDepartmentPlaceholder')} value={formData.departmentId} onChange={(e) => setFormData({ ...formData, departmentId: e.target.value })} />
                   </div>
                 ) : null}
 
                 {formData.primaryRoleName === 'STUDENT' ? (
-                  <div className="space-y-2 col-span-2">
+                  <div className="space-y-2 col-span-1 sm:col-span-2">
                     <Label className="text-blue-600">{t('users.modalStudentNumber')}</Label>
                     <Input required placeholder={t('users.modalStudentNumberPlaceholder')} value={formData.studentNumber} onChange={(e) => setFormData({ ...formData, studentNumber: e.target.value })} />
                   </div>
@@ -401,7 +428,7 @@ export function AddUserModal({
               <h3 className="text-sm font-bold flex items-center gap-2 text-emerald-600">
                 <MapPin className="size-4" /> {t('users.modalSectionPersonal')}
               </h3>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-2">
                   <Label>{t('users.modalGender')}</Label>
                   <Select value={formData.gender} onValueChange={(value) => setFormData({ ...formData, gender: value })}>
@@ -418,16 +445,16 @@ export function AddUserModal({
                   <Label>{t('users.modalBirthDate')}</Label>
                   <Input type="date" value={formData.birthDate} onChange={(e) => setFormData({ ...formData, birthDate: e.target.value })} />
                 </div>
-                <div className="space-y-2 col-span-2">
+                <div className="space-y-2 col-span-1 sm:col-span-2">
                   <Label>{t('users.modalPhone')}</Label>
                   <Input placeholder={t('users.modalPhonePlaceholder')} value={formData.phoneNumber} onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })} />
                 </div>
-                <div className="space-y-2 col-span-2">
+                <div className="space-y-2 col-span-1 sm:col-span-2">
                   <Label>{t('users.modalAddress')}</Label>
                   <Textarea className="h-20" placeholder={t('users.modalAddressPlaceholder')} value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })} />
                 </div>
                 {formData.primaryRoleName !== 'ADMIN' && formData.primaryRoleName !== '' ? (
-                  <div className="space-y-2 col-span-2">
+                  <div className="space-y-2 col-span-1 sm:col-span-2">
                     <Label>{t('users.modalBio')}</Label>
                     <Textarea className="h-20" placeholder={t('users.modalBioPlaceholder')} value={formData.bio} onChange={(e) => setFormData({ ...formData, bio: e.target.value })} />
                   </div>
@@ -435,9 +462,9 @@ export function AddUserModal({
               </div>
             </div>
 
-            <DialogFooter className="border-t pt-6">
-              <Button type="button" variant="ghost" onClick={onClose}>{t('users.modalCancel')}</Button>
-              <Button type="submit" disabled={isLoading || isFetchingRoles || roles.length === 0} className="min-w-[120px]">
+            <DialogFooter className="border-t pt-6 flex-col-reverse sm:flex-row gap-2">
+              <Button type="button" variant="ghost" onClick={onClose} className="w-full sm:w-auto">{t('users.modalCancel')}</Button>
+              <Button type="submit" disabled={isLoading || isFetchingRoles || roles.length === 0} className="min-w-[120px] w-full sm:w-auto">
                 {isLoading ? <Loader2 className="size-4 animate-spin mr-2" /> : null}
                 {userToEdit ? t('users.modalUpdate') : t('users.modalCreate')}
               </Button>

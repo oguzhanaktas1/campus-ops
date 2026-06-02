@@ -215,7 +215,7 @@ export function RequestTimelineTabs({
       </CardHeader>
       <CardContent>
         <Tabs defaultValue="status">
-          <TabsList className="mb-4 grid w-full grid-cols-4">
+          <TabsList className="mb-4 grid w-full grid-cols-2 sm:grid-cols-4">
             <TabsTrigger value="status">{tt('detail.status', 'Status')}</TabsTrigger>
             <TabsTrigger value="assignments">{tt('detail.assignments', 'Assignments')}</TabsTrigger>
             <TabsTrigger value="approvals">{tt('detail.approvals', 'Approvals')}</TabsTrigger>

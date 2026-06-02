@@ -230,7 +230,7 @@ export default function AdminRequestsPage() {
                   </div>
                   <Link
                     href={`/admin/requests/${req.id}`}
-                    className="flex-1 flex items-start justify-between gap-4 px-4 py-4"
+                    className="flex-1 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 px-4 py-4"
                   >
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-semibold text-foreground truncate">{req.title}</p>

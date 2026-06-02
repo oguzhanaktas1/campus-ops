@@ -252,7 +252,7 @@ export default function AdminUsersPage() {
   const end   = Math.min(page * PAGE_SIZE, total)
 
   return (
-    <div className="p-4 sm:p-6 space-y-5 max-w-6xl mx-auto pb-20">
+    <div className="p-4 sm:p-6 space-y-5 max-w-6xl mx-auto pb-20 overflow-x-hidden">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold text-foreground">{t('users.title')}</h1>
@@ -419,52 +419,55 @@ export default function AdminUsersPage() {
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="relative flex items-center justify-center text-sm">
-          <p className="absolute left-0 hidden sm:block text-muted-foreground">
-            {t('users.pageOf', { page, total: totalPages })}
-          </p>
-          <div className="flex items-center gap-1">
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1"
-              disabled={page <= 1 || isLoading}
-              onClick={() => handlePageChange(page - 1)}
-            >
-              <ChevronLeft className="size-4" /> {t('users.pagePrev')}
-            </Button>
-            {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
-              const pg = totalPages <= 7
-                ? i + 1
-                : page <= 4
-                  ? i + 1
-                  : page >= totalPages - 3
-                    ? totalPages - 6 + i
-                    : page - 3 + i
-              if (pg < 1 || pg > totalPages) return null
-              return (
+        <div className="flex items-center justify-center gap-1 flex-wrap">
+          <Button
+            variant="outline"
+            size="icon"
+            className="size-8"
+            disabled={page <= 1 || isLoading}
+            onClick={() => handlePageChange(page - 1)}
+          >
+            <ChevronLeft className="size-4" />
+          </Button>
+          {(() => {
+            const isMobile = typeof window !== 'undefined' && window.innerWidth < 640
+            const maxPages = isMobile ? 3 : 7
+            const pages: (number | '...')[] = []
+            if (totalPages <= maxPages) {
+              for (let i = 1; i <= totalPages; i++) pages.push(i)
+            } else if (page <= 2) {
+              pages.push(1, 2, 3, '...', totalPages)
+            } else if (page >= totalPages - 1) {
+              pages.push(1, '...', totalPages - 2, totalPages - 1, totalPages)
+            } else {
+              pages.push(1, '...', page, '...', totalPages)
+            }
+            return pages.map((p, i) =>
+              p === '...' ? (
+                <span key={`e-${i}`} className="px-1 text-xs text-muted-foreground select-none">…</span>
+              ) : (
                 <Button
-                  key={pg}
-                  variant={pg === page ? 'default' : 'outline'}
-                  size="sm"
-                  className="w-9"
+                  key={p}
+                  variant={p === page ? 'default' : 'outline'}
+                  size="icon"
+                  className="size-8 text-xs"
                   disabled={isLoading}
-                  onClick={() => handlePageChange(pg)}
+                  onClick={() => handlePageChange(p as number)}
                 >
-                  {pg}
+                  {p}
                 </Button>
               )
-            })}
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1"
-              disabled={page >= totalPages || isLoading}
-              onClick={() => handlePageChange(page + 1)}
-            >
-              {t('users.pageNext')} <ChevronRight className="size-4" />
-            </Button>
-          </div>
+            )
+          })()}
+          <Button
+            variant="outline"
+            size="icon"
+            className="size-8"
+            disabled={page >= totalPages || isLoading}
+            onClick={() => handlePageChange(page + 1)}
+          >
+            <ChevronRight className="size-4" />
+          </Button>
         </div>
       )}
 

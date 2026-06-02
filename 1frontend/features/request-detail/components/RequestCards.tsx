@@ -146,7 +146,7 @@ export function WorkflowProgressCard({
           </div>
         </div>
         <div className="-mx-1 overflow-x-auto px-1 pb-2">
-          <WorkflowStepIndicator steps={steps} className="min-w-[560px]" />
+          <WorkflowStepIndicator steps={steps} className="min-w-[420px] sm:min-w-[560px]" />
         </div>
         {showStepRows ? (
           <div className="space-y-2">
