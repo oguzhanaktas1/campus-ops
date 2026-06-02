@@ -33,7 +33,7 @@ export default function NewFacultyTicketPage() {
     setIsSubmitting(true)
 
     try {
-      const uploadedIds = await uploadAttachments(attachments.newFiles)
+      const uploadedIds = await uploadAttachments(attachments.newFiles, `${BACKEND}/faculty/upload`)
       const attachmentFileIds = [...attachments.linkedFileIds, ...uploadedIds]
       const res = await fetch(`${BACKEND}/it-tickets`, {
         method: 'POST',
@@ -148,7 +148,7 @@ export default function NewFacultyTicketPage() {
         </div>
 
         <div className="pt-2 border-t border-border">
-          <RequestAttachments onChange={setAttachments} />
+          <RequestAttachments hidePicker onChange={setAttachments} />
         </div>
 
         <div className="flex justify-end">

@@ -26,6 +26,7 @@ export interface AttachmentsState {
 
 interface Props {
   onChange: (state: AttachmentsState) => void
+  hidePicker?: boolean
 }
 
 function fmt(bytes: number) {
@@ -34,7 +35,7 @@ function fmt(bytes: number) {
   return `${(bytes / 1048576).toFixed(1)} MB`
 }
 
-export function RequestAttachments({ onChange }: Props) {
+export function RequestAttachments({ onChange, hidePicker = false }: Props) {
   const { t } = useI18n()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -169,16 +170,18 @@ export function RequestAttachments({ onChange }: Props) {
       </div>
 
       {/* Select from My Files */}
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        className="w-full gap-2 text-muted-foreground hover:text-foreground"
-        onClick={openPicker}
-      >
-        <FolderOpen className="size-4" />
-        {t('forms.selectFromMyFiles')}
-      </Button>
+      {!hidePicker && (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="w-full gap-2 text-muted-foreground hover:text-foreground"
+          onClick={openPicker}
+        >
+          <FolderOpen className="size-4" />
+          {t('forms.selectFromMyFiles')}
+        </Button>
+      )}
 
       {/* Selected files */}
       {total > 0 && (
@@ -314,24 +317,31 @@ export function RequestAttachments({ onChange }: Props) {
   )
 }
 
-/** Upload new File[] to /student/upload and return their server-side IDs. */
-export async function uploadAttachments(files: File[]): Promise<string[]> {
+/** Upload File[] in parallel and return their server-side IDs. */
+export async function uploadAttachments(
+  files: File[],
+  uploadUrl = `${BACKEND}/student/upload`,
+): Promise<string[]> {
   if (!files.length) return []
-  const ids: string[] = []
-  for (const file of files) {
-    try {
-      const fd = new FormData()
-      fd.append('file', file)
-      const res = await fetch(`${BACKEND}/student/upload`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${getToken()}` },
-        body: fd,
-      })
-      if (res.ok) {
-        const d = await res.json()
-        if (d.id) ids.push(d.id)
-      }
-    } catch { /* file upload failure is non-blocking */ }
-  }
-  return ids
+
+  const results = await Promise.all(
+    files.map(async (file) => {
+      try {
+        const fd = new FormData()
+        fd.append('file', file)
+        const res = await fetch(uploadUrl, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${getToken()}` },
+          body: fd,
+        })
+        if (res.ok) {
+          const d = await res.json()
+          return d.id as string | undefined
+        }
+      } catch { /* non-blocking */ }
+      return undefined
+    }),
+  )
+
+  return results.filter((id): id is string => Boolean(id))
 }

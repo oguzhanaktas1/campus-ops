@@ -808,6 +808,23 @@ export class StudentService {
         },
       });
 
+      if (data.attachmentFileIds?.length) {
+        for (const fileId of data.attachmentFileIds) {
+          const fileExists = await this.prisma.file.findUnique({ where: { id: fileId } });
+          if (fileExists) {
+            await this.prisma.fileLink.create({
+              data: {
+                fileId,
+                entityType: 'Request',
+                entityId: newRequest.id,
+                relationType: 'ATTACHMENT',
+                requestId: newRequest.id,
+              },
+            });
+          }
+        }
+      }
+
       return {
         message: 'Internship request successfully created.',
         requestNo: String(newRequest.requestNo),
@@ -864,6 +881,7 @@ export class StudentService {
       'facultyUserId',
       'preferredDate',
       'preferredTime',
+      'attachmentFileIds',
     ];
     const dynamicAnswers = {};
     for (const key in data) {
@@ -985,6 +1003,23 @@ export class StudentService {
           storageKey: meta.objectPath,
           mimeType: meta.mimeType,
         } as any);
+      }
+
+      if (Array.isArray(data.attachmentFileIds) && data.attachmentFileIds.length > 0) {
+        for (const fileId of data.attachmentFileIds as string[]) {
+          const fileExists = await tx.file.findUnique({ where: { id: fileId } });
+          if (fileExists) {
+            await tx.fileLink.create({
+              data: {
+                fileId,
+                entityType: 'Request',
+                entityId: req.id,
+                relationType: 'ATTACHMENT',
+                requestId: req.id,
+              },
+            });
+          }
+        }
       }
 
       if (!reqType.workflowDefinitionId && assignedUserId) {

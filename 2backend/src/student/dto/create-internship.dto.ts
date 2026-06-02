@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsBoolean, IsNumber } from 'class-validator';
+import { IsString, IsOptional, IsBoolean, IsNumber, IsArray } from 'class-validator';
 
 export class CreateInternshipDto {
   @IsOptional()
@@ -39,8 +39,12 @@ export class CreateInternshipDto {
   @IsBoolean()
   insuranceRequired?: boolean;
 
-  // 🔥 YENİ EKLENEN HOCA (DANIŞMAN) ID ALANI 🔥
   @IsOptional()
   @IsString()
   advisorUserId?: string;
+
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  attachmentFileIds?: string[];
 }

@@ -983,6 +983,23 @@ export class TicketsService {
 
       await this.slaService.startRequestSla(tx, req.id);
 
+      if (dto.attachmentFileIds?.length) {
+        for (const fileId of dto.attachmentFileIds) {
+          const fileExists = await tx.file.findUnique({ where: { id: fileId } });
+          if (fileExists) {
+            await tx.fileLink.create({
+              data: {
+                fileId,
+                entityType: 'Request',
+                entityId: req.id,
+                relationType: 'ATTACHMENT',
+                requestId: req.id,
+              },
+            });
+          }
+        }
+      }
+
       return {
         requestId: req.id,
         ticketId: ticket.id,

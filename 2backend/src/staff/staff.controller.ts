@@ -3,6 +3,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -12,19 +13,34 @@ import {
   Put,
   Query,
   Request,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { StaffService } from './staff.service';
+import { FilesService } from '../files/files.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { extractUserId } from '../core/auth/extract-user-id';
+import { MAX_SINGLE_FILE_BYTES } from '../files/file-security';
 
 @Controller('staff')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles('STAFF') // Sadece Personel girebilir
 export class StaffController {
-  constructor(private readonly staffService: StaffService) {}
+  constructor(
+    private readonly staffService: StaffService,
+    private readonly filesService: FilesService,
+  ) {}
+
+  @Post('upload')
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MAX_SINGLE_FILE_BYTES, files: 1 } }))
+  uploadFile(@Request() req: any, @UploadedFile() file: Express.Multer.File) {
+    if (!file) throw new BadRequestException('Herhangi bir dosya yüklenmedi!');
+    return this.filesService.uploadGeneralFile(extractUserId(req), file);
+  }
 
   @Get('metrics')
   getMetrics() {

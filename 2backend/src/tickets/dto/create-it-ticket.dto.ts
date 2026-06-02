@@ -4,6 +4,7 @@ import {
   IsOptional,
   IsEnum,
   IsDateString,
+  IsArray,
 } from 'class-validator';
 import { PriorityLevel } from '@prisma/client';
 
@@ -55,4 +56,9 @@ export class CreateItTicketDto {
   @IsString()
   @IsOptional()
   unitId?: string;
+
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  attachmentFileIds?: string[];
 }

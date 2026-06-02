@@ -1,12 +1,14 @@
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
-import { File } from '@prisma/client';
+import { File, FileCategory } from '@prisma/client';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { PrismaService } from '../core/prisma/prisma.service';
+import { assertSafeUpload, buildStorageObjectKey } from './file-security';
 
 @Injectable()
 export class FilesService {
   private readonly supabase: SupabaseClient | null;
 
-  constructor() {
+  constructor(private readonly prisma: PrismaService) {
     const supabaseUrl = process.env.SUPABASE_URL;
     const supabaseKey = process.env.SUPABASE_KEY;
     this.supabase =
@@ -68,6 +70,43 @@ export class FilesService {
     }
 
     return data.signedUrl;
+  }
+
+  async uploadGeneralFile(userId: string, file: Express.Multer.File) {
+    assertSafeUpload(file);
+
+    const objectPath = buildStorageObjectKey(userId, file.originalname);
+    const { error: uploadError } = await this.getClient().storage
+      .from('campusops-files')
+      .upload(objectPath, file.buffer, { contentType: file.mimetype });
+
+    if (uploadError) {
+      throw new InternalServerErrorException(`Supabase Error: ${uploadError.message}`);
+    }
+
+    const savedFile = await this.prisma.file.create({
+      data: {
+        storageProvider: 'SUPABASE',
+        bucketName: 'campusops-files',
+        storagePath: objectPath,
+        originalFileName: file.originalname,
+        mimeType: file.mimetype,
+        fileSizeBytes: file.size,
+        fileCategory: FileCategory.DOCUMENT,
+        uploadedByUserId: userId,
+      },
+    });
+
+    await this.prisma.auditLog.create({
+      data: {
+        userId,
+        actionType: 'UPLOAD',
+        entityType: 'File',
+        entityId: savedFile.id,
+      },
+    });
+
+    return savedFile;
   }
 
   async buildAttachmentResponse(

@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsNotEmpty } from 'class-validator';
+import { IsString, IsOptional, IsNotEmpty, IsArray } from 'class-validator';
 
 export class CreateGenericRequestDto {
   @IsNotEmpty()
@@ -25,8 +25,12 @@ export class CreateGenericRequestDto {
   @IsString()
   preferredTime?: string;
 
-  // 🔥 İŞTE NESTJS'İN KAPIDA SİLDİĞİ, BİZİM EKSİK BIRAKTIĞIMIZ ALAN 🔥
   @IsOptional()
   @IsString()
   facultyUserId?: string;
+
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  attachmentFileIds?: string[];
 }
