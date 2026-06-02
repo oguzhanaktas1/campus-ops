@@ -1938,14 +1938,30 @@ export class StudentService {
     }
 
     const objectPath = buildStorageObjectKey(userId, file.originalname);
-    const { error: uploadError } = await this.getSupabaseClient().storage
+
+    const UPLOAD_TIMEOUT_MS = 15_000;
+
+    const uploadPromise = this.getSupabaseClient().storage
       .from('campusops-files')
       .upload(objectPath, file.buffer, { contentType: file.mimetype });
 
-    if (uploadError) {
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('UPLOAD_TIMEOUT')), UPLOAD_TIMEOUT_MS),
+    );
+
+    let result: Awaited<typeof uploadPromise>;
+    try {
+      result = await Promise.race([uploadPromise, timeoutPromise]);
+    } catch (err: any) {
       throw new InternalServerErrorException(
-        `Supabase Error: ${uploadError.message}`,
+        err?.message === 'UPLOAD_TIMEOUT'
+          ? 'File upload timed out. Please try again.'
+          : `Supabase Error: ${String(err?.message ?? err)}`,
       );
+    }
+
+    if (result.error) {
+      throw new InternalServerErrorException(`Supabase Error: ${result.error.message}`);
     }
 
     const savedFile = await this.prisma.file.create({

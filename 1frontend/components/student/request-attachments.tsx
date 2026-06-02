@@ -91,6 +91,9 @@ export function RequestAttachments({ onChange, uploadUrl, hidePicker = false }: 
         return next
       })
 
+      const controller = new AbortController()
+      const timeout = setTimeout(() => controller.abort(), 20_000)
+
       try {
         const fd = new FormData()
         fd.append('file', entry.file)
@@ -98,7 +101,10 @@ export function RequestAttachments({ onChange, uploadUrl, hidePicker = false }: 
           method: 'POST',
           headers: { Authorization: `Bearer ${getToken()}` },
           body: fd,
+          signal: controller.signal,
         })
+        clearTimeout(timeout)
+
         if (res.ok) {
           const d = await res.json()
           const uploadedId = d.id as string | undefined
@@ -113,7 +119,8 @@ export function RequestAttachments({ onChange, uploadUrl, hidePicker = false }: 
             return
           }
         }
-      } catch { /* fall through to error */ }
+      } catch { /* abort or network error — fall through to error state */ }
+      finally { clearTimeout(timeout) }
 
       setEntries((prev) => {
         const next = prev.map((e) => (e.key === entry.key ? { ...e, status: 'error' as const } : e))
