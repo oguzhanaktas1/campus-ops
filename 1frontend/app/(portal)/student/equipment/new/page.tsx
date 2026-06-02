@@ -272,11 +272,11 @@ export default function NewStudentEquipmentPage() {
         </div>
 
         <div className="pt-2">
-          <RequestAttachments onChange={setAttachments} />
+          <RequestAttachments onChange={setAttachments} uploadUrl={`${BACKEND}/student/upload`} />
         </div>
 
         <div className="flex items-center gap-3 pt-4 border-t border-border">
-          <Button type="submit" disabled={isSubmitting} className="flex-1 sm:flex-none gap-2">
+          <Button type="submit" disabled={isSubmitting || !!attachments.isUploading} className="flex-1 sm:flex-none gap-2">
             {isSubmitting ? <Loader2 className="size-4 animate-spin" /> : <Package className="size-4" />}
             {t('common.submitRequest')}
           </Button>

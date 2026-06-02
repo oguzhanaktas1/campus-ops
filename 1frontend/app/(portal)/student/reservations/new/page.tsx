@@ -334,11 +334,11 @@ export default function NewReservationPage() {
         </div>
 
         <div className="pt-2">
-          <RequestAttachments onChange={setAttachments} />
+          <RequestAttachments onChange={setAttachments} uploadUrl={`${BACKEND}/student/upload`} />
         </div>
 
         <div className="flex items-center gap-3 pt-4 border-t border-border">
-          <Button type="submit" className="flex-1 sm:flex-none gap-2" disabled={isSubmitting}>
+          <Button type="submit" className="flex-1 sm:flex-none gap-2" disabled={isSubmitting || !!attachments.isUploading}>
             {isSubmitting ? <Loader2 className="size-4 animate-spin" /> : <Calendar className="size-4" />}
             {t('common.submitRequest')}
           </Button>

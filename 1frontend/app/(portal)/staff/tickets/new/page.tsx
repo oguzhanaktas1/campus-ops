@@ -33,6 +33,7 @@ export default function NewStaffTicketPage() {
     setIsSubmitting(true)
 
     try {
+      // newFiles only contains failed eager-upload files; retry them now
       const uploadedIds = await uploadAttachments(attachments.newFiles, `${BACKEND}/staff/upload`)
       const attachmentFileIds = [...attachments.linkedFileIds, ...uploadedIds]
       const res = await fetch(`${BACKEND}/it-tickets`, {
@@ -142,11 +143,11 @@ export default function NewStaffTicketPage() {
         </div>
 
         <div className="pt-2 border-t border-border">
-          <RequestAttachments hidePicker onChange={setAttachments} />
+          <RequestAttachments hidePicker uploadUrl={`${BACKEND}/staff/upload`} onChange={setAttachments} />
         </div>
 
         <div className="flex justify-end">
-          <Button type="submit" disabled={isSubmitting}>
+          <Button type="submit" disabled={isSubmitting || !!attachments.isUploading}>
             {isSubmitting ? <Loader2 className="size-4 animate-spin mr-1" /> : null}
             {t('tickets.submitTicket')}
           </Button>

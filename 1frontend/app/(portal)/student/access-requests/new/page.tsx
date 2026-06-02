@@ -15,6 +15,8 @@ import {
 import { useI18n } from '@/lib/i18n'
 import { RequestAttachments, uploadAttachments, AttachmentsState } from '@/components/student/request-attachments'
 
+const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000'
+
 const ACCESS_TYPES = ['System / Portal', 'Lab Access', 'Network Resource', 'Software License', 'Campus Area', 'Other']
 
 export default function NewStudentAccessRequestPage() {
@@ -139,12 +141,12 @@ export default function NewStudentAccessRequestPage() {
         </div>
 
         <div className="pt-4 border-t border-border">
-          <RequestAttachments onChange={setAttachments} />
+          <RequestAttachments onChange={setAttachments} uploadUrl={`${BACKEND}/student/upload`} />
         </div>
 
         <div className="flex justify-end gap-3 pt-2">
           <Button type="button" variant="outline" onClick={() => router.back()}>{t('common.cancel')}</Button>
-          <Button type="submit" disabled={isSubmitting} className="gap-2">
+          <Button type="submit" disabled={isSubmitting || !!attachments.isUploading} className="gap-2">
             {isSubmitting && <Loader2 className="size-4 animate-spin" />} {t('common.submitRequest')}
           </Button>
         </div>

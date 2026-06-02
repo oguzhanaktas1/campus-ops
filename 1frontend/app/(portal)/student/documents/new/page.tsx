@@ -188,7 +188,7 @@ export default function NewDocumentPage() {
 
         {/* Attachments */}
         <div className="px-5 py-4">
-          <RequestAttachments onChange={setAttachments} />
+          <RequestAttachments onChange={setAttachments} uploadUrl={`${BACKEND}/student/upload`} />
         </div>
 
         {/* Submit */}
@@ -196,7 +196,7 @@ export default function NewDocumentPage() {
           <Link href="/student/documents">
             <Button type="button" variant="ghost" size="sm">{t('common.cancel')}</Button>
           </Link>
-          <Button type="submit" size="sm" disabled={isSubmitting} className="gap-1.5">
+          <Button type="submit" size="sm" disabled={isSubmitting || !!attachments.isUploading} className="gap-1.5">
             {isSubmitting && <Loader2 className="size-3.5 animate-spin" />}
             {t('common.submitRequest')}
           </Button>

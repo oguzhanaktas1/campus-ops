@@ -318,7 +318,7 @@ export default function NewInternshipPage() {
         </div>
 
         <div className="rounded-lg border border-border bg-card p-5">
-          <RequestAttachments onChange={setAttachments} />
+          <RequestAttachments onChange={setAttachments} uploadUrl={`${BACKEND}/student/upload`} />
         </div>
 
         <div className="flex justify-end gap-3">
@@ -327,7 +327,7 @@ export default function NewInternshipPage() {
               {t('common.cancel')}
             </Button>
           </Link>
-          <Button type="submit" disabled={isSubmitting}>
+          <Button type="submit" disabled={isSubmitting || !!attachments.isUploading}>
             {isSubmitting && <Loader2 className="mr-2 size-4 animate-spin" />}
             {t('forms.submitApplication')}
           </Button>

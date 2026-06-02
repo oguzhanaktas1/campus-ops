@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useCallback } from 'react'
-import { Paperclip, Upload, FolderOpen, X, FileText, Search, Loader2, Check } from 'lucide-react'
+import { Paperclip, Upload, FolderOpen, X, FileText, Search, Loader2, Check, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -22,11 +22,20 @@ const ACCEPTED = '.pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.zip,.rar,.txt
 export interface AttachmentsState {
   newFiles: File[]
   linkedFileIds: string[]
+  isUploading?: boolean
 }
 
 interface Props {
   onChange: (state: AttachmentsState) => void
+  uploadUrl?: string
   hidePicker?: boolean
+}
+
+type FileEntry = {
+  key: string
+  file: File
+  status: 'pending' | 'uploading' | 'done' | 'error'
+  uploadedId?: string
 }
 
 function fmt(bytes: number) {
@@ -35,11 +44,15 @@ function fmt(bytes: number) {
   return `${(bytes / 1048576).toFixed(1)} MB`
 }
 
-export function RequestAttachments({ onChange, hidePicker = false }: Props) {
+function makeKey(file: File) {
+  return `${file.name}-${file.size}-${file.lastModified}`
+}
+
+export function RequestAttachments({ onChange, uploadUrl, hidePicker = false }: Props) {
   const { t } = useI18n()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const [newFiles, setNewFiles] = useState<File[]>([])
+  const [entries, setEntries] = useState<FileEntry[]>([])
   const [linkedIds, setLinkedIds] = useState<string[]>([])
   const [linkedMeta, setLinkedMeta] = useState<Record<string, { name: string; size: number }>>({})
 
@@ -49,38 +62,111 @@ export function RequestAttachments({ onChange, hidePicker = false }: Props) {
   const [loadingMyFiles, setLoadingMyFiles] = useState(false)
   const [query, setQuery] = useState('')
 
-  const emit = useCallback(
-    (files: File[], ids: string[]) => onChange({ newFiles: files, linkedFileIds: ids }),
-    [onChange],
+  const buildState = useCallback(
+    (currentEntries: FileEntry[], currentLinkedIds: string[]): AttachmentsState => {
+      const failedFiles = currentEntries.filter((e) => e.status === 'error').map((e) => e.file)
+      const uploadedIds = currentEntries.filter((e) => e.status === 'done' && e.uploadedId).map((e) => e.uploadedId!)
+      const isUploading = currentEntries.some((e) => e.status === 'uploading' || e.status === 'pending')
+      return {
+        newFiles: failedFiles,
+        linkedFileIds: [...currentLinkedIds, ...uploadedIds],
+        isUploading,
+      }
+    },
+    [],
   )
 
-  const addFiles = (incoming: FileList | File[]) => {
-    const valid: File[] = []
-    for (const f of Array.from(incoming)) {
-      if (f.size > MAX_BYTES) {
-        toast.error(`${f.name} — max ${MAX_MB} MB`)
-        continue
-      }
-      if (newFiles.some((x) => x.name === f.name && x.size === f.size)) continue
-      valid.push(f)
-    }
-    if (!valid.length) return
-    const next = [...newFiles, ...valid]
-    setNewFiles(next)
-    emit(next, linkedIds)
-  }
+  const emit = useCallback(
+    (currentEntries: FileEntry[], currentLinkedIds: string[]) => {
+      onChange(buildState(currentEntries, currentLinkedIds))
+    },
+    [onChange, buildState],
+  )
 
-  const removeNew = (i: number) => {
-    const next = newFiles.filter((_, idx) => idx !== i)
-    setNewFiles(next)
-    emit(next, linkedIds)
+  const uploadEntry = useCallback(
+    async (entry: FileEntry, url: string) => {
+      setEntries((prev) => {
+        const next = prev.map((e) => (e.key === entry.key ? { ...e, status: 'uploading' as const } : e))
+        emit(next, linkedIds)
+        return next
+      })
+
+      try {
+        const fd = new FormData()
+        fd.append('file', entry.file)
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${getToken()}` },
+          body: fd,
+        })
+        if (res.ok) {
+          const d = await res.json()
+          const uploadedId = d.id as string | undefined
+          if (uploadedId) {
+            setEntries((prev) => {
+              const next = prev.map((e) =>
+                e.key === entry.key ? { ...e, status: 'done' as const, uploadedId } : e,
+              )
+              emit(next, linkedIds)
+              return next
+            })
+            return
+          }
+        }
+      } catch { /* fall through to error */ }
+
+      setEntries((prev) => {
+        const next = prev.map((e) => (e.key === entry.key ? { ...e, status: 'error' as const } : e))
+        emit(next, linkedIds)
+        return next
+      })
+      toast.error(`${entry.file.name} — upload failed`)
+    },
+    [emit, linkedIds],
+  )
+
+  const addFiles = useCallback(
+    (incoming: FileList | File[]) => {
+      const newEntries: FileEntry[] = []
+      for (const f of Array.from(incoming)) {
+        if (f.size > MAX_BYTES) {
+          toast.error(`${f.name} — max ${MAX_MB} MB`)
+          continue
+        }
+        const key = makeKey(f)
+        if (entries.some((e) => e.key === key)) continue
+        newEntries.push({ key, file: f, status: uploadUrl ? 'pending' : 'pending' })
+      }
+      if (!newEntries.length) return
+
+      setEntries((prev) => {
+        const next = [...prev, ...newEntries]
+        emit(next, linkedIds)
+        return next
+      })
+
+      if (uploadUrl) {
+        for (const entry of newEntries) {
+          void uploadEntry(entry, uploadUrl)
+        }
+      }
+    },
+    [entries, linkedIds, uploadUrl, uploadEntry, emit],
+  )
+
+  const removeEntry = (key: string) => {
+    setEntries((prev) => {
+      const next = prev.filter((e) => e.key !== key)
+      emit(next, linkedIds)
+      return next
+    })
   }
 
   const removeLinked = (id: string) => {
     const next = linkedIds.filter((x) => x !== id)
     setLinkedIds(next)
     setLinkedMeta((prev) => { const m = { ...prev }; delete m[id]; return m })
-    emit(newFiles, next)
+    emit(entries, next)
   }
 
   const handleDrop = (e: React.DragEvent) => {
@@ -115,19 +201,15 @@ export function RequestAttachments({ onChange, hidePicker = false }: Props) {
       const next = [...linkedIds, file.id]
       setLinkedIds(next)
       setLinkedMeta((prev) => ({ ...prev, [file.id]: { name: file.name, size: file.size ?? 0 } }))
-      emit(newFiles, next)
+      emit(entries, next)
     }
   }
 
-  const filtered = myFiles.filter((f) =>
-    f.name?.toLowerCase().includes(query.toLowerCase()),
-  )
-
-  const total = newFiles.length + linkedIds.length
+  const filtered = myFiles.filter((f) => f.name?.toLowerCase().includes(query.toLowerCase()))
+  const total = entries.length + linkedIds.length
 
   return (
     <div className="space-y-3">
-      {/* Label */}
       <div className="flex items-center gap-2">
         <Paperclip className="size-4 text-muted-foreground" />
         <span className="text-sm font-medium">{t('forms.attachmentsOptional')}</span>
@@ -138,7 +220,6 @@ export function RequestAttachments({ onChange, hidePicker = false }: Props) {
         )}
       </div>
 
-      {/* Drop zone */}
       <div
         onDragOver={(e) => { e.preventDefault(); setIsDragOver(true) }}
         onDragLeave={() => setIsDragOver(false)}
@@ -150,9 +231,7 @@ export function RequestAttachments({ onChange, hidePicker = false }: Props) {
         }`}
         onClick={() => fileInputRef.current?.click()}
       >
-        <Upload
-          className={`size-6 mx-auto mb-1.5 ${isDragOver ? 'text-primary' : 'text-muted-foreground/50'}`}
-        />
+        <Upload className={`size-6 mx-auto mb-1.5 ${isDragOver ? 'text-primary' : 'text-muted-foreground/50'}`} />
         <p className="text-sm text-muted-foreground">
           {t('forms.dropFilesHere')}{' '}
           <span className="text-primary font-medium">{t('forms.browse')}</span>
@@ -169,7 +248,6 @@ export function RequestAttachments({ onChange, hidePicker = false }: Props) {
         />
       </div>
 
-      {/* Select from My Files */}
       {!hidePicker && (
         <Button
           type="button"
@@ -183,28 +261,49 @@ export function RequestAttachments({ onChange, hidePicker = false }: Props) {
         </Button>
       )}
 
-      {/* Selected files */}
       {total > 0 && (
         <div className="space-y-1.5">
-          {newFiles.map((file, i) => (
+          {entries.map((entry) => (
             <div
-              key={i}
-              className="flex items-center gap-2.5 bg-muted/40 border border-border rounded-md px-3 py-2"
+              key={entry.key}
+              className={`flex items-center gap-2.5 rounded-md px-3 py-2 border ${
+                entry.status === 'done'
+                  ? 'bg-emerald-50 border-emerald-200 dark:bg-emerald-950/20 dark:border-emerald-800'
+                  : entry.status === 'error'
+                    ? 'bg-red-50 border-red-200 dark:bg-red-950/20 dark:border-red-800'
+                    : 'bg-muted/40 border-border'
+              }`}
             >
-              <FileText className="size-4 text-muted-foreground shrink-0" />
+              <FileText className={`size-4 shrink-0 ${
+                entry.status === 'done' ? 'text-emerald-600' :
+                entry.status === 'error' ? 'text-red-500' :
+                'text-muted-foreground'
+              }`} />
               <div className="flex-1 min-w-0">
-                <p className="text-xs font-medium text-foreground truncate">{file.name}</p>
-                <p className="text-[10px] text-muted-foreground">{fmt(file.size)}</p>
+                <p className="text-xs font-medium text-foreground truncate">{entry.file.name}</p>
+                <p className="text-[10px] text-muted-foreground">{fmt(entry.file.size)}</p>
               </div>
-              <button
-                type="button"
-                onClick={() => removeNew(i)}
-                className="text-muted-foreground hover:text-destructive transition-colors shrink-0"
-              >
-                <X className="size-3.5" />
-              </button>
+              <div className="flex items-center gap-1 shrink-0">
+                {(entry.status === 'uploading' || entry.status === 'pending') && (
+                  <Loader2 className="size-3.5 animate-spin text-primary" />
+                )}
+                {entry.status === 'done' && (
+                  <Check className="size-3.5 text-emerald-600" />
+                )}
+                {entry.status === 'error' && (
+                  <AlertCircle className="size-3.5 text-red-500" />
+                )}
+                <button
+                  type="button"
+                  onClick={() => removeEntry(entry.key)}
+                  className="text-muted-foreground hover:text-destructive transition-colors"
+                >
+                  <X className="size-3.5" />
+                </button>
+              </div>
             </div>
           ))}
+
           {linkedIds.map((id) => {
             const m = linkedMeta[id]
             return (
@@ -230,7 +329,6 @@ export function RequestAttachments({ onChange, hidePicker = false }: Props) {
         </div>
       )}
 
-      {/* My Files picker dialog */}
       <Dialog open={pickerOpen} onOpenChange={setPickerOpen}>
         <DialogContent className="max-w-md flex flex-col max-h-[80vh]">
           <DialogHeader>
@@ -257,9 +355,7 @@ export function RequestAttachments({ onChange, hidePicker = false }: Props) {
               </div>
             ) : filtered.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-10">
-                {myFiles.length === 0
-                  ? t('forms.noFilesYet')
-                  : t('forms.noFilesMatch')}
+                {myFiles.length === 0 ? t('forms.noFilesYet') : t('forms.noFilesMatch')}
               </p>
             ) : (
               filtered.map((file) => {
@@ -275,24 +371,14 @@ export function RequestAttachments({ onChange, hidePicker = false }: Props) {
                         : 'hover:bg-muted/60 border border-transparent'
                     }`}
                   >
-                    <div
-                      className={`size-7 rounded-md flex items-center justify-center shrink-0 ${
-                        sel ? 'bg-primary text-white' : 'bg-muted text-muted-foreground'
-                      }`}
-                    >
-                      {sel ? (
-                        <Check className="size-3.5" />
-                      ) : (
-                        <FileText className="size-3.5" />
-                      )}
+                    <div className={`size-7 rounded-md flex items-center justify-center shrink-0 ${sel ? 'bg-primary text-white' : 'bg-muted text-muted-foreground'}`}>
+                      {sel ? <Check className="size-3.5" /> : <FileText className="size-3.5" />}
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-foreground truncate">{file.name}</p>
                       <p className="text-xs text-muted-foreground">
                         {file.size ? fmt(file.size) : ''}
-                        {file.uploadedAt
-                          ? ` · ${new Date(file.uploadedAt).toLocaleDateString()}`
-                          : ''}
+                        {file.uploadedAt ? ` · ${new Date(file.uploadedAt).toLocaleDateString()}` : ''}
                       </p>
                     </div>
                   </button>
@@ -303,9 +389,7 @@ export function RequestAttachments({ onChange, hidePicker = false }: Props) {
 
           <div className="flex items-center justify-between pt-3 border-t border-border">
             <span className="text-xs text-muted-foreground">
-              {linkedIds.length > 0
-                ? `${linkedIds.length} ${t('common.selected')}`
-                : ''}
+              {linkedIds.length > 0 ? `${linkedIds.length} ${t('common.selected')}` : ''}
             </span>
             <Button size="sm" onClick={() => setPickerOpen(false)}>
               {t('forms.doneBtn')}
