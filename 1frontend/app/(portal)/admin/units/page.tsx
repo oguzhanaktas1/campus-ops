@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { TopScrollTable } from '@/components/ui/top-scroll-table'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -225,9 +226,9 @@ export default function UnitsPage() {
     )
 
   return (
-    <div className="p-6 space-y-5 max-w-6xl mx-auto pb-20">
+    <div className="p-4 sm:p-6 space-y-5 max-w-6xl mx-auto pb-20">
       {/* Header */}
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold text-foreground">{t('organization.unitsTitle')}</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
@@ -258,7 +259,8 @@ export default function UnitsPage() {
 
       {/* Table */}
       <div className="bg-card border border-border rounded-lg shadow-sm overflow-hidden">
-        <table className="w-full text-sm">
+        <TopScrollTable>
+        <table className="w-full text-sm min-w-[600px]">
           <thead>
             <tr className="border-b border-border bg-muted/40">
               <th className="px-5 py-3 text-left font-semibold text-muted-foreground">{t('organization.unitsTitle')}</th>
@@ -317,6 +319,7 @@ export default function UnitsPage() {
             ))}
           </tbody>
         </table>
+        </TopScrollTable>
         {filtered.length === 0 && (
           <div className="text-center py-12">
             <Layers className="size-8 text-muted-foreground/40 mx-auto mb-3" />

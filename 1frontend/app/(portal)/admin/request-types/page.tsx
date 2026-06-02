@@ -13,6 +13,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
+import { TopScrollTable } from '@/components/ui/top-scroll-table'
 import { Search, Plus, Trash2, Loader2, FileCheck2, Settings2, Pencil } from 'lucide-react'
 import { toast } from 'sonner'
 import { AddRequestTypeModal } from '@/components/admin/add-request-type-modal'
@@ -142,8 +143,8 @@ export default function RequestTypesPage() {
   )
 
   return (
-    <div className="p-6 space-y-5 max-w-6xl mx-auto pb-20">
-      <div className="flex items-start justify-between gap-4">
+    <div className="p-4 sm:p-6 space-y-5 max-w-6xl mx-auto pb-20">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold text-foreground">{t('requestTypes.title')}</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
@@ -191,7 +192,8 @@ export default function RequestTypesPage() {
           </div>
         ) : (
         <>
-        <table className="w-full text-sm">
+        <TopScrollTable>
+        <table className="w-full text-sm min-w-[600px]">
           <thead>
             <tr className="border-b border-border bg-muted/40">
               <th className="px-5 py-3 text-left w-12">
@@ -263,6 +265,7 @@ export default function RequestTypesPage() {
             ))}
           </tbody>
         </table>
+        </TopScrollTable>
         {filtered.length === 0 && (
           <div className="text-center py-12">
             <FileCheck2 className="size-8 text-muted-foreground/40 mx-auto mb-3" />

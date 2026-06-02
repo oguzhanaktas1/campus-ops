@@ -286,10 +286,10 @@ export default function AdminDashboard() {
   const monitoringSummary = getMonitoringSummary(monitoring)
 
   return (
-    <div className="p-6 space-y-6 max-w-6xl mx-auto">
+    <div className="p-4 sm:p-6 space-y-4 sm:space-y-6 max-w-6xl mx-auto">
 
       {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-start items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-black tracking-tight text-foreground">{t('dashboard.title')}</h1>
           <p className="text-sm text-muted-foreground mt-0.5">{today} · {t('dashboard.subtitle')}</p>
@@ -426,7 +426,7 @@ export default function AdminDashboard() {
       </div>
 
       {/* ── Main KPI row ───────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
         {[
           {
             label: t('dashboard.totalRequests'),

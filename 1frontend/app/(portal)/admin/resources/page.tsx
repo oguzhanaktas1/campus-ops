@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback, useRef } from 'react'
+import { TopScrollTable } from '@/components/ui/top-scroll-table'
 import { Plus, Pencil, Trash2, Loader2, Box, Search, ChevronRight, ChevronLeft, DoorOpen, FlaskConical, Wrench, Car, LayoutGrid } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -230,7 +231,7 @@ export default function AdminResourcesPage() {
   }
 
   return (
-    <div className="p-6 space-y-6 max-w-6xl mx-auto pb-20">
+    <div className="p-4 sm:p-6 space-y-6 max-w-6xl mx-auto pb-20">
       {/* Dialog */}
       {showDialog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
@@ -438,8 +439,8 @@ export default function AdminResourcesPage() {
             <Loader2 className="size-5 animate-spin text-primary" />
           </div>
         )}
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+        <TopScrollTable>
+          <table className="w-full text-sm min-w-[700px]">
             <thead>
               <tr className="border-b border-border bg-muted/40">
                 <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">{t('resources.colName')}</th>
@@ -503,13 +504,13 @@ export default function AdminResourcesPage() {
               ))}
             </tbody>
           </table>
-          {!isLoading && resources.length === 0 && (
-            <div className="text-center py-16">
-              <Box className="size-10 text-muted-foreground/30 mx-auto mb-3" />
-              <p className="text-sm font-medium text-foreground">{t('resources.noResources')}</p>
-            </div>
-          )}
-        </div>
+        </TopScrollTable>
+        {!isLoading && resources.length === 0 && (
+          <div className="text-center py-16">
+            <Box className="size-10 text-muted-foreground/30 mx-auto mb-3" />
+            <p className="text-sm font-medium text-foreground">{t('resources.noResources')}</p>
+          </div>
+        )}
       </div>
 
       {/* Pagination */}

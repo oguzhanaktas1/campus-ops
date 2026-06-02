@@ -16,6 +16,7 @@ import { useI18n } from '@/lib/i18n'
 
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
+import { TopScrollTable } from '@/components/ui/top-scroll-table'
 
 type Role = 'student' | 'faculty' | 'staff' | 'admin' | 'organizer'
 type RoleFilter = Role | 'all'
@@ -251,8 +252,8 @@ export default function AdminUsersPage() {
   const end   = Math.min(page * PAGE_SIZE, total)
 
   return (
-    <div className="p-6 space-y-5 max-w-6xl mx-auto pb-20">
-      <div className="flex items-start justify-between gap-4">
+    <div className="p-4 sm:p-6 space-y-5 max-w-6xl mx-auto pb-20">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold text-foreground">{t('users.title')}</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
@@ -322,7 +323,8 @@ export default function AdminUsersPage() {
             <Loader2 className="size-5 animate-spin text-primary" />
           </div>
         )}
-        <table className="w-full text-sm">
+        <TopScrollTable>
+        <table className="w-full text-sm min-w-[600px]">
           <thead>
             <tr className="border-b border-border bg-muted/40">
               <th className="px-5 py-3 text-left w-12">
@@ -405,6 +407,7 @@ export default function AdminUsersPage() {
             })}
           </tbody>
         </table>
+        </TopScrollTable>
 
         {!isLoading && users.length === 0 && (
           <div className="text-center py-12">

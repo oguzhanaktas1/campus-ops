@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
+import { TopScrollTable } from '@/components/ui/top-scroll-table'
 import { Plus, Pencil, Trash2, Loader2, ShieldCheck, Clock, ChevronLeft, ChevronRight, Zap } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -294,7 +295,7 @@ export default function AdminSLAPage() {
   const eventsEnd     = Math.min(eventsPage * PAGE_SIZE, eventsTotal)
 
   return (
-    <div className="p-6 space-y-5 max-w-5xl mx-auto pb-20">
+    <div className="p-4 sm:p-6 space-y-5 max-w-5xl mx-auto pb-20">
 
       {/* Add/Edit Dialog */}
       {showDialog && (
@@ -440,8 +441,8 @@ export default function AdminSLAPage() {
                 <Loader2 className="size-5 animate-spin text-primary" />
               </div>
             )}
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+            <TopScrollTable>
+              <table className="w-full text-sm min-w-[700px]">
                 <thead>
                   <tr className="border-b border-border bg-muted/40">
                     <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">{t('sla.colName')}</th>
@@ -510,13 +511,13 @@ export default function AdminSLAPage() {
                   ))}
                 </tbody>
               </table>
-              {!policiesLoading && policies.length === 0 && (
-                <div className="text-center py-16">
-                  <ShieldCheck className="size-10 text-muted-foreground/30 mx-auto mb-3" />
-                  <p className="text-sm font-medium text-foreground">{t('sla.noSla')}</p>
-                </div>
-              )}
-            </div>
+            </TopScrollTable>
+            {!policiesLoading && policies.length === 0 && (
+              <div className="text-center py-16">
+                <ShieldCheck className="size-10 text-muted-foreground/30 mx-auto mb-3" />
+                <p className="text-sm font-medium text-foreground">{t('sla.noSla')}</p>
+              </div>
+            )}
           </div>
           <Pagination page={policiesPage} totalPages={policiesTotalPages} isLoading={policiesLoading} onChange={handlePoliciesPage} />
         </div>
@@ -536,8 +537,8 @@ export default function AdminSLAPage() {
                 <Loader2 className="size-5 animate-spin text-primary" />
               </div>
             )}
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+            <TopScrollTable>
+              <table className="w-full text-sm min-w-[700px]">
                 <thead>
                   <tr className="border-b border-border bg-muted/40">
                     <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">{t('sla.event')}</th>
@@ -585,13 +586,13 @@ export default function AdminSLAPage() {
                   ))}
                 </tbody>
               </table>
-              {!eventsLoading && eventsFetched && events.length === 0 && (
-                <div className="text-center py-16">
-                  <Zap className="size-10 text-muted-foreground/30 mx-auto mb-3" />
-                  <p className="text-sm font-medium text-foreground">{t('sla.noEvents')}</p>
-                </div>
-              )}
-            </div>
+            </TopScrollTable>
+            {!eventsLoading && eventsFetched && events.length === 0 && (
+              <div className="text-center py-16">
+                <Zap className="size-10 text-muted-foreground/30 mx-auto mb-3" />
+                <p className="text-sm font-medium text-foreground">{t('sla.noEvents')}</p>
+              </div>
+            )}
           </div>
           <Pagination page={eventsPage} totalPages={eventsTotalPages} isLoading={eventsLoading} onChange={handleEventsPage} />
         </div>

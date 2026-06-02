@@ -47,12 +47,12 @@ export function RequestDetailPage({
 
   return (
     <div className="min-h-full bg-muted/10">
-      <div className="mx-auto max-w-7xl space-y-6 p-6 pb-20">
-        <div className="rounded-2xl border bg-card p-5 shadow-sm">
+      <div className="mx-auto max-w-7xl space-y-4 sm:space-y-6 p-4 sm:p-6 pb-20">
+        <div className="rounded-2xl border bg-card p-4 sm:p-5 shadow-sm">
           <RequestHeader detail={detail} />
         </div>
 
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_340px]">
+        <div className="grid gap-4 sm:gap-6 lg:grid-cols-[minmax(0,2fr)_320px]">
           <div className="space-y-6">
             <WorkflowCurrentStepCard detail={detail} />
             <RequestMetaCard detail={detail} />

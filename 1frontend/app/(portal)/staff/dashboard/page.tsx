@@ -179,7 +179,7 @@ export default function StaffDashboard() {
   }
 
   return (
-    <div className="p-6 space-y-6 max-w-5xl mx-auto pb-20">
+    <div className="p-4 sm:p-6 space-y-4 sm:space-y-6 max-w-5xl mx-auto pb-20">
       <div>
         <h1 className="text-xl font-bold text-foreground">
           {t('dashboard.welcome', { name: user?.name?.split(' ')[0] || t('nav.staffPortal') })}
@@ -217,7 +217,7 @@ export default function StaffDashboard() {
         </div>
       )}
 
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
         <MetricCard title={t('dashboard.assignedTickets')} value={metrics.assignedCount} description={t('dashboard.inYourQueue')} icon={<Ticket className="size-4" />} />
         <MetricCard title={t('dashboard.overdue')} value={metrics.overdueCount} description={t('dashboard.pastSla')} icon={<AlertTriangle className="size-4" />} valueClassName="text-destructive" />
         <MetricCard title={t('dashboard.completedToday')} value={metrics.completedToday} icon={<CheckCircle2 className="size-4" />} trend={12} trendLabel="vs yesterday" />

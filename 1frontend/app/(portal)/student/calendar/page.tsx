@@ -130,7 +130,7 @@ export default function StudentCalendarPage() {
 
   return (
     <div className="p-6 space-y-6 max-w-5xl mx-auto">
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold text-foreground">{t('pages.calendarTitle')}</h1>
           <p className="text-sm text-muted-foreground mt-0.5">{t('pages.calendarSubtitle')}</p>

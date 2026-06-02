@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { TopScrollTable } from '@/components/ui/top-scroll-table'
 import { Input } from '@/components/ui/input'
 import { Search, Loader2, ShieldCheck } from 'lucide-react'
 import { toast } from 'sonner'
@@ -69,9 +70,9 @@ export default function PermissionsPage() {
     )
 
   return (
-    <div className="p-6 space-y-5 max-w-6xl mx-auto pb-20">
+    <div className="p-4 sm:p-6 space-y-5 max-w-6xl mx-auto pb-20">
       {/* Header */}
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold text-foreground">{t('permissions.title')}</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
@@ -120,7 +121,8 @@ export default function PermissionsPage() {
               </div>
 
               {/* Permissions in group */}
-              <table className="w-full text-sm">
+              <TopScrollTable>
+              <table className="w-full text-sm min-w-[600px]">
                 <tbody className="divide-y divide-border">
                   {groups[group].map((perm) => (
                     <tr key={perm.id} className="hover:bg-muted/20 transition-colors">
@@ -136,6 +138,7 @@ export default function PermissionsPage() {
                   ))}
                 </tbody>
               </table>
+              </TopScrollTable>
             </div>
           ))}
         </div>

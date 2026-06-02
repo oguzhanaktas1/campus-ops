@@ -1,6 +1,7 @@
 'use client'
 
 import { cn } from '@/lib/utils'
+import { TopScrollTable } from '@/components/ui/top-scroll-table'
 import { ScrollText, CheckCircle2, XCircle, User, Clock, Loader2, ChevronLeft, ChevronRight, Search } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -95,7 +96,7 @@ export default function AdminAuditPage() {
   })
 
   return (
-    <div className="p-6 space-y-5 max-w-6xl mx-auto pb-20">
+    <div className="p-4 sm:p-6 space-y-5 max-w-6xl mx-auto pb-20">
       <div>
         <h1 className="text-xl font-bold text-foreground">{t('auditLogs.title')}</h1>
         <p className="text-sm text-muted-foreground mt-0.5">{t('auditLogs.subtitle')}</p>
@@ -119,13 +120,13 @@ export default function AdminAuditPage() {
 
       {/* Table */}
       <div className="bg-card border border-border rounded-lg shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          {isLoading ? (
-            <div className="flex items-center justify-center py-20">
-              <Loader2 className="size-7 animate-spin text-primary" />
-            </div>
-          ) : (
-            <table className="w-full text-sm">
+        {isLoading ? (
+          <div className="flex items-center justify-center py-20">
+            <Loader2 className="size-7 animate-spin text-primary" />
+          </div>
+        ) : (
+          <TopScrollTable>
+            <table className="w-full text-sm min-w-[700px]">
               <thead>
                 <tr className="border-b border-border bg-muted/40">
                   <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground">{t('auditLogs.colAction')}</th>
@@ -187,15 +188,15 @@ export default function AdminAuditPage() {
                 ))}
               </tbody>
             </table>
-          )}
-          {!isLoading && logs.length === 0 && (
-            <div className="text-center py-16">
-              <ScrollText className="size-10 text-muted-foreground/30 mx-auto mb-3" />
-              <p className="text-sm font-medium text-foreground">{t('auditLogs.noLogs')}</p>
-              <p className="text-xs text-muted-foreground mt-1">{t('auditLogs.emptyHint')}</p>
-            </div>
-          )}
-        </div>
+          </TopScrollTable>
+        )}
+        {!isLoading && logs.length === 0 && (
+          <div className="text-center py-16">
+            <ScrollText className="size-10 text-muted-foreground/30 mx-auto mb-3" />
+            <p className="text-sm font-medium text-foreground">{t('auditLogs.noLogs')}</p>
+            <p className="text-xs text-muted-foreground mt-1">{t('auditLogs.emptyHint')}</p>
+          </div>
+        )}
 
         {/* Pagination */}
         {totalPages > 1 && (

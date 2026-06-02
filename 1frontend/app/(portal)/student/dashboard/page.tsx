@@ -148,7 +148,7 @@ export default function StudentDashboard() {
   ]
 
   return (
-    <div className="p-6 space-y-6 max-w-5xl mx-auto">
+    <div className="p-4 sm:p-6 space-y-4 sm:space-y-6 max-w-5xl mx-auto">
       <div>
         <h1 className="text-xl font-bold text-foreground">
           {t('dashboard.greeting', { name: firstName })}
@@ -158,7 +158,7 @@ export default function StudentDashboard() {
         </p>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
         <MetricCard
           title={t('dashboard.openRequests')}
           value={open.length}

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
+import { TopScrollTable } from '@/components/ui/top-scroll-table'
 import { Clock, AlertTriangle, AlertCircle, Info, Loader2, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
@@ -140,7 +141,7 @@ export default function AdminSystemEventsPage() {
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
   return (
-    <div className="p-6 space-y-5 max-w-6xl mx-auto pb-20">
+    <div className="p-4 sm:p-6 space-y-5 max-w-6xl mx-auto pb-20">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl font-bold text-foreground">{t('systemEvents.title')}</h1>
@@ -193,8 +194,8 @@ export default function AdminSystemEventsPage() {
           </div>
         ) : (
         <>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+        <TopScrollTable>
+          <table className="w-full text-sm min-w-[700px]">
             <thead>
               <tr className="border-b border-border bg-muted/40">
                 <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">{t('systemEvents.severity')}</th>
@@ -274,14 +275,14 @@ export default function AdminSystemEventsPage() {
               ))}
             </tbody>
           </table>
-          {filtered.length === 0 && (
-            <div className="text-center py-16">
-              <AlertCircle className="size-10 text-muted-foreground/30 mx-auto mb-3" />
-              <p className="text-sm font-medium text-foreground">{t('systemEvents.noEvents')}</p>
-              <p className="text-xs text-muted-foreground mt-1">{t('systemEvents.emptyHint')}</p>
-            </div>
-          )}
-        </div>
+        </TopScrollTable>
+        {filtered.length === 0 && (
+          <div className="text-center py-16">
+            <AlertCircle className="size-10 text-muted-foreground/30 mx-auto mb-3" />
+            <p className="text-sm font-medium text-foreground">{t('systemEvents.noEvents')}</p>
+            <p className="text-xs text-muted-foreground mt-1">{t('systemEvents.emptyHint')}</p>
+          </div>
+        )}
 
         {/* Pagination */}
         {totalPages > 1 && (

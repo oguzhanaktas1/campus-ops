@@ -121,13 +121,13 @@ export default function FacultyDashboard() {
   const lastName = user?.lastName || user?.fullName?.split(' ').slice(-1)[0] || 'User'
 
   return (
-    <div className="p-6 space-y-6 max-w-5xl mx-auto">
+    <div className="p-4 sm:p-6 space-y-4 sm:space-y-6 max-w-5xl mx-auto">
       <div>
         <h1 className="text-xl font-bold text-foreground">{t('dashboard.welcome', { title, name: lastName })}</h1>
         <p className="text-sm text-muted-foreground mt-0.5">{t('dashboard.subtitle')}</p>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
         <MetricCard title={t('dashboard.pendingApprovals')} value={metrics.pendingCount} description={t('common.requiredAction')} icon={<CheckSquare className="size-4" />} valueClassName="text-amber-600" />
         <MetricCard title={t('dashboard.approvedToday')} value={metrics.approvedToday} icon={<CheckCircle2 className="size-4" />} trend={metrics.approvedToday > 0 ? 15 : 0} trendLabel={t('common.vsYesterday')} />
         <MetricCard title={t('dashboard.rejectedToday')} value={metrics.rejectedToday} icon={<XCircle className="size-4" />} />
@@ -136,7 +136,7 @@ export default function FacultyDashboard() {
 
       <div className="grid lg:grid-cols-3 gap-5">
         <div className="lg:col-span-2 bg-card border border-border rounded-lg shadow-sm">
-          <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+          <div className="flex flex-col sm:flex-row sm:items-center items-start justify-between px-5 py-4 border-b border-border">
             <h2 className="text-sm font-semibold text-foreground">{t('dashboard.pendingApprovals')}</h2>
             <Link href="/faculty/approvals">
               <Button variant="ghost" size="sm" className="text-xs gap-1">{t('common.viewAll')} <ArrowRight className="size-3" /></Button>
