@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   ChevronDown,
   Download,
+  Eye,
   Loader2,
   Paperclip,
   RotateCcw,
@@ -30,6 +31,23 @@ import type { RequestDetailViewModel } from '@/features/request-detail/types'
 import { useOptionalT } from '@/lib/optional-t'
 import { StatusBadge } from '@/components/status-badge'
 import { cn } from '@/lib/utils'
+
+async function forceDownload(url: string, filename: string) {
+  try {
+    const res = await fetch(url)
+    const blob = await res.blob()
+    const objectUrl = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = objectUrl
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(objectUrl)
+  } catch {
+    window.open(url, '_blank')
+  }
+}
 
 export function RequestAttachmentsPanel({
   detail,
@@ -62,11 +80,21 @@ export function RequestAttachmentsPanel({
                   </div>
                 </div>
                 {file.url ? (
-                  <Button variant="ghost" size="icon" asChild>
-                    <a href={file.url} target="_blank" rel="noreferrer">
+                  <div className="flex items-center gap-1 shrink-0">
+                    <Button variant="ghost" size="icon" asChild title="Preview">
+                      <a href={file.url} target="_blank" rel="noreferrer">
+                        <Eye className="size-4" />
+                      </a>
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      title="Download"
+                      onClick={() => forceDownload(file.url!, file.name)}
+                    >
                       <Download className="size-4" />
-                    </a>
-                  </Button>
+                    </Button>
+                  </div>
                 ) : null}
               </div>
             ))}

@@ -16,7 +16,7 @@ import {
   validateDateWindow,
 } from '@/lib/date-time'
 import { useI18n } from '@/lib/i18n'
-import { RequestAttachments, uploadAttachments, AttachmentsState } from '@/components/student/request-attachments'
+import { RequestAttachments, uploadAttachments, AttachmentsState, clearAttachmentCache } from '@/components/student/request-attachments'
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000'
 const APPOINTMENT_TYPES = ['ACADEMIC', 'ADVISING', 'CONSULTATION', 'OFFICE_HOURS', 'OTHER']
@@ -125,6 +125,7 @@ export default function NewAppointmentPage() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.message || t('messages.failed'))
       toast.success(t('messages.appointmentSubmitted'))
+      clearAttachmentCache('student-appointment-new')
       router.push('/student/appointments')
     } catch (err: any) {
       toast.error(err.message)
@@ -266,7 +267,7 @@ export default function NewAppointmentPage() {
         </div>
 
         <div className="pt-2">
-          <RequestAttachments onChange={setAttachments} uploadUrl={`${BACKEND}/student/upload`} />
+          <RequestAttachments onChange={setAttachments} uploadUrl={`${BACKEND}/student/upload`} storageKey="student-appointment-new" />
         </div>
 
         <div className="flex items-center gap-3 pt-4 border-t border-border">

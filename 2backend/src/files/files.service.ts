@@ -63,7 +63,7 @@ export class FilesService {
 
     const { data, error } = await this.getClient().storage
       .from(file.bucketName)
-      .createSignedUrl(objectPath, 60 * 10);
+      .createSignedUrl(objectPath, 60 * 60);
 
     if (error || !data?.signedUrl) {
       return null;
@@ -77,7 +77,7 @@ export class FilesService {
 
     const objectPath = buildStorageObjectKey(userId, file.originalname);
 
-    const UPLOAD_TIMEOUT_MS = 15_000;
+    const UPLOAD_TIMEOUT_MS = 60_000;
 
     const uploadPromise = this.getClient().storage
       .from('campusops-files')

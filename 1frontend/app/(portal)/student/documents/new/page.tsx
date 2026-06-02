@@ -8,7 +8,7 @@ import Link from 'next/link'
 import { getToken } from '@/lib/auth'
 import { toast } from 'sonner'
 import { useI18n } from '@/lib/i18n'
-import { RequestAttachments, uploadAttachments, AttachmentsState } from '@/components/student/request-attachments'
+import { RequestAttachments, uploadAttachments, AttachmentsState, clearAttachmentCache } from '@/components/student/request-attachments'
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000'
 
@@ -56,6 +56,7 @@ export default function NewDocumentPage() {
         throw new Error((err as any).message ?? t('documents.submitFail'))
       }
       toast.success(t('documents.submitted'))
+      clearAttachmentCache('student-document-new')
       router.push('/student/documents')
     } catch (err: any) {
       toast.error(err.message ?? t('documents.submitFail'))
@@ -188,7 +189,7 @@ export default function NewDocumentPage() {
 
         {/* Attachments */}
         <div className="px-5 py-4">
-          <RequestAttachments onChange={setAttachments} uploadUrl={`${BACKEND}/student/upload`} />
+          <RequestAttachments onChange={setAttachments} uploadUrl={`${BACKEND}/student/upload`} storageKey="student-document-new" />
         </div>
 
         {/* Submit */}

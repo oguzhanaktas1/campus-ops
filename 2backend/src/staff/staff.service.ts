@@ -15,6 +15,7 @@ import { SlaService } from '../workflow/sla.service';
 import { buildWorkflowSummary } from '../workflow/workflow-summary';
 import { CacheService } from '../infrastructure/cache/cache.service';
 import { CacheKeys, CacheTtls } from '../infrastructure/cache/cache-keys';
+import { FilesService } from '../files/files.service';
 
 function deriveWorkflowStepStatus(params: {
   instanceStep: any;
@@ -40,6 +41,7 @@ export class StaffService {
     private prisma: PrismaService,
     private slaService: SlaService,
     private cacheService: CacheService,
+    private filesService: FilesService,
     @Optional() private notificationsService?: NotificationsService,
   ) {}
 
@@ -752,6 +754,9 @@ export class StaffService {
         date: history.changedAt,
         note: history.changeReason,
       })),
+      attachments: await Promise.all(
+        request.fileLinks.map((fl: any) => this.filesService.buildAttachmentResponse(fl.file)),
+      ),
       auditHistory: auditHistory.map((audit) => ({
         id: audit.id,
         actionType: audit.actionType,

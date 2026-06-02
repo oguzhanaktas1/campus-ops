@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { Paperclip, Upload, FolderOpen, X, FileText, Search, Loader2, Check, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -29,6 +29,7 @@ interface Props {
   onChange: (state: AttachmentsState) => void
   uploadUrl?: string
   hidePicker?: boolean
+  storageKey?: string
 }
 
 type FileEntry = {
@@ -37,6 +38,8 @@ type FileEntry = {
   status: 'pending' | 'uploading' | 'done' | 'error'
   uploadedId?: string
 }
+
+type PersistedFile = { id: string; name: string; size: number }
 
 function fmt(bytes: number) {
   if (bytes < 1024) return `${bytes} B`
@@ -48,7 +51,25 @@ function makeKey(file: File) {
   return `${file.name}-${file.size}-${file.lastModified}`
 }
 
-export function RequestAttachments({ onChange, uploadUrl, hidePicker = false }: Props) {
+function loadPersisted(key: string): PersistedFile[] {
+  try {
+    return JSON.parse(sessionStorage.getItem(key) ?? '[]')
+  } catch {
+    return []
+  }
+}
+
+function savePersisted(key: string, files: PersistedFile[]) {
+  try {
+    sessionStorage.setItem(key, JSON.stringify(files))
+  } catch { /* storage full or unavailable */ }
+}
+
+export function clearAttachmentCache(storageKey: string) {
+  try { sessionStorage.removeItem(storageKey) } catch { /* ignore */ }
+}
+
+export function RequestAttachments({ onChange, uploadUrl, hidePicker = false, storageKey }: Props) {
   const { t } = useI18n()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -61,6 +82,36 @@ export function RequestAttachments({ onChange, uploadUrl, hidePicker = false }: 
   const [myFiles, setMyFiles] = useState<any[]>([])
   const [loadingMyFiles, setLoadingMyFiles] = useState(false)
   const [query, setQuery] = useState('')
+
+  // Restore persisted uploads on mount
+  useEffect(() => {
+    if (!storageKey) return
+    const persisted = loadPersisted(storageKey)
+    if (!persisted.length) return
+    const ids = persisted.map((f) => f.id)
+    const meta: Record<string, { name: string; size: number }> = {}
+    for (const f of persisted) meta[f.id] = { name: f.name, size: f.size }
+    setLinkedIds(ids)
+    setLinkedMeta(meta)
+    onChange({ newFiles: [], linkedFileIds: ids, isUploading: false })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storageKey])
+
+  const persistUploaded = useCallback(
+    (currentEntries: FileEntry[], currentLinkedIds: string[], currentMeta: Record<string, { name: string; size: number }>) => {
+      if (!storageKey) return
+      const fromEntries: PersistedFile[] = currentEntries
+        .filter((e) => e.status === 'done' && e.uploadedId)
+        .map((e) => ({ id: e.uploadedId!, name: e.file.name, size: e.file.size }))
+      const fromLinked: PersistedFile[] = currentLinkedIds.map((id) => ({
+        id,
+        name: currentMeta[id]?.name ?? id,
+        size: currentMeta[id]?.size ?? 0,
+      }))
+      savePersisted(storageKey, [...fromLinked, ...fromEntries])
+    },
+    [storageKey],
+  )
 
   const buildState = useCallback(
     (currentEntries: FileEntry[], currentLinkedIds: string[]): AttachmentsState => {
@@ -77,10 +128,11 @@ export function RequestAttachments({ onChange, uploadUrl, hidePicker = false }: 
   )
 
   const emit = useCallback(
-    (currentEntries: FileEntry[], currentLinkedIds: string[]) => {
+    (currentEntries: FileEntry[], currentLinkedIds: string[], currentMeta?: Record<string, { name: string; size: number }>) => {
       onChange(buildState(currentEntries, currentLinkedIds))
+      persistUploaded(currentEntries, currentLinkedIds, currentMeta ?? linkedMeta)
     },
-    [onChange, buildState],
+    [onChange, buildState, persistUploaded, linkedMeta],
   )
 
   const uploadEntry = useCallback(
@@ -92,7 +144,7 @@ export function RequestAttachments({ onChange, uploadUrl, hidePicker = false }: 
       })
 
       const controller = new AbortController()
-      const timeout = setTimeout(() => controller.abort(), 20_000)
+      const timeout = setTimeout(() => controller.abort(), 60_000)
 
       try {
         const fd = new FormData()
@@ -142,7 +194,7 @@ export function RequestAttachments({ onChange, uploadUrl, hidePicker = false }: 
         }
         const key = makeKey(f)
         if (entries.some((e) => e.key === key)) continue
-        newEntries.push({ key, file: f, status: uploadUrl ? 'pending' : 'pending' })
+        newEntries.push({ key, file: f, status: 'pending' })
       }
       if (!newEntries.length) return
 
@@ -171,9 +223,11 @@ export function RequestAttachments({ onChange, uploadUrl, hidePicker = false }: 
 
   const removeLinked = (id: string) => {
     const next = linkedIds.filter((x) => x !== id)
+    const nextMeta = { ...linkedMeta }
+    delete nextMeta[id]
     setLinkedIds(next)
-    setLinkedMeta((prev) => { const m = { ...prev }; delete m[id]; return m })
-    emit(entries, next)
+    setLinkedMeta(nextMeta)
+    emit(entries, next, nextMeta)
   }
 
   const handleDrop = (e: React.DragEvent) => {
@@ -206,9 +260,10 @@ export function RequestAttachments({ onChange, uploadUrl, hidePicker = false }: 
       removeLinked(file.id)
     } else {
       const next = [...linkedIds, file.id]
+      const nextMeta = { ...linkedMeta, [file.id]: { name: file.name, size: file.size ?? 0 } }
       setLinkedIds(next)
-      setLinkedMeta((prev) => ({ ...prev, [file.id]: { name: file.name, size: file.size ?? 0 } }))
-      emit(entries, next)
+      setLinkedMeta(nextMeta)
+      emit(entries, next, nextMeta)
     }
   }
 

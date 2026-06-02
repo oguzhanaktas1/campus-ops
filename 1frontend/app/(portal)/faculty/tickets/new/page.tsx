@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { getToken } from '@/lib/auth'
 import { useI18n } from '@/lib/i18n'
-import { RequestAttachments, uploadAttachments, AttachmentsState } from '@/components/student/request-attachments'
+import { RequestAttachments, uploadAttachments, AttachmentsState, clearAttachmentCache } from '@/components/student/request-attachments'
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000'
 
@@ -53,6 +53,7 @@ export default function NewFacultyTicketPage() {
       }
 
       const created = await res.json()
+      clearAttachmentCache('faculty-ticket-new')
       toast.success(t('detail.ticketCreated'))
       router.push(`/faculty/requests/${created.requestId}?from=/faculty/tickets`)
     } catch {
@@ -149,7 +150,7 @@ export default function NewFacultyTicketPage() {
         </div>
 
         <div className="pt-2 border-t border-border">
-          <RequestAttachments hidePicker uploadUrl={`${BACKEND}/faculty/upload`} onChange={setAttachments} />
+          <RequestAttachments hidePicker uploadUrl={`${BACKEND}/faculty/upload`} onChange={setAttachments} storageKey="faculty-ticket-new" />
         </div>
 
         <div className="flex justify-end">

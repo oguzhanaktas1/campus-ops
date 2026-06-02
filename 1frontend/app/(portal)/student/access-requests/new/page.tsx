@@ -13,7 +13,7 @@ import {
   validateDateWindow,
 } from '@/lib/date-time'
 import { useI18n } from '@/lib/i18n'
-import { RequestAttachments, uploadAttachments, AttachmentsState } from '@/components/student/request-attachments'
+import { RequestAttachments, uploadAttachments, AttachmentsState, clearAttachmentCache } from '@/components/student/request-attachments'
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000'
 
@@ -86,6 +86,7 @@ export default function NewStudentAccessRequestPage() {
       if (!res.ok) throw new Error()
       const data = await res.json()
       toast.success(t('messages.accessSubmitted', { requestNo: data.requestNo }))
+      clearAttachmentCache('student-access-request-new')
       router.push('/student/access-requests')
     } catch {
       toast.error(t('messages.submitAccessFail'))
@@ -141,7 +142,7 @@ export default function NewStudentAccessRequestPage() {
         </div>
 
         <div className="pt-4 border-t border-border">
-          <RequestAttachments onChange={setAttachments} uploadUrl={`${BACKEND}/student/upload`} />
+          <RequestAttachments onChange={setAttachments} uploadUrl={`${BACKEND}/student/upload`} storageKey="student-access-request-new" />
         </div>
 
         <div className="flex justify-end gap-3 pt-2">

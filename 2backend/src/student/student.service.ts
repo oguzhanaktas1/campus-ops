@@ -1939,7 +1939,7 @@ export class StudentService {
 
     const objectPath = buildStorageObjectKey(userId, file.originalname);
 
-    const UPLOAD_TIMEOUT_MS = 15_000;
+    const UPLOAD_TIMEOUT_MS = 60_000;
 
     const uploadPromise = this.getSupabaseClient().storage
       .from('campusops-files')

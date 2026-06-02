@@ -49,7 +49,7 @@ function toAttachment(file: any) {
       typeof file.size === 'string'
         ? file.size
         : formatBytes(file.size ?? file.fileSizeBytes ?? file.file?.fileSizeBytes),
-    url: file.url ?? file.storagePath ?? file.file?.storagePath ?? null,
+    url: file.url ?? null,
   }
 }
 

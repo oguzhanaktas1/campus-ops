@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { getToken } from '@/lib/auth'
 import { useI18n } from '@/lib/i18n'
-import { RequestAttachments, uploadAttachments, AttachmentsState } from '@/components/student/request-attachments'
+import { RequestAttachments, uploadAttachments, AttachmentsState, clearAttachmentCache } from '@/components/student/request-attachments'
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000'
 
@@ -102,6 +102,7 @@ export default function NewStudentProcurementPage() {
       if (!res.ok) throw new Error(data.message || t('documents.submitFail'))
 
       toast.success(t('messages.procurementSubmitted', { requestNo: data.requestNo }))
+      clearAttachmentCache('student-procurement-new')
       router.push(`/student/requests/${data.requestId}`)
     } catch (error: any) {
       toast.error(error.message || t('messages.somethingWentWrong'))
@@ -229,7 +230,7 @@ export default function NewStudentProcurementPage() {
         </div>
 
         <div className="pt-2">
-          <RequestAttachments onChange={setAttachments} uploadUrl={`${BACKEND}/student/upload`} />
+          <RequestAttachments onChange={setAttachments} uploadUrl={`${BACKEND}/student/upload`} storageKey="student-procurement-new" />
         </div>
 
         <div className="flex items-center gap-3 pt-4 border-t border-border">

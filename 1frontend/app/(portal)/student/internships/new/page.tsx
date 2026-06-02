@@ -21,7 +21,7 @@ import {
   validateDateWindow,
 } from '@/lib/date-time'
 import { useI18n } from '@/lib/i18n'
-import { RequestAttachments, uploadAttachments, AttachmentsState } from '@/components/student/request-attachments'
+import { RequestAttachments, uploadAttachments, AttachmentsState, clearAttachmentCache } from '@/components/student/request-attachments'
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000'
 
@@ -121,6 +121,7 @@ export default function NewInternshipPage() {
 
       if (res.ok) {
         toast.success(t('messages.internshipSubmitted'))
+        clearAttachmentCache('student-internship-new')
         router.push('/student/internships')
       } else {
         const err = (await res.json().catch(() => ({}))) as { message?: string }
@@ -318,7 +319,7 @@ export default function NewInternshipPage() {
         </div>
 
         <div className="rounded-lg border border-border bg-card p-5">
-          <RequestAttachments onChange={setAttachments} uploadUrl={`${BACKEND}/student/upload`} />
+          <RequestAttachments onChange={setAttachments} uploadUrl={`${BACKEND}/student/upload`} storageKey="student-internship-new" />
         </div>
 
         <div className="flex justify-end gap-3">
