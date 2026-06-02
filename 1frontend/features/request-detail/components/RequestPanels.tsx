@@ -68,10 +68,10 @@ export function RequestAttachmentsPanel({
             {detail.attachments.map((file) => (
               <div
                 key={file.id}
-                className="flex items-center justify-between rounded-lg border bg-muted/30 px-3 py-3"
+                className="flex items-center gap-2 rounded-lg border bg-muted/30 px-3 py-3 min-w-0"
               >
-                <div className="flex min-w-0 items-center gap-3">
-                  <Paperclip className="size-4 text-muted-foreground" />
+                <div className="flex min-w-0 flex-1 items-center gap-2">
+                  <Paperclip className="size-4 text-muted-foreground shrink-0" />
                   <div className="min-w-0">
                     <p className="truncate text-sm font-medium text-foreground">
                       {file.name}
@@ -80,7 +80,7 @@ export function RequestAttachmentsPanel({
                   </div>
                 </div>
                 {file.url ? (
-                  <div className="flex items-center gap-1 shrink-0">
+                  <div className="flex items-center gap-1 shrink-0 ml-auto">
                     <Button variant="ghost" size="icon" asChild title="Preview">
                       <a href={file.url} target="_blank" rel="noreferrer">
                         <Eye className="size-4" />
@@ -215,7 +215,7 @@ export function RequestTimelineTabs({
       </CardHeader>
       <CardContent>
         <Tabs defaultValue="status">
-          <TabsList className="mb-4 grid w-full grid-cols-2 sm:grid-cols-4">
+          <TabsList className="mb-4 flex w-full overflow-x-auto sm:grid sm:grid-cols-4 [&>*]:shrink-0 sm:[&>*]:shrink">
             <TabsTrigger value="status">{tt('detail.status', 'Status')}</TabsTrigger>
             <TabsTrigger value="assignments">{tt('detail.assignments', 'Assignments')}</TabsTrigger>
             <TabsTrigger value="approvals">{tt('detail.approvals', 'Approvals')}</TabsTrigger>

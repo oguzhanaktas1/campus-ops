@@ -46,9 +46,9 @@ export function RequestDetailPage({
   }
 
   return (
-    <div className="min-h-full bg-muted/10">
+    <div className="min-h-full bg-muted/10 overflow-x-hidden">
       <div className="mx-auto max-w-7xl space-y-4 sm:space-y-6 p-4 sm:p-6 pb-20">
-        <div className="rounded-2xl border bg-card p-4 sm:p-5 shadow-sm">
+        <div className="rounded-2xl border bg-card p-4 sm:p-5 shadow-sm overflow-hidden">
           <RequestHeader detail={detail} />
         </div>
 

@@ -71,19 +71,19 @@ function RequestRequirementCard(props: {
 
   return (
     <div className="border border-border rounded-xl p-4 space-y-4 bg-card">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-start gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+        <div className="flex items-start gap-3 min-w-0">
           <div className="size-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary shrink-0">
             {props.icon}
           </div>
-          <div>
-            <div className="flex items-center gap-2">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
               <h2 className="text-sm font-semibold text-foreground">
                 {props.title}
               </h2>
               <span
                 className={cn(
-                  'text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full border',
+                  'text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full border shrink-0',
                   props.required
                     ? 'bg-amber-50 text-amber-700 border-amber-200'
                     : 'bg-muted text-muted-foreground border-border',
@@ -101,7 +101,7 @@ function RequestRequirementCard(props: {
           type="button"
           variant="outline"
           size="sm"
-          className="gap-1.5 shrink-0"
+          className="gap-1.5 shrink-0 self-start"
           onClick={() => window.open(props.createHref, '_blank', 'noopener,noreferrer')}
         >
           <ExternalLink className="size-3.5" />
@@ -328,7 +328,7 @@ export default function NewEventPlanPage() {
   }
 
   return (
-    <div className="p-6 max-w-4xl mx-auto pb-20">
+    <div className="p-4 sm:p-6 max-w-4xl mx-auto pb-20 overflow-x-hidden">
       <div className="mb-6">
         <h1 className="text-xl font-bold flex items-center gap-2">
           <ClipboardList className="size-5 text-primary" /> {t('dashboard.newEventPlan')}
@@ -340,7 +340,7 @@ export default function NewEventPlanPage() {
 
       <form
         onSubmit={handleSubmit}
-        className="bg-card border border-border rounded-xl shadow-sm p-6 space-y-6"
+        className="bg-card border border-border rounded-xl shadow-sm p-4 sm:p-6 space-y-6"
       >
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
           <p className="font-semibold">{t('pages.approvalRules')}</p>

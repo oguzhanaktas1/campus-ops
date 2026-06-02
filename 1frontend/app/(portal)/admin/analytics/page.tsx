@@ -59,7 +59,7 @@ function KpiCard({ label, value, sub, icon, accent, borderColor, iconBg, iconCol
     )}>
       <div>
         <p className="text-xs text-muted-foreground font-medium">{label}</p>
-        <p className={cn('text-2xl font-bold mt-1', accent ?? 'text-foreground')}>{value}</p>
+        <p className={cn('text-xl sm:text-2xl font-bold mt-1', accent ?? 'text-foreground')}>{value}</p>
         {sub && <p className="text-xs text-muted-foreground mt-0.5">{sub}</p>}
       </div>
       <div className={cn(
@@ -207,7 +207,7 @@ export default function AdminAnalyticsPage() {
   const approvalRateIconColor = (d.approvalRate ?? 0) >= 70 ? 'text-emerald-600' : 'text-amber-600'
 
   return (
-    <div className="p-6 space-y-6 max-w-6xl mx-auto">
+    <div className="p-4 sm:p-6 space-y-6 max-w-6xl mx-auto overflow-x-hidden">
 
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
@@ -227,7 +227,7 @@ export default function AdminAnalyticsPage() {
       </div>
 
       {/* Tabs — underline indicator style */}
-      <div className="flex items-center border-b border-border">
+      <div className="flex items-center border-b border-border overflow-x-auto">
         {TABS.map((tabItem) => (
           <button
             key={tabItem.key}

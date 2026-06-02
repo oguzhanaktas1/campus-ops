@@ -31,12 +31,12 @@ function KeyValueList({
         item.value ? (
           <div
             key={item.label}
-            className={cn('space-y-1', item.fullWidth && 'sm:col-span-2')}
+            className={cn('space-y-1 min-w-0', item.fullWidth && 'sm:col-span-2')}
           >
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground truncate">
               {item.label}
             </p>
-            <p className="text-sm text-foreground">{item.value}</p>
+            <p className="text-sm text-foreground break-words min-w-0">{item.value}</p>
           </div>
         ) : null,
       )}
@@ -56,8 +56,6 @@ export function RequestMetaCard({ detail }: { detail: RequestDetailViewModel }) 
           items={[
             { label: tt('detail.type', 'Type'), value: detail.requestType.name },
             { label: tt('detail.category', 'Category'), value: detail.requestType.category ?? null },
-            { label: tt('detail.status', 'Status'), value: titleize(detail.status) },
-            { label: tt('detail.priority', 'Priority'), value: titleize(detail.priority) },
             {
               label: tt('detail.submitted', 'Submitted'),
               value: formatDate(detail.submittedAt ?? detail.createdAt),
@@ -129,24 +127,24 @@ export function WorkflowProgressCard({
           </button>
         </div>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="flex items-center justify-between gap-3 rounded-lg border bg-muted/30 px-3 py-2">
-          <span className="shrink-0 text-sm text-muted-foreground">{tt('detail.currentStep', 'Current Step')}</span>
-          <div className="min-w-0 text-right">
-            <span className="block truncate text-sm font-medium text-foreground">
+      <CardContent className="space-y-4 overflow-hidden">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5 rounded-lg border bg-muted/30 px-3 py-2.5">
+          <span className="shrink-0 text-xs font-medium uppercase tracking-wide text-muted-foreground">{tt('detail.currentStep', 'Current Step')}</span>
+          <div className="min-w-0 sm:text-right">
+            <span className="block text-sm font-semibold text-foreground break-words">
               {currentStep ?? tt('detail.workflow', 'Workflow progression')}
             </span>
             {currentWorkflowStep ? (
-              <span className="block truncate text-xs text-muted-foreground">
+              <span className="block text-xs text-muted-foreground mt-0.5 break-words">
                 {currentOwner ? `${tt('detail.owner', 'Owner')}: ${currentOwner}` : null}
-                {currentOwner && currentTiming ? ' | ' : null}
+                {currentOwner && currentTiming ? ' · ' : null}
                 {currentTiming ?? null}
               </span>
             ) : null}
           </div>
         </div>
-        <div className="-mx-1 overflow-x-auto px-1 pb-2">
-          <WorkflowStepIndicator steps={steps} className="min-w-[420px] sm:min-w-[560px]" />
+        <div className="overflow-x-auto pb-2">
+          <WorkflowStepIndicator steps={steps} className="min-w-[380px] sm:min-w-[520px]" />
         </div>
         {showStepRows ? (
           <div className="space-y-2">
@@ -217,7 +215,7 @@ function WorkflowStepRow({
         </div>
       </div>
 
-      <div className="mt-3 grid gap-3 border-t pt-3 sm:grid-cols-3">
+      <div className="mt-3 grid gap-2 border-t pt-3 grid-cols-1 sm:grid-cols-3">
         <WorkflowStepField label={tt('detail.owner', 'Owner')} value={workflowStepOwner(step)} />
         <WorkflowStepField label={tt('detail.where', 'Where')} value={workflowStepLocation(step)} />
         <WorkflowStepField label={tt('detail.time', 'Time')} value={workflowStepTiming(step, tt)} />
@@ -397,8 +395,8 @@ export function RelatedEntitiesCard({
             { label: tt('detail.domainKey', 'Domain Key'),       value: humanize(detail.requestType.key) },
           ]}
         />
-        <div className="flex items-center justify-between gap-4 border-t pt-4 text-sm">
-          <span className="text-muted-foreground">{tt('detail.workflowStatus', 'Workflow Status')}</span>
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-4 text-sm">
+          <span className="text-muted-foreground shrink-0">{tt('detail.workflowStatus', 'Workflow Status')}</span>
           <StatusBadge status={detail.workflow.status ?? detail.status} />
         </div>
       </CardContent>

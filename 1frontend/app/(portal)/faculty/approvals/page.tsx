@@ -7,8 +7,10 @@ import {
   ChevronRight,
   Inbox,
   Loader2,
+  PanelLeftOpen,
   RotateCcw,
   Sparkles,
+  X,
   XCircle,
 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -69,6 +71,7 @@ export default function FacultyApprovalsPage() {
   const [selectedId, setSelectedId] = useState<string | null>(initialSelectedId)
   const [completedAction, setCompletedAction] = useState<ActionType>(null)
   const dismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
   const [comment, setComment] = useState('')
   const [aiEnabled, setAiEnabled] = useState(false)
   const [aiSummary, setAiSummary] = useState<{
@@ -276,123 +279,187 @@ export default function FacultyApprovalsPage() {
     }
   }
 
+  const pendingListContent = (
+    <>
+      <div className="border-b border-border px-4 py-4 flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <h1 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+            <Inbox className="size-4 text-primary shrink-0" />
+            {t('approvals.title')}
+          </h1>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {t('approvals.subtitle', { count: pending.length })}
+          </p>
+        </div>
+        <button
+          onClick={() => setSidebarOpen(false)}
+          className="lg:hidden p-1.5 rounded-md hover:bg-muted transition-colors shrink-0"
+          aria-label="Close list"
+        >
+          <X className="size-4 text-muted-foreground" />
+        </button>
+      </div>
+
+      <div className="overflow-y-auto h-[calc(100%-4rem)]">
+        {isQueueLoading ? (
+          <div className="flex h-48 items-center justify-center">
+            <Loader2 className="size-7 animate-spin text-primary" />
+          </div>
+        ) : pending.length === 0 ? (
+          <div className="p-4">
+            <EmptyState
+              title={t('approvals.noPending')}
+              description={t('approvals.noPendingDesc')}
+              icon={<CheckCircle2 className="size-6 text-emerald-500" />}
+            />
+          </div>
+        ) : (
+          <div className="divide-y divide-border">
+            {pending.map((item) => (
+              <button
+                key={item.id}
+                onClick={() => { setSelectedId(item.id); setSidebarOpen(false) }}
+                className={cn(
+                  'flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/40',
+                  selectedId === item.id && 'border-r-2 border-r-primary bg-primary/5',
+                )}
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-foreground">
+                    {item.title}
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {item.submittedByName} · {formatDate(item.createdAt)}
+                  </p>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <PriorityBadge priority={item.priority} />
+                    <StatusBadge status={item.status} />
+                  </div>
+                </div>
+                <ChevronRight className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </>
+  )
+
   return (
     <div className="h-full overflow-hidden">
+
+      {/* Mobile overlay backdrop */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 z-30 bg-black/50 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
       <div className="grid h-full lg:grid-cols-[320px_minmax(0,1fr)]">
-        <aside className="border-r border-border bg-card">
-          <div className="border-b border-border px-4 py-4">
-            <h1 className="flex items-center gap-2 text-sm font-semibold text-foreground">
-              <Inbox className="size-4 text-primary" />
+
+        {/* Sidebar — fixed overlay on mobile, static column on desktop */}
+        <aside className={cn(
+          'border-r border-border bg-card flex flex-col',
+          'fixed inset-y-0 left-0 z-40 w-[300px] transition-transform duration-200 ease-in-out',
+          'lg:relative lg:z-auto lg:w-auto lg:translate-x-0 lg:inset-auto',
+          sidebarOpen ? 'translate-x-0' : '-translate-x-full',
+        )}>
+          {pendingListContent}
+        </aside>
+
+        {/* Main */}
+        <main className="overflow-y-auto bg-muted/10 flex flex-col">
+
+          {/* Mobile toggle bar */}
+          <div className="flex items-center gap-3 border-b border-border px-4 py-2.5 lg:hidden shrink-0">
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="flex items-center gap-1.5 text-sm font-medium text-foreground hover:text-primary transition-colors"
+            >
+              <PanelLeftOpen className="size-4" />
               {t('approvals.title')}
-            </h1>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {t('approvals.subtitle', { count: pending.length })}
-            </p>
+              {pending.length > 0 && (
+                <span className="ml-0.5 rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-bold text-primary-foreground leading-none">
+                  {pending.length}
+                </span>
+              )}
+            </button>
+            {selectedSummary && (
+              <p className="text-sm text-muted-foreground truncate min-w-0">· {selectedSummary.title}</p>
+            )}
           </div>
 
-          <div className="max-h-[calc(100vh-9rem)] overflow-y-auto">
-            {isQueueLoading ? (
-              <div className="flex h-48 items-center justify-center">
-                <Loader2 className="size-7 animate-spin text-primary" />
+          <div className="flex-1 overflow-y-auto">
+            {!selectedId ? (
+              <div className="flex h-full items-center justify-center p-6">
+                <div className="text-center space-y-3">
+                  <EmptyState
+                    title={t('approvals.selectRequest')}
+                    description={t('approvals.selectRequestDesc')}
+                    icon={<Inbox className="size-6" />}
+                  />
+                  <button
+                    onClick={() => setSidebarOpen(true)}
+                    className="lg:hidden inline-flex items-center gap-1.5 text-sm text-primary hover:underline"
+                  >
+                    <PanelLeftOpen className="size-4" />
+                    {t('approvals.title')} ({pending.length})
+                  </button>
+                </div>
               </div>
-            ) : pending.length === 0 ? (
-              <div className="p-4">
-                <EmptyState
-                  title={t('approvals.noPending')}
-                  description={t('approvals.noPendingDesc')}
-                  icon={<CheckCircle2 className="size-6 text-emerald-500" />}
-                />
+            ) : isLoading || !detail ? (
+              <div className="flex h-full items-center justify-center">
+                <Loader2 className="size-8 animate-spin text-primary" />
               </div>
             ) : (
-              <div className="divide-y divide-border">
-                {pending.map((item) => (
-                  <button
-                    key={item.id}
-                    onClick={() => setSelectedId(item.id)}
-                    className={cn(
-                      'flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/40',
-                      selectedId === item.id &&
-                        'border-r-2 border-r-primary bg-primary/5',
-                    )}
-                  >
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium text-foreground">
-                        {item.title}
-                      </p>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        {item.submittedByName} · {formatDate(item.createdAt)}
-                      </p>
-                      <div className="mt-2 flex flex-wrap items-center gap-2">
-                        <PriorityBadge priority={item.priority} />
-                        <StatusBadge status={item.status} />
-                      </div>
-                    </div>
-                    <ChevronRight className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-                  </button>
-                ))}
+              <div className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6 pb-20">
+                <div className="rounded-2xl border bg-card p-4 sm:p-5 shadow-sm overflow-hidden">
+                  <RequestHeader detail={detail} />
+                </div>
+
+                <div className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_340px]">
+                  <div className="space-y-6">
+                    <WorkflowCurrentStepCard detail={detail} />
+                    <RequestMetaCard detail={detail} />
+                    <DomainDetailPanel detail={detail} />
+                    <RequestAttachmentsPanel detail={detail} />
+                    <RequestCommentsPanel
+                      detail={detail}
+                      onCommentAdded={(comments) => setDetail({ ...detail, comments })}
+                    />
+                    <RequestTimelineTabs detail={detail} />
+                  </div>
+
+                  <div className="space-y-6">
+                    <FacultyDecisionPanel
+                      detailStatus={detail.status}
+                      completedAction={completedAction}
+                      submittedByName={
+                        detail.requester?.fullName ??
+                        selectedSummary?.submittedByName ??
+                        'Requester'
+                      }
+                      requestTypeName={
+                        detail.requestType.name || selectedSummary?.typeName || 'Request'
+                      }
+                      comment={comment}
+                      isProcessing={isProcessing}
+                      onCommentChange={setComment}
+                      onAction={handleAction}
+                    />
+                    <ApprovalAiSummaryCard
+                      aiEnabled={aiEnabled}
+                      summary={aiSummary}
+                      isLoading={isAiLoading}
+                    />
+                    <RequestQuickFactsCard detail={detail} />
+                    <RelatedEntitiesCard detail={detail} />
+                  </div>
+                </div>
               </div>
             )}
           </div>
-        </aside>
-
-        <main className="overflow-y-auto bg-muted/10">
-          {!selectedId ? (
-            <div className="flex h-full items-center justify-center p-6">
-              <EmptyState
-                title={t('approvals.selectRequest')}
-                description={t('approvals.selectRequestDesc')}
-                icon={<Inbox className="size-6" />}
-              />
-            </div>
-          ) : isLoading || !detail ? (
-            <div className="flex h-full items-center justify-center">
-              <Loader2 className="size-8 animate-spin text-primary" />
-            </div>
-          ) : (
-            <div className="mx-auto max-w-7xl space-y-6 p-6 pb-20">
-              <RequestHeader detail={detail} />
-
-              <div className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_340px]">
-                <div className="space-y-6">
-                  <WorkflowCurrentStepCard detail={detail} />
-                  <RequestMetaCard detail={detail} />
-                  <DomainDetailPanel detail={detail} />
-                  <RequestAttachmentsPanel detail={detail} />
-                  <RequestCommentsPanel
-                    detail={detail}
-                    onCommentAdded={(comments) => setDetail({ ...detail, comments })}
-                  />
-                  <RequestTimelineTabs detail={detail} />
-                </div>
-
-                <div className="space-y-6">
-                  <FacultyDecisionPanel
-                    detailStatus={detail.status}
-                    completedAction={completedAction}
-                    submittedByName={
-                      detail.requester?.fullName ??
-                      selectedSummary?.submittedByName ??
-                      'Requester'
-                    }
-                    requestTypeName={
-                      detail.requestType.name || selectedSummary?.typeName || 'Request'
-                    }
-                    comment={comment}
-                    isProcessing={isProcessing}
-                    onCommentChange={setComment}
-                    onAction={handleAction}
-                  />
-                  <ApprovalAiSummaryCard
-                    aiEnabled={aiEnabled}
-                    summary={aiSummary}
-                    isLoading={isAiLoading}
-                  />
-                  <RequestQuickFactsCard detail={detail} />
-                  <RelatedEntitiesCard detail={detail} />
-                </div>
-              </div>
-            </div>
-          )}
         </main>
       </div>
     </div>

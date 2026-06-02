@@ -231,7 +231,7 @@ export default function AdminResourcesPage() {
   }
 
   return (
-    <div className="p-4 sm:p-6 space-y-6 max-w-6xl mx-auto pb-20">
+    <div className="p-4 sm:p-6 space-y-6 max-w-6xl mx-auto pb-20 overflow-x-hidden">
       {/* Dialog */}
       {showDialog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
@@ -301,7 +301,7 @@ export default function AdminResourcesPage() {
           </div>
           <div>
             <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">{t('common.total')}</p>
-            <p className="text-2xl font-bold text-foreground leading-none mt-0.5">
+            <p className="text-xl sm:text-2xl font-bold text-foreground leading-none mt-0.5">
               {statsLoading ? <span className="inline-block w-8 h-6 bg-muted animate-pulse rounded" /> : (typeCounts['all'] ?? 0)}
             </p>
           </div>
@@ -327,7 +327,7 @@ export default function AdminResourcesPage() {
               </div>
               <div className="min-w-0">
                 <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide truncate">{type}</p>
-                <p className="text-xl font-bold text-foreground leading-none mt-0.5">
+                <p className="text-lg sm:text-xl font-bold text-foreground leading-none mt-0.5">
                   {statsLoading ? <span className="inline-block w-6 h-5 bg-muted animate-pulse rounded" /> : count}
                 </p>
               </div>
@@ -515,8 +515,8 @@ export default function AdminResourcesPage() {
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="relative flex items-center justify-center text-sm">
-          <p className="absolute left-0 text-muted-foreground">{t('resources.pageOf', { page, total: totalPages })}</p>
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 text-sm">
+          <p className="text-muted-foreground">{t('resources.pageOf', { page, total: totalPages })}</p>
           <div className="flex items-center gap-1">
             <Button
               variant="outline" size="sm" className="gap-1"

@@ -249,7 +249,7 @@ export default function MonitoringPage() {
   const metrics = parsePrometheusMetrics(metricsRaw)
 
   return (
-    <div className="p-6 space-y-6 max-w-5xl mx-auto">
+    <div className="p-4 sm:p-6 space-y-6 max-w-5xl mx-auto overflow-x-hidden">
 
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
@@ -376,8 +376,8 @@ export default function MonitoringPage() {
       {queues.length > 0 && (
         <section>
           <h2 className="text-sm font-semibold text-foreground mb-3">{t('monitoring.rabbitmqQueues')}</h2>
-          <div className="bg-card border border-border rounded-lg overflow-hidden shadow-sm">
-            <table className="w-full text-xs">
+          <div className="bg-card border border-border rounded-lg overflow-x-auto shadow-sm">
+            <table className="w-full text-xs min-w-[540px]">
               <thead>
                 <tr className="border-b border-border bg-muted/40">
                   <th className="text-left py-2 px-4 font-medium text-muted-foreground">{t('monitoring.queue')}</th>
@@ -421,8 +421,8 @@ export default function MonitoringPage() {
           </button>
 
           {showMetrics && (
-            <div className="bg-card border border-border rounded-lg overflow-hidden shadow-sm">
-              <table className="w-full text-xs font-mono">
+            <div className="bg-card border border-border rounded-lg overflow-x-auto shadow-sm">
+              <table className="w-full text-xs font-mono min-w-[400px]">
                 <thead>
                   <tr className="border-b border-border bg-muted/40">
                     <th className="text-left py-2 px-4 font-medium text-muted-foreground">{t('monitoring.metric')}</th>

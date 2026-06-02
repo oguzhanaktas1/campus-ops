@@ -83,7 +83,7 @@ export default function FacultyTicketsPage() {
   const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
   return (
-    <div className="p-6 max-w-4xl mx-auto space-y-5 pb-20">
+    <div className="p-4 sm:p-6 max-w-4xl mx-auto space-y-5 pb-20 overflow-x-hidden">
       <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
         <div>
           <h1 className="text-xl font-bold text-foreground">{t('tickets.title')}</h1>
