@@ -1682,11 +1682,11 @@ const workflows: WorkflowSeedInput[] = [
     requestTypeKey: 'IT_SUPPORT',
     workflowKey: 'WF_IT_SUPPORT_V1',
     workflowName: 'IT Support Workflow',
-    description: 'Unified IT support flow: IT Review -> Manager Approval -> Approved. Ticket execution continues with ticket status.',
+    description: 'Unified IT support flow: IT Agent Review -> Manager Approval -> Approved. Ticket execution continues with ticket status.',
     stages: [
       {
         stepKey: 'IT_REVIEW',
-        stepName: 'IT Review',
+        stepName: 'IT Agent Review',
         stepType: WorkflowStepType.REVIEW,
         assignedRoleName: 'IT_AGENT',
         slaHours: 8,
@@ -1726,7 +1726,7 @@ const workflows: WorkflowSeedInput[] = [
     requestTypeKey: 'ACCESS_REQUEST',
     workflowKey: 'WF_ACCESS_REQUEST_V2',
     workflowName: 'Access Request Workflow',
-    description: 'Unified access flow: Security Review -> IT Review -> Manager Approval -> Approved.',
+    description: 'Unified access flow: Security Review -> IT Agent Review -> Manager Approval -> Approved.',
     stages: [
       {
         stepKey: 'SECURITY_REVIEW',
@@ -1737,7 +1737,7 @@ const workflows: WorkflowSeedInput[] = [
       },
       {
         stepKey: 'IT_REVIEW',
-        stepName: 'IT Review',
+        stepName: 'IT Agent Review',
         stepType: WorkflowStepType.REVIEW,
         assignedRoleName: 'IT_AGENT',
         slaHours: 24,

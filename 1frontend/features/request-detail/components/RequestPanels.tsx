@@ -501,10 +501,19 @@ function canCurrentUserDecide(detail: RequestDetailViewModel) {
   if (detail.requester?.id === user.id) return false
 
   const userRoles = new Set((user.roles ?? []).map(normalizeRole))
+  const step = activeWorkflowStep(detail)
+  const stepRole = normalizeRole(step?.assignedRole ?? step?.role)
+
+  // If the active step has an assigned role, only that role may act — no fallback.
+  // This prevents e.g. IT_AGENT from acting when the step has moved to MANAGER_APPROVAL.
+  if (stepRole) {
+    return userRoles.has(stepRole)
+  }
+
+  // No role assigned to step — fall back to direct assignment checks.
   const assignments = Array.isArray((detail.raw as any).assignments)
     ? ((detail.raw as any).assignments as any[])
     : []
-  const step = activeWorkflowStep(detail)
 
   const isCurrentAssignee = detail.currentAssignee?.id === user.id
   const isActiveAssignment = assignments.some((assignment) => {
@@ -519,10 +528,8 @@ function canCurrentUserDecide(detail: RequestDetailViewModel) {
     (step?.assignedToName &&
       step.assignedToName === detail.currentAssignee?.fullName &&
       detail.currentAssignee?.id === user.id)
-  const stepRole = normalizeRole(step?.assignedRole ?? step?.role)
-  const isStepRoleOwner = Boolean(stepRole) && userRoles.has(stepRole)
 
-  return isCurrentAssignee || isActiveAssignment || isStepAssignee || isStepRoleOwner
+  return isCurrentAssignee || isActiveAssignment || isStepAssignee
 }
 
 function TerminalActionPanel({ detail }: { detail: RequestDetailViewModel }) {
