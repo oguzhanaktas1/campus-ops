@@ -20,11 +20,11 @@ function FieldGrid({
   return (
     <div className="grid gap-4 sm:grid-cols-2">
       {visible.map((field) => (
-        <div key={field.label} className="space-y-1">
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        <div key={field.label} className="min-w-0 space-y-1">
+          <p className="truncate text-xs font-medium uppercase tracking-wide text-muted-foreground">
             {field.label}
           </p>
-          <p className="text-sm text-foreground">{field.value}</p>
+          <p className="break-words text-sm text-foreground">{field.value}</p>
         </div>
       ))}
     </div>

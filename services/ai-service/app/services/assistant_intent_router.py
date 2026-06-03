@@ -246,7 +246,10 @@ class AssistantIntentRouter:
             "kac acik request", "kac acik talep", "acik requestim", "acik talebim",
             "kac talebim var", "toplam talebim", "taleplerimin sayisi",
             "kac islemim var", "acik islemlerim",
+            "bugun kac talep", "bugun kac request", "bugun kac basvuru",
+            "bugun acik", "today's open", "today open",
             "how many open", "open requests count", "how many requests",
+            "kac yeni basvuru", "kac yeni talep",
         ]):
             return IntentResult("my_open_requests_count", {})
 

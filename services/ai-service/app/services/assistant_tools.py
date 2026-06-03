@@ -23,6 +23,58 @@ REQUEST_TYPE_LABELS: dict[str, str] = {
     "EQUIPMENT": "Equipment",
 }
 
+REQUEST_TYPE_LABELS_TR: dict[str, str] = {
+    "INTERNSHIP": "Staj",
+    "DOCUMENT": "Belge",
+    "RESERVATION": "Rezervasyon",
+    "APPOINTMENT": "Randevu",
+    "ACCESS_REQUEST": "Erişim Talebi",
+    "IT_TICKET": "IT Ticket",
+    "EVENT": "Etkinlik",
+    "PROCUREMENT": "Satın Alma",
+    "EQUIPMENT": "Ekipman",
+}
+
+
+# ── Language detection (TR vs EN) ─────────────────────────────────────────────
+
+_TURKISH_CHARS = set("çğıİöşüÇĞÖŞÜ")
+_TURKISH_HINTS = (
+    " ne ", " nasıl", " nasil", " kaç ", " kac ", " var ", " mı ", " mi ", " mu ", " mü ",
+    " mı?", " mi?", " mu?", " mü?", "mıdır", "midir", "mudur", "müdür",
+    "bugün", "bugun", "talep", "başvur", "basvur", "onay", "staj", "belge",
+    "randevu", "rezervasyon", "etkinlik", "bildirim", "geciken", "yaklaşan",
+    "merhaba", "selam", "günaydın", "gunaydin", "iyi günler", "teşekkür", "tesekkur",
+    "lütfen", "lutfen", "yardım", "yardim",
+)
+
+def detect_language(message: str, history: list | None = None) -> str:
+    """Return 'tr' if the message looks Turkish, else 'en'."""
+    if not message:
+        if history:
+            for msg in reversed(history):
+                if getattr(msg, "role", "") == "user":
+                    return detect_language(getattr(msg, "content", ""), None)
+        return "en"
+    lower = f" {message.lower()} "
+    if any(ch in _TURKISH_CHARS for ch in message):
+        return "tr"
+    if any(hint in lower for hint in _TURKISH_HINTS):
+        return "tr"
+    return "en"
+
+
+def _t(lang: str, en: str, tr: str) -> str:
+    """Pick the localized string by lang."""
+    return tr if lang == "tr" else en
+
+
+def _type_label(type_key: str, lang: str) -> str:
+    key = type_key.upper()
+    if lang == "tr":
+        return REQUEST_TYPE_LABELS_TR.get(key, REQUEST_TYPE_LABELS.get(key, type_key))
+    return REQUEST_TYPE_LABELS.get(key, type_key)
+
 # ── Role-based intent permission matrix ───────────────────────────────────────
 #
 # Maps intent name → set of roles allowed to access it.
@@ -73,22 +125,25 @@ class ToolResult:
     context: dict[str, object] = field(default_factory=dict)
 
 
-def _denied(intent: str) -> ToolResult:
-    return ToolResult(
-        handled=True,
-        answer=f"This information is not available for your current role. ({intent})",
+def _denied(intent: str, lang: str = "en") -> ToolResult:
+    msg = _t(
+        lang,
+        f"This information is not available for your current role. ({intent})",
+        f"Bu bilgi mevcut rolünüzle erişilebilir değil. ({intent})",
     )
+    return ToolResult(handled=True, answer=msg)
 
 
 class AssistantToolLayer:
 
     def execute(self, intent: str, payload: AssistantAskRequest, entities: dict[str, str]) -> ToolResult:
         role = payload.main_role.upper()
+        lang = detect_language(payload.message, payload.conversation_history)
 
         # Role permission gate — checked before dispatching any handler
         allowed_roles = INTENT_ROLE_ALLOW.get(intent)
         if allowed_roles is not None and role not in allowed_roles:
-            return _denied(intent)
+            return _denied(intent, lang)
 
         handlers = {
             # ── General / onboarding
@@ -224,11 +279,18 @@ class AssistantToolLayer:
 
     def _greeting(self, payload: AssistantAskRequest, _: dict[str, str]) -> ToolResult:
         role = payload.main_role.upper()
-        labels = {"ADMIN": "admin", "STUDENT": "student", "FACULTY": "faculty member", "STAFF": "staff member", "ORGANIZER": "organizer"}
-        label = labels.get(role, role.lower())
+        lang = detect_language(payload.message, payload.conversation_history)
+        labels_en = {"ADMIN": "admin", "STUDENT": "student", "FACULTY": "faculty member", "STAFF": "staff member", "ORGANIZER": "organizer"}
+        labels_tr = {"ADMIN": "yönetici", "STUDENT": "öğrenci", "FACULTY": "öğretim üyesi", "STAFF": "personel", "ORGANIZER": "etkinlik organizatörü"}
+        label_en = labels_en.get(role, role.lower())
+        label_tr = labels_tr.get(role, role.lower())
         return ToolResult(
             handled=True,
-            answer=f"Hi! I'm your CampusOps {label} assistant. Ask me about your requests, schedule, approvals, or anything on the platform.",
+            answer=_t(
+                lang,
+                f"Hi! I'm your CampusOps {label_en} assistant. Ask me about your requests, schedule, approvals, or anything on the platform.",
+                f"Merhaba! Ben CampusOps {label_tr} asistanınızım. Talepleriniz, takviminiz, onaylar veya platformla ilgili sorularınızı bekliyorum.",
+            ),
         )
 
     def _portal_guide(self, payload: AssistantAskRequest, _: dict[str, str]) -> ToolResult:
@@ -369,37 +431,128 @@ class AssistantToolLayer:
     # ══════════════════════════════════════════════════════════════════════════
 
     def _my_open_requests_count(self, payload: AssistantAskRequest, _: dict[str, str]) -> ToolResult:
+        lang = detect_language(payload.message, payload.conversation_history)
+        summary = payload.live_data_context.get("summary", {}) if isinstance(payload.live_data_context.get("summary"), dict) else {}
+        recent = self._as_list(payload.live_data_context.get("recentRequests"))
         open_items = [r for r in payload.open_requests if str(r.get("status", "")).upper() not in FINAL_STATUSES]
-        count = len(open_items)
-        summary = payload.live_data_context.get("summary", {})
-        total = int(self._to_number(summary.get("totalRequests", count))) if isinstance(summary, dict) else count
+        # Prefer the authoritative count from backend summary over the limited recent list.
+        count = int(self._to_number(summary.get("openRequests", len(open_items)))) if summary else len(open_items)
+        total = int(self._to_number(summary.get("totalRequests", count))) if summary else count
+        submitted_today = int(self._to_number(summary.get("submittedToday", 0))) if summary else 0
+
         cards = [AssistantCard(type="count", label="Open Requests", value=count)]
         if total and total != count:
             cards.append(AssistantCard(type="count", label="Total Requests", value=total))
-        return ToolResult(handled=True, answer=f"You have **{count}** open request(s).", cards=cards, context={"openRequests": open_items[:5]})
+        if submitted_today:
+            cards.append(AssistantCard(type="count", label="Submitted Today", value=submitted_today))
 
-    def _completed_requests(self, payload: AssistantAskRequest, _: dict[str, str]) -> ToolResult:
-        recent = self._as_list(payload.live_data_context.get("recentRequests"))
-        done = [r for r in recent if str(r.get("status", "")).upper() in {"COMPLETED", "APPROVED", "CLOSED"}]
-        if not done:
-            return ToolResult(handled=True, answer="No completed or approved requests found in your recent history.")
+        message_lower = payload.message.lower()
+        asks_today = any(token in message_lower for token in ["bugün", "bugun", "today", "today's"])
+        if asks_today and submitted_today:
+            answer = _t(
+                lang,
+                f"You submitted **{submitted_today}** request(s) today. Across all dates you have **{count}** request(s) still open.",
+                f"Bugün **{submitted_today}** yeni talep gönderdiniz. Toplamda şu an **{count}** açık talebiniz var.",
+            )
+        elif asks_today:
+            answer = _t(
+                lang,
+                f"No requests submitted today. You currently have **{count}** open request(s).",
+                f"Bugün gönderilmiş talebiniz yok. Şu anda **{count}** açık talebiniz var.",
+            )
+        else:
+            answer = _t(
+                lang,
+                f"You have **{count}** open request(s).",
+                f"**{count}** açık talebiniz var.",
+            )
+
+        # Provide a small status breakdown from recent records (richer reply).
+        breakdown = Counter(str(r.get("status", "")).upper() for r in (open_items or recent[:5]))
+        if breakdown and count:
+            highlight = ", ".join(f"{status}: {n}" for status, n in breakdown.most_common(3))
+            answer += _t(lang, f" (recent breakdown — {highlight})", f" (son kayıtlar — {highlight})")
+
         return ToolResult(
             handled=True,
-            answer=f"**{len(done)}** completed/approved request(s) found in your recent records.",
-            cards=[AssistantCard(type="count", label="Completed", value=len(done))],
-            context={"completedRequests": done[:5]},
+            answer=answer,
+            cards=cards,
+            context={"openRequests": open_items[:5], "summary": summary},
+        )
+
+    def _completed_requests(self, payload: AssistantAskRequest, _: dict[str, str]) -> ToolResult:
+        lang = detect_language(payload.message, payload.conversation_history)
+        summary = payload.live_data_context.get("summary", {}) if isinstance(payload.live_data_context.get("summary"), dict) else {}
+        recent = self._as_list(payload.live_data_context.get("recentRequests"))
+        approved_total = int(self._to_number(summary.get("approvedRequests", 0))) if summary else 0
+        rejected_total = int(self._to_number(summary.get("rejectedRequests", 0))) if summary else 0
+
+        done_recent = [r for r in recent if str(r.get("status", "")).upper() in {"COMPLETED", "APPROVED", "CLOSED"}]
+        total_done = approved_total if approved_total else len(done_recent)
+        if total_done == 0 and not done_recent:
+            return ToolResult(
+                handled=True,
+                answer=_t(
+                    lang,
+                    "No completed or approved requests found in your history.",
+                    "Geçmişinizde tamamlanmış veya onaylanmış talep bulunmuyor.",
+                ),
+            )
+
+        latest = done_recent[0] if done_recent else None
+        suffix = ""
+        if latest:
+            suffix = _t(
+                lang,
+                f" Most recent: **{latest.get('requestNo')}** ('{latest.get('title','')}').",
+                f" En sonuncusu: **{latest.get('requestNo')}** ('{latest.get('title','')}').",
+            )
+
+        answer = _t(
+            lang,
+            f"**{total_done}** approved/completed request(s) on record.",
+            f"Kayıtlarda **{total_done}** onaylanmış/tamamlanmış talep var.",
+        )
+        if rejected_total:
+            answer += _t(lang, f" ({rejected_total} rejected.)", f" ({rejected_total} reddedildi.)")
+        answer += suffix
+
+        cards = [AssistantCard(type="count", label="Approved/Completed", value=total_done)]
+        if rejected_total:
+            cards.append(AssistantCard(type="count", label="Rejected", value=rejected_total))
+
+        return ToolResult(
+            handled=True,
+            answer=answer,
+            cards=cards,
+            context={"completedRequests": done_recent[:5]},
         )
 
     def _draft_requests(self, payload: AssistantAskRequest, _: dict[str, str]) -> ToolResult:
+        lang = detect_language(payload.message, payload.conversation_history)
+        summary = payload.live_data_context.get("summary", {}) if isinstance(payload.live_data_context.get("summary"), dict) else {}
         recent = self._as_list(payload.live_data_context.get("recentRequests"))
-        drafts = [r for r in recent if str(r.get("status", "")).upper() == "DRAFT"]
-        if not drafts:
-            return ToolResult(handled=True, answer="No draft requests found. All your requests have been submitted.")
+        drafts_recent = [r for r in recent if str(r.get("status", "")).upper() == "DRAFT"]
+        total_drafts = int(self._to_number(summary.get("draftRequests", 0))) if summary else 0
+        count = total_drafts if total_drafts else len(drafts_recent)
+        if count == 0:
+            return ToolResult(
+                handled=True,
+                answer=_t(
+                    lang,
+                    "No draft requests found. All your requests have been submitted.",
+                    "Taslak talebiniz yok. Tüm talepleriniz gönderilmiş.",
+                ),
+            )
         return ToolResult(
             handled=True,
-            answer=f"You have **{len(drafts)}** draft request(s) not yet submitted.",
-            cards=[AssistantCard(type="count", label="Drafts", value=len(drafts))],
-            context={"drafts": drafts[:5]},
+            answer=_t(
+                lang,
+                f"You have **{count}** draft request(s) not yet submitted.",
+                f"Henüz gönderilmemiş **{count}** taslak talebiniz var.",
+            ),
+            cards=[AssistantCard(type="count", label="Drafts", value=count)],
+            context={"drafts": drafts_recent[:5]},
         )
 
     def _bulk_request_summary(self, payload: AssistantAskRequest, _: dict[str, str]) -> ToolResult:
@@ -417,10 +570,25 @@ class AssistantToolLayer:
 
     def _request_count_by_type(self, payload: AssistantAskRequest, _: dict[str, str]) -> ToolResult:
         recent = self._as_list(payload.live_data_context.get("recentRequests")) + payload.open_requests
-        counter: Counter[str] = Counter(
-            REQUEST_TYPE_LABELS.get(str(r.get("requestType", "") or r.get("type", "")).upper(), str(r.get("requestType", "Other")))
-            for r in recent
-        )
+        # Deduplicate by requestNo and prefer the structured key for labeling.
+        seen: set[str] = set()
+        unique: list[dict[str, object]] = []
+        for r in recent:
+            no = str(r.get("requestNo", "")).strip()
+            if no and no in seen:
+                continue
+            if no:
+                seen.add(no)
+            unique.append(r)
+
+        def label_for(item: dict[str, object]) -> str:
+            key = str(item.get("requestTypeKey", "") or "").upper()
+            if key and key in REQUEST_TYPE_LABELS:
+                return REQUEST_TYPE_LABELS[key]
+            raw = str(item.get("requestType", "") or item.get("type", "")).strip()
+            return REQUEST_TYPE_LABELS.get(raw.upper(), raw or "Other")
+
+        counter: Counter[str] = Counter(label_for(r) for r in unique)
         if not counter:
             return ToolResult(handled=True, answer="No request type data available.")
         cards = [AssistantCard(type="count", label=rtype, value=count) for rtype, count in counter.most_common(6)]
@@ -460,17 +628,51 @@ class AssistantToolLayer:
         )
 
     def _request_summary(self, payload: AssistantAskRequest, entities: dict[str, str]) -> ToolResult:
+        lang = detect_language(payload.message, payload.conversation_history)
         target = entities.get("requestNo")
         all_requests = self._as_list(payload.live_data_context.get("recentRequests")) + payload.open_requests
         for item in all_requests:
             if str(item.get("requestNo", "")).lower() == str(target).lower():
-                status = str(item.get("status", "UNKNOWN"))
+                status = str(item.get("status", "UNKNOWN")).upper()
                 title = str(item.get("title", ""))
-                req_type = str(item.get("requestType", "") or item.get("type", ""))
-                type_suffix = f" ({REQUEST_TYPE_LABELS.get(req_type.upper(), req_type)})" if req_type else ""
+                key = str(item.get("requestTypeKey", "") or "").upper()
+                req_type = key or str(item.get("requestType", "") or item.get("type", ""))
+                type_label = _type_label(req_type, lang) if req_type else ""
+                type_suffix = f" ({type_label})" if type_label else ""
+                due_at = str(item.get("dueAt", "") or "").strip()
+                due_suffix = _t(lang, f" Due: {due_at[:10]}.", f" Son tarih: {due_at[:10]}.") if due_at else ""
+
+                explain_en = {
+                    "APPROVED": "Approved ✓ — the request was accepted.",
+                    "REJECTED": "Rejected ✗ — see the reviewer's decision note.",
+                    "REVISION_REQUESTED": "Revision requested — the reviewer asked for changes; edit and resubmit.",
+                    "IN_REVIEW": "Currently being reviewed by an assignee.",
+                    "WAITING_APPROVAL": "Waiting on an approver's decision.",
+                    "SUBMITTED": "Submitted and queued for triage.",
+                    "DRAFT": "Saved as draft — not submitted yet.",
+                    "COMPLETED": "Completed ✓ — fully resolved.",
+                    "CANCELLED": "Cancelled.",
+                    "CLOSED": "Closed and archived.",
+                    "EXPIRED": "Expired before a decision was made.",
+                }.get(status, f"Currently in status {status}.")
+                explain_tr = {
+                    "APPROVED": "Onaylandı ✓ — talep kabul edildi.",
+                    "REJECTED": "Reddedildi ✗ — karar notuna bakabilirsiniz.",
+                    "REVISION_REQUESTED": "Düzeltme istendi — değerlendirici değişiklik istedi; güncelleyip tekrar gönderin.",
+                    "IN_REVIEW": "Şu anda atanan kişi tarafından inceleniyor.",
+                    "WAITING_APPROVAL": "Bir onaylayıcının kararını bekliyor.",
+                    "SUBMITTED": "Gönderildi ve değerlendirme sırasında.",
+                    "DRAFT": "Taslak olarak kaydedildi — henüz gönderilmedi.",
+                    "COMPLETED": "Tamamlandı ✓ — sonuçlandırıldı.",
+                    "CANCELLED": "İptal edildi.",
+                    "CLOSED": "Kapatıldı ve arşivlendi.",
+                    "EXPIRED": "Karar verilmeden süresi doldu.",
+                }.get(status, f"Şu anda {status} durumunda.")
+                status_explain = _t(lang, explain_en, explain_tr)
+
                 return ToolResult(
                     handled=True,
-                    answer=f"**{item.get('requestNo')}** — '{title}' is currently **{status}**{type_suffix}.",
+                    answer=f"**{item.get('requestNo')}**{type_suffix} — '{title}'. {status_explain}{due_suffix}",
                     cards=[AssistantCard(type="status", label=str(item.get("requestNo", "")), value=status, description=title or None)],
                     context={"request": item},
                 )
@@ -498,20 +700,114 @@ class AssistantToolLayer:
         return self._filter_by_type(payload, "EQUIPMENT", "Equipment")
 
     def _filter_by_type(self, payload: AssistantAskRequest, type_key: str, label: str) -> ToolResult:
-        all_requests = self._as_list(payload.live_data_context.get("recentRequests")) + payload.open_requests
-        matches = [
-            r for r in all_requests
-            if str(r.get("requestType", "") or r.get("type", "")).upper() in {type_key, label.upper().replace(" ", "_")}
-        ]
+        lang = detect_language(payload.message, payload.conversation_history)
+        type_label_local = _type_label(type_key, lang)
+
+        # Combine recentRequests + openRequests, de-duplicate by requestNo so counts stay honest.
+        candidates = self._as_list(payload.live_data_context.get("recentRequests")) + payload.open_requests
+        seen: set[str] = set()
+        all_requests: list[dict[str, object]] = []
+        for item in candidates:
+            req_no = str(item.get("requestNo", "")).strip()
+            if req_no and req_no in seen:
+                continue
+            if req_no:
+                seen.add(req_no)
+            all_requests.append(item)
+
+        label_upper = label.upper().replace(" ", "_")
+        type_synonyms = {type_key, label_upper}
+
+        def matches_type(item: dict[str, object]) -> bool:
+            # Prefer the structured requestTypeKey from backend; fall back to the legacy "requestType"/"type" string.
+            key_val = str(item.get("requestTypeKey", "") or "").upper()
+            if key_val and key_val in type_synonyms:
+                return True
+            raw = str(item.get("requestType", "") or item.get("type", "")).upper()
+            if not raw:
+                return False
+            if raw in type_synonyms:
+                return True
+            # Also tolerate names like "Internship Request" or "Staj Talebi" by substring match on the key.
+            return type_key in raw or label_upper in raw
+
+        matches = [r for r in all_requests if matches_type(r)]
         if not matches:
-            return ToolResult(handled=True, answer=f"No {label} requests found in your visible records.")
+            return ToolResult(
+                handled=True,
+                answer=_t(
+                    lang,
+                    f"You don't have any {type_label_local} requests on record yet.",
+                    f"Kayıtlarınızda {type_label_local} talebi bulunmuyor.",
+                ),
+                cards=[AssistantCard(type="count", label=f"Total {label}", value=0)],
+            )
+
+        # Sort by updatedAt desc so "latest" really means most recent activity.
+        def sort_key(item: dict[str, object]) -> str:
+            return str(item.get("updatedAt") or item.get("createdAt") or "")
+        matches.sort(key=sort_key, reverse=True)
+
         open_ones = [r for r in matches if str(r.get("status", "")).upper() not in FINAL_STATUSES]
         latest = matches[0]
-        status = str(latest.get("status", "UNKNOWN"))
+        latest_status = str(latest.get("status", "UNKNOWN")).upper()
+        latest_no = str(latest.get("requestNo", "—"))
+        latest_title = str(latest.get("title", "") or "").strip()
+        title_suffix = f" — '{latest_title}'" if latest_title else ""
+
+        status_phrase_en = {
+            "APPROVED":          f"**Yes — approved** ✓. Your latest {type_label_local} request **{latest_no}**{title_suffix} was approved.",
+            "REJECTED":          f"**Rejected** ✗. Your latest {type_label_local} request **{latest_no}**{title_suffix} was rejected. Check the decision note for details.",
+            "REVISION_REQUESTED":f"**Revision requested**. The reviewer asked for changes on **{latest_no}**{title_suffix}. Open it and resubmit.",
+            "IN_REVIEW":         f"**Still in review**. {type_label_local} request **{latest_no}**{title_suffix} is being evaluated by a reviewer.",
+            "WAITING_APPROVAL":  f"**Awaiting approval**. {type_label_local} request **{latest_no}**{title_suffix} is waiting for an approver's decision.",
+            "SUBMITTED":         f"**Submitted, not yet picked up**. {type_label_local} request **{latest_no}**{title_suffix} is queued for review.",
+            "DRAFT":              f"**Still a draft**. {type_label_local} request **{latest_no}**{title_suffix} hasn't been submitted yet.",
+            "CANCELLED":         f"**Cancelled**. {type_label_local} request **{latest_no}**{title_suffix} was cancelled.",
+            "COMPLETED":         f"**Completed** ✓. {type_label_local} request **{latest_no}**{title_suffix} is finalized.",
+            "CLOSED":            f"**Closed**. {type_label_local} request **{latest_no}**{title_suffix} is archived.",
+            "EXPIRED":           f"**Expired**. {type_label_local} request **{latest_no}**{title_suffix} timed out before a decision.",
+        }
+        status_phrase_tr = {
+            "APPROVED":          f"**Evet — onaylandı** ✓. {type_label_local} talebiniz **{latest_no}**{title_suffix} onaylandı.",
+            "REJECTED":          f"**Reddedildi** ✗. {type_label_local} talebiniz **{latest_no}**{title_suffix} reddedildi. Detay için karar notuna bakabilirsiniz.",
+            "REVISION_REQUESTED":f"**Düzeltme istendi**. Değerlendirici **{latest_no}**{title_suffix} için değişiklik istedi. Talebi açıp güncelleyip tekrar gönderin.",
+            "IN_REVIEW":         f"**Hâlâ inceleniyor**. {type_label_local} talebi **{latest_no}**{title_suffix} bir değerlendirici tarafından inceleniyor.",
+            "WAITING_APPROVAL":  f"**Onay bekliyor**. {type_label_local} talebi **{latest_no}**{title_suffix} onaylayıcı kararını bekliyor.",
+            "SUBMITTED":         f"**Gönderildi, henüz alınmadı**. {type_label_local} talebi **{latest_no}**{title_suffix} inceleme sırasında.",
+            "DRAFT":              f"**Hâlâ taslak**. {type_label_local} talebi **{latest_no}**{title_suffix} henüz gönderilmedi.",
+            "CANCELLED":         f"**İptal edildi**. {type_label_local} talebi **{latest_no}**{title_suffix} iptal edildi.",
+            "COMPLETED":         f"**Tamamlandı** ✓. {type_label_local} talebi **{latest_no}**{title_suffix} tamamlandı.",
+            "CLOSED":            f"**Kapatıldı**. {type_label_local} talebi **{latest_no}**{title_suffix} arşivlendi.",
+            "EXPIRED":           f"**Süresi doldu**. {type_label_local} talebi **{latest_no}**{title_suffix} bir karar verilmeden süresi geçti.",
+        }
+        default_en = f"Latest {type_label_local} request **{latest_no}**{title_suffix} is **{latest_status}**."
+        default_tr = f"En son {type_label_local} talebi **{latest_no}**{title_suffix} **{latest_status}** durumunda."
+        primary = _t(
+            lang,
+            status_phrase_en.get(latest_status, default_en),
+            status_phrase_tr.get(latest_status, default_tr),
+        )
+
+        # Suffix with totals for context.
+        if len(matches) > 1:
+            primary += _t(
+                lang,
+                f" Total {type_label_local} requests on record: **{len(matches)}** ({len(open_ones)} still open).",
+                f" Kayıtlardaki toplam {type_label_local} talebi: **{len(matches)}** ({len(open_ones)} hâlâ açık).",
+            )
+        elif open_ones and latest_status in FINAL_STATUSES:
+            primary += _t(
+                lang,
+                f" You also have **{len(open_ones)}** other open {type_label_local} request(s).",
+                f" Ayrıca **{len(open_ones)}** açık {type_label_local} talebiniz daha var.",
+            )
+
         return ToolResult(
             handled=True,
-            answer=f"**{len(matches)}** {label} request(s) found. Latest: **{latest.get('requestNo', '—')}** is **{status}**. ({len(open_ones)} still open)",
+            answer=primary,
             cards=[
+                AssistantCard(type="status", label=latest_no, value=latest_status, description=latest_title or None),
                 AssistantCard(type="count", label=f"Total {label}", value=len(matches)),
                 AssistantCard(type="count", label="Still Open", value=len(open_ones)),
             ],
@@ -523,11 +819,19 @@ class AssistantToolLayer:
     # ══════════════════════════════════════════════════════════════════════════
 
     def _pending_approvals(self, payload: AssistantAskRequest, _: dict[str, str]) -> ToolResult:
+        lang = detect_language(payload.message, payload.conversation_history)
         summary = payload.live_data_context.get("summary", {})
         recent = self._as_list(payload.live_data_context.get("recentRequests"))
         pending = [r for r in recent if str(r.get("status", "")).upper() in PENDING_STATUSES]
         count = int(self._to_number(summary.get("pendingApprovals", len(pending)))) if isinstance(summary, dict) else len(pending)
-        answer = f"**{count}** request(s) waiting for your approval." if count else "No pending approvals."
+        if count:
+            answer = _t(
+                lang,
+                f"**{count}** request(s) waiting for your approval.",
+                f"**{count}** talep onayınızı bekliyor.",
+            )
+        else:
+            answer = _t(lang, "No pending approvals.", "Bekleyen onay yok.")
         return ToolResult(
             handled=True, answer=answer,
             cards=[AssistantCard(type="count", label="Pending Approvals", value=count)],
@@ -549,13 +853,22 @@ class AssistantToolLayer:
         )
 
     def _overdue_items(self, payload: AssistantAskRequest, _: dict[str, str]) -> ToolResult:
+        lang = detect_language(payload.message, payload.conversation_history)
         summary = payload.live_data_context.get("summary", {})
         count = int(self._to_number(summary.get("overdueRequests", 0))) if isinstance(summary, dict) else 0
         if count == 0:
-            return ToolResult(handled=True, answer="No overdue requests in your scope.", cards=[AssistantCard(type="count", label="Overdue", value=0)])
+            return ToolResult(
+                handled=True,
+                answer=_t(lang, "No overdue requests in your scope.", "Kapsamınızda gecikmiş talep yok."),
+                cards=[AssistantCard(type="count", label="Overdue", value=0)],
+            )
         return ToolResult(
             handled=True,
-            answer=f"**{count}** overdue request(s) detected in your scope.",
+            answer=_t(
+                lang,
+                f"**{count}** overdue request(s) detected in your scope.",
+                f"Kapsamınızda **{count}** gecikmiş talep tespit edildi.",
+            ),
             cards=[AssistantCard(type="count", label="Overdue Requests", value=count)],
         )
 
@@ -572,20 +885,22 @@ class AssistantToolLayer:
         )
 
     def _my_workload(self, payload: AssistantAskRequest, _: dict[str, str]) -> ToolResult:
+        lang = detect_language(payload.message, payload.conversation_history)
         summary = payload.live_data_context.get("summary", {})
         recent = self._as_list(payload.live_data_context.get("recentRequests"))
         open_items = [r for r in recent if str(r.get("status", "")).upper() not in FINAL_STATUSES]
         pending = int(self._to_number(summary.get("pendingApprovals", 0))) if isinstance(summary, dict) else 0
         open_tickets = int(self._to_number(summary.get("openTickets", 0))) if isinstance(summary, dict) else 0
         cards = [AssistantCard(type="count", label="Active Items", value=len(open_items))]
-        parts = [f"**{len(open_items)}** active requests"]
+        parts = [_t(lang, f"**{len(open_items)}** active requests", f"**{len(open_items)}** aktif talep")]
         if pending:
-            parts.append(f"**{pending}** pending approvals")
+            parts.append(_t(lang, f"**{pending}** pending approvals", f"**{pending}** bekleyen onay"))
             cards.append(AssistantCard(type="count", label="Pending Approvals", value=pending))
         if open_tickets:
-            parts.append(f"**{open_tickets}** open tickets")
+            parts.append(_t(lang, f"**{open_tickets}** open tickets", f"**{open_tickets}** açık ticket"))
             cards.append(AssistantCard(type="count", label="Open Tickets", value=open_tickets))
-        return ToolResult(handled=True, answer="Your workload: " + ", ".join(parts) + ".", cards=cards)
+        prefix = _t(lang, "Your workload: ", "İş yükünüz: ")
+        return ToolResult(handled=True, answer=prefix + ", ".join(parts) + ".", cards=cards)
 
     def _faculty_internship_queue(self, payload: AssistantAskRequest, _: dict[str, str]) -> ToolResult:
         recent = self._as_list(payload.live_data_context.get("recentRequests"))
@@ -608,14 +923,22 @@ class AssistantToolLayer:
     # ══════════════════════════════════════════════════════════════════════════
 
     def _my_tickets(self, payload: AssistantAskRequest, _: dict[str, str]) -> ToolResult:
+        lang = detect_language(payload.message, payload.conversation_history)
         recent_tickets = self._as_list(payload.live_data_context.get("recentTickets"))
         summary = payload.live_data_context.get("summary", {})
         count = int(self._to_number(summary.get("openTickets", len([t for t in recent_tickets if str(t.get("ticketStatus", "")).upper() in OPEN_TICKET_STATUSES])))) if isinstance(summary, dict) else 0
         if not recent_tickets:
-            return ToolResult(handled=True, answer="No IT tickets found in your scope.")
+            return ToolResult(
+                handled=True,
+                answer=_t(lang, "No IT tickets found in your scope.", "Kapsamınızda IT ticket bulunmuyor."),
+            )
         return ToolResult(
             handled=True,
-            answer=f"**{count}** open IT ticket(s) in your scope.",
+            answer=_t(
+                lang,
+                f"**{count}** open IT ticket(s) in your scope.",
+                f"Kapsamınızda **{count}** açık IT ticket var.",
+            ),
             cards=[AssistantCard(type="count", label="Open Tickets", value=count)],
             context={"recentTickets": recent_tickets[:5]},
         )
@@ -677,9 +1000,13 @@ class AssistantToolLayer:
     # ══════════════════════════════════════════════════════════════════════════
 
     def _my_reservations(self, payload: AssistantAskRequest, _: dict[str, str]) -> ToolResult:
+        lang = detect_language(payload.message, payload.conversation_history)
         reservations = self._as_list(payload.live_data_context.get("upcomingReservations"))
         count = len(reservations)
-        answer = f"**{count}** upcoming reservation(s)." if count else "No upcoming reservations."
+        if count:
+            answer = _t(lang, f"**{count}** upcoming reservation(s).", f"**{count}** yaklaşan rezervasyonunuz var.")
+        else:
+            answer = _t(lang, "No upcoming reservations.", "Yaklaşan rezervasyonunuz yok.")
         return ToolResult(handled=True, answer=answer, cards=[AssistantCard(type="count", label="Reservations", value=count)], context={"upcomingReservations": reservations[:5]})
 
     def _resource_info(self, payload: AssistantAskRequest, _: dict[str, str]) -> ToolResult:
@@ -694,9 +1021,13 @@ class AssistantToolLayer:
     # ══════════════════════════════════════════════════════════════════════════
 
     def _my_notifications(self, payload: AssistantAskRequest, _: dict[str, str]) -> ToolResult:
+        lang = detect_language(payload.message, payload.conversation_history)
         summary = payload.live_data_context.get("summary", {})
         count = int(self._to_number(summary.get("unreadNotifications", 0))) if isinstance(summary, dict) else 0
-        answer = f"**{count}** unread notification(s)." if count else "No unread notifications."
+        if count:
+            answer = _t(lang, f"**{count}** unread notification(s).", f"**{count}** okunmamış bildiriminiz var.")
+        else:
+            answer = _t(lang, "No unread notifications.", "Okunmamış bildiriminiz yok.")
         return ToolResult(handled=True, answer=answer, cards=[AssistantCard(type="count", label="Unread Notifications", value=count)])
 
     # ══════════════════════════════════════════════════════════════════════════
@@ -704,39 +1035,52 @@ class AssistantToolLayer:
     # ══════════════════════════════════════════════════════════════════════════
 
     def _my_today_appointments(self, payload: AssistantAskRequest, _: dict[str, str]) -> ToolResult:
+        lang = detect_language(payload.message, payload.conversation_history)
         appointments = self._as_list(payload.live_data_context.get("upcomingAppointments"))[:5]
         count = len(appointments)
-        answer = f"**{count}** upcoming appointment(s)." if count else "No upcoming appointments."
+        if count:
+            answer = _t(lang, f"**{count}** upcoming appointment(s).", f"**{count}** yaklaşan randevunuz var.")
+        else:
+            answer = _t(lang, "No upcoming appointments.", "Yaklaşan randevunuz yok.")
         return ToolResult(handled=True, answer=answer, cards=[AssistantCard(type="count", label="Appointments", value=count)], context={"appointments": appointments})
 
     def _my_today_events(self, payload: AssistantAskRequest, _: dict[str, str]) -> ToolResult:
+        lang = detect_language(payload.message, payload.conversation_history)
         events = self._as_list(payload.live_data_context.get("upcomingEvents"))[:5]
         if not events:
             event_requests = self._as_list(payload.live_data_context.get("recentEventRequests"))
             events = [e for e in event_requests if str(e.get("requestStatus", "")).upper() == "APPROVED"][:5]
         count = len(events)
-        answer = f"**{count}** upcoming event(s)." if count else "No upcoming events."
+        if count:
+            answer = _t(lang, f"**{count}** upcoming event(s).", f"**{count}** yaklaşan etkinlik var.")
+        else:
+            answer = _t(lang, "No upcoming events.", "Yaklaşan etkinlik yok.")
         return ToolResult(handled=True, answer=answer, cards=[AssistantCard(type="count", label="Events", value=count)], context={"events": events})
 
     def _my_today_summary(self, payload: AssistantAskRequest, _: dict[str, str]) -> ToolResult:
+        lang = detect_language(payload.message, payload.conversation_history)
         summary = payload.live_data_context.get("summary", {})
         if not isinstance(summary, dict):
             summary = {}
         cards: list[AssistantCard] = []
         parts: list[str] = []
-        for key, label, phrase in [
-            ("openRequests",          "Open Requests",        "open request(s)"),
-            ("pendingApprovals",      "Pending Approvals",    "pending approval(s)"),
-            ("unreadNotifications",   "Unread Notifications", "unread notification(s)"),
-            ("upcomingAppointments",  "Appointments",         "upcoming appointment(s)"),
-            ("upcomingEvents",        "Events",               "upcoming event(s)"),
-            ("openTickets",           "Open Tickets",         "open ticket(s)"),
-        ]:
+        rows = [
+            ("openRequests",          "Open Requests",        "open request(s)",        "açık talep"),
+            ("pendingApprovals",      "Pending Approvals",    "pending approval(s)",    "bekleyen onay"),
+            ("unreadNotifications",   "Unread Notifications", "unread notification(s)", "okunmamış bildirim"),
+            ("upcomingAppointments",  "Appointments",         "upcoming appointment(s)","yaklaşan randevu"),
+            ("upcomingEvents",        "Events",               "upcoming event(s)",      "yaklaşan etkinlik"),
+            ("openTickets",           "Open Tickets",         "open ticket(s)",         "açık ticket"),
+        ]
+        for key, label, phrase_en, phrase_tr in rows:
             if key in summary:
                 val = self._to_number(summary[key])
                 cards.append(AssistantCard(type="count", label=label, value=val))
-                parts.append(f"**{int(val)}** {phrase}")
-        answer = "Your summary: " + ", ".join(parts) + "." if parts else "No summary data available."
+                parts.append(_t(lang, f"**{int(val)}** {phrase_en}", f"**{int(val)}** {phrase_tr}"))
+        if parts:
+            answer = _t(lang, "Your summary: " + ", ".join(parts) + ".", "Özetiniz: " + ", ".join(parts) + ".")
+        else:
+            answer = _t(lang, "No summary data available.", "Özet verisi mevcut değil.")
         return ToolResult(handled=bool(parts), answer=answer, cards=cards, context={"summary": summary, "recentRequests": self._as_list(payload.live_data_context.get("recentRequests"))[:5]})
 
     # ══════════════════════════════════════════════════════════════════════════

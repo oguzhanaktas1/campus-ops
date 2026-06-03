@@ -110,7 +110,7 @@ export function WorkflowProgressCard({
   const [showStepRows, setShowStepRows] = useState(false)
 
   return (
-    <Card>
+    <Card className="overflow-hidden">
       <CardHeader>
         <div className="flex items-center justify-between gap-3">
           <CardTitle>{title}</CardTitle>
@@ -127,7 +127,7 @@ export function WorkflowProgressCard({
           </button>
         </div>
       </CardHeader>
-      <CardContent className="space-y-4 overflow-hidden">
+      <CardContent className="space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5 rounded-lg border bg-muted/30 px-3 py-2.5">
           <span className="shrink-0 text-xs font-medium uppercase tracking-wide text-muted-foreground">{tt('detail.currentStep', 'Current Step')}</span>
           <div className="min-w-0 sm:text-right">

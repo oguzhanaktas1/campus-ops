@@ -5,7 +5,7 @@ import httpx
 from app.core.config import get_settings
 from app.models.assistant import AssistantAskRequest, AssistantAskResponse
 from app.services.assistant_intent_router import AssistantIntentRouter
-from app.services.assistant_tools import AssistantToolLayer
+from app.services.assistant_tools import AssistantToolLayer, detect_language
 from app.services.ollama_client import OllamaClient
 from app.services.prompt_service import PromptService
 from app.utils.validation import clamp_confidence
@@ -36,6 +36,12 @@ class AssistantService:
             return fallback
 
         history_text = self._format_conversation_history(payload)
+        detected_lang = detect_language(payload.message, payload.conversation_history)
+        lang_directive = (
+            "tr — Reply in Turkish (Türkçe yanıt verin)."
+            if detected_lang == "tr"
+            else "en — Reply in English."
+        )
         prompt = PromptService.render(
             "assistant/portal.md",
             payload=json.dumps(payload.model_dump(by_alias=True), ensure_ascii=False, indent=2),
@@ -43,6 +49,7 @@ class AssistantService:
             intent_entities=json.dumps(intent.entities, ensure_ascii=False, indent=2),
             tool_context=json.dumps(tool_result.context, ensure_ascii=False, indent=2),
             conversation_history=history_text,
+            detected_language=lang_directive,
         )
 
         try:
@@ -84,11 +91,15 @@ class AssistantService:
         intent_name: str,
         tool_result,
     ) -> AssistantAskResponse:
+        lang = detect_language(payload.message, payload.conversation_history)
         summary = payload.live_data_context.get("summary", {})
         recent_requests = payload.live_data_context.get("recentRequests", [])
         cards = tool_result.cards if getattr(tool_result, "cards", None) else []
 
-        answer = "I couldn't fully understand your question. Could you be more specific about which module, record, or action you're referring to in CampusOps?"
+        if lang == "tr":
+            answer = "Sorunuzu tam olarak anlayamadım. CampusOps'ta hangi modül, kayıt veya işlemden bahsettiğinizi biraz daha açıklar mısınız?"
+        else:
+            answer = "I couldn't fully understand your question. Could you be more specific about which module, record, or action you're referring to in CampusOps?"
 
         metric_intents = {
             "analytics_summary",
@@ -98,17 +109,27 @@ class AssistantService:
             "system_overview",
         }
 
+        labels_en = {
+            "totalUsers": "Total users",
+            "activeUsers": "Active users",
+            "openRequests": "Open requests",
+            "openTickets": "Open tickets",
+            "unreadNotifications": "Unread notifications",
+        }
+        labels_tr = {
+            "totalUsers": "Toplam kullanıcı",
+            "activeUsers": "Aktif kullanıcı",
+            "openRequests": "Açık talep",
+            "openTickets": "Açık ticket",
+            "unreadNotifications": "Okunmamış bildirim",
+        }
+        active_labels = labels_tr if lang == "tr" else labels_en
+
         if intent_name in metric_intents and isinstance(summary, dict):
             parts: list[str] = []
-            for key, label in (
-                ("totalUsers", "Total users"),
-                ("activeUsers", "Active users"),
-                ("openRequests", "Open requests"),
-                ("openTickets", "Open tickets"),
-                ("unreadNotifications", "Unread notifications"),
-            ):
+            for key in active_labels:
                 if key in summary:
-                    parts.append(f"{label}: {summary[key]}")
+                    parts.append(f"{active_labels[key]}: {summary[key]}")
             if parts:
                 answer = ". ".join(parts) + "."
             elif isinstance(recent_requests, list) and recent_requests:
@@ -116,10 +137,16 @@ class AssistantService:
                 if isinstance(first, dict):
                     request_no = first.get("requestNo") or "Record"
                     status = first.get("status") or "UNKNOWN"
-                    answer = f"Most recent visible record is {request_no} with status {status}."
+                    if lang == "tr":
+                        answer = f"Görünür en son kayıt: {request_no}, durum: {status}."
+                    else:
+                        answer = f"Most recent visible record is {request_no} with status {status}."
 
         elif intent_name == "help_navigation":
-            answer = "I couldn't find an exact page match. Could you be more specific about which action or module you're looking for?"
+            if lang == "tr":
+                answer = "Aradığınızla tam eşleşen bir sayfa bulamadım. Hangi işlemi veya modülü aradığınızı biraz daha açıklayabilir misiniz?"
+            else:
+                answer = "I couldn't find an exact page match. Could you be more specific about which action or module you're looking for?"
 
         elif intent_name in {"request_summary", "request_status_explanation"}:
             if isinstance(recent_requests, list) and recent_requests:
@@ -127,7 +154,10 @@ class AssistantService:
                 if isinstance(first, dict):
                     request_no = first.get("requestNo") or "Record"
                     status = first.get("status") or "UNKNOWN"
-                    answer = f"Couldn't find that specific request. Most recent visible record: {request_no} — status: {status}."
+                    if lang == "tr":
+                        answer = f"Belirttiğiniz talep bulunamadı. Görünür en son kayıt: {request_no} — durum: {status}."
+                    else:
+                        answer = f"Couldn't find that specific request. Most recent visible record: {request_no} — status: {status}."
 
         return AssistantAskResponse(
             answer=answer,

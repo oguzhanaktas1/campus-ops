@@ -369,7 +369,7 @@ export default function FacultyApprovalsPage() {
         </aside>
 
         {/* Main */}
-        <main className="overflow-y-auto bg-muted/10 flex flex-col">
+        <main className="overflow-hidden bg-muted/10 flex flex-col">
 
           {/* Mobile toggle bar */}
           <div className="flex items-center gap-3 border-b border-border px-4 py-2.5 lg:hidden shrink-0">
@@ -419,7 +419,7 @@ export default function FacultyApprovalsPage() {
                 </div>
 
                 <div className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_340px]">
-                  <div className="space-y-6">
+                  <div className="min-w-0 space-y-6">
                     <WorkflowCurrentStepCard detail={detail} />
                     <RequestMetaCard detail={detail} />
                     <DomainDetailPanel detail={detail} />
@@ -431,7 +431,7 @@ export default function FacultyApprovalsPage() {
                     <RequestTimelineTabs detail={detail} />
                   </div>
 
-                  <div className="space-y-6">
+                  <div className="min-w-0 space-y-6">
                     <FacultyDecisionPanel
                       detailStatus={detail.status}
                       completedAction={completedAction}

@@ -53,7 +53,7 @@ export function RequestDetailPage({
         </div>
 
         <div className="grid gap-4 sm:gap-6 lg:grid-cols-[minmax(0,2fr)_320px]">
-          <div className="space-y-6">
+          <div className="min-w-0 space-y-6">
             <WorkflowCurrentStepCard detail={detail} />
             <RequestMetaCard detail={detail} />
             <DomainDetailPanel detail={detail} />
@@ -65,7 +65,7 @@ export function RequestDetailPage({
             <RequestTimelineTabs detail={detail} />
           </div>
 
-          <div className="space-y-6">
+          <div className="min-w-0 space-y-6">
             <RequestActionPanel detail={detail} onDetailChange={setDetail} />
             <RequestQuickFactsCard detail={detail} />
             <RelatedEntitiesCard detail={detail} />

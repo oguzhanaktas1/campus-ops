@@ -21,6 +21,28 @@ type RouteDetail = {
   keywords: string[];
 };
 
+const TERMINAL_REQUEST_STATUSES = [
+  'COMPLETED',
+  'APPROVED',
+  'REJECTED',
+  'CANCELLED',
+  'CLOSED',
+  'EXPIRED',
+] as const;
+
+function startOfToday(): Date {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+function startOfTomorrow(): Date {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() + 1);
+  return d;
+}
+
 const SYSTEM_ASSISTANT_CONTEXT =
   'CampusOps is a multi-portal campus operations platform. It includes request workflows, approvals, documents, reservations, appointments, events, access requests, IT tickets, procurement, analytics, users, roles, permissions, workflows, integrations, monitoring, reports, and audit logs. The assistant must help only within the current user role, sub-roles, and visible scope.';
 
@@ -931,6 +953,7 @@ export class AiService {
           title: item.title,
           status: item.status,
           requestType: item.requestType?.name ?? item.requestType?.key ?? null,
+          requestTypeKey: item.requestType?.key ?? null,
           updatedAt: item.updatedAt,
         })),
         recentAuditLogs,
@@ -946,73 +969,131 @@ export class AiService {
     }
 
     if (portal === 'student') {
-      const [myRequests, upcomingAppointments, upcomingReservations, unreadNotifications, upcomingEvents] =
-        await Promise.all([
-          this.prisma.request.findMany({
-            where: { requesterUserId: user.userId, deletedAt: null },
-            orderBy: { updatedAt: 'desc' },
-            take: 8,
-            select: {
-              requestNo: true,
-              title: true,
-              status: true,
-              updatedAt: true,
-              requestType: { select: { key: true, name: true } },
-            },
-          }),
-          this.prisma.appointment.findMany({
-            where: {
-              OR: [{ requesterUserId: user.userId }, { hostUserId: user.userId }],
-              startAt: { gte: now },
-            },
-            orderBy: { startAt: 'asc' },
-            take: 5,
-            select: {
-              title: true,
-              status: true,
-              startAt: true,
-              endAt: true,
-              locationText: true,
-            },
-          }),
-          this.prisma.reservation.findMany({
-            where: { reservedByUserId: user.userId, startAt: { gte: now } },
-            orderBy: { startAt: 'asc' },
-            take: 5,
-            select: {
-              title: true,
-              status: true,
-              startAt: true,
-              endAt: true,
-            },
-          }),
-          this.prisma.notification.count({
-            where: { userId: user.userId, isRead: false },
-          }),
-          this.prisma.event.findMany({
-            where: { startAt: { gte: now }, status: 'PUBLISHED' },
-            orderBy: { startAt: 'asc' },
-            take: 5,
-            select: {
-              title: true,
-              startAt: true,
-              endAt: true,
-              status: true,
-              locationText: true,
-            },
-          }),
-        ]);
-
-      const openCount = myRequests.filter((item) =>
-        !['COMPLETED', 'APPROVED', 'REJECTED', 'CANCELLED', 'CLOSED', 'EXPIRED'].includes(item.status),
-      ).length;
+      const todayStart = startOfToday();
+      const tomorrowStart = startOfTomorrow();
+      const [
+        myRequests,
+        totalRequestsCount,
+        openRequestsCount,
+        approvedCount,
+        rejectedCount,
+        revisionCount,
+        draftCount,
+        submittedTodayCount,
+        upcomingDeadlineCount,
+        upcomingAppointments,
+        upcomingReservations,
+        unreadNotifications,
+        upcomingEvents,
+      ] = await Promise.all([
+        this.prisma.request.findMany({
+          where: { requesterUserId: user.userId, deletedAt: null },
+          orderBy: { updatedAt: 'desc' },
+          take: 15,
+          select: {
+            requestNo: true,
+            title: true,
+            status: true,
+            updatedAt: true,
+            createdAt: true,
+            submittedAt: true,
+            dueAt: true,
+            requestType: { select: { key: true, name: true } },
+          },
+        }),
+        this.prisma.request.count({
+          where: { requesterUserId: user.userId, deletedAt: null },
+        }),
+        this.prisma.request.count({
+          where: {
+            requesterUserId: user.userId,
+            deletedAt: null,
+            status: { notIn: [...TERMINAL_REQUEST_STATUSES] },
+          },
+        }),
+        this.prisma.request.count({
+          where: { requesterUserId: user.userId, deletedAt: null, status: 'APPROVED' },
+        }),
+        this.prisma.request.count({
+          where: { requesterUserId: user.userId, deletedAt: null, status: 'REJECTED' },
+        }),
+        this.prisma.request.count({
+          where: { requesterUserId: user.userId, deletedAt: null, status: 'REVISION_REQUESTED' },
+        }),
+        this.prisma.request.count({
+          where: { requesterUserId: user.userId, deletedAt: null, status: 'DRAFT' },
+        }),
+        this.prisma.request.count({
+          where: {
+            requesterUserId: user.userId,
+            deletedAt: null,
+            submittedAt: { gte: todayStart, lt: tomorrowStart },
+          },
+        }),
+        this.prisma.request.count({
+          where: {
+            requesterUserId: user.userId,
+            deletedAt: null,
+            status: { notIn: [...TERMINAL_REQUEST_STATUSES] },
+            dueAt: { gte: now },
+          },
+        }),
+        this.prisma.appointment.findMany({
+          where: {
+            OR: [{ requesterUserId: user.userId }, { hostUserId: user.userId }],
+            startAt: { gte: now },
+          },
+          orderBy: { startAt: 'asc' },
+          take: 5,
+          select: {
+            title: true,
+            status: true,
+            startAt: true,
+            endAt: true,
+            locationText: true,
+          },
+        }),
+        this.prisma.reservation.findMany({
+          where: { reservedByUserId: user.userId, startAt: { gte: now } },
+          orderBy: { startAt: 'asc' },
+          take: 5,
+          select: {
+            title: true,
+            status: true,
+            startAt: true,
+            endAt: true,
+          },
+        }),
+        this.prisma.notification.count({
+          where: { userId: user.userId, isRead: false },
+        }),
+        this.prisma.event.findMany({
+          where: { startAt: { gte: now }, status: 'PUBLISHED' },
+          orderBy: { startAt: 'asc' },
+          take: 5,
+          select: {
+            title: true,
+            startAt: true,
+            endAt: true,
+            status: true,
+            locationText: true,
+          },
+        }),
+      ]);
 
       return {
         generatedAt: now.toISOString(),
+        todayDate: todayStart.toISOString(),
         portal,
         summary: {
-          totalRequests: myRequests.length,
-          openRequests: openCount,
+          totalRequests: totalRequestsCount,
+          openRequests: openRequestsCount,
+          approvedRequests: approvedCount,
+          rejectedRequests: rejectedCount,
+          revisionRequested: revisionCount,
+          draftRequests: draftCount,
+          submittedToday: submittedTodayCount,
+          upcomingDeadlines: upcomingDeadlineCount,
           unreadNotifications,
           upcomingAppointments: upcomingAppointments.length,
           upcomingEvents: upcomingEvents.length,
@@ -1022,6 +1103,10 @@ export class AiService {
           title: item.title,
           status: item.status,
           requestType: item.requestType?.name ?? item.requestType?.key ?? null,
+          requestTypeKey: item.requestType?.key ?? null,
+          createdAt: item.createdAt,
+          submittedAt: item.submittedAt,
+          dueAt: item.dueAt,
           updatedAt: item.updatedAt,
         })),
         upcomingAppointments,
@@ -1031,7 +1116,28 @@ export class AiService {
     }
 
     if (portal === 'faculty') {
-      const [visibleRequests, upcomingAppointments] = await Promise.all([
+      const facultyAssigneeFilter = {
+        OR: [
+          { currentAssigneeUserId: user.userId },
+          {
+            workflowInstance: {
+              instanceSteps: {
+                some: { assignedToUserId: user.userId },
+              },
+            },
+          },
+        ],
+        deletedAt: null,
+      };
+
+      const [
+        visibleRequests,
+        pendingApprovalsCount,
+        approvedCount,
+        rejectedCount,
+        overdueCount,
+        upcomingAppointments,
+      ] = await Promise.all([
         this.prisma.request.findMany({
           where: {
             OR: [
@@ -1048,13 +1154,34 @@ export class AiService {
             deletedAt: null,
           },
           orderBy: { updatedAt: 'desc' },
-          take: 10,
+          take: 15,
           select: {
             requestNo: true,
             title: true,
             status: true,
             updatedAt: true,
+            dueAt: true,
             requestType: { select: { key: true, name: true } },
+            requester: { select: { profile: { select: { fullName: true } } } },
+          },
+        }),
+        this.prisma.request.count({
+          where: {
+            ...facultyAssigneeFilter,
+            status: { in: ['WAITING_APPROVAL', 'IN_REVIEW', 'SUBMITTED'] },
+          },
+        }),
+        this.prisma.request.count({
+          where: { ...facultyAssigneeFilter, status: 'APPROVED' },
+        }),
+        this.prisma.request.count({
+          where: { ...facultyAssigneeFilter, status: 'REJECTED' },
+        }),
+        this.prisma.request.count({
+          where: {
+            ...facultyAssigneeFilter,
+            status: { notIn: [...TERMINAL_REQUEST_STATUSES] },
+            dueAt: { lt: now },
           },
         }),
         this.prisma.appointment.findMany({
@@ -1074,22 +1201,25 @@ export class AiService {
         }),
       ]);
 
-      const pendingApprovals = visibleRequests.filter((item) =>
-        ['WAITING_APPROVAL', 'IN_REVIEW', 'SUBMITTED'].includes(item.status),
-      ).length;
-
       return {
         generatedAt: now.toISOString(),
+        todayDate: startOfToday().toISOString(),
         portal,
         summary: {
           visibleRequests: visibleRequests.length,
-          pendingApprovals,
+          pendingApprovals: pendingApprovalsCount,
+          approvedRequests: approvedCount,
+          rejectedRequests: rejectedCount,
+          overdueRequests: overdueCount,
         },
         recentRequests: visibleRequests.map((item) => ({
           requestNo: item.requestNo,
           title: item.title,
           status: item.status,
           requestType: item.requestType?.name ?? item.requestType?.key ?? null,
+          requestTypeKey: item.requestType?.key ?? null,
+          requesterName: item.requester?.profile?.fullName ?? null,
+          dueAt: item.dueAt,
           updatedAt: item.updatedAt,
         })),
         upcomingAppointments,
@@ -1107,11 +1237,27 @@ export class AiService {
           }
         : { reportedByUserId: user.userId };
 
-      const [recentTickets, recentRequests] = await Promise.all([
+      const staffRequestFilter = {
+        OR: [
+          { currentAssigneeUserId: user.userId },
+          { requesterUserId: user.userId },
+        ],
+        deletedAt: null,
+      };
+
+      const [
+        recentTickets,
+        recentRequests,
+        openTicketsCount,
+        resolvedTicketsCount,
+        openRequestsCount,
+        pendingApprovalsCount,
+        overdueRequestsCount,
+      ] = await Promise.all([
         this.prisma.itTicket.findMany({
           where: ticketWhere,
           orderBy: { updatedAt: 'desc' },
-          take: 8,
+          take: 10,
           select: {
             category: true,
             ticketStatus: true,
@@ -1120,34 +1266,66 @@ export class AiService {
           },
         }),
         this.prisma.request.findMany({
-          where: {
-            OR: [
-              { currentAssigneeUserId: user.userId },
-              { requesterUserId: user.userId },
-            ],
-            deletedAt: null,
-          },
+          where: staffRequestFilter,
           orderBy: { updatedAt: 'desc' },
-          take: 8,
+          take: 15,
           select: {
             requestNo: true,
             title: true,
             status: true,
             updatedAt: true,
+            dueAt: true,
             requestType: { select: { key: true, name: true } },
+            requester: { select: { profile: { select: { fullName: true } } } },
+          },
+        }),
+        this.prisma.itTicket.count({
+          where: {
+            ...ticketWhere,
+            ticketStatus: {
+              in: ['OPEN', 'TRIAGED', 'IN_PROGRESS', 'WAITING_USER', 'REOPENED'],
+            },
+          },
+        }),
+        this.prisma.itTicket.count({
+          where: {
+            ...ticketWhere,
+            ticketStatus: { in: ['RESOLVED', 'CLOSED'] },
+          },
+        }),
+        this.prisma.request.count({
+          where: {
+            ...staffRequestFilter,
+            status: { notIn: [...TERMINAL_REQUEST_STATUSES] },
+          },
+        }),
+        this.prisma.request.count({
+          where: {
+            ...staffRequestFilter,
+            status: { in: ['WAITING_APPROVAL', 'IN_REVIEW', 'SUBMITTED'] },
+          },
+        }),
+        this.prisma.request.count({
+          where: {
+            ...staffRequestFilter,
+            status: { notIn: [...TERMINAL_REQUEST_STATUSES] },
+            dueAt: { lt: now },
           },
         }),
       ]);
 
       return {
         generatedAt: now.toISOString(),
+        todayDate: startOfToday().toISOString(),
         portal,
         summary: {
           visibleTickets: recentTickets.length,
           visibleRequests: recentRequests.length,
-          openTickets: recentTickets.filter((item) =>
-            ['OPEN', 'TRIAGED', 'IN_PROGRESS', 'WAITING_USER', 'REOPENED'].includes(item.ticketStatus),
-          ).length,
+          openTickets: openTicketsCount,
+          resolvedTickets: resolvedTicketsCount,
+          openRequests: openRequestsCount,
+          pendingApprovals: pendingApprovalsCount,
+          overdueRequests: overdueRequestsCount,
         },
         recentTickets: recentTickets.map((item) => ({
           category: item.category,
@@ -1162,6 +1340,9 @@ export class AiService {
           title: item.title,
           status: item.status,
           requestType: item.requestType?.name ?? item.requestType?.key ?? null,
+          requestTypeKey: item.requestType?.key ?? null,
+          requesterName: item.requester?.profile?.fullName ?? null,
+          dueAt: item.dueAt,
           updatedAt: item.updatedAt,
         })),
       };
@@ -1387,29 +1568,67 @@ export class AiService {
       title: string;
       status: string;
       requestNo: string;
+      requestType: string | null;
+      requestTypeKey: string | null;
+      dueAt: Date | null;
+      submittedAt: Date | null;
+      createdAt: Date;
       updatedAt: Date;
     }>
   > {
     const normalizedRoles = user.roles.map((role) => role.toUpperCase());
+    const requestSelect = {
+      id: true,
+      title: true,
+      status: true,
+      requestNo: true,
+      dueAt: true,
+      submittedAt: true,
+      createdAt: true,
+      updatedAt: true,
+      requestType: { select: { key: true, name: true } },
+    };
+
+    type RawRequest = {
+      id: string;
+      title: string;
+      status: string;
+      requestNo: string;
+      dueAt: Date | null;
+      submittedAt: Date | null;
+      createdAt: Date;
+      updatedAt: Date;
+      requestType: { key: string; name: string } | null;
+    };
+
+    const shape = (rows: RawRequest[]) =>
+      rows.map((item) => ({
+        id: item.id,
+        title: item.title,
+        status: item.status,
+        requestNo: item.requestNo,
+        requestType: item.requestType?.name ?? item.requestType?.key ?? null,
+        requestTypeKey: item.requestType?.key ?? null,
+        dueAt: item.dueAt,
+        submittedAt: item.submittedAt,
+        createdAt: item.createdAt,
+        updatedAt: item.updatedAt,
+      }));
 
     if (portal === 'student' || portal === 'organizer') {
-      return this.prisma.request.findMany({
-        where: { requesterUserId: user.userId },
-        orderBy: { createdAt: 'desc' },
-        take: 5,
-        select: {
-          id: true,
-          title: true,
-          status: true,
-          requestNo: true,
-          updatedAt: true,
-        },
+      const rows = await this.prisma.request.findMany({
+        where: { requesterUserId: user.userId, deletedAt: null },
+        orderBy: { updatedAt: 'desc' },
+        take: 25,
+        select: requestSelect,
       });
+      return shape(rows);
     }
 
     if (portal === 'faculty') {
-      return this.prisma.request.findMany({
+      const rows = await this.prisma.request.findMany({
         where: {
+          deletedAt: null,
           OR: [
             { currentAssigneeUserId: user.userId },
             {
@@ -1425,23 +1644,19 @@ export class AiService {
           ],
         },
         orderBy: { updatedAt: 'desc' },
-        take: 5,
-        select: {
-          id: true,
-          title: true,
-          status: true,
-          requestNo: true,
-          updatedAt: true,
-        },
+        take: 25,
+        select: requestSelect,
       });
+      return shape(rows);
     }
 
     if (portal === 'staff') {
       const isManager =
         normalizedRoles.includes('ADMIN') || normalizedRoles.includes('IT_MANAGER');
-      return this.prisma.request.findMany({
+      const rows = await this.prisma.request.findMany({
         where: isManager
           ? {
+              deletedAt: null,
               OR: [
                 {
                   itTicket: {
@@ -1452,6 +1667,7 @@ export class AiService {
               ],
             }
           : {
+              deletedAt: null,
               OR: [
                 { currentAssigneeUserId: user.userId },
                 {
@@ -1462,29 +1678,20 @@ export class AiService {
               ],
             },
         orderBy: { updatedAt: 'desc' },
-        take: 5,
-        select: {
-          id: true,
-          title: true,
-          status: true,
-          requestNo: true,
-          updatedAt: true,
-        },
+        take: 25,
+        select: requestSelect,
       });
+      return shape(rows);
     }
 
     if (portal === 'admin') {
-      return this.prisma.request.findMany({
+      const rows = await this.prisma.request.findMany({
+        where: { deletedAt: null },
         orderBy: { updatedAt: 'desc' },
-        take: 5,
-        select: {
-          id: true,
-          title: true,
-          status: true,
-          requestNo: true,
-          updatedAt: true,
-        },
+        take: 25,
+        select: requestSelect,
       });
+      return shape(rows);
     }
 
     return [];
