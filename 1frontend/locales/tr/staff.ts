@@ -39,6 +39,9 @@ const tr = {
     inProgress: 'Devam Ediyor',
     records: '{{count}} kayıt',
     selected: 'seçildi',
+    markAllRead: 'Tümünü Okundu İşaretle',
+    selectAll: 'Tümünü Seç',
+    deselectAll: 'Seçimi Kaldır',
   },
   nav: {
     dashboard: 'Panel',
@@ -358,6 +361,17 @@ const tr = {
     noFilesYet: 'Henüz dosya yüklenmedi.',
     noFilesMatch: 'Eşleşen dosya yok.',
     doneBtn: 'Tamam',
+  },
+  notifications: {
+    empty: 'Bildirim yok',
+    viewAll: 'Tüm bildirimleri gör',
+    goToNotification: 'Bildirime Git',
+  },
+  time: {
+    justNow: 'az önce',
+    minutesAgo: '{{count}} dk önce',
+    hoursAgo: '{{count}} sa önce',
+    daysAgo: '{{count}} gün önce',
   },
 }
 

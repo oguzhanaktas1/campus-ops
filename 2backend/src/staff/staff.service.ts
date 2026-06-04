@@ -12,7 +12,10 @@ import { PrismaService } from '../core/prisma/prisma.service';
 import { RequestStatus, Prisma, AuditActionType } from '@prisma/client'; // 🔥 AuditActionType Eklendi
 import * as bcrypt from 'bcrypt';
 import { SlaService } from '../workflow/sla.service';
-import { buildWorkflowSummary } from '../workflow/workflow-summary';
+import {
+  buildWorkflowSummary,
+  deriveAppointmentTargetUser,
+} from '../workflow/workflow-summary';
 import { CacheService } from '../infrastructure/cache/cache.service';
 import { CacheKeys, CacheTtls } from '../infrastructure/cache/cache-keys';
 import { FilesService } from '../files/files.service';
@@ -523,7 +526,18 @@ export class StaffService {
             },
           },
         },
-        appointmentRequest: true,
+        appointmentRequest: {
+          include: {
+            targetUser: {
+              select: {
+                id: true,
+                email: true,
+                profile: { select: { fullName: true } },
+                primaryRoles: { select: { role: { select: { name: true } } }, take: 1 },
+              },
+            },
+          },
+        },
         procurementRequest: true,
         accessRequest: true,
         eventRequest: true,
@@ -585,7 +599,9 @@ export class StaffService {
             title: request.requester.profile?.title || null,
           }
         : null,
-      workflow: buildWorkflowSummary(request.workflowInstance, request.status),
+      workflow: buildWorkflowSummary(request.workflowInstance, request.status, {
+        targetUser: deriveAppointmentTargetUser(request),
+      }),
       formData: {
         ...(request.dynamicData as Record<string, unknown> | null),
         ...(request.documentRequest

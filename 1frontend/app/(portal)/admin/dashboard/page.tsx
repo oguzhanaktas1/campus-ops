@@ -77,6 +77,7 @@ export default function AdminDashboard() {
   const timeAgo = useTimeAgo()
   const [metrics, setMetrics]   = useState<any>(null)
   const [recent,  setRecent]    = useState<any[]>([])
+  const [todayCount, setTodayCount] = useState(0)
   const [reports, setReports]   = useState<any>(null)
   const [monitoring, setMonitoring] = useState<any>(null)
   const [aiNarration, setAiNarration] = useState<any>(null)
@@ -118,7 +119,7 @@ export default function AdminDashboard() {
 
   const buildLocalAiNarration = (dashboard: any, report: any, snapshot: any) => {
     const monitor = getMonitoringSummary(snapshot)
-    const summary = `Dashboard summary: ${dashboard.totalRequests ?? 0} total requests, ${dashboard.openRequests ?? 0} open requests, ${dashboard.activeUsers ?? 0} active users, ${dashboard.urgentRequests ?? 0} urgent requests, ${dashboard.urgentItTickets ?? 0} urgent IT tickets, and ${dashboard.todayRequests ?? 0} requests today. Monitoring status is ${monitor.status === 'ok' ? 'healthy' : monitor.status}; ${monitor.problems.length ? `problems: ${monitor.problems.join(', ')}.` : 'no blocking problem detected.'}`
+    const summary = `Dashboard summary: ${dashboard.totalRequests ?? 0} total requests, ${dashboard.openRequests ?? 0} open requests, ${dashboard.activeUsers ?? 0} active users, ${dashboard.urgentRequests ?? 0} urgent requests, ${dashboard.urgentItTickets ?? 0} urgent IT tickets, and ${dashboard.todayCount ?? 0} requests in the last 24h. Monitoring status is ${monitor.status === 'ok' ? 'healthy' : monitor.status}; ${monitor.problems.length ? `problems: ${monitor.problems.join(', ')}.` : 'no blocking problem detected.'}`
     return {
       summary,
       highlights: [
@@ -154,7 +155,7 @@ export default function AdminDashboard() {
             activeUsers: dashboardData.activeUsers ?? 0,
             urgentRequests: dashboardData.urgentRequests ?? 0,
             urgentItTickets: dashboardData.urgentItTickets ?? 0,
-            todayRequests: dashboardData.todayRequests ?? 0,
+            todayRequests: dashboardData.todayCount ?? 0,
             openTickets: dashboardData.openTickets ?? 0,
             approvalRate: dashboardData.approvalRate ?? 0,
             approvedEndRequests: dashboardData.approvedEndRequests ?? 0,
@@ -221,10 +222,15 @@ export default function AdminDashboard() {
         nextMetrics = await mRes.json()
         setMetrics(nextMetrics)
       }
+      let nextTodayCount = 0
       if (reqRes.ok) {
         const all: any[] = await reqRes.json()
         nextRecent = all.slice(0, 6)
         setRecent(nextRecent)
+        const startOfToday = new Date()
+        startOfToday.setHours(0, 0, 0, 0)
+        nextTodayCount = all.filter((r: any) => new Date(r.createdAt) >= startOfToday).length
+        setTodayCount(nextTodayCount)
       }
       if (rRes.ok) {
         nextReports = await rRes.json()
@@ -236,7 +242,7 @@ export default function AdminDashboard() {
       }
 
       if (nextMetrics) {
-        void fetchAiNarration(base, headers, nextMetrics, nextReports, nextRecent, nextMonitoring)
+        void fetchAiNarration(base, headers, { ...nextMetrics, todayCount: nextTodayCount }, nextReports, nextRecent, nextMonitoring)
       }
     } catch (e) {
       console.error('Dashboard fetch error:', e)
@@ -360,7 +366,7 @@ export default function AdminDashboard() {
         {[
           {
             label: t('dashboard.todayRequests'),
-            value: m.todayRequests ?? 0,
+            value: todayCount,
             icon: FileText,
             gradient: 'from-primary/10 to-primary/5',
             border: 'border-primary/20',

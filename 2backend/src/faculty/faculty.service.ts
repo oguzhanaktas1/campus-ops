@@ -12,7 +12,10 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../core/prisma/prisma.service';
 import { SlaService } from '../workflow/sla.service';
 import { WorkflowEngineService } from '../workflow/workflow-engine.service';
-import { buildWorkflowSummary } from '../workflow/workflow-summary';
+import {
+  buildWorkflowSummary,
+  deriveAppointmentTargetUser,
+} from '../workflow/workflow-summary';
 import { CacheService } from '../infrastructure/cache/cache.service';
 import { FilesService } from '../files/files.service';
 import {
@@ -802,7 +805,18 @@ export class FacultyService {
             },
           },
         },
-        appointmentRequest: true,
+        appointmentRequest: {
+          include: {
+            targetUser: {
+              select: {
+                id: true,
+                email: true,
+                profile: { select: { fullName: true } },
+                primaryRoles: { select: { role: { select: { name: true } } }, take: 1 },
+              },
+            },
+          },
+        },
         procurementRequest: true,
         accessRequest: true,
         eventRequest: true,
@@ -934,7 +948,9 @@ export class FacultyService {
             }
           : null,
       })),
-      workflow: buildWorkflowSummary(request.workflowInstance, request.status),
+      workflow: buildWorkflowSummary(request.workflowInstance, request.status, {
+        targetUser: deriveAppointmentTargetUser(request),
+      }),
     };
     }); // end cacheService.getOrSet
   }

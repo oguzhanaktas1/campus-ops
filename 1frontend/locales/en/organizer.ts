@@ -29,6 +29,9 @@ const en = {
     settings: 'Settings',
     notifications: 'Notifications',
     records: '{{count}} records',
+    markAllRead: 'Mark all read',
+    selectAll: 'Select All',
+    deselectAll: 'Deselect All',
   },
   nav: {
     dashboard: 'Dashboard',
@@ -264,8 +267,18 @@ const en = {
     viewRequest: 'View Request',
     submitCreationRequest: 'Submit Creation Request',
     expectedBudget: 'Expected Budget ($)',
-    ready: 'Ready',
     notReady: 'Pending',
+  },
+  notifications: {
+    empty: 'No notifications',
+    viewAll: 'View all notifications',
+    goToNotification: 'Go to Notification',
+  },
+  time: {
+    justNow: 'just now',
+    minutesAgo: '{{count}}m ago',
+    hoursAgo: '{{count}}h ago',
+    daysAgo: '{{count}}d ago',
   },
 }
 

@@ -17,6 +17,9 @@ const tr: StudentTranslations = {
     active: 'Aktif',
     past: 'Geçmiş',
     selected: 'seçildi',
+    markAllRead: 'Tümünü Okundu İşaretle',
+    selectAll: 'Tümünü Seç',
+    deselectAll: 'Seçimi Kaldır',
   },
   nav: {
     dashboard: 'Panel',
@@ -533,6 +536,11 @@ const tr: StudentTranslations = {
     minutesAgo: '{{count}} dk önce',
     hoursAgo: '{{count}} sa önce',
     daysAgo: '{{count}} gün önce',
+  },
+  notifications: {
+    empty: 'Bildirim yok',
+    viewAll: 'Tüm bildirimleri gör',
+    goToNotification: 'Bildirime Git',
   },
   detail: {
     notFound: 'Talep bulunamadı.',

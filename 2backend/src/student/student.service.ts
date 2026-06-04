@@ -20,7 +20,10 @@ import {
   Prisma,
 } from '@prisma/client';
 import { WorkflowEngineService } from '../workflow/workflow-engine.service';
-import { buildWorkflowSummary } from '../workflow/workflow-summary';
+import {
+  buildWorkflowSummary,
+  deriveAppointmentTargetUser,
+} from '../workflow/workflow-summary';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { CreateInternshipDto } from './dto/create-internship.dto';
 import { CreateGenericRequestDto } from './dto/create-generic-request.dto';
@@ -1486,7 +1489,18 @@ export class StudentService {
             },
           },
         },
-        appointmentRequest: true,
+        appointmentRequest: {
+          include: {
+            targetUser: {
+              select: {
+                id: true,
+                email: true,
+                profile: { select: { fullName: true } },
+                primaryRoles: { select: { role: { select: { name: true } } }, take: 1 },
+              },
+            },
+          },
+        },
         procurementRequest: true,
         accessRequest: true,
         eventRequest: true,
@@ -1608,7 +1622,9 @@ export class StudentService {
         date: h.changedAt,
         note: h.changeReason || 'Status updated.',
       })),
-      workflow: buildWorkflowSummary(workflowInstance, request.status),
+      workflow: buildWorkflowSummary(workflowInstance, request.status, {
+        targetUser: deriveAppointmentTargetUser(request),
+      }),
     };
   }
 

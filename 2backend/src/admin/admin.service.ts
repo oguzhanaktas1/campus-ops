@@ -23,7 +23,10 @@ import {
   makeCacheHash,
 } from '../infrastructure/cache/cache-keys';
 import { FilesService } from '../files/files.service';
-import { buildWorkflowSummary } from '../workflow/workflow-summary';
+import {
+  buildWorkflowSummary,
+  deriveAppointmentTargetUser,
+} from '../workflow/workflow-summary';
 
 const TERMINAL_REQUEST_STATUSES: RequestStatus[] = [
   'APPROVED',
@@ -982,7 +985,18 @@ export class AdminService {
             },
           },
         },
-        appointmentRequest: true,
+        appointmentRequest: {
+          include: {
+            targetUser: {
+              select: {
+                id: true,
+                email: true,
+                profile: { select: { fullName: true } },
+                primaryRoles: { select: { role: { select: { name: true } } }, take: 1 },
+              },
+            },
+          },
+        },
         procurementRequest: true,
         accessRequest: true,
         eventRequest: true,
@@ -1138,7 +1152,9 @@ export class AdminService {
             }
           : null,
       })),
-      workflow: buildWorkflowSummary(request.workflowInstance, request.status),
+      workflow: buildWorkflowSummary(request.workflowInstance, request.status, {
+        targetUser: deriveAppointmentTargetUser(request),
+      }),
     };
     }); // end cacheService.getOrSet
   }

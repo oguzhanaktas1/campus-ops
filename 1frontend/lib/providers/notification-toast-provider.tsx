@@ -86,7 +86,7 @@ export function NotificationToastProvider({ children }: { children: React.ReactN
         duration: 6000,
         action: navigateHref
           ? {
-              label: ttRef.current('notifications.goToNotification', 'Bildirime Git'),
+              label: ttRef.current('notifications.goToNotification', 'Go to Notification'),
               onClick: () => {
                 router.push(navigateHref)
               },

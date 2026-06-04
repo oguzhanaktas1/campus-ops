@@ -2,9 +2,10 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
-import { FileText, Loader2, Search, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react'
-import { Input } from '@/components/ui/input'
+import { FileText, Loader2, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { SmartSearchInput } from '@/components/smart-search-input'
+import { smartFilter } from '@/lib/smart-search'
 import { StatusBadge, PriorityBadge } from '@/components/status-badge'
 import { toast } from 'sonner'
 import { getToken } from '@/lib/auth'
@@ -49,17 +50,16 @@ export default function FacultyRequestsPage() {
     { key: 'REJECTED', label: t('common.rejected'), count: requests.filter((r) => r.status === 'REJECTED').length },
   ]
 
-  const filtered = requests.filter((r) => {
-    if (activeTab && r.status !== activeTab) return false
-    if (!search) return true
-    const q = search.toLowerCase()
-    return (
-      r.title?.toLowerCase().includes(q) ||
-      r.requestNo?.toLowerCase().includes(q) ||
-      (r.submittedByName ?? r.requesterName ?? '').toLowerCase().includes(q) ||
-      r.typeName?.toLowerCase().includes(q)
-    )
-  })
+  const filtered = (() => {
+    const byTab = activeTab ? requests.filter((r) => r.status === activeTab) : requests
+    if (!search.trim()) return byTab
+    return smartFilter(byTab, search, [
+      { getValue: (r: any) => r.title, weight: 2 },
+      { getValue: (r: any) => r.requestNo, weight: 1.5 },
+      { getValue: (r: any) => r.submittedByName ?? r.requesterName, weight: 1 },
+      { getValue: (r: any) => r.typeName, weight: 0.8 },
+    ])
+  })()
 
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE)
   const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
@@ -73,15 +73,13 @@ export default function FacultyRequestsPage() {
             {t('requests.subtitle', { count: requests.length })}
           </p>
         </div>
-        <div className="relative w-full sm:w-64 shrink-0">
-          <Search className="absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
-          <Input
-            placeholder={t('common.search')}
-            className="pl-9 h-9"
-            value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(1) }}
-          />
-        </div>
+        <SmartSearchInput
+          value={search}
+          onChange={(v) => { setSearch(v); setPage(1) }}
+          placeholder={t('common.search')}
+          resultCount={search.trim() ? filtered.length : undefined}
+          className="w-full sm:w-64 shrink-0"
+        />
       </div>
 
       <div className="flex flex-wrap gap-1 bg-muted/50 p-1 rounded-lg border border-border w-fit">

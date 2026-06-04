@@ -62,9 +62,73 @@ export type WorkflowRequestType = {
   category?: string | null
 }
 
+export type WorkflowInstance = {
+  id: string
+  status: string
+  isOverdue: boolean
+  startedAt: string | null
+  endedAt: string | null
+  totalAgeMinutes: number
+  currentStepAgeMinutes: number
+  inactiveMinutes: number
+  currentStep?: { id: string; stepName: string } | null
+  instanceSteps: Array<{
+    workflowStep: { id: string }
+    status: string
+    isOverdue?: boolean
+    startedAt?: string | null
+    completedAt?: string | null
+    dueAt?: string | null
+    actionTaken?: string | null
+    assignedTo?: { fullName: string } | null
+    actionBy?: { fullName: string } | null
+  }>
+  activeAssignment?: {
+    assignedToName: string
+    assignedByName?: string | null
+    assignedAt: string
+    assignedAgeMinutes: number
+  } | null
+  approvalTimeline: Array<{
+    id: string
+    actionType: string
+    createdAt: string
+    decisionNote?: string | null
+    actionBy: { fullName: string }
+  }>
+  request: {
+    id: string
+    requestNo: string
+    title: string
+    requesterName: string
+    currentAssigneeName?: string | null
+    status: string
+    priority: string
+    sla?: {
+      dueAt: string | null
+      firstResponseState: string
+      resolutionState: string
+      escalationTriggered: boolean
+      stepOverdueCount?: number | null
+    } | null
+    ticketLifecycle?: {
+      status: string
+      openedBy?: string | null
+      openedAt?: string | null
+      resolvedBy?: string | null
+      resolvedAt?: string | null
+      closedBy?: string | null
+      closedAt?: string | null
+      reopenedCount?: number | null
+      stages?: Array<{ key: string; label: string; at: string; by?: string | null; note?: string | null }> | null
+    } | null
+  }
+}
+
 export type WorkflowDetail = WorkflowSummary & {
   steps: WorkflowStep[]
   transitions: WorkflowTransition[]
+  instances: WorkflowInstance[]
   metrics?: {
     totalInstances: number
     requestTypeCount: number

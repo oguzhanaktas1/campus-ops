@@ -291,7 +291,25 @@ function workflowStepTiming(
     return tt('detail.since', `Since ${dateStr}`, { date: dateStr })
   }
 
+  if (typeof step.slaHours === 'number' && step.slaHours > 0) {
+    const duration = formatSlaDuration(step.slaHours)
+    return tt('detail.slaDuration', `SLA ${duration}`, { duration })
+  }
+
   return null
+}
+
+function formatSlaDuration(slaHours: number) {
+  if (!Number.isFinite(slaHours) || slaHours <= 0) return ''
+  if (slaHours < 1) {
+    const minutes = Math.max(1, Math.round(slaHours * 60))
+    return `${minutes}m`
+  }
+  const days = Math.floor(slaHours / 24)
+  const hours = Math.round(slaHours % 24)
+  if (days > 0 && hours > 0) return `${days}d ${hours}h`
+  if (days > 0) return `${days}d`
+  return `${Math.round(slaHours)}h`
 }
 
 function formatWorkflowDate(value?: string | null) {

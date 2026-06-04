@@ -18,9 +18,9 @@ function timeAgo(ts: string, tt: (key: string, fallback: string, params?: Record
   if (!ts) return ''
   const diff = (Date.now() - new Date(ts).getTime()) / 1000
   if (diff < 60) return tt('time.justNow', 'just now')
-  if (diff < 3600) return tt('time.minutesAgoShort', '{{count}}m ago', { count: Math.floor(diff / 60) })
-  if (diff < 86400) return tt('time.hoursAgoShort', '{{count}}h ago', { count: Math.floor(diff / 3600) })
-  return tt('time.daysAgoShort', '{{count}}d ago', { count: Math.floor(diff / 86400) })
+  if (diff < 3600) return tt('time.minutesAgo', '{{count}}m ago', { count: Math.floor(diff / 60) })
+  if (diff < 86400) return tt('time.hoursAgo', '{{count}}h ago', { count: Math.floor(diff / 3600) })
+  return tt('time.daysAgo', '{{count}}d ago', { count: Math.floor(diff / 86400) })
 }
 
 const typeColors: Record<string, string> = {

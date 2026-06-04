@@ -17,6 +17,9 @@ const en: StudentTranslations = {
     active: 'Active',
     past: 'Past',
     selected: 'selected',
+    markAllRead: 'Mark all read',
+    selectAll: 'Select All',
+    deselectAll: 'Deselect All',
   },
   nav: {
     dashboard: 'Dashboard',
@@ -533,6 +536,11 @@ const en: StudentTranslations = {
     minutesAgo: '{{count}}m ago',
     hoursAgo: '{{count}}h ago',
     daysAgo: '{{count}}d ago',
+  },
+  notifications: {
+    empty: 'No notifications',
+    viewAll: 'View all notifications',
+    goToNotification: 'Go to Notification',
   },
   detail: {
     notFound: 'Request not found.',

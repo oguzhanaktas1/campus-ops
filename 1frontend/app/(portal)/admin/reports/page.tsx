@@ -273,39 +273,32 @@ export default function AdminReportsPage() {
     ? Math.round(((data.totalTickets - data.openTickets) / data.totalTickets) * 100)
     : 0
 
-  // Localized labels for PDF / Excel export. `tt()` falls back to a Turkish default
-  // when the i18n key is not yet defined in the dictionary, so the export works
-  // even before translations are added.
-  const tt = (key: string, fallback: string): string => {
-    const v = t(key)
-    return v === key ? fallback : v
-  }
   const buildLabels = (): ReportLabels => ({
-    title: tt('reports.title', 'Yönetici Raporu'),
-    subtitle: tt('reports.subtitle', 'Platform geneli operasyon özeti'),
-    metric: tt('reports.colName', 'Metrik'),
-    value: tt('reports.colPeriod', 'Değer'),
-    status: tt('reports.statusColumn', 'Durum'),
-    type: tt('reports.typeColumn', 'Tip'),
-    days: tt('reports.daysShort', 'gün'),
-    sectionSummary: tt('reports.fullSummary', 'Genel Özet'),
-    sectionRequests: tt('reports.requests', 'Talepler'),
-    sectionRequestsByStatus: tt('reports.byStatus', 'Duruma Göre Talepler'),
-    sectionRequestsByType: tt('reports.byType', 'Tipe Göre Talepler'),
-    sectionTickets: tt('reports.itTickets', 'IT Ticketları'),
-    sectionTicketsByStatus: tt('reports.byTicketStatus', 'Duruma Göre Ticketlar'),
-    sectionOperations: tt('reports.operations', 'Operasyonlar'),
-    rowTotalRequests: tt('reports.rowTotalRequests', 'Toplam Talep'),
-    rowOpenRequests: tt('reports.rowOpenRequests', 'Açık Talep'),
-    rowResolvedRequests: tt('reports.rowResolvedRequests', 'Çözülmüş Talep'),
-    rowOverdueRequests: tt('reports.rowOverdueRequests', 'Geciken Talep'),
-    rowAvgResolution: tt('reports.rowAvgResolution', 'Ortalama Çözüm Süresi'),
-    rowApprovalRate: tt('reports.rowApprovalRate', 'Onay Oranı'),
-    rowTotalUsers: tt('reports.totalUsers', 'Toplam Kullanıcı'),
-    rowTotalTickets: tt('reports.rowTotalTickets', 'Toplam Ticket'),
-    rowOpenTickets: tt('reports.rowOpenTickets', 'Açık Ticket'),
-    rowTotalReservations: tt('reports.rowTotalReservations', 'Toplam Rezervasyon'),
-    rowTotalAppointments: tt('reports.rowTotalAppointments', 'Toplam Randevu'),
+    title: t('reports.title'),
+    subtitle: t('reports.subtitle'),
+    metric: t('reports.colName'),
+    value: t('reports.colPeriod'),
+    status: t('reports.statusColumn'),
+    type: t('reports.typeColumn'),
+    days: t('reports.daysShort'),
+    sectionSummary: t('reports.fullSummary'),
+    sectionRequests: t('reports.requests'),
+    sectionRequestsByStatus: t('reports.byStatus'),
+    sectionRequestsByType: t('reports.byType'),
+    sectionTickets: t('reports.itTickets'),
+    sectionTicketsByStatus: t('reports.byTicketStatus'),
+    sectionOperations: t('reports.operations'),
+    rowTotalRequests: t('reports.rowTotalRequests'),
+    rowOpenRequests: t('reports.rowOpenRequests'),
+    rowResolvedRequests: t('reports.rowResolvedRequests'),
+    rowOverdueRequests: t('reports.rowOverdueRequests'),
+    rowAvgResolution: t('reports.rowAvgResolution'),
+    rowApprovalRate: t('reports.rowApprovalRate'),
+    rowTotalUsers: t('reports.totalUsers'),
+    rowTotalTickets: t('reports.rowTotalTickets'),
+    rowOpenTickets: t('reports.rowOpenTickets'),
+    rowTotalReservations: t('reports.rowTotalReservations'),
+    rowTotalAppointments: t('reports.rowTotalAppointments'),
   })
 
   const handleExportPdf = async () => {
@@ -314,9 +307,9 @@ export default function AdminReportsPage() {
     try {
       const payload = buildReportPayload(data, buildLabels())
       await exportReportToPdf(payload)
-      toast.success(tt('reports.exportPdfSuccess', 'PDF indirildi'))
+      toast.success(t('reports.exportPdfSuccess'))
     } catch {
-      toast.error(tt('reports.exportFail', 'Dışa aktarma başarısız oldu'))
+      toast.error(t('reports.exportFail'))
     } finally {
       setExporting(null)
     }
@@ -328,9 +321,9 @@ export default function AdminReportsPage() {
     try {
       const payload = buildReportPayload(data, buildLabels())
       exportReportToExcel(payload)
-      toast.success(tt('reports.exportExcelSuccess', 'Excel indirildi'))
+      toast.success(t('reports.exportExcelSuccess'))
     } catch {
-      toast.error(tt('reports.exportFail', 'Dışa aktarma başarısız oldu'))
+      toast.error(t('reports.exportFail'))
     } finally {
       setExporting(null)
     }
@@ -373,7 +366,7 @@ export default function AdminReportsPage() {
             </DropdownMenuTrigger>
             <DropdownMenuContent className="w-40">
               <DropdownMenuLabel>
-                {tt('reports.exportAs', 'Dışa Aktar')}
+                {t('reports.exportAs')}
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem onSelect={() => void handleExportPdf()}>

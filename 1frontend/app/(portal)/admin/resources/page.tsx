@@ -2,9 +2,10 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { TopScrollTable } from '@/components/ui/top-scroll-table'
-import { Plus, Pencil, Trash2, Loader2, Box, Search, ChevronRight, ChevronLeft, DoorOpen, FlaskConical, Wrench, Car, LayoutGrid } from 'lucide-react'
+import { Plus, Pencil, Trash2, Loader2, Box, ChevronRight, ChevronLeft, DoorOpen, FlaskConical, Wrench, Car, LayoutGrid } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { SmartSearchInput } from '@/components/smart-search-input'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import Link from 'next/link'
@@ -73,7 +74,7 @@ export default function AdminResourcesPage() {
   const [isSaving, setIsSaving] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
-  const searchTimer = useRef<ReturnType<typeof setTimeout>>()
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
 
   const loadStats = useCallback(async () => {
@@ -339,15 +340,15 @@ export default function AdminResourcesPage() {
       {/* Filters */}
       <div className="space-y-2.5">
         <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
-          <div className="relative flex-1 max-w-sm">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-            <Input
-              placeholder={t('resources.searchPlaceholder')}
-              className="pl-9"
-              value={search}
-              onChange={e => handleSearch(e.target.value)}
-            />
-          </div>
+          <SmartSearchInput
+            value={search}
+            onChange={handleSearch}
+            placeholder={t('resources.searchPlaceholder')}
+            debounceMs={400}
+            isLoading={isLoading && search.length > 0}
+            resultCount={search.trim() ? total : undefined}
+            className="flex-1 max-w-sm"
+          />
           {/* Result count badge */}
           <div className={cn(
             'flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm font-medium transition-colors',

@@ -21,12 +21,15 @@ export interface AdminTranslations {
     confirm: string
     yes: string
     no: string
+    none: string
     all: string
     total: string
     active: string
     inactive: string
     enabled: string
     disabled: string
+    enable: string
+    disable: string
     required: string
     optional: string
     back: string
@@ -52,6 +55,8 @@ export interface AdminTranslations {
     selected: string
     deleteSelected: string
     selectAll: string
+    deselectAll: string
+    markAllRead: string
     systemHealthy: string
   }
   assistant: Record<string, string>
@@ -100,6 +105,7 @@ export interface AdminTranslations {
   permissions: Record<string, string>
   events: Record<string, string>
   pages: Record<string, string>
+  time: Record<string, string>
 }
 
 export interface StudentTranslations {
@@ -118,6 +124,10 @@ export interface StudentTranslations {
     all: string
     active: string
     past: string
+    selected: string
+    markAllRead: string
+    selectAll: string
+    deselectAll: string
   }
   nav: {
     dashboard: string
@@ -176,4 +186,5 @@ export interface StudentTranslations {
   status: Record<string, string>
   time: Record<string, string>
   detail: Record<string, string>
+  notifications: Record<string, string>
 }

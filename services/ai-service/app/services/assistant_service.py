@@ -58,28 +58,43 @@ class AssistantService:
                 self.client.generate_json(prompt),
                 timeout=self.settings.assistant_response_timeout_seconds,
             )
-            links = result.get("links", [])
-            safe_links = [
-                link
-                for link in links
-                if isinstance(link, dict)
-                and link.get("href") in payload.authorized_routes
-            ]
-            cards = result.get("cards", [])
-            safe_cards = [card for card in cards if isinstance(card, dict)]
-            return AssistantAskResponse.model_validate(
-                {
-                    "answer": result.get("answer", fallback.answer),
-                    "links": safe_links,
-                    "cards": safe_cards,
-                    "confidence": clamp_confidence(result.get("confidence"), 0.85),
-                    "fallbackUsed": False,
-                }
-            )
+            return self._build_response(result, payload, fallback)
         except asyncio.TimeoutError:
-            return self._timeout_fallback(payload, fallback)
+            # Default model timed out — retry once with the faster fallback model.
+            try:
+                result = await asyncio.wait_for(
+                    self.client.generate_json_with(prompt, self.settings.fallback_model),
+                    timeout=self.settings.assistant_response_timeout_seconds,
+                )
+                return self._build_response(result, payload, fallback)
+            except (asyncio.TimeoutError, httpx.HTTPError, ValueError, KeyError):
+                return self._timeout_fallback(payload, fallback)
         except (httpx.HTTPError, ValueError, KeyError):
             return fallback
+
+    def _build_response(
+        self,
+        result: dict,
+        payload: AssistantAskRequest,
+        fallback: AssistantAskResponse,
+    ) -> AssistantAskResponse:
+        links = result.get("links", [])
+        safe_links = [
+            link
+            for link in links
+            if isinstance(link, dict) and link.get("href") in payload.authorized_routes
+        ]
+        cards = result.get("cards", [])
+        safe_cards = [card for card in cards if isinstance(card, dict)]
+        return AssistantAskResponse.model_validate(
+            {
+                "answer": result.get("answer", fallback.answer),
+                "links": safe_links,
+                "cards": safe_cards,
+                "confidence": clamp_confidence(result.get("confidence"), 0.85),
+                "fallbackUsed": False,
+            }
+        )
 
     def _timeout_fallback(
         self,

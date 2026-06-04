@@ -14,7 +14,10 @@ import { CreateRequestDto } from './dto/create-request.dto';
 import { AddCommentDto } from './dto/add-comment.dto';
 import { WorkflowEngineService } from '../workflow/workflow-engine.service';
 import { SlaService } from '../workflow/sla.service';
-import { buildWorkflowSummary } from '../workflow/workflow-summary';
+import {
+  buildWorkflowSummary,
+  deriveAppointmentTargetUser,
+} from '../workflow/workflow-summary';
 import { CacheService } from '../infrastructure/cache/cache.service';
 import { FilesService } from '../files/files.service';
 import {
@@ -439,6 +442,18 @@ export class RequestsService {
           equipmentRequest: {
             include: { labResource: { select: { id: true, name: true, resourceType: true } } },
           },
+          appointmentRequest: {
+            include: {
+              targetUser: {
+                select: {
+                  id: true,
+                  email: true,
+                  profile: { select: { fullName: true } },
+                  primaryRoles: { select: { role: { select: { name: true } } }, take: 1 },
+                },
+              },
+            },
+          },
           itTicket: true,
           internshipRequest: {
             include: {
@@ -562,7 +577,9 @@ export class RequestsService {
             }
           : null,
       })),
-      workflow: buildWorkflowSummary(req.workflowInstance, req.status),
+      workflow: buildWorkflowSummary(req.workflowInstance, req.status, {
+        targetUser: deriveAppointmentTargetUser(req),
+      }),
       attachments,
       domainData,
       };

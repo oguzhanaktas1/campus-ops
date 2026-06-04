@@ -99,11 +99,35 @@ function terminalCurrentStep(
     .replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
+type WorkflowSummaryContext = {
+  targetUser?: {
+    id: string | null;
+    fullName: string | null;
+    email?: string | null;
+    role?: string | null;
+  } | null;
+};
+
+export function deriveAppointmentTargetUser(request: any): WorkflowSummaryContext['targetUser'] {
+  const ar = request?.appointmentRequest;
+  const user = ar?.targetUser;
+  if (!user) return null;
+  return {
+    id: user.id ?? null,
+    fullName: user.profile?.fullName ?? user.email ?? null,
+    email: user.email ?? null,
+    role: user.primaryRoles?.[0]?.role?.name ?? null,
+  };
+}
+
 export function buildWorkflowSummary(
   workflowInstance: any,
   requestStatus: RequestStatus | string,
+  context: WorkflowSummaryContext = {},
 ) {
   if (!workflowInstance) return null;
+
+  const targetUser = context.targetUser ?? null;
 
   const steps = (workflowInstance.workflowDefinition?.steps ?? [])
     .filter((step: any) => shouldDisplayStep(step, requestStatus))
@@ -112,15 +136,34 @@ export function buildWorkflowSummary(
         (item: any) => item.workflowStepId === step.id,
       );
       const isCurrent = step.id === workflowInstance.currentStepId;
-      const assignedTo = actorPayload(instanceStep?.assignedTo ?? step.assignedUser);
+      const isTargetReviewStep =
+        String(step.stepKey ?? '').toUpperCase() === 'TARGET_REVIEW';
+
+      const baseAssignedTo = actorPayload(
+        instanceStep?.assignedTo ?? step.assignedUser,
+      );
+      const assignedTo =
+        isTargetReviewStep && targetUser && (targetUser.fullName || targetUser.id)
+          ? {
+              id: targetUser.id ?? null,
+              fullName: targetUser.fullName ?? null,
+              email: targetUser.email ?? null,
+              role: targetUser.role ?? null,
+            }
+          : baseAssignedTo;
       const actionBy = actorPayload(instanceStep?.actionBy);
+
+      const label =
+        isTargetReviewStep && assignedTo?.fullName
+          ? `${assignedTo.fullName} Review`
+          : step.stepName;
 
       return {
         id: step.id,
         workflowStepId: step.id,
         key: step.stepKey,
         stepKey: step.stepKey,
-        label: step.stepName,
+        label,
         name: step.stepName,
         type: step.stepType,
         status: deriveStepStatus({
@@ -155,12 +198,21 @@ export function buildWorkflowSummary(
       };
     });
 
+  const currentStepName =
+    workflowInstance.currentStep?.stepName ??
+    terminalCurrentStep(requestStatus, workflowInstance.status);
+  const isCurrentTargetReview =
+    String(workflowInstance.currentStep?.stepKey ?? '').toUpperCase() ===
+    'TARGET_REVIEW';
+  const enrichedCurrentStep =
+    isCurrentTargetReview && targetUser?.fullName
+      ? `${targetUser.fullName} Review`
+      : currentStepName;
+
   return {
     id: workflowInstance.id,
     status: workflowInstance.status,
-    currentStep:
-      workflowInstance.currentStep?.stepName ??
-      terminalCurrentStep(requestStatus, workflowInstance.status),
+    currentStep: enrichedCurrentStep,
     currentStepKey: workflowInstance.currentStep?.stepKey ?? null,
     workflowName: workflowInstance.workflowDefinition?.name ?? null,
     steps,

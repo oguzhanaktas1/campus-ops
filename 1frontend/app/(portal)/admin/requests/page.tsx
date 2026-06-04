@@ -2,14 +2,15 @@
 
 import { useEffect, useState, useMemo } from 'react'
 import { StatusBadge, PriorityBadge } from '@/components/status-badge'
-import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { Search, Trash2, Loader2, AlertCircle, AlertTriangle, ChevronLeft, ChevronRight, CheckSquare, Square } from 'lucide-react'
+import { Trash2, Loader2, AlertCircle, AlertTriangle, ChevronLeft, ChevronRight, CheckSquare, Square } from 'lucide-react'
 import { toast } from 'sonner'
 import Link from 'next/link'
 import { getToken } from '@/lib/auth'
 import { useI18n } from '@/lib/i18n'
+import { SmartSearchInput } from '@/components/smart-search-input'
+import { smartFilter } from '@/lib/smart-search'
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000'
 const PAGE_SIZE = 20
@@ -85,16 +86,20 @@ export default function AdminRequestsPage() {
     }
   }
 
-  const filtered = useMemo(() => requests.filter((r) => {
-    const matchesSearch =
-      search === '' ||
-      r.title?.toLowerCase().includes(search.toLowerCase()) ||
-      r.submittedByName?.toLowerCase().includes(search.toLowerCase()) ||
-      r.requestNo?.toLowerCase().includes(search.toLowerCase())
-    const matchesStatus = statusFilter === 'all' || r.status?.toLowerCase() === statusFilter.toLowerCase()
-    const matchesType = typeFilter === 'all' || r.type === typeFilter || r.typeName?.toLowerCase() === typeFilter.toLowerCase()
-    return matchesSearch && matchesStatus && matchesType
-  }), [requests, search, statusFilter, typeFilter])
+  const filtered = useMemo(() => {
+    const byStatus = requests.filter((r) => {
+      const matchesStatus = statusFilter === 'all' || r.status?.toLowerCase() === statusFilter.toLowerCase()
+      const matchesType = typeFilter === 'all' || r.type === typeFilter || r.typeName?.toLowerCase() === typeFilter.toLowerCase()
+      return matchesStatus && matchesType
+    })
+    if (!search.trim()) return byStatus
+    return smartFilter(byStatus, search, [
+      { getValue: (r: any) => r.title, weight: 2 },
+      { getValue: (r: any) => r.requestNo, weight: 1.5 },
+      { getValue: (r: any) => r.submittedByName, weight: 1 },
+      { getValue: (r: any) => r.typeName, weight: 0.8 },
+    ])
+  }, [requests, search, statusFilter, typeFilter])
 
   useEffect(() => { setPage(1) }, [search, statusFilter, typeFilter])
 
@@ -158,15 +163,13 @@ export default function AdminRequestsPage() {
       </div>
 
       <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-          <Input
-            placeholder={t('requests.searchPlaceholder')}
-            className="pl-9"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
+        <SmartSearchInput
+          value={search}
+          onChange={setSearch}
+          placeholder={t('requests.searchPlaceholder')}
+          resultCount={search.trim() ? filtered.length : undefined}
+          className="flex-1"
+        />
         <select
           className="h-10 rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring shrink-0"
           value={statusFilter}

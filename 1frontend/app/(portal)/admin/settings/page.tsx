@@ -205,7 +205,7 @@ export default function AdminSettingsPage() {
                     <Input value={profile.phoneNumber} onChange={e => setProfile({ ...profile, phoneNumber: e.target.value })} placeholder={t('settings.phonePlaceholder')} />
                   </div>
                   <div className="space-y-1.5">
-                    <Label>{t('settings.title')}</Label>
+                    <Label>{t('settings.titleField')}</Label>
                     <Input value={profile.title} onChange={e => setProfile({ ...profile, title: e.target.value })} placeholder={t('settings.titlePlaceholder')} />
                   </div>
                   <div className="space-y-1.5">

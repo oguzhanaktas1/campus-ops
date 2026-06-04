@@ -2,11 +2,11 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 import {
-  Search, UserPlus, MoreHorizontal, ShieldCheck, GraduationCap, Users, Briefcase, Loader2, Edit, Trash2, Download, AlertCircle, ChevronLeft, ChevronRight
+  UserPlus, MoreHorizontal, ShieldCheck, GraduationCap, Users, Briefcase, Loader2, Edit, Trash2, Download, AlertCircle, ChevronLeft, ChevronRight
 } from 'lucide-react'
+import { SmartSearchInput } from '@/components/smart-search-input'
 import { AddUserModal } from '@/components/admin/add-user-modal'
 import { toast } from 'sonner'
 import jsPDF from 'jspdf'
@@ -72,7 +72,7 @@ export default function AdminUsersPage() {
   const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
 
-  const searchTimer = useRef<ReturnType<typeof setTimeout>>()
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000'
 
   const load = useCallback(async (pg: number, q: string, role: RoleFilter) => {
@@ -306,15 +306,14 @@ export default function AdminUsersPage() {
       </div>
 
       {/* Search */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-        <Input
-          placeholder={t('users.searchPlaceholder')}
-          className="pl-9"
-          value={search}
-          onChange={(e) => handleSearch(e.target.value)}
-        />
-      </div>
+      <SmartSearchInput
+        value={search}
+        onChange={handleSearch}
+        placeholder={t('users.searchPlaceholder')}
+        debounceMs={400}
+        isLoading={isLoading && search.length > 0}
+        resultCount={search.trim() ? total : undefined}
+      />
 
       {/* Table */}
       <div className="bg-card border border-border rounded-lg shadow-sm overflow-hidden">

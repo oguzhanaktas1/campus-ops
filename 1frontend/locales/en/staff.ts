@@ -39,6 +39,9 @@ const en = {
     inProgress: 'In Progress',
     records: '{{count}} records',
     selected: 'selected',
+    markAllRead: 'Mark all read',
+    selectAll: 'Select All',
+    deselectAll: 'Deselect All',
   },
   nav: {
     dashboard: 'Dashboard',
@@ -358,6 +361,17 @@ const en = {
     noFilesYet: 'No files uploaded yet.',
     noFilesMatch: 'No matching files.',
     doneBtn: 'Done',
+  },
+  notifications: {
+    empty: 'No notifications',
+    viewAll: 'View all notifications',
+    goToNotification: 'Go to Notification',
+  },
+  time: {
+    justNow: 'just now',
+    minutesAgo: '{{count}}m ago',
+    hoursAgo: '{{count}}h ago',
+    daysAgo: '{{count}}d ago',
   },
 }
 

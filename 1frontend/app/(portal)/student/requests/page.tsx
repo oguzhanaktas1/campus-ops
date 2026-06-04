@@ -3,12 +3,13 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { Clock, Loader2, MessageSquare, User, Search, AlertCircle } from 'lucide-react'
-import { Input } from '@/components/ui/input'
+import { Clock, Loader2, MessageSquare, User, AlertCircle } from 'lucide-react'
 import { PriorityBadge, StatusBadge } from '@/components/status-badge'
 import { cn } from '@/lib/utils'
 import { getToken } from '@/lib/auth'
 import { useI18n } from '@/lib/i18n'
+import { SmartSearchInput } from '@/components/smart-search-input'
+import { smartFilter } from '@/lib/smart-search'
 
 const STATUS_TABS = [
   { id: 'all',                labelKey: 'requests.all' },
@@ -83,15 +84,17 @@ export default function RequestsListingPage() {
       month: 'short', day: 'numeric', year: 'numeric',
     })
 
-  const filtered = requests.filter((r) => {
-    const q = searchQuery.toLowerCase()
-    const matchesSearch =
-      r.title.toLowerCase().includes(q) ||
-      r.typeName.toLowerCase().includes(q) ||
-      (r.currentAssigneeName || r.assignedToName || '').toLowerCase().includes(q)
-    const matchesStatus = statusFilter === 'all' || r.status.toLowerCase() === statusFilter
-    return matchesSearch && matchesStatus
-  })
+  const filtered = (() => {
+    const byStatus = requests.filter((r) =>
+      statusFilter === 'all' || r.status.toLowerCase() === statusFilter
+    )
+    if (!searchQuery.trim()) return byStatus
+    return smartFilter(byStatus, searchQuery, [
+      { getValue: (r: RequestItem) => r.title, weight: 2 },
+      { getValue: (r: RequestItem) => r.typeName, weight: 1 },
+      { getValue: (r: RequestItem) => r.currentAssigneeName ?? r.assignedToName, weight: 0.8 },
+    ])
+  })()
 
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-5 pb-20">
@@ -100,15 +103,13 @@ export default function RequestsListingPage() {
           <h1 className="text-xl font-bold text-foreground">{pageTitle}</h1>
           <p className="text-sm text-muted-foreground mt-0.5">{pageSubtitle}</p>
         </div>
-        <div className="relative w-full sm:w-64 shrink-0">
-          <Search className="absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
-          <Input
-            placeholder={t('requests.searchPlaceholder')}
-            className="pl-9 h-9"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-        </div>
+        <SmartSearchInput
+          value={searchQuery}
+          onChange={setSearchQuery}
+          placeholder={t('requests.searchPlaceholder')}
+          resultCount={searchQuery.trim() ? filtered.length : undefined}
+          className="w-full sm:w-64 shrink-0"
+        />
       </div>
 
       <div className="flex flex-wrap gap-1 bg-muted/50 p-1 rounded-lg border border-border w-fit">

@@ -726,7 +726,8 @@ const legacyWorkflows: WorkflowSeedInput[] = [
     requestTypeKey: 'APPOINTMENT',
     workflowKey: 'WF_APPOINTMENT_V1',
     workflowName: 'Appointment Workflow',
-    description: 'Appointment request workflow',
+    description:
+      'Two-step appointment flow: target user reviews first, then RESOURCE_MANAGER approves.',
     steps: [
       {
         stepKey: 'SUBMIT',
@@ -735,19 +736,23 @@ const legacyWorkflows: WorkflowSeedInput[] = [
         stepType: WorkflowStepType.START,
       },
       {
-        stepKey: 'MANAGER_APPROVAL',
-        stepName: 'Manager Approval',
-        stepOrder: 2,
-        stepType: WorkflowStepType.APPROVAL,
-        slaHours: 24,
-      },
-      {
         stepKey: 'TARGET_REVIEW',
         stepName: 'Target User Review',
-        stepOrder: 3,
+        stepOrder: 2,
         stepType: WorkflowStepType.REVIEW,
-        assignedRoleName: 'FACULTY',
         slaHours: 48,
+        configJson: {
+          assignment: 'dynamic',
+          assigneeSource: 'calendar.targetUserId',
+        },
+      },
+      {
+        stepKey: 'RESOURCE_REVIEW',
+        stepName: 'Resource Manager Approval',
+        stepOrder: 3,
+        stepType: WorkflowStepType.APPROVAL,
+        assignedRoleName: 'RESOURCE_MANAGER',
+        slaHours: 24,
       },
       {
         stepKey: 'REVISION',
@@ -772,69 +777,43 @@ const legacyWorkflows: WorkflowSeedInput[] = [
     transitions: [
       {
         fromStepKey: 'SUBMIT',
-        toStepKey: 'MANAGER_APPROVAL',
-        actionType: WorkflowActionType.SUBMIT,
-        conditionJson: {
-          path: 'calendar.requiresManagerApproval',
-          equals: true,
-        },
-      },
-      {
-        fromStepKey: 'SUBMIT',
         toStepKey: 'TARGET_REVIEW',
         actionType: WorkflowActionType.SUBMIT,
-        conditionJson: {
-          path: 'calendar.requiresManagerApproval',
-          equals: false,
-        },
       },
       {
-        fromStepKey: 'MANAGER_APPROVAL',
-        toStepKey: 'TARGET_REVIEW',
+        fromStepKey: 'TARGET_REVIEW',
+        toStepKey: 'RESOURCE_REVIEW',
         actionType: WorkflowActionType.APPROVE,
       },
       {
-        fromStepKey: 'MANAGER_APPROVAL',
+        fromStepKey: 'TARGET_REVIEW',
         toStepKey: 'REVISION',
         actionType: WorkflowActionType.REQUEST_REVISION,
       },
       {
-        fromStepKey: 'MANAGER_APPROVAL',
+        fromStepKey: 'TARGET_REVIEW',
         toStepKey: 'REJECTED_END',
         actionType: WorkflowActionType.REJECT,
       },
       {
-        fromStepKey: 'TARGET_REVIEW',
+        fromStepKey: 'RESOURCE_REVIEW',
         toStepKey: 'APPROVED_END',
         actionType: WorkflowActionType.APPROVE,
       },
       {
-        fromStepKey: 'TARGET_REVIEW',
+        fromStepKey: 'RESOURCE_REVIEW',
         toStepKey: 'REVISION',
         actionType: WorkflowActionType.REQUEST_REVISION,
       },
       {
-        fromStepKey: 'TARGET_REVIEW',
+        fromStepKey: 'RESOURCE_REVIEW',
         toStepKey: 'REJECTED_END',
         actionType: WorkflowActionType.REJECT,
       },
       {
         fromStepKey: 'REVISION',
-        toStepKey: 'MANAGER_APPROVAL',
-        actionType: WorkflowActionType.SUBMIT,
-        conditionJson: {
-          path: 'calendar.requiresManagerApproval',
-          equals: true,
-        },
-      },
-      {
-        fromStepKey: 'REVISION',
         toStepKey: 'TARGET_REVIEW',
         actionType: WorkflowActionType.SUBMIT,
-        conditionJson: {
-          path: 'calendar.requiresManagerApproval',
-          equals: false,
-        },
       },
     ],
   },
@@ -1667,13 +1646,24 @@ const workflows: WorkflowSeedInput[] = [
     requestTypeKey: 'APPOINTMENT',
     workflowKey: 'WF_APPOINTMENT_V1',
     workflowName: 'Appointment Workflow',
-    description: 'Unified appointment flow: Resource Review -> Approved.',
+    description:
+      'Two-step appointment flow: Target User Review -> Resource Manager Approval -> Approved.',
     stages: [
       {
-        stepKey: 'RESOURCE_REVIEW',
-        stepName: 'Resource Review',
+        stepKey: 'TARGET_REVIEW',
+        stepName: 'Target User Review',
         stepType: WorkflowStepType.REVIEW,
-        assignedRoleName: 'FACULTY_SECRETARY',
+        slaHours: 48,
+        configJson: {
+          assignment: 'dynamic',
+          assigneeSource: 'calendar.targetUserId',
+        },
+      },
+      {
+        stepKey: 'RESOURCE_REVIEW',
+        stepName: 'Resource Manager Approval',
+        stepType: WorkflowStepType.APPROVAL,
+        assignedRoleName: 'RESOURCE_MANAGER',
         slaHours: 24,
       },
     ],

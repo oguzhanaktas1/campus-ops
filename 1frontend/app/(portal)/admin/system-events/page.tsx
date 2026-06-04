@@ -260,7 +260,7 @@ export default function AdminSystemEventsPage() {
                             <span className="font-mono">{e.entityId}</span>
                           </p>
                         )}
-                        {e.metadata && (
+                        {e.metadata != null && (
                           <div>
                             <p className="text-xs font-semibold text-muted-foreground mb-1">{t('systemEvents.metadata')}</p>
                             <pre className="text-xs font-mono bg-background border border-border rounded p-3 overflow-x-auto max-h-40 text-foreground">

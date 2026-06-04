@@ -9,15 +9,15 @@ import {
   ExternalLink,
   Filter,
   Loader2,
-  Search,
   TimerReset,
   Workflow,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
+import { SmartSearchInput } from '@/components/smart-search-input'
+import { smartFilter } from '@/lib/smart-search'
 import {
   WORKFLOW_BACKEND as BACKEND,
   workflowAuthHeaders as authHeaders,
@@ -170,37 +170,28 @@ export default function AdminWorkflowInstancesPage() {
   )
 
   const filteredRecords = useMemo(() => {
-    const query = search.trim().toLowerCase()
-
-    return records.filter((record) => {
-      const matchesSearch =
-        query.length === 0 ||
-        [
-          record.instance.request.requestNo,
-          record.instance.request.title,
-          record.instance.request.requesterName,
-          record.instance.request.currentAssigneeName ?? '',
-          record.workflowName,
-          record.workflowKey,
-          record.instance.currentStep?.stepName ?? '',
-          ...record.requestTypes.flatMap((type) => [type.name, type.key]),
-        ].some((value) => value.toLowerCase().includes(query))
-
+    const byFilters = records.filter((record) => {
       const matchesRequestType =
         requestTypeFilter === 'all' ||
         record.requestTypes.some((type) => type.id === requestTypeFilter)
-
       const matchesWorkflow =
         workflowFilter === 'all' || record.workflowId === workflowFilter
-
       const matchesStatus =
         statusFilter === 'all' ||
         (statusFilter === 'overdue'
           ? record.instance.isOverdue
           : record.instance.status === statusFilter)
-
-      return matchesSearch && matchesRequestType && matchesWorkflow && matchesStatus
+      return matchesRequestType && matchesWorkflow && matchesStatus
     })
+    if (!search.trim()) return byFilters
+    return smartFilter(byFilters, search, [
+      { getValue: (r: WorkflowInstanceRecord) => r.instance.request.title, weight: 2 },
+      { getValue: (r: WorkflowInstanceRecord) => r.instance.request.requestNo, weight: 1.5 },
+      { getValue: (r: WorkflowInstanceRecord) => r.instance.request.requesterName, weight: 1 },
+      { getValue: (r: WorkflowInstanceRecord) => r.instance.request.currentAssigneeName, weight: 1 },
+      { getValue: (r: WorkflowInstanceRecord) => r.workflowName, weight: 0.8 },
+      { getValue: (r: WorkflowInstanceRecord) => r.instance.currentStep?.stepName, weight: 0.7 },
+    ])
   }, [records, requestTypeFilter, search, statusFilter, workflowFilter])
 
   // Reset page on filter change
@@ -257,15 +248,12 @@ export default function AdminWorkflowInstancesPage() {
         </div>
 
         <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1.5fr)_220px_220px]">
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder={t('common.search')}
-              className="pl-9"
-            />
-          </div>
+          <SmartSearchInput
+            value={search}
+            onChange={setSearch}
+            placeholder={t('common.search')}
+            resultCount={search.trim() ? filteredRecords.length : undefined}
+          />
 
           <select
             value={workflowFilter}

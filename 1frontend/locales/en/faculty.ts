@@ -50,6 +50,9 @@ const en = {
     phone: 'Phone',
     department: 'Department',
     selected: 'selected',
+    markAllRead: 'Mark all read',
+    selectAll: 'Select All',
+    deselectAll: 'Deselect All',
   },
 
   nav: {
@@ -450,6 +453,9 @@ const en = {
     title: 'Notifications',
     subtitle: '{{count}} notification(s).',
     noNotifications: 'No notifications.',
+    empty: 'No notifications',
+    viewAll: 'View all notifications',
+    goToNotification: 'Go to Notification',
     markAllRead: 'Mark All Read',
     deleted: '{{count}} notifications deleted',
     deleteFail: 'Failed to delete notifications',
@@ -471,7 +477,7 @@ const en = {
     lastName: 'Last Name',
     email: 'Email',
     phone: 'Phone',
-    title: 'Title',
+    titleField: 'Title',
     department: 'Department',
     bio: 'Bio',
     address: 'Address',
@@ -656,6 +662,12 @@ const en = {
     noFilesYet: 'No files uploaded yet.',
     noFilesMatch: 'No matching files.',
     doneBtn: 'Done',
+  },
+  time: {
+    justNow: 'just now',
+    minutesAgo: '{{count}}m ago',
+    hoursAgo: '{{count}}h ago',
+    daysAgo: '{{count}}d ago',
   },
 }
 

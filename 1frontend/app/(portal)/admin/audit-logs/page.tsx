@@ -2,9 +2,9 @@
 
 import { cn } from '@/lib/utils'
 import { TopScrollTable } from '@/components/ui/top-scroll-table'
-import { ScrollText, CheckCircle2, XCircle, User, Clock, Loader2, ChevronLeft, ChevronRight, Search } from 'lucide-react'
-import { Input } from '@/components/ui/input'
+import { ScrollText, CheckCircle2, XCircle, User, Clock, Loader2, ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { SmartSearchInput } from '@/components/smart-search-input'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { toast } from 'sonner'
 import { getToken } from '@/lib/auth'
@@ -104,15 +104,15 @@ export default function AdminAuditPage() {
 
       {/* Search + stats */}
       <div className="flex items-center gap-3 flex-wrap">
-        <div className="relative max-w-sm flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-          <Input
-            placeholder={t('auditLogs.searchPlaceholder')}
-            className="pl-9"
-            value={search}
-            onChange={(e) => handleSearchChange(e.target.value)}
-          />
-        </div>
+        <SmartSearchInput
+          value={search}
+          onChange={handleSearchChange}
+          placeholder={t('auditLogs.searchPlaceholder')}
+          debounceMs={400}
+          isLoading={isLoading && search.length > 0}
+          resultCount={search.trim() ? total : undefined}
+          className="max-w-sm flex-1"
+        />
         <span className="text-xs text-muted-foreground font-medium whitespace-nowrap">
           {t('auditLogs.entries', { count: total })}
         </span>

@@ -107,7 +107,8 @@ const WORKFLOW_STEP_TEMPLATES: Record<string, WorkflowTemplateStep[]> = {
   ],
   APPOINTMENT: [
     { key: 'SUBMIT', label: 'Submitted' },
-    { key: 'RESOURCE_REVIEW', label: 'Resource Review' },
+    { key: 'TARGET_REVIEW', label: 'Target User Review' },
+    { key: 'RESOURCE_REVIEW', label: 'Resource Manager Approval' },
     { key: 'APPROVED_END', label: 'Approved' },
   ],
   IT_SUPPORT: [
@@ -178,7 +179,6 @@ const STEP_KEY_ALIASES: Record<string, string> = {
   PROCUREMENT_INTAKE: 'PROCUREMENT_REVIEW',
   PROCUREMENT_FINAL_APPROVAL: 'PROCUREMENT_REVIEW',
   EVENT_COORDINATOR_FINAL: 'EVENT_COORDINATOR_REVIEW',
-  TARGET_REVIEW: 'RESOURCE_REVIEW',
   MANAGER_REVIEW: 'MANAGER_APPROVAL',
 }
 

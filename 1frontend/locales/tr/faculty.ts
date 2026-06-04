@@ -50,6 +50,9 @@ const tr = {
     phone: 'Telefon',
     department: 'Bölüm',
     selected: 'seçildi',
+    markAllRead: 'Tümünü Okundu İşaretle',
+    selectAll: 'Tümünü Seç',
+    deselectAll: 'Seçimi Kaldır',
   },
 
   nav: {
@@ -450,6 +453,9 @@ const tr = {
     title: 'Bildirimler',
     subtitle: '{{count}} bildirim.',
     noNotifications: 'Bildirim yok.',
+    empty: 'Bildirim yok',
+    viewAll: 'Tüm bildirimleri gör',
+    goToNotification: 'Bildirime Git',
     markAllRead: 'Tümünü Okundu İşaretle',
     deleted: '{{count}} bildirim silindi',
     deleteFail: 'Bildirimler silinemedi',
@@ -471,7 +477,7 @@ const tr = {
     lastName: 'Soyad',
     email: 'E-posta',
     phone: 'Telefon',
-    title: 'Ünvan',
+    titleField: 'Ünvan',
     department: 'Bölüm',
     bio: 'Biyografi',
     address: 'Adres',
@@ -657,6 +663,12 @@ const tr = {
     noFilesYet: 'Henüz dosya yüklenmedi.',
     noFilesMatch: 'Eşleşen dosya yok.',
     doneBtn: 'Tamam',
+  },
+  time: {
+    justNow: 'az önce',
+    minutesAgo: '{{count}} dk önce',
+    hoursAgo: '{{count}} sa önce',
+    daysAgo: '{{count}} gün önce',
   },
 }
 
