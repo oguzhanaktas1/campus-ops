@@ -37,7 +37,7 @@ export class AppointmentRequestsController {
   /** GET /appointment-requests/incoming */
   @Get('incoming')
   findIncoming(@CurrentUser() user: ReqUser) {
-    return this.svc.findIncoming(user.userId);
+    return this.svc.findIncoming(user.userId, user.roles);
   }
 
   /** GET /appointment-requests/:id */
@@ -46,16 +46,36 @@ export class AppointmentRequestsController {
     return this.svc.findById(user.userId, user.roles, id);
   }
 
-  /** POST /appointment-requests/:id/confirm */
+  /** POST /appointment-requests/:id/confirm — target user accepts; routes to RESOURCE_MANAGER */
   @Post(':id/confirm')
   confirm(@CurrentUser() user: ReqUser, @Param('id') id: string, @Body() dto: any) {
     return this.svc.confirm(user.userId, user.roles, id, dto);
   }
 
-  /** POST /appointment-requests/:id/decline */
+  /** POST /appointment-requests/:id/decline — target user rejects */
   @Post(':id/decline')
   decline(@CurrentUser() user: ReqUser, @Param('id') id: string, @Body() dto: any) {
     return this.svc.decline(user.userId, user.roles, id, dto);
+  }
+
+  /** POST /appointment-requests/:id/manager-approve — RESOURCE_MANAGER final approval */
+  @Post(':id/manager-approve')
+  managerApprove(
+    @CurrentUser() user: ReqUser,
+    @Param('id') id: string,
+    @Body() dto: any,
+  ) {
+    return this.svc.managerApprove(user.userId, user.roles, id, dto);
+  }
+
+  /** POST /appointment-requests/:id/manager-decline — RESOURCE_MANAGER rejects */
+  @Post(':id/manager-decline')
+  managerDecline(
+    @CurrentUser() user: ReqUser,
+    @Param('id') id: string,
+    @Body() dto: any,
+  ) {
+    return this.svc.managerDecline(user.userId, user.roles, id, dto);
   }
 
   /** POST /appointment-requests/:id/cancel */

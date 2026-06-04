@@ -110,7 +110,8 @@ export default function FacultyAppointmentDetailPage() {
     </div>
   )
 
-  const canAct = ['SUBMITTED', 'IN_REVIEW', 'WAITING_APPROVAL'].includes(data.status)
+  const canAct = ['SUBMITTED', 'IN_REVIEW'].includes(data.status)
+  const isAwaitingManager = data.status === 'WAITING_APPROVAL' || data.awaitingManagerApproval
 
   return (
     <div className="p-6 space-y-5 max-w-4xl mx-auto pb-20">
@@ -155,6 +156,17 @@ export default function FacultyAppointmentDetailPage() {
             </div>
             {data.details && <div><p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-1">{t('detail.details')}</p><p className="text-sm text-muted-foreground">{data.details}</p></div>}
           </div>
+
+          {isAwaitingManager && !data.actualAppointment && (
+            <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
+              <p className="text-sm font-semibold text-amber-700 dark:text-amber-300">
+                Awaiting Resource Manager Approval
+              </p>
+              <p className="text-xs text-amber-700/80 dark:text-amber-300/80 mt-1">
+                You confirmed this appointment. The Resource Manager must give the final approval before it becomes active.
+              </p>
+            </div>
+          )}
 
           {data.actualAppointment && (
             <div className="bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800 rounded-lg p-4">

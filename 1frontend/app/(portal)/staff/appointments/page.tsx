@@ -60,7 +60,7 @@ export default function StaffAppointmentsPage() {
     return (
       a.topic?.toLowerCase().includes(q) ||
       a.requestNo?.toLowerCase().includes(q) ||
-      a.requesterName?.toLowerCase().includes(q) ||
+      a.requester?.fullName?.toLowerCase().includes(q) ||
       a.appointmentType?.toLowerCase().includes(q)
     )
   })
@@ -126,7 +126,7 @@ export default function StaffAppointmentsPage() {
             {paged.map((a) => (
               <Link
                 key={a.id}
-                href={`/staff/requests/appointments/${a.id}`}
+                href={`/staff/appointments/${a.id}`}
                 className="flex items-start justify-between gap-4 px-5 py-4 hover:bg-muted/30 transition-colors"
               >
                 <div className="min-w-0 flex-1">
@@ -139,7 +139,8 @@ export default function StaffAppointmentsPage() {
                     )}
                   </div>
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
-                    {a.requesterName && <span>{a.requesterName}</span>}
+                    {a.requester?.fullName && <span>{a.requester.fullName}</span>}
+                    {a.targetUser?.fullName && <span className="opacity-70">→ {a.targetUser.fullName}</span>}
                     {a.preferredStartAt && <span>{fmtDateTime(a.preferredStartAt)}</span>}
                     {a.appointmentType && <span>{a.appointmentType}</span>}
                   </div>

@@ -32,7 +32,23 @@ type CalendarMetadata = {
   hasConflict: boolean;
   hostConflictCount: number;
   requesterConflictCount: number;
+  targetConfirmedAt: string | null;
+  targetConfirmedByUserId: string | null;
+  confirmedStartAt: string | null;
+  confirmedEndAt: string | null;
+  confirmedLocationText: string | null;
 };
+
+const RESOURCE_MANAGER_ROLE = 'RESOURCE_MANAGER';
+
+const TERMINAL_STATUSES: RequestStatus[] = [
+  RequestStatus.APPROVED,
+  RequestStatus.REJECTED,
+  RequestStatus.CANCELLED,
+  RequestStatus.CLOSED,
+  RequestStatus.COMPLETED,
+  RequestStatus.EXPIRED,
+];
 
 @Injectable()
 export class AppointmentsService {
@@ -70,8 +86,34 @@ export class AppointmentsService {
         hasConflict: input.hasConflict,
         hostConflictCount: input.hostConflictCount,
         requesterConflictCount: input.requesterConflictCount,
+        targetConfirmedAt: input.targetConfirmedAt,
+        targetConfirmedByUserId: input.targetConfirmedByUserId,
+        confirmedStartAt: input.confirmedStartAt,
+        confirmedEndAt: input.confirmedEndAt,
+        confirmedLocationText: input.confirmedLocationText,
       },
     };
+  }
+
+  private async getResourceManagerUserIds(): Promise<string[]> {
+    const users = await this.prisma.user.findMany({
+      where: {
+        deletedAt: null,
+        primaryRoles: {
+          some: { role: { name: RESOURCE_MANAGER_ROLE } },
+        },
+      },
+      select: { id: true },
+    });
+    return users.map((u) => u.id);
+  }
+
+  private async userHasResourceManagerRole(userId: string): Promise<boolean> {
+    const found = await this.prisma.userRole.findFirst({
+      where: { userId, role: { name: RESOURCE_MANAGER_ROLE } },
+      select: { id: true },
+    });
+    return Boolean(found);
   }
 
   private extractCalendarMetadata(
@@ -106,6 +148,26 @@ export class AppointmentsService {
         typeof calendar.requesterConflictCount === 'number'
           ? calendar.requesterConflictCount
           : 0,
+      targetConfirmedAt:
+        typeof calendar.targetConfirmedAt === 'string'
+          ? calendar.targetConfirmedAt
+          : null,
+      targetConfirmedByUserId:
+        typeof calendar.targetConfirmedByUserId === 'string'
+          ? calendar.targetConfirmedByUserId
+          : null,
+      confirmedStartAt:
+        typeof calendar.confirmedStartAt === 'string'
+          ? calendar.confirmedStartAt
+          : null,
+      confirmedEndAt:
+        typeof calendar.confirmedEndAt === 'string'
+          ? calendar.confirmedEndAt
+          : null,
+      confirmedLocationText:
+        typeof calendar.confirmedLocationText === 'string'
+          ? calendar.confirmedLocationText
+          : null,
     };
   }
 
@@ -225,6 +287,11 @@ export class AppointmentsService {
       hasCalendarConflict: metadata.hasConflict,
       hostConflictCount: metadata.hostConflictCount,
       requesterConflictCount: metadata.requesterConflictCount,
+      targetConfirmedAt: metadata.targetConfirmedAt,
+      confirmedStartAt: metadata.confirmedStartAt,
+      confirmedEndAt: metadata.confirmedEndAt,
+      confirmedLocationText: metadata.confirmedLocationText,
+      awaitingManagerApproval: req.status === RequestStatus.WAITING_APPROVAL,
       createdAt: ar.createdAt,
     };
   }
@@ -360,6 +427,11 @@ export class AppointmentsService {
             hasConflict: false,
             hostConflictCount: hostConflicts.length,
             requesterConflictCount: requesterConflicts.length,
+            targetConfirmedAt: null,
+            targetConfirmedByUserId: null,
+            confirmedStartAt: null,
+            confirmedEndAt: null,
+            confirmedLocationText: null,
           }),
         },
       });
@@ -422,19 +494,10 @@ export class AppointmentsService {
     void this.notificationsService.createNotification({
       userId: dto.targetUserId,
       title: 'New Appointment Request',
-      message: `${dto.topic} - appointment requested.`,
+      message: `${dto.topic} - appointment requested. Please confirm before manager review.`,
       requestId: result.requestId,
       actionUrl: '/faculty/appointments',
     });
-    if (requiresManagerApproval && managerUserId && managerUserId !== dto.targetUserId) {
-      void this.notificationsService.createNotification({
-        userId: managerUserId,
-        title: 'Appointment Requires Manager Review',
-        message: `${dto.topic} was submitted with manager-review flag.`,
-        requestId: result.requestId,
-        actionUrl: '/staff/appointments',
-      });
-    }
 
     return result;
   }
@@ -470,9 +533,22 @@ export class AppointmentsService {
     return records.map((r) => this.toListItem(r));
   }
 
-  async findIncoming(userId: string) {
+  async findIncoming(userId: string, roles: string[] = []) {
+    const isResourceManager =
+      roles.includes(RESOURCE_MANAGER_ROLE) ||
+      (await this.userHasResourceManagerRole(userId));
+
+    const where: Prisma.AppointmentRequestWhereInput = isResourceManager
+      ? {
+          OR: [
+            { targetUserId: userId },
+            { request: { status: RequestStatus.WAITING_APPROVAL } },
+          ],
+        }
+      : { targetUserId: userId };
+
     const records = await this.prisma.appointmentRequest.findMany({
-      where: { targetUserId: userId },
+      where,
       include: {
         request: {
           select: {
@@ -537,12 +613,16 @@ export class AppointmentsService {
     const isAdmin = roles.includes('ADMIN');
     const isRequester = ar.requesterUserId === userId;
     const isTarget = ar.targetUserId === userId;
+    const req = ar.request as any;
+    const isResourceManagerForApproval =
+      req.status === RequestStatus.WAITING_APPROVAL &&
+      (roles.includes(RESOURCE_MANAGER_ROLE) ||
+        (await this.userHasResourceManagerRole(userId)));
 
-    if (!isAdmin && !isRequester && !isTarget) {
+    if (!isAdmin && !isRequester && !isTarget && !isResourceManagerForApproval) {
       throw new ForbiddenException('Access denied.');
     }
 
-    const req = ar.request as any;
     return {
       id: req.id,
       requestNo: req.requestNo,
@@ -567,6 +647,8 @@ export class AppointmentsService {
       },
       actualAppointment: ar.actualAppointment ?? null,
       calendar: this.extractCalendarMetadata(req.dynamicData),
+      awaitingManagerApproval: req.status === RequestStatus.WAITING_APPROVAL,
+      isResourceManagerViewer: isResourceManagerForApproval,
       statusHistory: req.statusHistory.map((h: any) => ({
         id: h.id,
         status: h.newStatus,
@@ -615,8 +697,15 @@ export class AppointmentsService {
     const prevReq = await this.prisma.request.findUnique({
       where: { id: requestId },
     });
-    if (prevReq?.status === RequestStatus.APPROVED) {
-      throw new BadRequestException('Already confirmed.');
+    if (!prevReq) throw new NotFoundException('Request not found.');
+    if (prevReq.status === RequestStatus.APPROVED) {
+      throw new BadRequestException('Already approved.');
+    }
+    if (prevReq.status === RequestStatus.WAITING_APPROVAL) {
+      throw new BadRequestException('Already awaiting manager approval.');
+    }
+    if (TERMINAL_STATUSES.includes(prevReq.status)) {
+      throw new BadRequestException('Request is no longer actionable.');
     }
 
     await this.validateAgainstAvailability(userId, startAt, endAt);
@@ -638,20 +727,144 @@ export class AppointmentsService {
       );
     }
 
-    await this.workflowEngine.processAction(userId, roles, requestId, {
-      action: 'approve',
-      comment: dto.note?.trim() || undefined,
+    const previousMetadata = this.extractCalendarMetadata(prevReq.dynamicData);
+    const nextStatus = RequestStatus.WAITING_APPROVAL;
+    const now = new Date();
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.request.update({
+        where: { id: requestId },
+        data: {
+          status: nextStatus,
+          currentAssigneeUserId: null,
+          dynamicData: this.buildRequestMetadata({
+            ...previousMetadata,
+            availabilityValidated: true,
+            hasConflict: false,
+            hostConflictCount: hostConflicts.length,
+            requesterConflictCount: requesterConflicts.length,
+            targetConfirmedAt: now.toISOString(),
+            targetConfirmedByUserId: userId,
+            confirmedStartAt: startAt.toISOString(),
+            confirmedEndAt: endAt.toISOString(),
+            confirmedLocationText: dto.locationText?.trim() || null,
+          }),
+        },
+      });
+
+      await tx.requestStatusHistory.create({
+        data: {
+          requestId,
+          oldStatus: prevReq.status,
+          newStatus: nextStatus,
+          changedByUserId: userId,
+          changeReason:
+            dto.note?.trim() ||
+            'Target user confirmed. Awaiting Resource Manager approval.',
+        },
+      });
+
+      if (dto.note?.trim()) {
+        await tx.requestComment.create({
+          data: { requestId, userId, commentText: dto.note, isInternal: false },
+        });
+      }
     });
 
-    const previousMetadata = this.extractCalendarMetadata(prevReq?.dynamicData);
+    const managerIds = await this.getResourceManagerUserIds();
+    for (const managerId of managerIds) {
+      if (managerId === userId) continue;
+      void this.notificationsService.createNotification({
+        userId: managerId,
+        title: 'Appointment Awaiting Manager Approval',
+        message: `${ar.topic} was confirmed by host. Resource Manager review required.`,
+        requestId,
+        actionUrl: '/staff/appointments',
+      });
+    }
+
+    void this.notificationsService.createNotification({
+      userId: ar.requesterUserId,
+      title: 'Appointment Pending Manager Approval',
+      message:
+        'The host confirmed your appointment. Final approval is pending Resource Manager review.',
+      requestId,
+      actionUrl: '/student/appointments',
+    });
+
+    return {
+      requestId,
+      requesterUserId: ar.requesterUserId,
+      status: nextStatus,
+      awaitingManagerApproval: true,
+    };
+  }
+
+  async managerApprove(
+    userId: string,
+    roles: string[],
+    requestId: string,
+    dto: { note?: string },
+  ) {
+    const isResourceManager =
+      roles.includes(RESOURCE_MANAGER_ROLE) ||
+      (await this.userHasResourceManagerRole(userId));
+    if (!isResourceManager) {
+      throw new ForbiddenException(
+        'Only Resource Managers can perform this action.',
+      );
+    }
+
+    const ar = await this.prisma.appointmentRequest.findFirst({
+      where: { requestId },
+    });
+    if (!ar) throw new NotFoundException('Appointment request not found.');
+
+    const prevReq = await this.prisma.request.findUnique({
+      where: { id: requestId },
+    });
+    if (!prevReq) throw new NotFoundException('Request not found.');
+    if (prevReq.status !== RequestStatus.WAITING_APPROVAL) {
+      throw new BadRequestException(
+        'Appointment is not awaiting manager approval.',
+      );
+    }
+
+    const previousMetadata = this.extractCalendarMetadata(prevReq.dynamicData);
+    const startAt = previousMetadata.confirmedStartAt
+      ? new Date(previousMetadata.confirmedStartAt)
+      : (ar.preferredStartAt ?? new Date());
+    const endAt = previousMetadata.confirmedEndAt
+      ? new Date(previousMetadata.confirmedEndAt)
+      : (ar.preferredEndAt ?? new Date(startAt.getTime() + 60 * 60 * 1000));
+    const locationText = previousMetadata.confirmedLocationText ?? null;
+
+    const hostConflicts = await this.findConflictingAppointments(
+      ar.targetUserId,
+      startAt,
+      endAt,
+      ar.actualAppointmentId,
+    );
+    const requesterConflicts = await this.findConflictingAppointments(
+      ar.requesterUserId,
+      startAt,
+      endAt,
+      ar.actualAppointmentId,
+    );
+    if (hostConflicts.length > 0 || requesterConflicts.length > 0) {
+      throw new BadRequestException(
+        'Confirmed time now conflicts with an existing appointment.',
+      );
+    }
+
     const confirmResult = await this.prisma.$transaction(async (tx) => {
       const appointment = await tx.appointment.create({
         data: {
           requesterUserId: ar.requesterUserId,
-          hostUserId: userId,
+          hostUserId: ar.targetUserId,
           title: ar.topic,
           description: ar.details ?? null,
-          locationText: dto.locationText ?? null,
+          locationText,
           startAt,
           endAt,
           status: AppointmentStatus.CONFIRMED,
@@ -667,13 +880,25 @@ export class AppointmentsService {
       await tx.request.update({
         where: { id: requestId },
         data: {
+          status: RequestStatus.APPROVED,
+          currentAssigneeUserId: null,
+          closedAt: new Date(),
           dynamicData: this.buildRequestMetadata({
             ...previousMetadata,
-            availabilityValidated: true,
-            hasConflict: false,
             hostConflictCount: hostConflicts.length,
             requesterConflictCount: requesterConflicts.length,
           }),
+        },
+      });
+
+      await tx.requestStatusHistory.create({
+        data: {
+          requestId,
+          oldStatus: RequestStatus.WAITING_APPROVAL,
+          newStatus: RequestStatus.APPROVED,
+          changedByUserId: userId,
+          changeReason:
+            dto.note?.trim() || 'Resource Manager approved the appointment.',
         },
       });
 
@@ -683,9 +908,7 @@ export class AppointmentsService {
         });
       }
 
-      await tx.calendarEvent.deleteMany({
-        where: { requestId },
-      });
+      await tx.calendarEvent.deleteMany({ where: { requestId } });
 
       await tx.calendarEvent.create({
         data: {
@@ -700,7 +923,7 @@ export class AppointmentsService {
 
       await tx.calendarEvent.create({
         data: {
-          userId,
+          userId: ar.targetUserId,
           title: `Appointment: ${ar.topic}`,
           description: ar.details ?? null,
           startDate: startAt,
@@ -713,6 +936,7 @@ export class AppointmentsService {
         requestId,
         appointmentId: appointment.id,
         requesterUserId: ar.requesterUserId,
+        targetUserId: ar.targetUserId,
         status: AppointmentStatus.CONFIRMED,
       };
     });
@@ -720,11 +944,92 @@ export class AppointmentsService {
     void this.notificationsService.createNotification({
       userId: confirmResult.requesterUserId,
       title: 'Appointment Confirmed',
-      message: 'Your appointment request has been confirmed.',
+      message: 'Your appointment has been approved by the Resource Manager.',
       requestId,
       actionUrl: '/student/appointments',
     });
+    void this.notificationsService.createNotification({
+      userId: confirmResult.targetUserId,
+      title: 'Appointment Approved',
+      message: 'Resource Manager approved the appointment.',
+      requestId,
+      actionUrl: '/faculty/appointments',
+    });
     return confirmResult;
+  }
+
+  async managerDecline(
+    userId: string,
+    roles: string[],
+    requestId: string,
+    dto: { reason?: string },
+  ) {
+    const isResourceManager =
+      roles.includes(RESOURCE_MANAGER_ROLE) ||
+      (await this.userHasResourceManagerRole(userId));
+    if (!isResourceManager) {
+      throw new ForbiddenException(
+        'Only Resource Managers can perform this action.',
+      );
+    }
+    const reason = dto.reason?.trim();
+    if (!reason) {
+      throw new BadRequestException('A reason is required.');
+    }
+
+    const ar = await this.prisma.appointmentRequest.findFirst({
+      where: { requestId },
+    });
+    if (!ar) throw new NotFoundException('Appointment request not found.');
+
+    const prevReq = await this.prisma.request.findUnique({
+      where: { id: requestId },
+    });
+    if (!prevReq) throw new NotFoundException('Request not found.');
+    if (prevReq.status !== RequestStatus.WAITING_APPROVAL) {
+      throw new BadRequestException(
+        'Appointment is not awaiting manager approval.',
+      );
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.request.update({
+        where: { id: requestId },
+        data: {
+          status: RequestStatus.REJECTED,
+          currentAssigneeUserId: null,
+          closedAt: new Date(),
+        },
+      });
+      await tx.requestStatusHistory.create({
+        data: {
+          requestId,
+          oldStatus: prevReq.status,
+          newStatus: RequestStatus.REJECTED,
+          changedByUserId: userId,
+          changeReason: reason,
+        },
+      });
+      await tx.requestComment.create({
+        data: { requestId, userId, commentText: reason, isInternal: false },
+      });
+    });
+
+    void this.notificationsService.createNotification({
+      userId: ar.requesterUserId,
+      title: 'Appointment Declined',
+      message: reason,
+      requestId,
+      actionUrl: '/student/appointments',
+    });
+    void this.notificationsService.createNotification({
+      userId: ar.targetUserId,
+      title: 'Appointment Declined by Manager',
+      message: reason,
+      requestId,
+      actionUrl: '/faculty/appointments',
+    });
+    return { requestId, status: RequestStatus.REJECTED };
   }
 
   async decline(
