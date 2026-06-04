@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next'
 import { Analytics } from '@vercel/analytics/next'
 import { ThemeProvider } from '@/components/theme-provider'
 import { AuthFetchProvider } from '@/components/auth-fetch-provider'
+import { Toaster } from '@/components/ui/sonner'
 import './globals.css'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://campusflow.app'
@@ -179,6 +180,7 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <AuthFetchProvider>{children}</AuthFetchProvider>
+          <Toaster position="bottom-right" closeButton richColors expand={false} />
           <Analytics />
         </ThemeProvider>
       </body>

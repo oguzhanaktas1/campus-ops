@@ -27,6 +27,7 @@ import AuthGuard from "@/components/AuthGuard/auth-guard";
 import { PortalAssistant } from "@/components/ai/portal-assistant";
 import { fetchProfile, getStoredUser } from "@/lib/auth";
 import { RealtimeProvider } from "@/lib/providers/realtime-provider";
+import { NotificationToastProvider } from "@/lib/providers/notification-toast-provider";
 
 function AdminLayoutInner({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<any>(null);
@@ -131,7 +132,13 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (!user) return null;
+  if (!user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="size-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   const topbar = (
     <div className="flex items-center justify-between flex-1">
@@ -185,7 +192,9 @@ export default function AdminLayout({
   return (
     <AdminI18nProvider>
       <RealtimeProvider>
-        <AdminLayoutInner>{children}</AdminLayoutInner>
+        <NotificationToastProvider>
+          <AdminLayoutInner>{children}</AdminLayoutInner>
+        </NotificationToastProvider>
       </RealtimeProvider>
     </AdminI18nProvider>
   );

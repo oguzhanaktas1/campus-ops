@@ -11,6 +11,7 @@ import {
   getStoredUser,
   resolvePortalPath,
 } from '@/lib/auth'
+import { triggerSessionExpired } from '@/lib/session-expiry'
 
 const CHECK_INTERVAL_MS = 60 * 1000
 
@@ -32,25 +33,43 @@ export default function AuthGuard({ children, allowedRoles }: AuthGuardProps) {
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const hasInitialized = useRef(false)
 
-  const evict = useCallback((message?: string) => {
-    if (message) toast.error(message)
-    clearAuth()
-    hasInitialized.current = false
-    router.replace('/login')
-  }, [router])
+  const evict = useCallback(
+    (
+      options?: { sessionExpired?: boolean; statusMessage?: string },
+    ) => {
+      if (options?.sessionExpired) {
+        // Centralized session-expired flow: persistent TR/EN toast + redirect.
+        triggerSessionExpired('unauthorized')
+      } else if (options?.statusMessage) {
+        toast.error(options.statusMessage)
+        clearAuth()
+        router.replace('/login')
+      } else {
+        clearAuth()
+        router.replace('/login')
+      }
+      hasInitialized.current = false
+      setIsAuthorized(false)
+    },
+    [router],
+  )
 
   const verify = useCallback(async (): Promise<boolean> => {
     let profile: any
     try {
       profile = await fetchProfile()
     } catch {
-      evict('Your session has expired. Please log in again.')
+      evict({ sessionExpired: true })
       return false
     }
 
     const status = String(profile?.status ?? '').toUpperCase()
     if (status && status !== 'ACTIVE') {
-      evict(STATUS_MESSAGES[status] ?? `Account status: ${status}. Please contact support.`)
+      evict({
+        statusMessage:
+          STATUS_MESSAGES[status] ??
+          `Account status: ${status}. Please contact support.`,
+      })
       return false
     }
 
@@ -72,7 +91,10 @@ export default function AuthGuard({ children, allowedRoles }: AuthGuardProps) {
   useEffect(() => {
     const storedUser = getStoredUser()
     if (!storedUser) {
-      evict()
+      // No local session at all — just send them to login, no expiry toast
+      // needed (they were never signed in on this tab).
+      clearAuth()
+      router.replace('/login')
       return
     }
 

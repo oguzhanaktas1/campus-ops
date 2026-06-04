@@ -30,6 +30,7 @@ import AuthGuard from "@/components/AuthGuard/auth-guard";
 import { PortalAssistant } from "@/components/ai/portal-assistant";
 import { fetchProfile, getStoredUser, getToken } from "@/lib/auth";
 import { RealtimeProvider } from "@/lib/providers/realtime-provider";
+import { NotificationToastProvider } from "@/lib/providers/notification-toast-provider";
 
 function StudentLayoutInner({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<any>(null);
@@ -105,7 +106,15 @@ function StudentLayoutInner({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (!user) return null;
+  if (!user) {
+    // Session expired or profile fetch failed — show spinner instead of a blank
+    // white screen while AuthGuard / AuthFetchProvider redirect to /login.
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="size-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   const dynamicNavItems = navItems.map((item) =>
     item.href === "/student/notifications" ? { ...item, badge: unreadCount } : item,
@@ -162,7 +171,9 @@ export default function StudentLayout({
   return (
     <StudentI18nProvider>
       <RealtimeProvider>
-        <StudentLayoutInner>{children}</StudentLayoutInner>
+        <NotificationToastProvider>
+          <StudentLayoutInner>{children}</StudentLayoutInner>
+        </NotificationToastProvider>
       </RealtimeProvider>
     </StudentI18nProvider>
   );

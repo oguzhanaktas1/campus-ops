@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useI18n } from '@/lib/i18n'
 import {
   ChevronRight,
@@ -40,6 +40,10 @@ export default function AdminWorkflowsPage() {
   const [workflows, setWorkflows] = useState<WorkflowSummary[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [selectedWorkflow, setSelectedWorkflow] = useState<WorkflowDetail | null>(null)
+  // Per-workflow detail cache so re-clicking an already-fetched workflow is instant
+  // and the panel doesn't flash a loader between selections. A ref is intentional:
+  // we don't want cache updates to trigger re-renders or re-create callbacks.
+  const detailCacheRef = useRef<Record<string, WorkflowDetail>>({})
   const [roles, setRoles] = useState<Array<{ id: string; name: string }>>([])
   const [users, setUsers] = useState<Array<{ id: string; name: string; email: string }>>([])
   const [units, setUnits] = useState<Array<{ id: string; name: string }>>([])
@@ -131,22 +135,38 @@ export default function AdminWorkflowsPage() {
     }
   }, [isMetaLoading, roles.length, units.length, users.length])
 
-  const fetchWorkflowDetail = useCallback(async (id: string) => {
-    setIsDetailLoading(true)
-    try {
-      const res = await fetch(`${BACKEND}/admin/workflows/${id}`, {
-        headers: authHeaders(),
-      })
-      if (!res.ok) throw new Error(t('workflows.detailLoadFail'))
-      const data = (await res.json()) as WorkflowDetail
-      setSelectedWorkflow(data)
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : t('workflows.detailLoadFail'))
-      setSelectedWorkflow(null)
-    } finally {
-      setIsDetailLoading(false)
-    }
-  }, [])
+  const fetchWorkflowDetail = useCallback(
+    async (id: string, opts?: { force?: boolean }) => {
+      const cached = detailCacheRef.current[id]
+      // Use cached detail instantly; only show loader on a true cold load.
+      if (cached && !opts?.force) {
+        setSelectedWorkflow(cached)
+        setIsDetailLoading(false)
+        return
+      }
+      // If nothing cached, surface the loader; otherwise keep previous visible.
+      if (!cached) setIsDetailLoading(true)
+      try {
+        const res = await fetch(`${BACKEND}/admin/workflows/${id}`, {
+          headers: authHeaders(),
+        })
+        if (!res.ok) throw new Error(t('workflows.detailLoadFail'))
+        const data = (await res.json()) as WorkflowDetail
+        detailCacheRef.current[id] = data
+        // Only commit to the panel if user is still on this workflow.
+        setSelectedId((current) => {
+          if (current === id) setSelectedWorkflow(data)
+          return current
+        })
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : t('workflows.detailLoadFail'))
+        if (!cached) setSelectedWorkflow(null)
+      } finally {
+        setIsDetailLoading(false)
+      }
+    },
+    [],
+  )
 
   useEffect(() => {
     void fetchWorkflows()
@@ -196,7 +216,7 @@ export default function AdminWorkflowsPage() {
     await fetchWorkflows()
     if (keepSelectedId) {
       setSelectedId(keepSelectedId)
-      await fetchWorkflowDetail(keepSelectedId)
+      await fetchWorkflowDetail(keepSelectedId, { force: true })
     }
   }
 
@@ -245,6 +265,7 @@ export default function AdminWorkflowsPage() {
       toast.success(t('workflows.deleteSuccess'))
       const fallbackId =
         workflows.find((workflow) => workflow.id !== id)?.id ?? null
+      delete detailCacheRef.current[id]
       setSelectedId((current) => (current === id ? fallbackId : current))
       await fetchWorkflows()
     } catch (error) {
@@ -280,7 +301,7 @@ export default function AdminWorkflowsPage() {
       toast.success(t('workflows.stepAdded'))
       setIsCreateStepOpen(false)
       resetStepForm()
-      await fetchWorkflowDetail(selectedId)
+      await fetchWorkflowDetail(selectedId, { force: true })
       await fetchWorkflows()
     } catch (error) {
       toast.error(error instanceof Error ? error.message : t('workflows.stepAddFail'))
@@ -312,7 +333,7 @@ export default function AdminWorkflowsPage() {
       toast.success(t('workflows.transitionAdded'))
       setIsCreateTransitionOpen(false)
       resetTransitionForm(selectedWorkflow)
-      await fetchWorkflowDetail(selectedId)
+      await fetchWorkflowDetail(selectedId, { force: true })
     } catch (error) {
       toast.error(error instanceof Error ? error.message : t('workflows.transitionAddFail'))
     } finally {

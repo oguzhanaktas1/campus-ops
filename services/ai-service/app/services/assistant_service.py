@@ -1,3 +1,4 @@
+import asyncio
 import json
 
 import httpx
@@ -53,7 +54,10 @@ class AssistantService:
         )
 
         try:
-            result = await self.client.generate_json(prompt)
+            result = await asyncio.wait_for(
+                self.client.generate_json(prompt),
+                timeout=self.settings.assistant_response_timeout_seconds,
+            )
             links = result.get("links", [])
             safe_links = [
                 link
@@ -72,8 +76,38 @@ class AssistantService:
                     "fallbackUsed": False,
                 }
             )
+        except asyncio.TimeoutError:
+            return self._timeout_fallback(payload, fallback)
         except (httpx.HTTPError, ValueError, KeyError):
             return fallback
+
+    def _timeout_fallback(
+        self,
+        payload: AssistantAskRequest,
+        fallback: AssistantAskResponse,
+    ) -> AssistantAskResponse:
+        """Return a localized 'I can't answer right now' response when the LLM
+        exceeds the assistant response timeout budget."""
+        lang = detect_language(payload.message, payload.conversation_history)
+        if lang == "tr":
+            answer = (
+                "Üzgünüm, bu soruya şu anda yanıt veremiyorum. "
+                f"Yapay zeka {int(self.settings.assistant_response_timeout_seconds)} saniye içinde "
+                "cevap üretemedi — lütfen biraz sonra tekrar deneyin veya sorunuzu kısaltıp tekrar sorun."
+            )
+        else:
+            answer = (
+                "Sorry, I can't answer this question right now. "
+                f"The AI did not respond within {int(self.settings.assistant_response_timeout_seconds)} seconds — "
+                "please try again in a moment or shorten the question and retry."
+            )
+        return AssistantAskResponse(
+            answer=answer,
+            links=[],
+            cards=fallback.cards,
+            confidence=max(self.settings.fallback_confidence, 0.2),
+            fallbackUsed=True,
+        )
 
     def _format_conversation_history(self, payload: AssistantAskRequest) -> str:
         history = payload.conversation_history

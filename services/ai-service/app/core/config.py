@@ -22,6 +22,12 @@ class Settings(BaseSettings):
     runtime_fallback_urls: str = Field(default="", alias="AI_RUNTIME_FALLBACK_URLS")
     fallback_model: str = Field(default="llama3.2:1b", alias="AI_FALLBACK_MODEL")
     request_timeout_seconds: float = Field(default=30.0, alias="AI_REQUEST_TIMEOUT_SECONDS")
+    # Hard end-to-end budget for the portal assistant chat (LLM branch only — tool answers
+    # always return immediately). When exceeded, the user gets a localized "can't answer
+    # right now" message instead of a hanging request.
+    assistant_response_timeout_seconds: float = Field(
+        default=10.0, alias="AI_ASSISTANT_RESPONSE_TIMEOUT_SECONDS"
+    )
     internal_api_key: str = Field(default="campusops-ai-internal-dev-key", alias="AI_INTERNAL_API_KEY")
     fallback_confidence: float = Field(default=0.25, alias="AI_FALLBACK_CONFIDENCE")
 

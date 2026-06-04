@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import {
   BarChart2, FileText, Ticket, BookMarked, CalendarDays,
   Loader2, TrendingUp, Clock, Users, CheckCircle2, XCircle,
-  AlertTriangle, RefreshCw, Download,
+  AlertTriangle, RefreshCw, Download, FileSpreadsheet, ChevronDown,
 } from 'lucide-react'
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, CartesianGrid,
@@ -12,9 +12,22 @@ import {
 } from 'recharts'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { toast } from 'sonner'
 import { getToken } from '@/lib/auth'
 import { useI18n } from '@/lib/i18n'
+import {
+  exportReportToExcel,
+  exportReportToPdf,
+  type ReportExportInput,
+} from '@/lib/report-export'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -103,36 +116,108 @@ function ChartPanel({ title, children }: { title: string; children: React.ReactN
   )
 }
 
-// ─── Export helper ────────────────────────────────────────────────────────────
+// ─── Export payload builder ───────────────────────────────────────────────────
+//
+// Produces the common structured payload consumed by both PDF and Excel exporters.
+// Single source of truth — keeps both formats in sync.
 
-function exportCSV(data: ReportData) {
-  const rows: string[][] = [
-    ['Metric', 'Value'],
-    ['Total Requests',      String(data.totalRequests)],
-    ['Open Requests',       String(data.openRequests)],
-    ['Resolved Requests',   String(data.resolvedRequests)],
-    ['Overdue Requests',    String(data.overdueRequests ?? 0)],
-    ['Avg Resolution Days', String(data.avgResolutionDays ?? '—')],
-    ['Total Users',         String(data.totalUsers)],
-    ['Total Tickets',       String(data.totalTickets)],
-    ['Open Tickets',        String(data.openTickets)],
-    ['Total Reservations',  String(data.totalReservations)],
-    ['Total Appointments',  String(data.totalAppointments)],
-    [],
-    ['Status', 'Count'],
-    ...data.requestsByStatus.map(r => [r.status, String(r.count)]),
-    [],
-    ['Type', 'Count'],
-    ...data.requestsByType.map(r => [r.type, String(r.count)]),
-  ]
-  const csv = rows.map(r => r.join(',')).join('\n')
-  const blob = new Blob([csv], { type: 'text/csv' })
-  const url  = URL.createObjectURL(blob)
-  const a    = document.createElement('a')
-  a.href     = url
-  a.download = `campus-ops-report-${new Date().toISOString().slice(0, 10)}.csv`
-  a.click()
-  URL.revokeObjectURL(url)
+interface ReportLabels {
+  title: string
+  subtitle: string
+  metric: string
+  value: string
+  status: string
+  type: string
+  days: string
+  sectionSummary: string
+  sectionRequests: string
+  sectionRequestsByStatus: string
+  sectionRequestsByType: string
+  sectionTickets: string
+  sectionTicketsByStatus: string
+  sectionOperations: string
+  rowTotalRequests: string
+  rowOpenRequests: string
+  rowResolvedRequests: string
+  rowOverdueRequests: string
+  rowAvgResolution: string
+  rowApprovalRate: string
+  rowTotalUsers: string
+  rowTotalTickets: string
+  rowOpenTickets: string
+  rowTotalReservations: string
+  rowTotalAppointments: string
+}
+
+function buildReportPayload(data: ReportData, l: ReportLabels): ReportExportInput {
+  const dash = '—'
+  const sections: ReportExportInput['sections'] = []
+
+  sections.push({
+    title: l.sectionSummary,
+    headers: [l.metric, l.value],
+    rows: [
+      [l.rowTotalRequests, data.totalRequests],
+      [l.rowOpenRequests, data.openRequests],
+      [l.rowResolvedRequests, data.resolvedRequests],
+      [l.rowOverdueRequests, data.overdueRequests ?? 0],
+      [
+        l.rowAvgResolution,
+        data.avgResolutionDays != null ? `${data.avgResolutionDays} ${l.days}` : dash,
+      ],
+      [l.rowApprovalRate, data.approvalRate != null ? `%${data.approvalRate}` : dash],
+      [l.rowTotalUsers, data.totalUsers],
+    ],
+  })
+
+  if (data.requestsByStatus?.length) {
+    sections.push({
+      title: l.sectionRequestsByStatus,
+      headers: [l.status, l.value],
+      rows: data.requestsByStatus.map((row) => [row.status.replace(/_/g, ' '), row.count]),
+    })
+  }
+
+  if (data.requestsByType?.length) {
+    sections.push({
+      title: l.sectionRequestsByType,
+      headers: [l.type, l.value],
+      rows: data.requestsByType.map((row) => [row.type, row.count]),
+    })
+  }
+
+  sections.push({
+    title: l.sectionTickets,
+    headers: [l.metric, l.value],
+    rows: [
+      [l.rowTotalTickets, data.totalTickets],
+      [l.rowOpenTickets, data.openTickets],
+    ],
+  })
+
+  if (data.ticketsByStatus?.length) {
+    sections.push({
+      title: l.sectionTicketsByStatus,
+      headers: [l.status, l.value],
+      rows: data.ticketsByStatus.map((row) => [row.status.replace(/_/g, ' '), row.count]),
+    })
+  }
+
+  sections.push({
+    title: l.sectionOperations,
+    headers: [l.metric, l.value],
+    rows: [
+      [l.rowTotalReservations, data.totalReservations],
+      [l.rowTotalAppointments, data.totalAppointments],
+    ],
+  })
+
+  return {
+    title: l.title,
+    subtitle: l.subtitle,
+    filename: 'campus-ops-report',
+    sections,
+  }
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
@@ -142,6 +227,7 @@ export default function AdminReportsPage() {
   const [data,       setData]       = useState<ReportData | null>(null)
   const [loading,    setLoading]    = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const [exporting,  setExporting]  = useState<'pdf' | 'excel' | null>(null)
 
   const fetchReport = useCallback(async (silent = false) => {
     if (silent) setRefreshing(true)
@@ -187,6 +273,69 @@ export default function AdminReportsPage() {
     ? Math.round(((data.totalTickets - data.openTickets) / data.totalTickets) * 100)
     : 0
 
+  // Localized labels for PDF / Excel export. `tt()` falls back to a Turkish default
+  // when the i18n key is not yet defined in the dictionary, so the export works
+  // even before translations are added.
+  const tt = (key: string, fallback: string): string => {
+    const v = t(key)
+    return v === key ? fallback : v
+  }
+  const buildLabels = (): ReportLabels => ({
+    title: tt('reports.title', 'Yönetici Raporu'),
+    subtitle: tt('reports.subtitle', 'Platform geneli operasyon özeti'),
+    metric: tt('reports.colName', 'Metrik'),
+    value: tt('reports.colPeriod', 'Değer'),
+    status: tt('reports.statusColumn', 'Durum'),
+    type: tt('reports.typeColumn', 'Tip'),
+    days: tt('reports.daysShort', 'gün'),
+    sectionSummary: tt('reports.fullSummary', 'Genel Özet'),
+    sectionRequests: tt('reports.requests', 'Talepler'),
+    sectionRequestsByStatus: tt('reports.byStatus', 'Duruma Göre Talepler'),
+    sectionRequestsByType: tt('reports.byType', 'Tipe Göre Talepler'),
+    sectionTickets: tt('reports.itTickets', 'IT Ticketları'),
+    sectionTicketsByStatus: tt('reports.byTicketStatus', 'Duruma Göre Ticketlar'),
+    sectionOperations: tt('reports.operations', 'Operasyonlar'),
+    rowTotalRequests: tt('reports.rowTotalRequests', 'Toplam Talep'),
+    rowOpenRequests: tt('reports.rowOpenRequests', 'Açık Talep'),
+    rowResolvedRequests: tt('reports.rowResolvedRequests', 'Çözülmüş Talep'),
+    rowOverdueRequests: tt('reports.rowOverdueRequests', 'Geciken Talep'),
+    rowAvgResolution: tt('reports.rowAvgResolution', 'Ortalama Çözüm Süresi'),
+    rowApprovalRate: tt('reports.rowApprovalRate', 'Onay Oranı'),
+    rowTotalUsers: tt('reports.totalUsers', 'Toplam Kullanıcı'),
+    rowTotalTickets: tt('reports.rowTotalTickets', 'Toplam Ticket'),
+    rowOpenTickets: tt('reports.rowOpenTickets', 'Açık Ticket'),
+    rowTotalReservations: tt('reports.rowTotalReservations', 'Toplam Rezervasyon'),
+    rowTotalAppointments: tt('reports.rowTotalAppointments', 'Toplam Randevu'),
+  })
+
+  const handleExportPdf = async () => {
+    if (!data) return
+    setExporting('pdf')
+    try {
+      const payload = buildReportPayload(data, buildLabels())
+      await exportReportToPdf(payload)
+      toast.success(tt('reports.exportPdfSuccess', 'PDF indirildi'))
+    } catch {
+      toast.error(tt('reports.exportFail', 'Dışa aktarma başarısız oldu'))
+    } finally {
+      setExporting(null)
+    }
+  }
+
+  const handleExportExcel = () => {
+    if (!data) return
+    setExporting('excel')
+    try {
+      const payload = buildReportPayload(data, buildLabels())
+      exportReportToExcel(payload)
+      toast.success(tt('reports.exportExcelSuccess', 'Excel indirildi'))
+    } catch {
+      toast.error(tt('reports.exportFail', 'Dışa aktarma başarısız oldu'))
+    } finally {
+      setExporting(null)
+    }
+  }
+
   return (
     <div className="p-6 space-y-8 max-w-6xl mx-auto pb-20">
 
@@ -206,10 +355,39 @@ export default function AdminReportsPage() {
             <RefreshCw className={cn('size-3.5', refreshing && 'animate-spin')} />
             {t('common.refresh')}
           </Button>
-          <Button size="sm" className="gap-1.5 h-8 text-xs bg-primary hover:bg-primary/90" onClick={() => exportCSV(data)}>
-            <Download className="size-3.5" />
-            {t('reports.download')}
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                size="sm"
+                className="gap-1.5 h-8 text-xs bg-primary hover:bg-primary/90"
+                disabled={exporting !== null}
+              >
+                {exporting !== null ? (
+                  <Loader2 className="size-3.5 animate-spin" />
+                ) : (
+                  <Download className="size-3.5" />
+                )}
+                {t('reports.download')}
+                <ChevronDown className="size-3.5 opacity-70" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="w-40">
+              <DropdownMenuLabel>
+                {tt('reports.exportAs', 'Dışa Aktar')}
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onSelect={() => void handleExportPdf()}>
+                <FileText className="size-4 text-red-500" />
+                <span>PDF</span>
+                <span className="ml-auto text-[10px] text-muted-foreground">.pdf</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => handleExportExcel()}>
+                <FileSpreadsheet className="size-4 text-emerald-600" />
+                <span>Excel</span>
+                <span className="ml-auto text-[10px] text-muted-foreground">.xls</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 

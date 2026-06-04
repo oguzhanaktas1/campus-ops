@@ -10,6 +10,7 @@ import { CampusFlowLogo } from "@/components/campusflow-logo";
 import { AlertTriangle, ArrowRight, Eye, EyeOff, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { apiLogin, resolvePortalPath, setAuth } from "@/lib/auth";
+import { resetSessionExpiry } from "@/lib/session-expiry";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { AuthI18nProvider } from "@/components/auth/auth-i18n-provider";
@@ -36,6 +37,9 @@ function LoginPageInner() {
       if (data.access_token) {
         localStorage.setItem("access_token", data.access_token);
       }
+      // Clear the persistent session-expired toast and arm the guard so a
+      // future expiry within the same tab can trigger again.
+      resetSessionExpiry();
       toast.success(t("login.success"));
       router.push(resolvePortalPath(data.user));
     } catch (err: any) {

@@ -29,6 +29,7 @@ import AuthGuard from "@/components/AuthGuard/auth-guard";
 import { PortalAssistant } from "@/components/ai/portal-assistant";
 import { fetchProfile, getStoredUser } from "@/lib/auth";
 import { RealtimeProvider } from "@/lib/providers/realtime-provider";
+import { NotificationToastProvider } from "@/lib/providers/notification-toast-provider";
 import { StaffI18nProvider } from "@/components/staff/staff-i18n-provider";
 import { useI18n } from "@/lib/i18n";
 
@@ -71,7 +72,13 @@ function StaffLayoutInner({
     );
   }
 
-  if (!user) return null;
+  if (!user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="size-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   const navItems: NavItem[] = [
     { label: t('nav.dashboard'), href: "/staff/dashboard", icon: LayoutDashboard },
@@ -136,7 +143,9 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
   return (
     <StaffI18nProvider>
       <RealtimeProvider>
-        <StaffLayoutInner>{children}</StaffLayoutInner>
+        <NotificationToastProvider>
+          <StaffLayoutInner>{children}</StaffLayoutInner>
+        </NotificationToastProvider>
       </RealtimeProvider>
     </StaffI18nProvider>
   );

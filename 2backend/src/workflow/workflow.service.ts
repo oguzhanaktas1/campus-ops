@@ -10,14 +10,12 @@ import { CacheKeys, CacheTtls } from '../infrastructure/cache/cache-keys';
 import { CreateWorkflowDto } from './dto/create-workflow.dto';
 import { CreateWorkflowStepDto } from './dto/create-workflow-step.dto';
 import { CreateWorkflowTransitionDto } from './dto/create-workflow-transition.dto';
-import { SlaService } from './sla.service';
 
 @Injectable()
 export class WorkflowService {
   constructor(
     private prisma: PrismaService,
     private cacheService: CacheService,
-    private slaService: SlaService,
   ) {}
 
   private minutesBetween(from: Date | null | undefined, to: Date | null | undefined) {
@@ -529,7 +527,12 @@ export class WorkflowService {
     const key = CacheKeys.adminWorkflowDetail(id, requestVersion, workflowVersion);
 
     return this.cacheService.getOrSet(key, CacheTtls.workflowOverview, async () => {
-      await this.slaService.runSlaSweep();
+      // NOTE: SLA sweep is intentionally NOT awaited here. SlaSchedulerService
+      // runs it every 5 minutes in the background, so calling it synchronously
+      // on every detail load (which can mean 10+ workflows × hundreds of DB
+      // queries per sweep) is the main cause of slow detail loads. The
+      // `overdueInstances` count below may be up to ~5 minutes stale; that is
+      // acceptable for an admin diagnostic view.
 
       const [wf, activeInstances, completedInstances, overdueInstances] = await Promise.all([
         this.prisma.workflowDefinition.findUnique({
@@ -550,7 +553,9 @@ export class WorkflowService {
             },
           },
           transitions: {
-            include: {
+            select: {
+              id: true,
+              actionType: true,
               fromStep: { select: { id: true, stepKey: true, stepName: true } },
               toStep: { select: { id: true, stepKey: true, stepName: true } },
             },

@@ -12,7 +12,6 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { cn } from '@/lib/utils'
 import { useOptionalT } from '@/lib/optional-t'
-import { toast } from 'sonner'
 import { useRealtime } from '@/lib/providers/realtime-provider'
 
 function timeAgo(ts: string, tt: (key: string, fallback: string, params?: Record<string, string | number>) => string) {
@@ -74,15 +73,12 @@ export function NotificationBell({ role = 'student' }: NotificationBellProps) {
 
   useEffect(() => {
     if (!socket) return
+    // Toast for the same event is handled globally by NotificationToastProvider —
+    // here we only update the bell's local list so the unread count and dropdown
+    // reflect the new notification in real time.
     const handler = (payload: any) => {
       const notif = payload?.data ?? payload
       setNotifications(prev => [{ ...notif, isRead: false }, ...prev])
-      if (notif?.title) {
-        toast(notif.title, {
-          description: notif.message,
-          duration: 5000,
-        })
-      }
     }
     // Re-fetch on reconnect to catch any missed notifications
     const onReconnect = () => { void fetchNotifications() }
