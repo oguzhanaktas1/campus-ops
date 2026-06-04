@@ -2644,26 +2644,35 @@ export class AdminService {
   // ─── SINGLE USER ─────────────────────────────────────────────────────────
 
   async getUserById(id: string) {
-    const user = await this.prisma.user.findUnique({
-      where: { id },
+    const profileInclude = {
       include: {
-        profile: {
-          include: {
-            faculty: { select: { id: true, name: true } },
-            department: { select: { id: true, name: true } },
-          },
-        },
-        primaryRoles: {
-          include: {
-            role: true,
-            faculty: { select: { id: true, name: true } },
-            department: { select: { id: true, name: true } },
-            unit: { select: { id: true, name: true } },
-          },
-          orderBy: { isPrimary: 'desc' },
-        },
+        faculty: { select: { id: true, name: true } },
+        department: { select: { id: true, name: true } },
+        unit: { select: { id: true, name: true } },
       },
-    });
+    };
+    const rolesInclude = {
+      include: {
+        role: true,
+        faculty: { select: { id: true, name: true } },
+        department: { select: { id: true, name: true } },
+        unit: { select: { id: true, name: true } },
+      },
+      orderBy: { isPrimary: 'desc' as const },
+    };
+
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+    const user = isUuid
+      ? await this.prisma.user.findUnique({
+          where: { id },
+          include: { profile: profileInclude, primaryRoles: rolesInclude },
+        })
+      : await this.prisma.user.findFirst({
+          where: {
+            profile: { OR: [{ studentNumber: id }, { staffNumber: id }] },
+          },
+          include: { profile: profileInclude, primaryRoles: rolesInclude },
+        });
 
     if (!user) throw new NotFoundException('User not found.');
 
@@ -2672,6 +2681,7 @@ export class AdminService {
       email: user.email,
       phoneNumber: user.phoneNumber,
       status: user.status,
+      isEmailVerified: user.isEmailVerified,
       createdAt: user.createdAt,
       lastLoginAt: user.lastLoginAt,
       profile: user.profile,

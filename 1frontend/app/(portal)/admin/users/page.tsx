@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import {
@@ -59,6 +60,7 @@ interface PagedResult {
 
 export default function AdminUsersPage() {
   const { t } = useI18n()
+  const router = useRouter()
   const [result, setResult] = useState<PagedResult>({ data: [], total: 0, page: 1, totalPages: 1, roleCounts: {} })
   const [isLoading, setIsLoading] = useState(true)
   const [page, setPage] = useState(1)
@@ -346,9 +348,17 @@ export default function AdminUsersPage() {
             {users.map((user) => {
               const roleCfg = roleConfig[user.role]
               const secondaryRoles = (user.roles ?? []).filter((item) => !item.isPrimary).map((item) => item.name)
+              const identifier = user.role === 'student' ? user.studentNumber : user.staffNumber
               return (
-                <tr key={user.id} className="hover:bg-muted/20 transition-colors">
-                  <td className="px-5 py-3.5">
+                <tr
+                  key={user.id}
+                  className="hover:bg-muted/20 transition-colors cursor-pointer"
+                  onClick={(e) => {
+                    if ((e.target as HTMLElement).closest('input, button, [role=menuitem], [data-radix-popper-content-wrapper]')) return
+                    router.push(`/admin/users/${identifier ?? user.id}`)
+                  }}
+                >
+                  <td className="px-5 py-3.5" onClick={(e) => e.stopPropagation()}>
                     <input
                       type="checkbox"
                       className="size-4 rounded border-border cursor-pointer"
@@ -383,7 +393,7 @@ export default function AdminUsersPage() {
                     </div>
                   </td>
                   <td className="px-5 py-3.5"><StatusBadge status={user.status} /></td>
-                  <td className="px-5 py-3.5 text-right">
+                  <td className="px-5 py-3.5 text-right" onClick={(e) => e.stopPropagation()}>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="icon" className="size-7"><MoreHorizontal className="size-4" /></Button>
