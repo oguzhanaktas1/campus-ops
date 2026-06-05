@@ -961,7 +961,7 @@ function AiRuntimeDetails({ ai }: { ai: ServiceStatus }) {
 
       {!!runtime?.availableModels?.length && (
         <div className="flex flex-wrap gap-1">
-          {runtime.availableModels.slice(0, 6).map((model) => (
+          {runtime.availableModels.filter((m) => !m.endsWith(':cloud')).slice(0, 6).map((model) => (
             <span key={model} className="rounded bg-background px-1.5 py-0.5 text-[10px] text-muted-foreground">
               {model}
             </span>

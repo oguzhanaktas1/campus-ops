@@ -955,6 +955,7 @@ export class AppointmentsService {
       requestId,
       actionUrl: '/faculty/appointments',
     });
+
     return confirmResult;
   }
 
