@@ -23,7 +23,8 @@
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
-    "seed:synthetic": "ts-node --transpile-only prisma/synthetic-seed.ts"
+    "seed:synthetic": "ts-node --transpile-only prisma/synthetic-seed.ts",
+    "seed:synthetic2": "ts-node --transpile-only prisma/synthetic-seed-2.ts"
   },
   "dependencies": {
     "@nestjs/bullmq": "^11.0.4",

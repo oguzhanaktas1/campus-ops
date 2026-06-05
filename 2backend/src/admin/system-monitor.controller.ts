@@ -57,7 +57,7 @@ export class SystemMonitorController {
       await this.prisma.$queryRaw`SELECT 1`;
       checks.database = true;
     } catch { checks.database = false; }
-    checks.rabbitmq = (this.mqPublisher as any).channel !== null;
+    checks.rabbitmq = this.mqPublisher.isConnected();
     const allReady = Object.values(checks).every(Boolean);
     return { status: allReady ? 'ready' : 'not_ready', checks, service: 'backend', timestamp: new Date().toISOString() };
   }

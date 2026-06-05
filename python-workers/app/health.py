@@ -52,7 +52,7 @@ class _Handler(BaseHTTPRequestHandler):
             })
         elif self.path == "/ready":
             all_ready = all(_state.values())
-            body = {"status": "ready" if all_ready else "not_ready", **_state}
+            body = {"status": "ready" if all_ready else "not_ready", "checks": _state}
             self._json(200 if all_ready else 503, body)
         else:
             self._json(404, {"error": "not found"})

@@ -103,6 +103,10 @@ export class RabbitmqPublisher implements OnModuleInit, OnModuleDestroy {
   // Publish
   // ─────────────────────────────────────────────────────────────────────────
 
+  isConnected(): boolean {
+    return this.channel !== null;
+  }
+
   publish(payload: AnyEventPayload): void {
     if (!this.channel) {
       this.logger.warn(`RabbitMQ not ready — skipping event: ${payload.event}`);
