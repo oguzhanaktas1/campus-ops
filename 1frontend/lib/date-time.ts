@@ -17,29 +17,43 @@ export function getCurrentDateTimeInputValue() {
   return `${year}-${month}-${day}T${hours}:${minutes}`
 }
 
+export interface DateWindowMessages {
+  startPast: string
+  endPast: string
+  endBeforeStart: string
+  endSameAsStart: string
+}
+
 export function validateDateWindow(params: {
   start?: string
   end?: string
   type: 'date' | 'datetime-local'
-  startLabel: string
-  endLabel: string
+  messages?: DateWindowMessages
+  /** @deprecated use messages */
+  startLabel?: string
+  /** @deprecated use messages */
+  endLabel?: string
 }) {
-  const { start, end, type, startLabel, endLabel } = params
+  const { start, end, type, messages, startLabel = 'Başlangıç', endLabel = 'Bitiş' } = params
   const nowValue =
     type === 'datetime-local'
       ? getCurrentDateTimeInputValue()
       : getCurrentDateInputValue()
 
   if (start && start < nowValue) {
-    return `${startLabel} bugunden once olamaz.`
+    return messages?.startPast ?? `${startLabel} geçmiş bir zaman olamaz.`
   }
 
   if (end && end < nowValue) {
-    return `${endLabel} bugunden once olamaz.`
+    return messages?.endPast ?? `${endLabel} geçmiş bir zaman olamaz.`
+  }
+
+  if (start && end && end === start) {
+    return messages?.endSameAsStart ?? `${endLabel} ${startLabel.toLowerCase()} ile aynı olamaz.`
   }
 
   if (start && end && end < start) {
-    return `${endLabel}, ${startLabel.toLowerCase()} degerinden once olamaz.`
+    return messages?.endBeforeStart ?? `${endLabel} ${startLabel.toLowerCase()} değerinden önce olamaz.`
   }
 
   return null

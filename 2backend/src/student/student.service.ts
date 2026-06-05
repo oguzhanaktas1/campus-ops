@@ -166,7 +166,10 @@ export class StudentService {
       case 'APPOINTMENT':
         return request.appointmentRequest
           ? {
-              targetUserId: request.appointmentRequest.targetUserId,
+              targetUser:
+                request.appointmentRequest.targetUser?.profile?.fullName ??
+                request.appointmentRequest.targetUser?.email ??
+                null,
               appointmentType: request.appointmentRequest.appointmentType,
               topic: request.appointmentRequest.topic,
               details: request.appointmentRequest.details,

@@ -20,7 +20,7 @@ import { RequestAttachments, uploadAttachments, AttachmentsState, clearAttachmen
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5000'
 const APPOINTMENT_TYPES = ['ACADEMIC', 'ADVISING', 'CONSULTATION', 'OFFICE_HOURS', 'OTHER']
-const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+const DAY_NAMES = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt']
 
 export default function NewAppointmentPage() {
   const router = useRouter()
@@ -39,6 +39,13 @@ export default function NewAppointmentPage() {
     preferredStartAt: '',
     preferredEndAt: '',
   })
+
+  const dateMessages = {
+    startPast: t('messages.dateStartPast'),
+    endPast: t('messages.dateEndPast'),
+    endBeforeStart: t('messages.dateEndBeforeStart'),
+    endSameAsStart: t('messages.dateEndSameAsStart'),
+  }
 
   useEffect(() => {
     const load = async () => {
@@ -71,8 +78,7 @@ export default function NewAppointmentPage() {
       start: nextForm.preferredStartAt,
       end: nextForm.preferredEndAt,
       type: 'datetime-local',
-      startLabel: 'Baslangic tarihi',
-      endLabel: 'Bitis tarihi',
+      messages: dateMessages,
     })
     setForm(nextForm)
     setDateError(error)
@@ -89,18 +95,30 @@ export default function NewAppointmentPage() {
     if (!form.targetUserId) { toast.error(t('messages.selectPerson')); return }
     if (!form.appointmentType) { toast.error(t('messages.selectAppointmentType')); return }
     if (!form.topic.trim()) { toast.error(t('messages.enterTopic')); return }
-    const validationError = validateDateWindow({
-      start: form.preferredStartAt,
-      end: form.preferredEndAt,
-      type: 'datetime-local',
-      startLabel: 'Baslangic tarihi',
-      endLabel: 'Bitis tarihi',
-    })
-    if (validationError) {
-      setDateError(validationError)
-      toast.error(validationError)
+
+    if (form.preferredStartAt && !form.preferredEndAt) {
+      toast.error(t('messages.appointmentEndRequired'))
       return
     }
+    if (!form.preferredStartAt && form.preferredEndAt) {
+      toast.error(t('messages.appointmentStartRequired'))
+      return
+    }
+
+    if (form.preferredStartAt || form.preferredEndAt) {
+      const validationError = validateDateWindow({
+        start: form.preferredStartAt,
+        end: form.preferredEndAt,
+        type: 'datetime-local',
+        messages: dateMessages,
+      })
+      if (validationError) {
+        setDateError(validationError)
+        toast.error(validationError)
+        return
+      }
+    }
+
     setIsSubmitting(true)
     try {
       const uploadedIds = await uploadAttachments(attachments.newFiles)
@@ -123,12 +141,21 @@ export default function NewAppointmentPage() {
         }),
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.message || t('messages.failed'))
+      if (!res.ok) {
+        const msg: string = data.message || ''
+        const lower = msg.toLowerCase()
+        if (lower.includes('conflict')) {
+          toast.error(t('messages.dateConflict'))
+        } else {
+          toast.error(t('messages.appointmentSubmitFail'))
+        }
+        return
+      }
       toast.success(t('messages.appointmentSubmitted'))
       clearAttachmentCache('student-appointment-new')
       router.push('/student/appointments')
-    } catch (err: any) {
-      toast.error(err.message)
+    } catch {
+      toast.error(t('messages.networkTryAgain'))
     } finally {
       setIsSubmitting(false)
     }
@@ -211,8 +238,8 @@ export default function NewAppointmentPage() {
             <Select value={form.appointmentType} onValueChange={(v) => set('appointmentType', v)}>
               <SelectTrigger><SelectValue placeholder={t('forms.typePlaceholder')} /></SelectTrigger>
               <SelectContent>
-                {APPOINTMENT_TYPES.map((t) => (
-                  <SelectItem key={t} value={t}>{t.replace('_', ' ')}</SelectItem>
+                {APPOINTMENT_TYPES.map((type) => (
+                  <SelectItem key={type} value={type}>{type.replace('_', ' ')}</SelectItem>
                 ))}
               </SelectContent>
             </Select>

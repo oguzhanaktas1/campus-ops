@@ -135,6 +135,40 @@ function TicketDetailPanel({ data }: { data: Record<string, unknown> }) {
   )
 }
 
+function formatTR(value: string | Date | null | undefined, includeTime = true) {
+  if (!value) return '-'
+  const d = new Date(value as string)
+  if (isNaN(d.getTime())) return String(value)
+  return d.toLocaleString('tr-TR', {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+    ...(includeTime ? { hour: '2-digit', minute: '2-digit' } : {}),
+    timeZone: 'Europe/Istanbul',
+  })
+}
+
+function AppointmentDetailPanel({ data }: { data: Record<string, unknown> }) {
+  return (
+    <FieldGrid
+      fields={[
+        { label: 'Kişi', value: String(data.targetUser ?? '') || null },
+        { label: 'Randevu Türü', value: String(data.appointmentType ?? '').replace(/_/g, ' ') || null },
+        { label: 'Konu', value: String(data.topic ?? '') || null },
+        { label: 'Detaylar', value: String(data.details ?? '') || null },
+        {
+          label: 'Tercih Edilen Başlangıç',
+          value: data.preferredStartAt ? formatTR(String(data.preferredStartAt)) : null,
+        },
+        {
+          label: 'Tercih Edilen Bitiş',
+          value: data.preferredEndAt ? formatTR(String(data.preferredEndAt)) : null,
+        },
+      ]}
+    />
+  )
+}
+
 function InternshipDetailPanel({ data }: { data: Record<string, unknown> }) {
   return (
     <FieldGrid
@@ -188,6 +222,8 @@ export function DomainDetailPanel({
           <TicketDetailPanel data={data} />
         ) : data && key.includes('INTERNSHIP') ? (
           <InternshipDetailPanel data={data} />
+        ) : data && key.includes('APPOINTMENT') ? (
+          <AppointmentDetailPanel data={data} />
         ) : (
           <GenericDomainPanel data={data} />
         )}
