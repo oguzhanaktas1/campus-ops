@@ -145,7 +145,7 @@ export function PortalAssistant({
 
   if (isChecking) {
     return (
-      <div className="fixed bottom-4 right-4 z-50">
+      <div className="fixed bottom-4 right-4 z-50 sm:bottom-5 sm:right-5">
         <button
           type="button"
           className="flex h-14 w-14 items-center justify-center rounded-full border border-border bg-background text-muted-foreground shadow-lg"
@@ -163,9 +163,10 @@ export function PortalAssistant({
   }
 
   return (
-    <div className="pointer-events-none fixed bottom-4 right-4 z-50 flex max-w-[calc(100vw-2rem)] flex-col items-end gap-3 sm:bottom-5 sm:right-5">
+    <>
+      {/* Chat card — anchored above the trigger, never pushes the button */}
       {isOpen && (
-        <div className="pointer-events-auto flex w-[calc(100vw-2rem)] max-h-[calc(100dvh-6rem)] flex-col overflow-hidden rounded-[1.5rem] border border-border/80 bg-background/95 shadow-2xl backdrop-blur sm:w-[400px] sm:max-h-[680px]">
+        <div className="pointer-events-auto fixed bottom-[4.5rem] right-2 z-50 flex w-[calc(100vw-1rem)] max-h-[calc(100dvh-5.5rem)] flex-col overflow-hidden rounded-[1.5rem] border border-border/80 bg-background/95 shadow-2xl backdrop-blur sm:bottom-[5.25rem] sm:right-5 sm:w-[400px] sm:max-h-[min(680px,calc(100dvh-6.5rem))]">
           {/* Header */}
           <div className="flex-none border-b border-border/70 bg-gradient-to-r from-primary/10 via-background to-background px-4 py-3.5">
             <div className="flex items-start justify-between gap-3">
@@ -220,7 +221,7 @@ export function PortalAssistant({
             {/* Messages */}
             <div
               ref={messagesRef}
-              className="min-h-[160px] flex-1 space-y-3 overflow-y-auto rounded-2xl border border-border/70 bg-muted/20 p-3"
+              className="min-h-[120px] flex-1 space-y-3 overflow-y-auto rounded-2xl border border-border/70 bg-muted/20 p-3"
             >
               {messages.length === 0 ? (
                 <div className="space-y-2 rounded-2xl border border-dashed border-border bg-background/90 p-3 text-sm text-muted-foreground">
@@ -322,31 +323,33 @@ export function PortalAssistant({
         </div>
       )}
 
-      {/* Trigger button */}
-      <button
-        type="button"
-        className={cn(
-          'pointer-events-auto flex items-center gap-2 rounded-full border border-primary/20 bg-primary px-3 py-2.5 text-primary-foreground shadow-xl transition-all hover:scale-[1.02] hover:shadow-2xl sm:gap-3 sm:px-4 sm:py-3',
-          isOpen && 'bg-foreground text-background',
-        )}
-        onClick={() => setIsOpen((current) => !current)}
-        aria-expanded={isOpen}
-        aria-label={isOpen ? tt('assistant.collapse', 'Collapse AI assistant') : tt('assistant.open', 'Open AI assistant')}
-      >
-        <span className="flex size-8 items-center justify-center rounded-full bg-white/15 sm:size-10">
-          {isOpen ? (
-            <ChevronDown className="size-4 sm:size-5" />
-          ) : (
-            <MessageCircleMore className="size-4 sm:size-5" />
+      {/* Trigger button — always pinned to bottom-right regardless of chat state */}
+      <div className="pointer-events-none fixed bottom-4 right-2 z-50 sm:bottom-5 sm:right-5">
+        <button
+          type="button"
+          className={cn(
+            'pointer-events-auto flex items-center gap-2 rounded-full border border-primary/20 bg-primary px-3 py-2.5 text-primary-foreground shadow-xl transition-all hover:scale-[1.02] hover:shadow-2xl sm:gap-3 sm:px-4 sm:py-3',
+            isOpen && 'bg-foreground text-background',
           )}
-        </span>
-        <span className="text-left">
-          <span className="block text-sm font-semibold">{tt('assistant.triggerTitle', 'AI Assistant')}</span>
-          <span className="block text-[11px] opacity-85">
-            {isOpen ? tt('assistant.hideChat', 'Hide chat') : tt('assistant.askQuickQuestion', 'Ask a quick question')}
+          onClick={() => setIsOpen((current) => !current)}
+          aria-expanded={isOpen}
+          aria-label={isOpen ? tt('assistant.collapse', 'Collapse AI assistant') : tt('assistant.open', 'Open AI assistant')}
+        >
+          <span className="flex size-8 items-center justify-center rounded-full bg-white/15 sm:size-10">
+            {isOpen ? (
+              <ChevronDown className="size-4 sm:size-5" />
+            ) : (
+              <MessageCircleMore className="size-4 sm:size-5" />
+            )}
           </span>
-        </span>
-      </button>
-    </div>
+          <span className="text-left">
+            <span className="block text-sm font-semibold">{tt('assistant.triggerTitle', 'AI Assistant')}</span>
+            <span className="block text-[11px] opacity-85">
+              {isOpen ? tt('assistant.hideChat', 'Hide chat') : tt('assistant.askQuickQuestion', 'Ask a quick question')}
+            </span>
+          </span>
+        </button>
+      </div>
+    </>
   )
 }
