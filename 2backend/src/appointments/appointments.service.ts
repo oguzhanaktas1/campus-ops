@@ -329,6 +329,7 @@ export class AppointmentsService {
       preferredStartAt?: string;
       preferredEndAt?: string;
       priority?: PriorityLevel;
+      attachmentFileIds?: string[];
     },
   ) {
     const target = await this.prisma.user.findUnique({
@@ -458,6 +459,23 @@ export class AppointmentsService {
           preferredEndAt,
         },
       });
+
+      if (Array.isArray(dto.attachmentFileIds) && dto.attachmentFileIds.length > 0) {
+        for (const fileId of dto.attachmentFileIds) {
+          const fileExists = await tx.file.findUnique({ where: { id: fileId } });
+          if (fileExists) {
+            await tx.fileLink.create({
+              data: {
+                fileId,
+                entityType: 'Request',
+                entityId: req.id,
+                relationType: 'ATTACHMENT',
+                requestId: req.id,
+              },
+            });
+          }
+        }
+      }
 
       const wfDefId = reqType.workflowDefinitionId;
       if (wfDefId) {

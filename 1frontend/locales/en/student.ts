@@ -589,6 +589,12 @@ const en: StudentTranslations = {
     owner: 'Owner',
     where: 'Where',
     time: 'Time',
+    apptPerson: 'Person',
+    apptType: 'Appointment Type',
+    apptTopic: 'Topic',
+    apptDetails: 'Details',
+    apptStart: 'Preferred Start',
+    apptEnd: 'Preferred End',
   },
 }
 

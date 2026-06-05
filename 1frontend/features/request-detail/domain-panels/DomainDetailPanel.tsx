@@ -1,6 +1,9 @@
+'use client'
+
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import type { RequestDetailViewModel } from '@/features/request-detail/types'
 import { formatDate, humanize, titleize } from '@/features/request-detail/utils'
+import { useOptionalT } from '@/lib/optional-t'
 
 function FieldGrid({
   fields,
@@ -36,10 +39,11 @@ function GenericDomainPanel({
 }: {
   data: Record<string, unknown> | null
 }) {
+  const tt = useOptionalT()
   if (!data) {
     return (
       <p className="text-sm text-muted-foreground">
-        No domain overview is available.
+        {tt('detail.noDomainOverview', 'No domain overview is available.')}
       </p>
     )
   }
@@ -51,6 +55,14 @@ function GenericDomainPanel({
         ? null
         : String(value),
   }))
+
+  if (fields.filter((f) => f.value).length === 0) {
+    return (
+      <p className="text-sm text-muted-foreground">
+        {tt('detail.noDomainData', 'No domain-specific data available.')}
+      </p>
+    )
+  }
 
   return <FieldGrid fields={fields} />
 }
@@ -149,19 +161,20 @@ function formatTR(value: string | Date | null | undefined, includeTime = true) {
 }
 
 function AppointmentDetailPanel({ data }: { data: Record<string, unknown> }) {
+  const tt = useOptionalT()
   return (
     <FieldGrid
       fields={[
-        { label: 'Kişi', value: String(data.targetUser ?? '') || null },
-        { label: 'Randevu Türü', value: String(data.appointmentType ?? '').replace(/_/g, ' ') || null },
-        { label: 'Konu', value: String(data.topic ?? '') || null },
-        { label: 'Detaylar', value: String(data.details ?? '') || null },
+        { label: tt('detail.apptPerson', 'Kişi'), value: String(data.targetUser ?? '') || null },
+        { label: tt('detail.apptType', 'Randevu Türü'), value: String(data.appointmentType ?? '').replace(/_/g, ' ') || null },
+        { label: tt('detail.apptTopic', 'Konu'), value: String(data.topic ?? '') || null },
+        { label: tt('detail.apptDetails', 'Detaylar'), value: String(data.details ?? '') || null },
         {
-          label: 'Tercih Edilen Başlangıç',
+          label: tt('detail.apptStart', 'Tercih Edilen Başlangıç'),
           value: data.preferredStartAt ? formatTR(String(data.preferredStartAt)) : null,
         },
         {
-          label: 'Tercih Edilen Bitiş',
+          label: tt('detail.apptEnd', 'Tercih Edilen Bitiş'),
           value: data.preferredEndAt ? formatTR(String(data.preferredEndAt)) : null,
         },
       ]}
@@ -207,13 +220,14 @@ export function DomainDetailPanel({
 }: {
   detail: RequestDetailViewModel
 }) {
+  const tt = useOptionalT()
   const key = detail.requestType.key.toUpperCase()
   const data = detail.domainData
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Domain Overview</CardTitle>
+        <CardTitle>{tt('detail.domainOverview', 'Domain Overview')}</CardTitle>
       </CardHeader>
       <CardContent>
         {data && key.includes('EQUIPMENT') ? (

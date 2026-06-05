@@ -589,6 +589,12 @@ const tr: StudentTranslations = {
     owner: 'Sahip',
     where: 'Yer',
     time: 'Zaman',
+    apptPerson: 'Kişi',
+    apptType: 'Randevu Türü',
+    apptTopic: 'Konu',
+    apptDetails: 'Detaylar',
+    apptStart: 'Tercih Edilen Başlangıç',
+    apptEnd: 'Tercih Edilen Bitiş',
   },
 }
 
