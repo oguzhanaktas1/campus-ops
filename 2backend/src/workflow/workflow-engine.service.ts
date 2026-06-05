@@ -922,6 +922,60 @@ export class WorkflowEngineService {
                 dto.comment ?? `${dto.action} action processed.`,
               );
             }
+
+            // When an APPOINTMENT workflow reaches APPROVED_END, create calendar events
+            // for both the requester (student) and the target user.
+            if (nextStep.stepKey === 'APPROVED_END') {
+              const fullRequest = await tx.request.findUnique({
+                where: { id: requestId },
+                include: {
+                  requestType: { select: { key: true } },
+                  appointmentRequest: {
+                    select: {
+                      topic: true,
+                      details: true,
+                      preferredStartAt: true,
+                      preferredEndAt: true,
+                      targetUserId: true,
+                    },
+                  },
+                },
+              });
+
+              if (
+                fullRequest?.requestType?.key?.toUpperCase() === 'APPOINTMENT' &&
+                fullRequest.appointmentRequest?.preferredStartAt &&
+                fullRequest.appointmentRequest?.preferredEndAt
+              ) {
+                const appt = fullRequest.appointmentRequest;
+                const title = appt.topic;
+                const description = appt.details ?? undefined;
+                const startDate = appt.preferredStartAt!;
+                const endDate = appt.preferredEndAt!;
+
+                await tx.calendarEvent.createMany({
+                  data: [
+                    {
+                      userId: fullRequest.requesterUserId,
+                      title,
+                      description,
+                      startDate,
+                      endDate,
+                      requestId,
+                    },
+                    {
+                      userId: appt.targetUserId,
+                      title,
+                      description,
+                      startDate,
+                      endDate,
+                      requestId,
+                    },
+                  ],
+                  skipDuplicates: true,
+                });
+              }
+            }
           }
 
           await tx.workflowInstance.update({
