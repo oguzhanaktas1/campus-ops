@@ -201,3 +201,251 @@ In production the services are configured via `docker-compose.prod.yml`. Key dif
 - AI models remain `qwen2.5:3b-instruct` (default) and `llama3.2:1b` (fallback)
 - Load balancing and TLS termination are handled at the infrastructure layer in front of the Docker services
 - Redis rate-limit state and session cache persist across backend restarts
+
+## Photos
+
+### Landing Page
+
+<p align="center">
+  <img src="./1frontend/public/photos/campusflow-landing-page-1.png" alt="CampusFlow Landing Page - Hero Section" width="1000">
+</p>
+
+### Landing Page - Features
+
+<p align="center">
+  <img src="./1frontend/public/photos/campusflow-landing-page-2.png" alt="CampusFlow Landing Page - Features Section" width="1000">
+</p>
+
+### Landing Page - Services
+
+<p align="center">
+  <img src="./1frontend/public/photos/campusflow-landing-page-3.png" alt="CampusFlow Landing Page - Services Section" width="1000">
+</p>
+
+### Landing Page - Footer
+
+<p align="center">
+  <img src="./1frontend/public/photos/campusflow-landing-page-4.png" alt="CampusFlow Landing Page - Footer" width="1000">
+</p>
+
+### Landing Page (Dark Mode)
+
+<p align="center">
+  <img src="./1frontend/public/photos/campusflow-landing-page-dark-mode.png" alt="CampusFlow Landing Page - Dark Mode" width="1000">
+</p>
+
+### Login Screen
+
+<p align="center">
+  <img src="./1frontend/public/photos/login-screen.png" alt="CampusFlow Login Screen" width="1000">
+</p>
+
+### Admin - All Requests
+
+<p align="center">
+  <img src="./1frontend/public/photos/admin-all-requests.png" alt="Admin Panel - All Requests" width="1000">
+</p>
+
+### Admin - Analytics Dashboard
+
+<p align="center">
+  <img src="./1frontend/public/photos/admin-analytics.png" alt="Admin Analytics Dashboard" width="1000">
+</p>
+
+### Admin - Dashboard
+
+<p align="center">
+  <img src="./1frontend/public/photos/admin-dashboard.png" alt="Admin Dashboard" width="1000">
+</p>
+
+### Admin - Reports
+
+<p align="center">
+  <img src="./1frontend/public/photos/admin-reports.png" alt="Admin Reports" width="1000">
+</p>
+
+### Admin - Request Types
+
+<p align="center">
+  <img src="./1frontend/public/photos/admin-request-types.png" alt="Admin Request Types Management" width="1000">
+</p>
+
+### Admin - Roles & Permissions
+
+<p align="center">
+  <img src="./1frontend/public/photos/admin-roles.png" alt="Admin Roles and Permissions" width="1000">
+</p>
+
+### Admin - Users
+
+<p align="center">
+  <img src="./1frontend/public/photos/admin-users.png" alt="Admin User Management" width="1000">
+</p>
+
+### Admin - Workflow Instances
+
+<p align="center">
+  <img src="./1frontend/public/photos/admin-workflow-instances.png" alt="Admin Workflow Instances" width="1000">
+</p>
+
+### Integrations
+
+<p align="center">
+  <img src="./1frontend/public/photos/integrations.png" alt="System Integrations" width="1000">
+</p>
+
+### Admin AI Assistant
+
+<p align="center">
+  <img src="./1frontend/public/photos/admin_ai_assistant.png" alt="Admin AI Assistant" width="1000">
+</p>
+
+### Resource Management
+
+<p align="center">
+  <img src="./1frontend/public/photos/resources.png" alt="Resource Management" width="1000">
+</p>
+
+### SLA Policies
+
+<p align="center">
+  <img src="./1frontend/public/photos/sla-policies.png" alt="SLA Policy Management" width="1000">
+</p>
+
+### Notification Settings
+
+<p align="center">
+  <img src="./1frontend/public/photos/settings-notifications.png" alt="Notification Settings" width="1000">
+</p>
+
+### Profile Settings
+
+<p align="center">
+  <img src="./1frontend/public/photos/settings-profile.png" alt="Profile Settings" width="1000">
+</p>
+
+### Security Settings
+
+<p align="center">
+  <img src="./1frontend/public/photos/settings-security.png" alt="Security Settings" width="1000">
+</p>
+
+### Audit Logs
+
+<p align="center">
+  <img src="./1frontend/public/photos/audit-logs.png" alt="Audit Logs" width="1000">
+</p>
+
+### Calendar
+
+<p align="center">
+  <img src="./1frontend/public/photos/calendar.png" alt="Campus Calendar" width="1000">
+</p>
+
+### Faculty - Approvals
+
+<p align="center">
+  <img src="./1frontend/public/photos/faculty-approvals.png" alt="Faculty Approval Queue" width="1000">
+</p>
+
+### Faculty - Approval Details
+
+<p align="center">
+  <img src="./1frontend/public/photos/faculty-approvals-devami.png" alt="Faculty Approval Details" width="1000">
+</p>
+
+### Notifications
+
+<p align="center">
+  <img src="./1frontend/public/photos/notifications.png" alt="Notifications Center" width="1000">
+</p>
+
+### Organizer - Event Plans
+
+<p align="center">
+  <img src="./1frontend/public/photos/organizer-event-plans.png" alt="Organizer Event Plans" width="1000">
+</p>
+
+### Organizer - Published Events
+
+<p align="center">
+  <img src="./1frontend/public/photos/organizer-publisher-events.png" alt="Organizer Published Events" width="1000">
+</p>
+
+### Request Details
+
+<p align="center">
+  <img src="./1frontend/public/photos/request_detay.png" alt="Request Details" width="1000">
+</p>
+
+### Request Timeline & History
+
+<p align="center">
+  <img src="./1frontend/public/photos/request_detay_devam.png" alt="Request Timeline and History" width="1000">
+</p>
+
+### Staff Dashboard
+
+<p align="center">
+  <img src="./1frontend/public/photos/staff-dashboard.png" alt="Staff Dashboard" width="1000">
+</p>
+
+### Staff - IT Tickets
+
+<p align="center">
+  <img src="./1frontend/public/photos/staff-it-tickets.png" alt="Staff IT Tickets" width="1000">
+</p>
+
+### Staff - Requests
+
+<p align="center">
+  <img src="./1frontend/public/photos/staff-requests.png" alt="Staff Requests" width="1000">
+</p>
+
+### Student AI Assistant
+
+<p align="center">
+  <img src="./1frontend/public/photos/student-ai-asistant.png" alt="Student AI Assistant" width="1000">
+</p>
+
+### Student Dashboard
+
+<p align="center">
+  <img src="./1frontend/public/photos/student-dashboard.png" alt="Student Dashboard" width="1000">
+</p>
+
+### Student Requests
+
+<p align="center">
+  <img src="./1frontend/public/photos/student-requests.png" alt="Student Requests" width="1000">
+</p>
+
+### Student Settings
+
+<p align="center">
+  <img src="./1frontend/public/photos/student-settings.png" alt="Student Settings" width="1000">
+</p>
+
+### System Events
+
+<p align="center">
+  <img src="./1frontend/public/photos/system-events.png" alt="System Events" width="1000">
+</p>
+
+### System Monitoring
+
+<p align="center">
+  <img src="./1frontend/public/photos/system_monitoring.png" alt="System Monitoring Dashboard" width="1000">
+</p>
+
+### Webhook Logs
+
+<p align="center">
+  <img src="./1frontend/public/photos/webhook-logs.png" alt="Webhook Logs" width="1000">
+</p>
+
+### Workflow Designer
+
+<p align="center">
+  <img src="./1frontend/public/photos/workflows.png" alt="Workflow Management" width="1000">
+</p>
